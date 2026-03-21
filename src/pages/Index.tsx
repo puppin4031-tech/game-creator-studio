@@ -110,7 +110,7 @@ const Index = () => {
 
 
   return (
-    <div style={{ height: '100vh', width: '100vw', position: 'relative', overflow: 'hidden' }}>
+    <div className="h-screen w-screen relative overflow-hidden">
       {/* Map */}
       <GameMap
         userLat={position.latitude}
