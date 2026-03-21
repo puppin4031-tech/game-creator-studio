@@ -85,6 +85,14 @@ export default function ThemeManagement() {
                   <Card
                     key={theme.id}
                     className="group overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer border-border/50"
+                    onClick={() => {
+                      // Exodus theme → go to Exodus dashboard
+                      if (theme.name.includes('엑소더스') || theme.name.toLowerCase().includes('exodus')) {
+                        navigate('/admin/exodus');
+                      } else {
+                        navigate(`/admin/themes/${theme.id}`);
+                      }
+                    }}
                   >
                     {/* Gradient thumbnail area */}
                     <div
