@@ -23,15 +23,15 @@ export function ExodusSidebar() {
   const collapsed = state === 'collapsed';
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-[#1e2d4a]">
-      <SidebarContent className="bg-[#0f1d32]">
+    <Sidebar collapsible="icon" className="border-r border-border">
+      <SidebarContent className="bg-sidebar-background">
         {/* Back to admin */}
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <NavLink to="/admin" className="text-[#7b8da6] hover:text-[#d4a843] hover:bg-[#162340]" activeClassName="">
+                  <NavLink to="/admin" className="text-muted-foreground hover:text-accent hover:bg-sidebar-accent" activeClassName="">
                     <ArrowLeft className="mr-2 h-5 w-5" />
                     {!collapsed && <span className="text-[15px]">관리자 홈</span>}
                   </NavLink>
@@ -45,9 +45,9 @@ export function ExodusSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel className="px-3">
             {!collapsed ? (
-              <span className="text-[#d4a843] font-bold tracking-widest text-xs uppercase">⚡ Exodus</span>
+              <span className="text-accent font-bold tracking-widest text-xs uppercase">⚡ Exodus</span>
             ) : (
-              <span className="text-[#d4a843]">⚡</span>
+              <span className="text-accent">⚡</span>
             )}
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -58,8 +58,8 @@ export function ExodusSidebar() {
                     <NavLink
                       to={item.url}
                       end={item.url === '/admin/exodus'}
-                      className="text-[#7b8da6] hover:text-[#e8e0d0] hover:bg-[#162340]"
-                      activeClassName="bg-[#162340] text-[#d4a843] font-medium"
+                      className="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
+                      activeClassName="bg-sidebar-accent text-accent font-medium"
                     >
                       <item.icon className="mr-2 h-5 w-5" />
                       {!collapsed && <span className="text-[15px]">{item.title}</span>}
@@ -72,15 +72,15 @@ export function ExodusSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-2 bg-[#0f1d32] border-t border-[#1e2d4a]">
+      <SidebarFooter className="p-2 bg-sidebar-background border-t border-border">
         {!collapsed && profile && (
-          <div className="px-2 py-1 text-sm text-[#7b8da6] truncate mb-1">
+          <div className="px-2 py-1 text-sm text-muted-foreground truncate mb-1">
             {profile.display_name || profile.email}
           </div>
         )}
         <Button
           variant="ghost" size="sm"
-          className="w-full justify-start text-[15px] text-[#7b8da6] hover:text-[#d4a843] hover:bg-[#162340]"
+          className="w-full justify-start text-[15px] text-muted-foreground hover:text-accent hover:bg-sidebar-accent"
           onClick={signOut}
         >
           <LogOut className="h-5 w-5 mr-2" />

@@ -4,33 +4,33 @@
 
 @layer base {
   :root {
-    --background: 220 20% 10%;
-    --foreground: 210 40% 95%;
+    --background: 0 0% 100%;
+    --foreground: 220 20% 15%;
 
-    --card: 220 18% 14%;
-    --card-foreground: 210 40% 95%;
+    --card: 220 15% 97%;
+    --card-foreground: 220 20% 15%;
 
-    --popover: 220 18% 14%;
-    --popover-foreground: 210 40% 95%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 15%;
 
-    --primary: 150 80% 45%;
-    --primary-foreground: 220 20% 10%;
+    --primary: 150 80% 35%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 15% 20%;
-    --secondary-foreground: 210 40% 90%;
+    --secondary: 220 15% 93%;
+    --secondary-foreground: 220 20% 25%;
 
-    --muted: 220 15% 18%;
-    --muted-foreground: 215 15% 55%;
+    --muted: 220 15% 95%;
+    --muted-foreground: 220 10% 45%;
 
-    --accent: 35 90% 55%;
+    --accent: 35 90% 50%;
     --accent-foreground: 220 20% 10%;
 
-    --destructive: 0 75% 55%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 75% 50%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 22%;
-    --input: 220 15% 22%;
-    --ring: 150 80% 45%;
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 150 80% 35%;
 
     --radius: 0.75rem;
 
@@ -38,14 +38,14 @@
     --game-warning: 35 90% 55%;
     --game-danger: 0 75% 55%;
 
-    --sidebar-background: 220 18% 12%;
-    --sidebar-foreground: 210 40% 90%;
-    --sidebar-primary: 150 80% 45%;
-    --sidebar-primary-foreground: 220 20% 10%;
-    --sidebar-accent: 220 15% 18%;
-    --sidebar-accent-foreground: 210 40% 90%;
-    --sidebar-border: 220 15% 22%;
-    --sidebar-ring: 150 80% 45%;
+    --sidebar-background: 220 15% 96%;
+    --sidebar-foreground: 220 20% 25%;
+    --sidebar-primary: 150 80% 35%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 15% 92%;
+    --sidebar-accent-foreground: 220 20% 25%;
+    --sidebar-border: 220 15% 88%;
+    --sidebar-ring: 150 80% 35%;
   }
 }
 
@@ -58,11 +58,6 @@
     @apply bg-background text-foreground;
     overflow: hidden;
   }
-}
-
-/* Google Maps overrides */
-.gm-style {
-  background: hsl(220, 20%, 15%) !important;
 }
 
 /* Game animations */

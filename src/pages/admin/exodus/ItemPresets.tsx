@@ -35,7 +35,7 @@ const items: GameItem[] = [
     stageHint: '3,4재앙 — 이/파리',
   },
   {
-    id: 'ore', name: '빛나는 광석', image: oreImg, color: '#22d3ee',
+    id: 'ore', name: '빛나는 광석', image: oreImg, color: '#0891b2',
     description: '깊은 어둠 속에서도 빛을 발하는 신비한 광석. 흑암 스테이지에서 시야를 밝힌다.',
     tags: ['핵심 아이템', 'UI 상호작용'],
     stageHint: '9재앙 — 흑암 해제',
@@ -51,8 +51,8 @@ const items: GameItem[] = [
 export default function ItemPresets() {
   return (
     <div className="p-3 sm:p-4 md:p-6 h-full overflow-y-auto">
-      <h1 className="text-2xl sm:text-3xl font-bold text-[#d4a843] mb-1">아이템 프리셋</h1>
-      <p className="text-[#7b8da6] text-[15px] sm:text-[17px] mb-4">트레이딩 카드 스타일의 수집품 목록</p>
+      <h1 className="text-2xl sm:text-3xl font-bold text-accent mb-1">아이템 프리셋</h1>
+      <p className="text-muted-foreground text-[15px] sm:text-[17px] mb-4">트레이딩 카드 스타일의 수집품 목록</p>
 
       <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
         {items.map((item, i) => (
@@ -63,8 +63,8 @@ export default function ItemPresets() {
           >
             <div className="aspect-[3/4] rounded-xl border overflow-hidden flex flex-col transition-all hover:shadow-xl relative"
               style={{
-                borderColor: item.color + '40',
-                background: `linear-gradient(180deg, ${item.color}15 0%, #111f38 40%, #0a1628 100%)`,
+                borderColor: item.color + '30',
+                background: `linear-gradient(180deg, ${item.color}10 0%, hsl(220 15% 97%) 40%, hsl(0 0% 100%) 100%)`,
               }}
             >
               {/* Image area */}
@@ -78,9 +78,9 @@ export default function ItemPresets() {
 
               {/* Info */}
               <div className="px-2 pb-2 relative z-10">
-                <h3 className="text-[12px] sm:text-[14px] font-bold text-[#e8e0d0] truncate">{item.name}</h3>
-                <p className="text-[10px] sm:text-[11px] text-[#7b8da6] truncate">{item.stageHint}</p>
-                <p className="text-[10px] sm:text-[11px] text-[#7b8da6] leading-tight line-clamp-2 mt-0.5 hidden sm:block">
+                <h3 className="text-[12px] sm:text-[14px] font-bold text-foreground truncate">{item.name}</h3>
+                <p className="text-[10px] sm:text-[11px] text-muted-foreground truncate">{item.stageHint}</p>
+                <p className="text-[10px] sm:text-[11px] text-muted-foreground leading-tight line-clamp-2 mt-0.5 hidden sm:block">
                   {item.description}
                 </p>
                 <div className="flex flex-wrap gap-0.5 mt-1">
@@ -88,7 +88,7 @@ export default function ItemPresets() {
                     <Badge
                       key={tag}
                       className="text-[8px] sm:text-[10px] px-1 py-0 border-0 font-normal"
-                      style={{ backgroundColor: item.color + '20', color: item.color }}
+                      style={{ backgroundColor: item.color + '15', color: item.color }}
                     >
                       {tag}
                     </Badge>
