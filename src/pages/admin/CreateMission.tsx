@@ -1,8 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { MapContainer, TileLayer, Rectangle, useMapEvents, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Button } from '@/components/ui/button';
@@ -13,25 +12,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Card, CardContent } from '@/components/ui/card';
 import { PlusCircle, MapPin } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { useEffect } from 'react';
-
-function BoundsEnforcer({ bounds }: { bounds: L.LatLngBoundsExpression }) {
-  const map = useMap();
-  useEffect(() => {
-    map.setMaxBounds(bounds);
-    map.fitBounds(bounds);
-  }, [map, bounds]);
-  return null;
-}
-
-function ClickHandler({ onClick }: { onClick: (lat: number, lng: number) => void }) {
-  useMapEvents({
-    click(e) {
-      onClick(e.latlng.lat, e.latlng.lng);
-    },
-  });
-  return null;
-}
 
 const newMarkerIcon = L.divIcon({
   html: `<div style="width:18px;height:18px;border-radius:50%;background:hsl(35,90%,55%);border:3px solid white;box-shadow:0 0 10px hsl(35,90%,55%,0.5);"></div>`,
@@ -43,6 +23,9 @@ const newMarkerIcon = L.divIcon({
 export default function CreateMission() {
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const clickMarkerRef = useRef<L.Marker | null>(null);
   const [clickedPos, setClickedPos] = useState<{ lat: number; lng: number } | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [title, setTitle] = useState('');
@@ -60,6 +43,41 @@ export default function CreateMission() {
     },
     enabled: !!profile?.assigned_region,
   });
+
+  // Initialize map
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current || !region) return;
+    const bounds: L.LatLngBoundsExpression = [
+      [region.bounds_south, region.bounds_west],
+      [region.bounds_north, region.bounds_east],
+    ];
+    const map = L.map(containerRef.current).setView([region.center_lat, region.center_lng], 16);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    map.setMaxBounds(bounds);
+    map.fitBounds(bounds);
+    L.rectangle(bounds, { color: 'hsl(150,80%,45%)', weight: 2, fillOpacity: 0.05, dashArray: '8 4' }).addTo(map);
+
+    map.on('click', (e: L.LeafletMouseEvent) => {
+      setClickedPos({ lat: e.latlng.lat, lng: e.latlng.lng });
+      setShowModal(true);
+    });
+
+    mapRef.current = map;
+    return () => { map.remove(); mapRef.current = null; };
+  }, [region]);
+
+  // Update click marker
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (clickMarkerRef.current) {
+      clickMarkerRef.current.remove();
+      clickMarkerRef.current = null;
+    }
+    if (clickedPos) {
+      clickMarkerRef.current = L.marker([clickedPos.lat, clickedPos.lng], { icon: newMarkerIcon }).addTo(map);
+    }
+  }, [clickedPos]);
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -98,11 +116,6 @@ export default function CreateMission() {
     setClickedPos(null);
   };
 
-  const handleMapClick = useCallback((lat: number, lng: number) => {
-    setClickedPos({ lat, lng });
-    setShowModal(true);
-  }, []);
-
   if (!profile?.assigned_region || !region) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-3rem)]">
@@ -111,11 +124,6 @@ export default function CreateMission() {
     );
   }
 
-  const bounds: L.LatLngBoundsExpression = [
-    [region.bounds_south, region.bounds_west],
-    [region.bounds_north, region.bounds_east],
-  ];
-
   return (
     <div className="h-[calc(100vh-3rem)] relative">
       <div className="absolute top-3 left-3 z-[1000] bg-card/90 backdrop-blur rounded-lg px-3 py-1.5 border border-border flex items-center gap-2">
@@ -123,13 +131,7 @@ export default function CreateMission() {
         <span className="text-sm font-medium">지도를 클릭하여 미션 추가</span>
       </div>
 
-      <MapContainer center={[region.center_lat, region.center_lng]} zoom={16} className="h-full w-full">
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        <BoundsEnforcer bounds={bounds} />
-        <Rectangle bounds={bounds} pathOptions={{ color: 'hsl(150,80%,45%)', weight: 2, fillOpacity: 0.05, dashArray: '8 4' }} />
-        <ClickHandler onClick={handleMapClick} />
-        {clickedPos && <Marker position={[clickedPos.lat, clickedPos.lng]} icon={newMarkerIcon} />}
-      </MapContainer>
+      <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
 
       <Dialog open={showModal} onOpenChange={open => { if (!open) { setShowModal(false); setClickedPos(null); } }}>
         <DialogContent className="max-w-md">
