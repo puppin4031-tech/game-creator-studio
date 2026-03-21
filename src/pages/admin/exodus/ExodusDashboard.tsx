@@ -40,7 +40,7 @@ export default function ExodusDashboard() {
               </div>
             </div>
             <div className="text-2xl font-bold text-[#e8e0d0]">{s.value}</div>
-            <div className="text-[13px] text-[#7b8da6]">{s.label}</div>
+            <div className="text-[15px] text-[#7b8da6]">{s.label}</div>
           </div>
         ))}
       </div>
