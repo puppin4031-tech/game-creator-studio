@@ -38,6 +38,7 @@ function AdminRoutes() {
           <Route path="map" element={<GlobalMapView />} />
           <Route path="users" element={<UserManagement />} />
           <Route path="approvals" element={<ApprovalManagement />} />
+          <Route path="themes" element={<ThemeManagement />} />
         </>
       )}
       {isSubAdmin && (
