@@ -57,8 +57,8 @@ const stages = [
 export default function StagesTimeline() {
   return (
     <div className="p-4 md:p-6">
-      <h1 className="text-2xl font-bold text-[#d4a843] mb-1">10대 재앙 스테이지</h1>
-      <p className="text-[#7b8da6] text-[15px] mb-6">1재앙부터 10재앙까지의 플레이 타임라인</p>
+      <h1 className="text-2xl sm:text-3xl font-bold text-[#d4a843] mb-1">10대 재앙 스테이지</h1>
+      <p className="text-[#7b8da6] text-[15px] sm:text-[17px] mb-6">1재앙부터 10재앙까지의 플레이 타임라인</p>
 
       <div className="relative">
         {/* Vertical line */}
