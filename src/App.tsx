@@ -17,6 +17,7 @@ import SubRegionMap from "./pages/admin/SubRegionMap";
 import CreateMission from "./pages/admin/CreateMission";
 import MyMissions from "./pages/admin/MyMissions";
 import ThemeManagement from "./pages/admin/ThemeManagement";
+import ThemeDetail from "./pages/admin/ThemeDetail";
 import ExodusDashboard from "./pages/admin/exodus/ExodusDashboard";
 import StagesTimeline from "./pages/admin/exodus/StagesTimeline";
 import NPCEncyclopedia from "./pages/admin/exodus/NPCEncyclopedia";
