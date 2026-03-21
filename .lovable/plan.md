@@ -1,62 +1,31 @@
 
 
-# 스팟 관리 시스템 구현 계획
+## Plan: GlobalMapView에 스팟 표시 + 클릭 시 스팟 관리로 이동
 
-## 개요
-관리자가 지도에서 사각형 영역으로 스팟을 생성하고, 스팟 내부에 테마/이벤트 요소를 배치할 수 있는 시스템을 구축합니다.
+### 현재 상태
+- `GlobalMapView`는 regions(행정구역)과 missions(미션 핀)만 표시
+- `SpotManagement`와 `SpotDetail`에서는 스팟 사각형과 요소 마커가 잘 구현되어 있음
 
-## 데이터베이스 변경
+### 변경 사항
 
-### 1. `spots` 테이블 수정
-현재 spots 테이블은 단일 좌표(lat/lng)만 저장합니다. 사각형 영역을 지원하기 위해 컬럼을 추가합니다:
+**1. GlobalMapView.tsx 수정**
+- `spots` 테이블 데이터를 추가로 fetch (bounds + theme_id + name 포함)
+- `themes` 테이블도 fetch하여 스팟의 테마 색상 매핑
+- 각 스팟을 `L.rectangle`로 지도에 표시 (테마 색상 적용, 테마 없으면 기본 회색)
+- 스팟 사각형에 이름 tooltip 표시
+- 스팟 클릭 시:
+  - 테마 미설정 → 테마 선택 팝업(popup) 표시 (select + 저장 버튼)
+  - 테마 설정됨 → `/admin/exodus/spots` 페이지로 이동하면서 해당 스팟 ID를 query param으로 전달 (예: `?spotId=xxx`)
 
-- `bounds_north`, `bounds_south`, `bounds_east`, `bounds_west` (double precision) — 사각형 경계
-- `creator_id` (uuid, NOT NULL) — 생성한 관리자 ID
-- `theme_id` (uuid, nullable, FK to themes) — 연결된 테마
+**2. SpotManagement.tsx 수정**
+- URL query param `spotId`가 있으면 해당 스팟을 자동으로 `selectedSpot`으로 설정하여 `SpotDetail` 화면으로 바로 진입
+- 이를 통해 GlobalMapView에서 클릭 → 스팟 관리 페이지의 상세 뷰로 직접 이동
 
-### 2. `spot_elements` 테이블 생성 (신규)
-스팟 내부에 배치되는 테마 요소(아이템, 퀴즈, 퍼즐 등)의 위치를 저장합니다:
+**3. SpotDetail (변경 없음)**
+- 이미 스팟 경계 사각형 + 요소 마커가 지도에 표시되어 있어 직관적으로 확인 가능
 
-| 컬럼 | 타입 | 설명 |
-|------|------|------|
-| id | uuid PK | |
-| spot_id | uuid FK(spots) | 소속 스팟 |
-| theme_element_id | uuid FK(theme_elements) | 테마 요소 참조 |
-| latitude | double precision | 배치 위치 |
-| longitude | double precision | 배치 위치 |
-| creator_id | uuid | 배치한 관리자 |
-| created_at | timestamptz | |
-
-### 3. RLS 정책
-- **spots**: 모든 관리자가 INSERT 가능. UPDATE/DELETE는 `creator_id = auth.uid()` 또는 main_admin만 가능
-- **spot_elements**: 동일 패턴 (자기 스팟 내 요소만 수정, main_admin은 전체)
-
-## 프론트엔드 구현
-
-### 4. 스팟 관리 페이지 (`/admin/exodus/spots`)
-Leaflet 지도 기반의 스팟 관리 화면:
-
-- **스팟 생성**: 지도에서 드래그하여 사각형 영역 지정 → 이름/설명 입력 → 저장
-- **스팟 목록**: 사이드 패널에 생성된 스팟 리스트 표시
-- **권한 제어**: 자신이 만든 스팟만 편집/삭제 가능, main_admin은 모든 스팟 편집 가능
-- 사각형은 `L.rectangle`로 지도에 표시, GPS 좌표로 고정
-
-### 5. 스팟 상세/테마 배치 화면
-스팟 클릭 시 진입하는 상세 화면:
-
-- **테마 선택**: 드롭다운으로 themes 테이블에서 테마 선택
-- **요소 배치**: 선택한 테마의 theme_elements를 드래그&드롭으로 스팟 사각형 내부 지도에 배치
-- 스팟 경계 밖에는 배치 불가 (좌표 검증)
-
-### 6. 사이드바 메뉴 추가
-ExodusSidebar에 "스팟 관리" 메뉴 항목 추가 (`/admin/exodus/spots`)
-
-### 7. 라우트 추가
-App.tsx에 `/admin/exodus/spots` 라우트 등록
-
-## 구현 순서
-1. DB 마이그레이션 (spots 컬럼 추가 + spot_elements 테이블 + RLS)
-2. 스팟 관리 페이지 (지도 + 사각형 드래그 생성)
-3. 스팟 상세 — 테마 선택 및 요소 배치
-4. 사이드바/라우트 연결
+### 기술 요약
+- `react-router-dom`의 `useNavigate`와 `useSearchParams` 활용
+- GlobalMapView에서 `L.rectangle` 클릭 이벤트로 네비게이션 처리
+- 테마 미설정 스팟은 popup 내 select로 테마 지정 후 이동
 
