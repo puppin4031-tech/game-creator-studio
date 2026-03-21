@@ -10,7 +10,7 @@ export function FloorSelector({ currentFloor, onFloorChange }: FloorSelectorProp
   const label = currentFloor < 0 ? `B${Math.abs(currentFloor)}` : `${currentFloor}F`;
 
   return (
-    <div className="fixed top-4 right-4 z-[1000] flex flex-col items-center gap-1 rounded-xl border border-border bg-card/90 p-1.5 backdrop-blur-lg shadow-lg">
+    <div className="fixed top-16 right-4 z-[1000] flex flex-col items-center gap-1 rounded-xl border border-border bg-card/90 p-1.5 backdrop-blur-lg shadow-lg">
       <Button
         variant="ghost"
         size="icon"
