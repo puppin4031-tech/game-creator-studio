@@ -85,8 +85,8 @@ export default function ItemPresets() {
               </div>
 
               {/* Description */}
-              <div className="px-3 pb-3 relative z-10">
-                <p className="text-[11px] text-[#7b8da6] leading-relaxed line-clamp-3 mb-2">
+              <div className="px-2 pb-2 relative z-10">
+                <p className="text-[9px] sm:text-[10px] text-[#7b8da6] leading-relaxed line-clamp-2 mb-1">
                   {item.description}
                 </p>
                 <div className="flex flex-wrap gap-1">
