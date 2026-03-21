@@ -52,8 +52,8 @@ const Index = () => {
 
   const detectedSpots = useSpotDetection(
     spots,
-    position?.latitude ?? null,
-    position?.longitude ?? null,
+    position.latitude,
+    position.longitude,
     currentFloor
   );
 
