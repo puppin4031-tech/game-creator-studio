@@ -15,6 +15,7 @@ import ApprovalManagement from "./pages/admin/ApprovalManagement";
 import SubRegionMap from "./pages/admin/SubRegionMap";
 import CreateMission from "./pages/admin/CreateMission";
 import MyMissions from "./pages/admin/MyMissions";
+import ThemeManagement from "./pages/admin/ThemeManagement";
 
 const queryClient = new QueryClient();
 
