@@ -49,6 +49,151 @@ export type Database = {
           },
         ]
       }
+      missions: {
+        Row: {
+          created_at: string
+          creator_id: string
+          description: string | null
+          floor: number
+          id: string
+          latitude: number
+          longitude: number
+          qr_code_info: string | null
+          quiz_content: string | null
+          region_id: string
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          creator_id: string
+          description?: string | null
+          floor?: number
+          id?: string
+          latitude: number
+          longitude: number
+          qr_code_info?: string | null
+          quiz_content?: string | null
+          region_id: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          creator_id?: string
+          description?: string | null
+          floor?: number
+          id?: string
+          latitude?: number
+          longitude?: number
+          qr_code_info?: string | null
+          quiz_content?: string | null
+          region_id?: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "missions_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          assigned_region: string | null
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assigned_region?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assigned_region?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_assigned_region_fkey"
+            columns: ["assigned_region"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      regions: {
+        Row: {
+          bounds_east: number
+          bounds_north: number
+          bounds_south: number
+          bounds_west: number
+          center_lat: number
+          center_lng: number
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          bounds_east: number
+          bounds_north: number
+          bounds_south: number
+          bounds_west: number
+          center_lat: number
+          center_lng: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          bounds_east?: number
+          bounds_north?: number
+          bounds_south?: number
+          bounds_west?: number
+          center_lat?: number
+          center_lng?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       spots: {
         Row: {
           created_at: string
@@ -134,10 +279,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_region: { Args: { _user_id: string }; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "main_admin" | "sub_admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -264,6 +416,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["main_admin", "sub_admin"],
+    },
   },
 } as const
