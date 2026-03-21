@@ -51,8 +51,8 @@ const items: GameItem[] = [
 export default function ItemPresets() {
   return (
     <div className="p-3 sm:p-4 md:p-6 h-full overflow-y-auto">
-      <h1 className="text-xl sm:text-2xl font-bold text-[#d4a843] mb-1">아이템 프리셋</h1>
-      <p className="text-[#7b8da6] text-[13px] sm:text-[15px] mb-4">트레이딩 카드 스타일의 수집품 목록</p>
+      <h1 className="text-2xl sm:text-3xl font-bold text-[#d4a843] mb-1">아이템 프리셋</h1>
+      <p className="text-[#7b8da6] text-[15px] sm:text-[17px] mb-4">트레이딩 카드 스타일의 수집품 목록</p>
 
       <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
         {items.map((item, i) => (
@@ -78,16 +78,16 @@ export default function ItemPresets() {
 
               {/* Info */}
               <div className="px-2 pb-2 relative z-10">
-                <h3 className="text-[10px] sm:text-[12px] font-bold text-[#e8e0d0] truncate">{item.name}</h3>
-                <p className="text-[8px] sm:text-[9px] text-[#7b8da6] truncate">{item.stageHint}</p>
-                <p className="text-[8px] sm:text-[9px] text-[#7b8da6] leading-tight line-clamp-2 mt-0.5 hidden sm:block">
+                <h3 className="text-[12px] sm:text-[14px] font-bold text-[#e8e0d0] truncate">{item.name}</h3>
+                <p className="text-[10px] sm:text-[11px] text-[#7b8da6] truncate">{item.stageHint}</p>
+                <p className="text-[10px] sm:text-[11px] text-[#7b8da6] leading-tight line-clamp-2 mt-0.5 hidden sm:block">
                   {item.description}
                 </p>
                 <div className="flex flex-wrap gap-0.5 mt-1">
                   {item.tags.map(tag => (
                     <Badge
                       key={tag}
-                      className="text-[7px] sm:text-[8px] px-1 py-0 border-0 font-normal"
+                      className="text-[8px] sm:text-[10px] px-1 py-0 border-0 font-normal"
                       style={{ backgroundColor: item.color + '20', color: item.color }}
                     >
                       {tag}

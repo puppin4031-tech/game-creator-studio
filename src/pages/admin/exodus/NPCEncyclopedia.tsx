@@ -104,8 +104,8 @@ export default function NPCEncyclopedia() {
 
   return (
     <div className="p-4 md:p-6 h-full overflow-y-auto">
-      <h1 className="text-2xl font-bold text-[#d4a843] mb-1">NPC 도감</h1>
-      <p className="text-[#7b8da6] text-[15px] mb-6">캐릭터 카드를 클릭하면 대화 미리보기를 확인할 수 있습니다</p>
+      <h1 className="text-2xl sm:text-3xl font-bold text-[#d4a843] mb-1">NPC 도감</h1>
+      <p className="text-[#7b8da6] text-[15px] sm:text-[17px] mb-6">캐릭터 카드를 클릭하면 대화 미리보기를 확인할 수 있습니다</p>
 
       {/* NPC Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
@@ -125,12 +125,12 @@ export default function NPCEncyclopedia() {
             </div>
             <div className="p-2">
               <div className="flex items-center gap-1 mb-0.5">
-                <span className="text-[13px] font-bold text-[#e8e0d0]">{npc.name}</span>
-                <Badge className="text-[9px] border-0 px-1" style={{ backgroundColor: npc.color + '20', color: npc.color }}>
+                <span className="text-[15px] font-bold text-[#e8e0d0]">{npc.name}</span>
+                <Badge className="text-[10px] border-0 px-1" style={{ backgroundColor: npc.color + '20', color: npc.color }}>
                   {npc.title}
                 </Badge>
               </div>
-              <p className="text-[11px] text-[#7b8da6] line-clamp-1">{npc.role}</p>
+              <p className="text-[12px] text-[#7b8da6] line-clamp-1">{npc.role}</p>
             </div>
           </button>
         ))}

@@ -22,10 +22,10 @@ export default function ExodusDashboard() {
     <div className="p-4 md:p-6 space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-[#d4a843]">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#d4a843]">
           ⚡ EXODUS 대시보드
         </h1>
-        <p className="text-[#7b8da6] text-[15px] mt-1">
+        <p className="text-[#7b8da6] text-[15px] sm:text-[17px] mt-1">
           출애굽기 10대 재앙 — AR 위치 기반 방탈출 게임 프리셋
         </p>
       </div>
@@ -40,7 +40,7 @@ export default function ExodusDashboard() {
               </div>
             </div>
             <div className="text-2xl font-bold text-[#e8e0d0]">{s.value}</div>
-            <div className="text-[13px] text-[#7b8da6]">{s.label}</div>
+            <div className="text-[15px] text-[#7b8da6]">{s.label}</div>
           </div>
         ))}
       </div>
@@ -58,8 +58,8 @@ export default function ExodusDashboard() {
               <div className="flex items-center gap-3">
                 <link.icon className="h-5 w-5 text-[#d4a843] group-hover:scale-110 transition-transform" />
                 <div>
-                  <div className="text-[15px] font-medium text-[#e8e0d0]">{link.title}</div>
-                  <div className="text-[13px] text-[#7b8da6]">{link.desc}</div>
+                  <div className="text-[16px] font-medium text-[#e8e0d0]">{link.title}</div>
+                  <div className="text-[14px] text-[#7b8da6]">{link.desc}</div>
                 </div>
               </div>
             </button>
