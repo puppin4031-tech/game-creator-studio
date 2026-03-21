@@ -22,10 +22,10 @@ export default function ExodusDashboard() {
     <div className="p-4 md:p-6 space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-[#d4a843]">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#d4a843]">
           ⚡ EXODUS 대시보드
         </h1>
-        <p className="text-[#7b8da6] text-[15px] mt-1">
+        <p className="text-[#7b8da6] text-[15px] sm:text-[17px] mt-1">
           출애굽기 10대 재앙 — AR 위치 기반 방탈출 게임 프리셋
         </p>
       </div>
