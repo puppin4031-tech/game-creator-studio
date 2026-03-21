@@ -103,7 +103,7 @@ export default function NPCEncyclopedia() {
   }, [selectedNPC]);
 
   return (
-    <div className="p-4 md:p-6">
+    <div className="p-4 md:p-6 h-full overflow-y-auto">
       <h1 className="text-2xl font-bold text-[#d4a843] mb-1">NPC 도감</h1>
       <p className="text-[#7b8da6] text-[15px] mb-6">캐릭터 카드를 클릭하면 대화 미리보기를 확인할 수 있습니다</p>
 
