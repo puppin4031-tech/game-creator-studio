@@ -58,6 +58,18 @@ export default function SpotManagement() {
 
   useEffect(() => { fetchSpots(); }, [fetchSpots]);
 
+  // Auto-select spot from URL query param
+  useEffect(() => {
+    const spotId = searchParams.get('spotId');
+    if (spotId && spots.length > 0 && !selectedSpot) {
+      const target = spots.find(s => s.id === spotId);
+      if (target) {
+        setSelectedSpot(target);
+        setSearchParams({}, { replace: true });
+      }
+    }
+  }, [spots, searchParams, selectedSpot, setSearchParams]);
+
   // Init map
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
