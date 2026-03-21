@@ -51,8 +51,8 @@ const items: GameItem[] = [
 export default function ItemPresets() {
   return (
     <div className="p-3 sm:p-4 md:p-6 h-full overflow-y-auto">
-      <h1 className="text-xl sm:text-2xl font-bold text-[#d4a843] mb-1">아이템 프리셋</h1>
-      <p className="text-[#7b8da6] text-[13px] sm:text-[15px] mb-4">트레이딩 카드 스타일의 수집품 목록</p>
+      <h1 className="text-2xl sm:text-3xl font-bold text-[#d4a843] mb-1">아이템 프리셋</h1>
+      <p className="text-[#7b8da6] text-[15px] sm:text-[17px] mb-4">트레이딩 카드 스타일의 수집품 목록</p>
 
       <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
         {items.map((item, i) => (
