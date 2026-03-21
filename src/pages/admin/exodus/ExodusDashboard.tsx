@@ -58,8 +58,8 @@ export default function ExodusDashboard() {
               <div className="flex items-center gap-3">
                 <link.icon className="h-5 w-5 text-[#d4a843] group-hover:scale-110 transition-transform" />
                 <div>
-                  <div className="text-[15px] font-medium text-[#e8e0d0]">{link.title}</div>
-                  <div className="text-[13px] text-[#7b8da6]">{link.desc}</div>
+                  <div className="text-[16px] font-medium text-[#e8e0d0]">{link.title}</div>
+                  <div className="text-[14px] text-[#7b8da6]">{link.desc}</div>
                 </div>
               </div>
             </button>

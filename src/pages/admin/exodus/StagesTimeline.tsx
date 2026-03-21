@@ -83,20 +83,20 @@ export default function StagesTimeline() {
               <div className="flex-1 rounded-xl bg-[#111f38] border border-[#1e2d4a] hover:border-[#d4a843]/30 p-4 transition-all group">
                 <div className="flex items-center gap-2 mb-2">
                   <stage.icon className="h-5 w-5" style={{ color: stage.color }} />
-                  <h3 className="text-[15px] font-semibold text-[#e8e0d0]">{stage.name}</h3>
+                  <h3 className="text-[16px] font-semibold text-[#e8e0d0]">{stage.name}</h3>
                   <Badge
-                    className="ml-auto text-[11px] border-0"
+                    className="ml-auto text-[12px] border-0"
                     style={{ backgroundColor: stage.color + '20', color: stage.color }}
                   >
                     {stage.type}
                   </Badge>
                   {stage.deferred && (
-                    <Badge variant="outline" className="text-[10px] border-[#7b8da6]/30 text-[#7b8da6]">
+                    <Badge variant="outline" className="text-[11px] border-[#7b8da6]/30 text-[#7b8da6]">
                       보류
                     </Badge>
                   )}
                 </div>
-                <p className="text-[13px] text-[#7b8da6] leading-relaxed">{stage.condition}</p>
+                <p className="text-[14px] text-[#7b8da6] leading-relaxed">{stage.condition}</p>
               </div>
             </div>
           ))}
