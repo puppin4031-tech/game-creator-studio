@@ -12,6 +12,7 @@ import { InventoryDrawer } from '@/components/game/InventoryDrawer';
 import { QuestDrawer } from '@/components/game/QuestDrawer';
 import { HintPopup } from '@/components/game/HintPopup';
 import { ItemAcquiredToast } from '@/components/game/ItemAcquiredToast';
+import { GameMenu } from '@/components/game/GameMenu';
 import type { Tables } from '@/integrations/supabase/types';
 
 const MOCK_USER_ID = 'anonymous-player';
@@ -111,6 +112,9 @@ const Index = () => {
 
   return (
     <div className="h-screen w-screen relative overflow-hidden">
+      {/* Game menu */}
+      <GameMenu />
+
       {/* Map */}
       <GameMap
         userLat={position.latitude}
