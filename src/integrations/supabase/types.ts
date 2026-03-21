@@ -239,6 +239,89 @@ export type Database = {
         }
         Relationships: []
       }
+      theme_elements: {
+        Row: {
+          content: Json | null
+          created_at: string
+          description: string | null
+          element_type: Database["public"]["Enums"]["theme_element_type"]
+          icon: string | null
+          id: string
+          image_url: string | null
+          sort_order: number | null
+          theme_id: string
+          title: string
+        }
+        Insert: {
+          content?: Json | null
+          created_at?: string
+          description?: string | null
+          element_type: Database["public"]["Enums"]["theme_element_type"]
+          icon?: string | null
+          id?: string
+          image_url?: string | null
+          sort_order?: number | null
+          theme_id: string
+          title: string
+        }
+        Update: {
+          content?: Json | null
+          created_at?: string
+          description?: string | null
+          element_type?: Database["public"]["Enums"]["theme_element_type"]
+          icon?: string | null
+          id?: string
+          image_url?: string | null
+          sort_order?: number | null
+          theme_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theme_elements_theme_id_fkey"
+            columns: ["theme_id"]
+            isOneToOne: false
+            referencedRelation: "themes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      themes: {
+        Row: {
+          category: Database["public"]["Enums"]["theme_category"]
+          color_primary: string | null
+          color_secondary: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          thumbnail_url: string | null
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["theme_category"]
+          color_primary?: string | null
+          color_secondary?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          thumbnail_url?: string | null
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["theme_category"]
+          color_primary?: string | null
+          color_secondary?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          thumbnail_url?: string | null
+        }
+        Relationships: []
+      }
       user_inventory: {
         Row: {
           acquired_at: string
@@ -290,6 +373,8 @@ export type Database = {
     }
     Enums: {
       app_role: "main_admin" | "sub_admin"
+      theme_category: "biblical" | "historical" | "fantasy" | "nature"
+      theme_element_type: "item" | "quiz" | "puzzle" | "story"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -418,6 +503,8 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["main_admin", "sub_admin"],
+      theme_category: ["biblical", "historical", "fantasy", "nature"],
+      theme_element_type: ["item", "quiz", "puzzle", "story"],
     },
   },
 } as const
