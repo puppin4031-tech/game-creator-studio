@@ -19,9 +19,9 @@ export function GameMenu() {
       {/* Menu toggle button */}
       <button
         onClick={() => setOpen(!open)}
-        className="fixed top-4 right-4 z-[1100] w-10 h-10 rounded-full bg-card/90 backdrop-blur border border-border flex items-center justify-center shadow-lg hover:bg-accent transition-colors"
+        className="fixed top-4 right-4 z-[1100] w-12 h-12 rounded-full bg-card/90 backdrop-blur border border-border flex items-center justify-center shadow-lg hover:bg-accent transition-colors"
       >
-        {open ? <X className="h-5 w-5 text-foreground" /> : <Menu className="h-5 w-5 text-foreground" />}
+        {open ? <X className="h-6 w-6 text-foreground" /> : <Menu className="h-6 w-6 text-foreground" />}
       </button>
 
       {/* Overlay */}
@@ -31,36 +31,36 @@ export function GameMenu() {
 
       {/* Slide-in panel */}
       <div
-        className={`fixed top-0 right-0 z-[1060] h-full w-72 bg-card border-l border-border shadow-2xl transform transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 right-0 z-[1060] h-full w-80 bg-card border-l border-border shadow-2xl transform transition-transform duration-300 ease-in-out ${
           open ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
-        <div className="flex flex-col h-full pt-16 px-4 pb-6">
+        <div className="flex flex-col h-full pt-18 px-5 pb-6">
           {/* Profile section */}
           {user ? (
             <div className="mb-6 p-4 rounded-xl bg-muted/50 border border-border">
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                  <User className="h-5 w-5 text-primary" />
+                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                  <User className="h-6 w-6 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
+                  <p className="text-[15px] font-medium text-foreground truncate">
                     {profile?.display_name || user.email}
                   </p>
-                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  <p className="text-[13px] text-muted-foreground truncate">{user.email}</p>
                 </div>
               </div>
               {(profile?.role === 'main_admin' || profile?.role === 'sub_admin') && (
-                <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                  <Shield className="h-3 w-3" />
+                <span className="inline-flex items-center gap-1 text-[13px] bg-primary/10 text-primary px-2.5 py-1 rounded-full">
+                  <Shield className="h-3.5 w-3.5" />
                   {profile.role === 'main_admin' ? '메인 관리자' : '서브 관리자'}
                 </span>
               )}
             </div>
           ) : (
             <div className="mb-6 p-4 rounded-xl bg-muted/50 border border-border text-center">
-              <User className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">로그인하여 게임 진행을 저장하세요</p>
+              <User className="h-9 w-9 text-muted-foreground mx-auto mb-2" />
+              <p className="text-[15px] text-muted-foreground">로그인하여 게임 진행을 저장하세요</p>
             </div>
           )}
 
@@ -69,10 +69,10 @@ export function GameMenu() {
             {!user ? (
               <Button
                 variant="ghost"
-                className="justify-start gap-3 h-11 text-foreground"
+                className="justify-start gap-3 h-12 text-[15px] text-foreground"
                 onClick={() => { navigate('/login'); setOpen(false); }}
               >
-                <LogIn className="h-4 w-4" />
+                <LogIn className="h-5 w-5" />
                 로그인 / 회원가입
               </Button>
             ) : (
@@ -80,10 +80,10 @@ export function GameMenu() {
                 {(profile?.role === 'main_admin' || profile?.role === 'sub_admin') && (
                   <Button
                     variant="ghost"
-                    className="justify-start gap-3 h-11 text-foreground"
+                    className="justify-start gap-3 h-12 text-[15px] text-foreground"
                     onClick={() => { navigate('/admin'); setOpen(false); }}
                   >
-                    <Shield className="h-4 w-4" />
+                    <Shield className="h-5 w-5" />
                     관리자 대시보드
                   </Button>
                 )}
@@ -92,19 +92,19 @@ export function GameMenu() {
 
             <Button
               variant="ghost"
-              className="justify-start gap-3 h-11 text-foreground"
+              className="justify-start gap-3 h-12 text-[15px] text-foreground"
               onClick={() => setOpen(false)}
             >
-              <Settings className="h-4 w-4" />
+              <Settings className="h-5 w-5" />
               설정
             </Button>
 
             <Button
               variant="ghost"
-              className="justify-start gap-3 h-11 text-foreground"
+              className="justify-start gap-3 h-12 text-[15px] text-foreground"
               onClick={() => setOpen(false)}
             >
-              <HelpCircle className="h-4 w-4" />
+              <HelpCircle className="h-5 w-5" />
               도움말
             </Button>
           </nav>
@@ -113,10 +113,10 @@ export function GameMenu() {
           {user && (
             <Button
               variant="ghost"
-              className="justify-start gap-3 h-11 text-destructive hover:text-destructive hover:bg-destructive/10 mt-auto"
+              className="justify-start gap-3 h-12 text-[15px] text-destructive hover:text-destructive hover:bg-destructive/10 mt-auto"
               onClick={handleLogout}
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-5 w-5" />
               로그아웃
             </Button>
           )}
