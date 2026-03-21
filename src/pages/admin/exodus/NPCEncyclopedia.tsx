@@ -115,7 +115,7 @@ export default function NPCEncyclopedia() {
             onClick={() => handleSelect(npc)}
             className="group rounded-xl bg-[#111f38] border border-[#1e2d4a] hover:border-[#d4a843]/40 overflow-hidden transition-all hover:shadow-lg hover:shadow-[#d4a843]/10 text-left"
           >
-            <div className="aspect-[3/4] relative overflow-hidden bg-gradient-to-b from-[#162340] to-[#0a1628]">
+            <div className="aspect-[3/4] relative overflow-hidden bg-gradient-to-b from-[#162340] to-[#0a1628] max-h-[180px]">
               <img
                 src={npc.image}
                 alt={npc.name}

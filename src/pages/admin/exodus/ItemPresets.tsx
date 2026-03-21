@@ -75,12 +75,12 @@ export default function ItemPresets() {
               </div>
 
               {/* Icon area */}
-              <div className="flex-1 flex items-center justify-center relative z-10">
+              <div className="flex-1 flex items-center justify-center relative z-10 py-2">
                 <div
-                  className="w-20 h-20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300"
-                  style={{ backgroundColor: item.color + '20', boxShadow: `0 0 30px ${item.color}20` }}
+                  className="w-14 h-14 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300"
+                  style={{ backgroundColor: item.color + '20', boxShadow: `0 0 20px ${item.color}20` }}
                 >
-                  <item.icon className="h-10 w-10" style={{ color: item.color }} />
+                  <item.icon className="h-7 w-7" style={{ color: item.color }} />
                 </div>
               </div>
 
