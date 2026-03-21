@@ -46,11 +46,11 @@ const items: GameItem[] = [
 
 export default function ItemPresets() {
   return (
-    <div className="p-4 md:p-6">
+    <div className="p-4 md:p-6 h-full overflow-y-auto">
       <h1 className="text-2xl font-bold text-[#d4a843] mb-1">아이템 프리셋</h1>
       <p className="text-[#7b8da6] text-[15px] mb-6">트레이딩 카드 스타일의 수집품 목록</p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         {items.map((item, i) => (
           <div
             key={item.id}
@@ -75,12 +75,12 @@ export default function ItemPresets() {
               </div>
 
               {/* Icon area */}
-              <div className="flex-1 flex items-center justify-center relative z-10">
+              <div className="flex-1 flex items-center justify-center relative z-10 py-2">
                 <div
-                  className="w-20 h-20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300"
-                  style={{ backgroundColor: item.color + '20', boxShadow: `0 0 30px ${item.color}20` }}
+                  className="w-14 h-14 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300"
+                  style={{ backgroundColor: item.color + '20', boxShadow: `0 0 20px ${item.color}20` }}
                 >
-                  <item.icon className="h-10 w-10" style={{ color: item.color }} />
+                  <item.icon className="h-7 w-7" style={{ color: item.color }} />
                 </div>
               </div>
 

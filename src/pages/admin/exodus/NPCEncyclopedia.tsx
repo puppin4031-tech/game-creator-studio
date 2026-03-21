@@ -103,19 +103,19 @@ export default function NPCEncyclopedia() {
   }, [selectedNPC]);
 
   return (
-    <div className="p-4 md:p-6">
+    <div className="p-4 md:p-6 h-full overflow-y-auto">
       <h1 className="text-2xl font-bold text-[#d4a843] mb-1">NPC 도감</h1>
       <p className="text-[#7b8da6] text-[15px] mb-6">캐릭터 카드를 클릭하면 대화 미리보기를 확인할 수 있습니다</p>
 
       {/* NPC Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {npcs.map(npc => (
           <button
             key={npc.id}
             onClick={() => handleSelect(npc)}
             className="group rounded-xl bg-[#111f38] border border-[#1e2d4a] hover:border-[#d4a843]/40 overflow-hidden transition-all hover:shadow-lg hover:shadow-[#d4a843]/10 text-left"
           >
-            <div className="aspect-[3/4] relative overflow-hidden bg-gradient-to-b from-[#162340] to-[#0a1628]">
+            <div className="aspect-[3/4] relative overflow-hidden bg-gradient-to-b from-[#162340] to-[#0a1628] max-h-[180px]">
               <img
                 src={npc.image}
                 alt={npc.name}
