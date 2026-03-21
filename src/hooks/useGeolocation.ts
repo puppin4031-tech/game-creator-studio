@@ -7,17 +7,18 @@ export interface GeoPosition {
 }
 
 interface UseGeolocationReturn {
-  position: GeoPosition | null;
+  position: GeoPosition;
   error: string | null;
   isTracking: boolean;
   mockMove: (direction: 'north' | 'south' | 'east' | 'west') => void;
   setMockPosition: (lat: number, lng: number) => void;
 }
 
-const MOCK_STEP = 0.0001; // ~11 meters
+const DEFAULT_POSITION: GeoPosition = { latitude: 37.5665, longitude: 126.9780, accuracy: null };
+const MOCK_STEP = 0.0001;
 
 export function useGeolocation(): UseGeolocationReturn {
-  const [position, setPosition] = useState<GeoPosition | null>(null);
+  const [position, setPosition] = useState<GeoPosition>(DEFAULT_POSITION);
   const [error, setError] = useState<string | null>(null);
   const [isTracking, setIsTracking] = useState(false);
   const [useMock, setUseMock] = useState(false);
@@ -27,8 +28,6 @@ export function useGeolocation(): UseGeolocationReturn {
 
     if (!navigator.geolocation) {
       setError('Geolocation not supported');
-      // Fall back to mock position (Seoul)
-      setPosition({ latitude: 37.5665, longitude: 126.9780, accuracy: null });
       setUseMock(true);
       return;
     }
@@ -45,13 +44,9 @@ export function useGeolocation(): UseGeolocationReturn {
       },
       (err) => {
         setError(err.message);
-        // Fall back to mock
-        if (!position) {
-          setPosition({ latitude: 37.5665, longitude: 126.9780, accuracy: null });
-          setUseMock(true);
-        }
+        setUseMock(true);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
 
     return () => {
@@ -63,12 +58,11 @@ export function useGeolocation(): UseGeolocationReturn {
   const mockMove = useCallback((direction: 'north' | 'south' | 'east' | 'west') => {
     setUseMock(true);
     setPosition(prev => {
-      const base = prev || { latitude: 37.5665, longitude: 126.9780, accuracy: null };
       switch (direction) {
-        case 'north': return { ...base, latitude: base.latitude + MOCK_STEP };
-        case 'south': return { ...base, latitude: base.latitude - MOCK_STEP };
-        case 'east': return { ...base, longitude: base.longitude + MOCK_STEP };
-        case 'west': return { ...base, longitude: base.longitude - MOCK_STEP };
+        case 'north': return { ...prev, latitude: prev.latitude + MOCK_STEP };
+        case 'south': return { ...prev, latitude: prev.latitude - MOCK_STEP };
+        case 'east': return { ...prev, longitude: prev.longitude + MOCK_STEP };
+        case 'west': return { ...prev, longitude: prev.longitude - MOCK_STEP };
       }
     });
   }, []);
