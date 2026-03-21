@@ -132,7 +132,7 @@ export default function GlobalMapView() {
               </select>
               <button
                 onClick={handleThemeSave}
-                style={{ width: '100%', padding: '6px 12px', background: '#d4a843', color: '#0f1d32', border: 'none', borderRadius: 4, fontWeight: 600, cursor: 'pointer' }}
+                style={{ width: '100%', padding: '6px 12px', background: 'hsl(35 90% 50%)', color: 'hsl(220 20% 10%)', border: 'none', borderRadius: 4, fontWeight: 600, cursor: 'pointer' }}
               >
                 설정 후 관리 페이지로 이동
               </button>
