@@ -5,7 +5,7 @@ import {
   SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
   SidebarFooter, useSidebar,
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, List, Users, Package, Puzzle, ArrowLeft, LogOut } from 'lucide-react';
+import { LayoutDashboard, List, Users, Package, Puzzle, ArrowLeft, LogOut, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const menuItems = [
@@ -14,6 +14,7 @@ const menuItems = [
   { title: 'NPC 도감', url: '/admin/exodus/npcs', icon: Users },
   { title: '아이템 프리셋', url: '/admin/exodus/items', icon: Package },
   { title: '퍼즐/퀴즈 메이커', url: '/admin/exodus/puzzle-maker', icon: Puzzle },
+  { title: '스팟 관리', url: '/admin/exodus/spots', icon: MapPin },
 ];
 
 export function ExodusSidebar() {

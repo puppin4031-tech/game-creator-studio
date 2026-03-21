@@ -194,9 +194,59 @@ export type Database = {
         }
         Relationships: []
       }
-      spots: {
+      spot_elements: {
         Row: {
           created_at: string
+          creator_id: string
+          id: string
+          latitude: number
+          longitude: number
+          spot_id: string
+          theme_element_id: string
+        }
+        Insert: {
+          created_at?: string
+          creator_id: string
+          id?: string
+          latitude: number
+          longitude: number
+          spot_id: string
+          theme_element_id: string
+        }
+        Update: {
+          created_at?: string
+          creator_id?: string
+          id?: string
+          latitude?: number
+          longitude?: number
+          spot_id?: string
+          theme_element_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spot_elements_spot_id_fkey"
+            columns: ["spot_id"]
+            isOneToOne: false
+            referencedRelation: "spots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spot_elements_theme_element_id_fkey"
+            columns: ["theme_element_id"]
+            isOneToOne: false
+            referencedRelation: "theme_elements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spots: {
+        Row: {
+          bounds_east: number | null
+          bounds_north: number | null
+          bounds_south: number | null
+          bounds_west: number | null
+          created_at: string
+          creator_id: string | null
           description: string | null
           floor: number
           hint_text: string | null
@@ -208,9 +258,15 @@ export type Database = {
           longitude: number
           name: string
           quest_id: string | null
+          theme_id: string | null
         }
         Insert: {
+          bounds_east?: number | null
+          bounds_north?: number | null
+          bounds_south?: number | null
+          bounds_west?: number | null
           created_at?: string
+          creator_id?: string | null
           description?: string | null
           floor?: number
           hint_text?: string | null
@@ -222,9 +278,15 @@ export type Database = {
           longitude: number
           name: string
           quest_id?: string | null
+          theme_id?: string | null
         }
         Update: {
+          bounds_east?: number | null
+          bounds_north?: number | null
+          bounds_south?: number | null
+          bounds_west?: number | null
           created_at?: string
+          creator_id?: string | null
           description?: string | null
           floor?: number
           hint_text?: string | null
@@ -236,8 +298,17 @@ export type Database = {
           longitude?: number
           name?: string
           quest_id?: string | null
+          theme_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "spots_theme_id_fkey"
+            columns: ["theme_id"]
+            isOneToOne: false
+            referencedRelation: "themes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       theme_elements: {
         Row: {

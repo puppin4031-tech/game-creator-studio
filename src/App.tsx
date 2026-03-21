@@ -22,6 +22,7 @@ import StagesTimeline from "./pages/admin/exodus/StagesTimeline";
 import NPCEncyclopedia from "./pages/admin/exodus/NPCEncyclopedia";
 import ItemPresets from "./pages/admin/exodus/ItemPresets";
 import PuzzleQuizMaker from "./pages/admin/exodus/PuzzleQuizMaker";
+import SpotManagement from "./pages/admin/exodus/SpotManagement";
 
 const queryClient = new QueryClient();
 
@@ -83,6 +84,7 @@ const App = () => (
               <Route path="npcs" element={<NPCEncyclopedia />} />
               <Route path="items" element={<ItemPresets />} />
               <Route path="puzzle-maker" element={<PuzzleQuizMaker />} />
+              <Route path="spots" element={<SpotManagement />} />
             </Route>
             {/* Main admin */}
             <Route
