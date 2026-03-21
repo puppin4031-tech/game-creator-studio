@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ interface Spot {
 
 export default function SpotManagement() {
   const { user, isMainAdmin } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
   const rectanglesRef = useRef<Map<string, L.Rectangle>>(new Map());
@@ -55,6 +57,18 @@ export default function SpotManagement() {
   }, []);
 
   useEffect(() => { fetchSpots(); }, [fetchSpots]);
+
+  // Auto-select spot from URL query param
+  useEffect(() => {
+    const spotId = searchParams.get('spotId');
+    if (spotId && spots.length > 0 && !selectedSpot) {
+      const target = spots.find(s => s.id === spotId);
+      if (target) {
+        setSelectedSpot(target);
+        setSearchParams({}, { replace: true });
+      }
+    }
+  }, [spots, searchParams, selectedSpot, setSearchParams]);
 
   // Init map
   useEffect(() => {
