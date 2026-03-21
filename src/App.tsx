@@ -84,6 +84,7 @@ const App = () => (
               <Route path="npcs" element={<NPCEncyclopedia />} />
               <Route path="items" element={<ItemPresets />} />
               <Route path="puzzle-maker" element={<PuzzleQuizMaker />} />
+              <Route path="spots" element={<SpotManagement />} />
             </Route>
             {/* Main admin */}
             <Route
