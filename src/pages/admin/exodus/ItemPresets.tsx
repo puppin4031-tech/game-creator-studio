@@ -69,9 +69,9 @@ export default function ItemPresets() {
                 style={{ boxShadow: `inset 0 0 40px ${item.color}15` }} />
 
               {/* Header */}
-              <div className="px-3 pt-3 pb-1 relative z-10">
-                <h3 className="text-[14px] font-bold text-[#e8e0d0] truncate">{item.name}</h3>
-                <p className="text-[10px] text-[#7b8da6]">{item.stageHint}</p>
+              <div className="px-2 pt-2 pb-0.5 relative z-10">
+                <h3 className="text-[11px] sm:text-[13px] font-bold text-[#e8e0d0] truncate">{item.name}</h3>
+                <p className="text-[9px] text-[#7b8da6] truncate">{item.stageHint}</p>
               </div>
 
               {/* Icon area */}
