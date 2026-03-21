@@ -47,6 +47,7 @@ function AdminRoutes() {
           <Route path="users" element={<UserManagement />} />
           <Route path="approvals" element={<ApprovalManagement />} />
           <Route path="themes" element={<ThemeManagement />} />
+          <Route path="themes/:themeId" element={<ThemeDetail />} />
         </>
       )}
       {isSubAdmin && (
