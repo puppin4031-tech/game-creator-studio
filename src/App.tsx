@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import GoogleMapsProvider from "@/components/GoogleMapsProvider";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
@@ -64,46 +65,46 @@ function AdminRoutes() {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/login" element={<Login />} />
-            {/* Exodus dashboard — separate layout */}
-            <Route
-              path="/admin/exodus"
-              element={
-                <ProtectedRoute>
-                  <ExodusLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<ExodusDashboard />} />
-              <Route path="stages" element={<StagesTimeline />} />
-              <Route path="npcs" element={<NPCEncyclopedia />} />
-              <Route path="items" element={<ItemPresets />} />
-              <Route path="puzzle-maker" element={<PuzzleQuizMaker />} />
-              <Route path="spots" element={<SpotManagement />} />
-            </Route>
-            {/* Main admin */}
-            <Route
-              path="/admin/*"
-              element={
-                <ProtectedRoute>
-                  <AdminLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route path="*" element={<AdminRoutes />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
+    <GoogleMapsProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/login" element={<Login />} />
+              <Route
+                path="/admin/exodus"
+                element={
+                  <ProtectedRoute>
+                    <ExodusLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<ExodusDashboard />} />
+                <Route path="stages" element={<StagesTimeline />} />
+                <Route path="npcs" element={<NPCEncyclopedia />} />
+                <Route path="items" element={<ItemPresets />} />
+                <Route path="puzzle-maker" element={<PuzzleQuizMaker />} />
+                <Route path="spots" element={<SpotManagement />} />
+              </Route>
+              <Route
+                path="/admin/*"
+                element={
+                  <ProtectedRoute>
+                    <AdminLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="*" element={<AdminRoutes />} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </GoogleMapsProvider>
   </QueryClientProvider>
 );
 

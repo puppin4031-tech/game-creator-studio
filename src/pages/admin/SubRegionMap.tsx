@@ -1,23 +1,27 @@
-import { useEffect, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { GoogleMap, Rectangle, Marker } from '@react-google-maps/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
+const containerStyle = { width: '100%', height: '100%' };
+
 const statusColors: Record<string, string> = {
-  '작성중': 'hsl(220,15%,40%)',
-  '승인대기': 'hsl(35,90%,55%)',
-  '승인완료': 'hsl(150,80%,45%)',
-  '반려': 'hsl(0,75%,55%)',
+  '작성중': '#5a6a80',
+  '승인대기': '#e0952d',
+  '승인완료': '#26b34a',
+  '반려': '#dc3545',
+};
+
+const missionIconUrl = (status: string) => {
+  const color = statusColors[status]?.replace('#', '') || '888888';
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"><circle cx="7" cy="7" r="5" fill="#${color}" stroke="white" stroke-width="2"/></svg>`)}`;
 };
 
 export default function SubRegionMap() {
   const { profile } = useAuth();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<L.Map | null>(null);
 
   const { data: region } = useQuery({
     queryKey: ['my-region', profile?.assigned_region],
@@ -39,36 +43,6 @@ export default function SubRegionMap() {
     enabled: !!profile?.assigned_region,
   });
 
-  useEffect(() => {
-    if (!containerRef.current || mapRef.current || !region) return;
-    const bounds: L.LatLngBoundsExpression = [
-      [region.bounds_south, region.bounds_west],
-      [region.bounds_north, region.bounds_east],
-    ];
-    const map = L.map(containerRef.current, { zoomControl: true }).setView([region.center_lat, region.center_lng], 16);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    map.setMaxBounds(bounds);
-    map.fitBounds(bounds);
-    L.rectangle(bounds, { color: 'hsl(150,80%,45%)', weight: 2, fillOpacity: 0.05, dashArray: '8 4' }).addTo(map);
-    mapRef.current = map;
-    return () => { map.remove(); mapRef.current = null; };
-  }, [region]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    missions.forEach(m => {
-      L.marker([m.latitude, m.longitude], {
-        icon: L.divIcon({
-          html: `<div style="width:14px;height:14px;border-radius:50%;background:${statusColors[m.status] || 'gray'};border:2px solid white;"></div>`,
-          className: '',
-          iconSize: [14, 14],
-          iconAnchor: [7, 7],
-        }),
-      }).addTo(map).bindPopup(`<div class="text-sm"><strong>${m.title}</strong><br/>상태: ${m.status}<br/>${m.floor}층</div>`);
-    });
-  }, [missions]);
-
   if (!profile?.assigned_region) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-3rem)]">
@@ -84,12 +58,37 @@ export default function SubRegionMap() {
   return (
     <div className="h-[calc(100vh-3rem)] relative">
       {region && (
-        <div className="absolute top-3 left-3 z-[1000] bg-card/90 backdrop-blur rounded-lg px-3 py-1.5 border border-border">
+        <div className="absolute top-3 left-3 z-10 bg-card/90 backdrop-blur rounded-lg px-3 py-1.5 border border-border">
           <span className="text-sm font-bold text-primary">{region.name}</span>
         </div>
       )}
-      <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
-      <div className="absolute bottom-3 left-3 z-[1000] flex gap-2">
+      {region && (
+        <GoogleMap
+          mapContainerStyle={containerStyle}
+          center={{ lat: region.center_lat, lng: region.center_lng }}
+          zoom={16}
+          options={{
+            restriction: {
+              latLngBounds: { north: region.bounds_north, south: region.bounds_south, east: region.bounds_east, west: region.bounds_west },
+              strictBounds: true,
+            },
+          }}
+        >
+          <Rectangle
+            bounds={{ north: region.bounds_north, south: region.bounds_south, east: region.bounds_east, west: region.bounds_west }}
+            options={{ strokeColor: 'hsl(150,80%,45%)', strokeWeight: 2, fillOpacity: 0.05, strokeOpacity: 1 }}
+          />
+          {missions.map(m => (
+            <Marker
+              key={m.id}
+              position={{ lat: m.latitude, lng: m.longitude }}
+              icon={{ url: missionIconUrl(m.status), scaledSize: new google.maps.Size(14, 14), anchor: new google.maps.Point(7, 7) }}
+              title={`${m.title} (${m.status}) ${m.floor}층`}
+            />
+          ))}
+        </GoogleMap>
+      )}
+      <div className="absolute bottom-3 left-3 z-10 flex gap-2">
         {Object.entries(statusColors).map(([status, color]) => (
           <Badge key={status} variant="outline" className="bg-card/80 backdrop-blur text-xs">
             <div className="w-2 h-2 rounded-full mr-1" style={{ background: color }} />
