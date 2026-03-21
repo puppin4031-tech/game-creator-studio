@@ -5,7 +5,7 @@ import {
   SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
   SidebarFooter, useSidebar,
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, List, Users, Package, Puzzle, ArrowLeft, LogOut } from 'lucide-react';
+import { LayoutDashboard, List, Users, Package, Puzzle, ArrowLeft, LogOut, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const menuItems = [
