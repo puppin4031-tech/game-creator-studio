@@ -15,6 +15,7 @@ import ApprovalManagement from "./pages/admin/ApprovalManagement";
 import SubRegionMap from "./pages/admin/SubRegionMap";
 import CreateMission from "./pages/admin/CreateMission";
 import MyMissions from "./pages/admin/MyMissions";
+import ThemeManagement from "./pages/admin/ThemeManagement";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ function AdminRoutes() {
           <Route path="map" element={<GlobalMapView />} />
           <Route path="users" element={<UserManagement />} />
           <Route path="approvals" element={<ApprovalManagement />} />
+          <Route path="themes" element={<ThemeManagement />} />
         </>
       )}
       {isSubAdmin && (
