@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +18,7 @@ const categoryConfig = {
 type ThemeCategory = keyof typeof categoryConfig;
 
 export default function ThemeManagement() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<string>('all');
 
   const { data: themes = [], isLoading } = useQuery({
@@ -83,6 +85,14 @@ export default function ThemeManagement() {
                   <Card
                     key={theme.id}
                     className="group overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer border-border/50"
+                    onClick={() => {
+                      // Exodus theme → go to Exodus dashboard
+                      if (theme.name.includes('엑소더스') || theme.name.toLowerCase().includes('exodus')) {
+                        navigate('/admin/exodus');
+                      } else {
+                        navigate(`/admin/themes/${theme.id}`);
+                      }
+                    }}
                   >
                     {/* Gradient thumbnail area */}
                     <div
