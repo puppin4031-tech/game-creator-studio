@@ -14,7 +14,121 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      game_logs: {
+        Row: {
+          action: string
+          created_at: string
+          floor: number | null
+          id: string
+          spot_id: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          floor?: number | null
+          id?: string
+          spot_id?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          floor?: number | null
+          id?: string
+          spot_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_logs_spot_id_fkey"
+            columns: ["spot_id"]
+            isOneToOne: false
+            referencedRelation: "spots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spots: {
+        Row: {
+          created_at: string
+          description: string | null
+          floor: number
+          hint_text: string | null
+          id: string
+          is_active: boolean
+          item_icon: string | null
+          item_name: string | null
+          latitude: number
+          longitude: number
+          name: string
+          quest_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          floor?: number
+          hint_text?: string | null
+          id?: string
+          is_active?: boolean
+          item_icon?: string | null
+          item_name?: string | null
+          latitude: number
+          longitude: number
+          name: string
+          quest_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          floor?: number
+          hint_text?: string | null
+          id?: string
+          is_active?: boolean
+          item_icon?: string | null
+          item_name?: string | null
+          latitude?: number
+          longitude?: number
+          name?: string
+          quest_id?: string | null
+        }
+        Relationships: []
+      }
+      user_inventory: {
+        Row: {
+          acquired_at: string
+          id: string
+          item_icon: string | null
+          item_name: string
+          spot_id: string | null
+          user_id: string
+        }
+        Insert: {
+          acquired_at?: string
+          id?: string
+          item_icon?: string | null
+          item_name: string
+          spot_id?: string | null
+          user_id: string
+        }
+        Update: {
+          acquired_at?: string
+          id?: string
+          item_icon?: string | null
+          item_name?: string
+          spot_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_inventory_spot_id_fkey"
+            columns: ["spot_id"]
+            isOneToOne: false
+            referencedRelation: "spots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
