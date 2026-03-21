@@ -12,12 +12,12 @@ export interface DetectedSpot {
 
 export function useSpotDetection(
   spots: Tables<'spots'>[] | undefined,
-  userLat: number | null,
-  userLng: number | null,
+  userLat: number,
+  userLng: number,
   currentFloor: number
 ): DetectedSpot[] {
   return useMemo(() => {
-    if (!spots || userLat === null || userLng === null) return [];
+    if (!spots) return [];
 
     return spots
       .filter(s => s.is_active && s.floor === currentFloor)

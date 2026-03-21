@@ -44,7 +44,7 @@ export function GameMap({ userLat, userLng, detectedSpots, onSpotClick }: GameMa
     <MapContainer
       center={[userLat, userLng]}
       zoom={18}
-      className="h-full w-full"
+      style={{ height: '100%', width: '100%' }}
       zoomControl={false}
     >
       <TileLayer
