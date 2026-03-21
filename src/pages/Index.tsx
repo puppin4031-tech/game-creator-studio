@@ -112,6 +112,9 @@ const Index = () => {
 
   return (
     <div className="h-screen w-screen relative overflow-hidden">
+      {/* Game menu */}
+      <GameMenu />
+
       {/* Map */}
       <GameMap
         userLat={position.latitude}
