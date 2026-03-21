@@ -29,6 +29,7 @@ interface Spot {
 
 export default function SpotManagement() {
   const { user, isMainAdmin } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
   const rectanglesRef = useRef<Map<string, L.Rectangle>>(new Map());
