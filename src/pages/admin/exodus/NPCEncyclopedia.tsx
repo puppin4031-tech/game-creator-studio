@@ -104,8 +104,8 @@ export default function NPCEncyclopedia() {
 
   return (
     <div className="p-4 md:p-6 h-full overflow-y-auto">
-      <h1 className="text-2xl font-bold text-[#d4a843] mb-1">NPC 도감</h1>
-      <p className="text-[#7b8da6] text-[15px] mb-6">캐릭터 카드를 클릭하면 대화 미리보기를 확인할 수 있습니다</p>
+      <h1 className="text-2xl sm:text-3xl font-bold text-[#d4a843] mb-1">NPC 도감</h1>
+      <p className="text-[#7b8da6] text-[15px] sm:text-[17px] mb-6">캐릭터 카드를 클릭하면 대화 미리보기를 확인할 수 있습니다</p>
 
       {/* NPC Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
