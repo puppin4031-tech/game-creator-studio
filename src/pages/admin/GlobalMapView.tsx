@@ -1,59 +1,42 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { GoogleMap, Rectangle, Marker, InfoWindow } from '@react-google-maps/api';
 
-const missionIcon = (status: string) => L.divIcon({
-  html: `<div style="width:12px;height:12px;border-radius:50%;background:${
-    status === '승인완료' ? 'hsl(150,80%,45%)' :
-    status === '승인대기' ? 'hsl(35,90%,55%)' :
-    status === '반려' ? 'hsl(0,75%,55%)' : 'hsl(220,15%,40%)'
-  };border:2px solid white;"></div>`,
-  className: '',
-  iconSize: [12, 12],
-  iconAnchor: [6, 6],
-});
+const containerStyle = { width: '100%', height: '100%' };
+const center = { lat: 37.5665, lng: 126.978 };
+
+const missionIconUrl = (status: string) => {
+  const color = status === '승인완료' ? '26b34a' : status === '승인대기' ? 'e0952d' : status === '반려' ? 'dc3545' : '7b8da6';
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"><circle cx="7" cy="7" r="5" fill="#${color}" stroke="white" stroke-width="2"/></svg>`)}`;
+};
 
 export default function GlobalMapView() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const spotLayerRef = useRef<L.LayerGroup | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [infoSpot, setInfoSpot] = useState<any>(null);
+  const [selectedThemeId, setSelectedThemeId] = useState('');
 
   const { data: regions } = useQuery({
     queryKey: ['regions'],
-    queryFn: async () => {
-      const { data } = await supabase.from('regions').select('*');
-      return data || [];
-    },
+    queryFn: async () => { const { data } = await supabase.from('regions').select('*'); return data || []; },
   });
 
   const { data: missions } = useQuery({
     queryKey: ['all-missions'],
-    queryFn: async () => {
-      const { data } = await supabase.from('missions').select('*');
-      return data || [];
-    },
+    queryFn: async () => { const { data } = await supabase.from('missions').select('*'); return data || []; },
   });
 
   const { data: spots } = useQuery({
     queryKey: ['all-spots'],
-    queryFn: async () => {
-      const { data } = await supabase.from('spots').select('*');
-      return data || [];
-    },
+    queryFn: async () => { const { data } = await supabase.from('spots').select('*'); return data || []; },
   });
 
   const { data: themes } = useQuery({
     queryKey: ['themes'],
-    queryFn: async () => {
-      const { data } = await supabase.from('themes').select('*');
-      return data || [];
-    },
+    queryFn: async () => { const { data } = await supabase.from('themes').select('*'); return data || []; },
   });
 
   const updateThemeMutation = useMutation({
@@ -70,116 +53,93 @@ export default function GlobalMapView() {
     },
   });
 
-  useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
-    const map = L.map(containerRef.current, { zoomControl: true }).setView([37.5665, 126.978], 11);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OSM',
-    }).addTo(map);
-    spotLayerRef.current = L.layerGroup().addTo(map);
-    mapRef.current = map;
-    return () => { map.remove(); mapRef.current = null; };
-  }, []);
+  const themeMap = new Map((themes || []).map(t => [t.id, t]));
 
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !regions) return;
-    regions.forEach(r => {
-      L.rectangle(
-        [[r.bounds_south, r.bounds_west], [r.bounds_north, r.bounds_east]],
-        { color: 'hsl(150,80%,45%)', weight: 2, fillOpacity: 0.1 }
-      ).addTo(map).bindPopup(`<strong>${r.name}</strong><br/>${r.description || ''}`);
-    });
-  }, [regions]);
+  const handleSpotClick = useCallback((spot: any) => {
+    if (spot.theme_id) {
+      navigate(`/admin/exodus/spots?spotId=${spot.id}`);
+    } else {
+      setInfoSpot(spot);
+      setSelectedThemeId('');
+    }
+  }, [navigate]);
 
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !missions) return;
-    missions.forEach(m => {
-      L.marker([m.latitude, m.longitude], { icon: missionIcon(m.status) })
-        .addTo(map)
-        .bindPopup(`<div class="text-sm"><strong>${m.title}</strong><br/>상태: ${m.status}<br/>${m.floor}층</div>`);
-    });
-  }, [missions]);
-
-  // Draw spot rectangles
-  useEffect(() => {
-    const map = mapRef.current;
-    const layer = spotLayerRef.current;
-    if (!map || !layer || !spots) return;
-
-    layer.clearLayers();
-    const themeMap = new Map((themes || []).map(t => [t.id, t]));
-
-    spots.forEach(spot => {
-      if (spot.bounds_north == null || spot.bounds_south == null || spot.bounds_east == null || spot.bounds_west == null) return;
-
-      const theme = spot.theme_id ? themeMap.get(spot.theme_id) : null;
-      const color = theme?.color_primary || '#7b8da6';
-
-      const rect = L.rectangle(
-        [[spot.bounds_south, spot.bounds_west], [spot.bounds_north, spot.bounds_east]],
-        { color, weight: 2, fillOpacity: 0.2 }
-      );
-
-      rect.bindTooltip(spot.name, { permanent: false, direction: 'center' });
-
-      rect.on('click', () => {
-        if (spot.theme_id) {
-          // Has theme → go to spot management
-          navigate(`/admin/exodus/spots?spotId=${spot.id}`);
-        } else {
-          // No theme → show theme picker popup
-          const themeOptions = (themes || [])
-            .filter(t => t.is_active)
-            .map(t => `<option value="${t.id}">${t.name} (${t.category})</option>`)
-            .join('');
-
-          const popupContent = document.createElement('div');
-          popupContent.innerHTML = `
-            <div style="min-width:200px;">
-              <strong style="font-size:14px;">${spot.name}</strong>
-              <p style="color:#888;font-size:12px;margin:4px 0 8px;">테마를 선택해주세요</p>
-              <select id="theme-select-${spot.id}" style="width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;margin-bottom:8px;">
-                <option value="">테마 선택...</option>
-                ${themeOptions}
-              </select>
-              <button id="theme-save-${spot.id}" style="width:100%;padding:6px 12px;background:#d4a843;color:#0f1d32;border:none;border-radius:4px;font-weight:600;cursor:pointer;">
-                설정 후 관리 페이지로 이동
-              </button>
-            </div>
-          `;
-
-          const popup = rect.bindPopup(popupContent, { maxWidth: 260 }).openPopup();
-
-          setTimeout(() => {
-            const btn = document.getElementById(`theme-save-${spot.id}`);
-            btn?.addEventListener('click', () => {
-              const select = document.getElementById(`theme-select-${spot.id}`) as HTMLSelectElement;
-              const themeId = select?.value;
-              if (!themeId) {
-                toast({ title: '테마를 선택해주세요', variant: 'destructive' });
-                return;
-              }
-              updateThemeMutation.mutate(
-                { spotId: spot.id, themeId },
-                { onSuccess: () => {
-                  map.closePopup();
-                  navigate(`/admin/exodus/spots?spotId=${spot.id}`);
-                }}
-              );
-            });
-          }, 50);
-        }
-      });
-
-      rect.addTo(layer);
-    });
-  }, [spots, themes, navigate, updateThemeMutation]);
+  const handleThemeSave = () => {
+    if (!selectedThemeId || !infoSpot) {
+      toast({ title: '테마를 선택해주세요', variant: 'destructive' });
+      return;
+    }
+    updateThemeMutation.mutate(
+      { spotId: infoSpot.id, themeId: selectedThemeId },
+      { onSuccess: () => { setInfoSpot(null); navigate(`/admin/exodus/spots?spotId=${infoSpot.id}`); } }
+    );
+  };
 
   return (
     <div className="h-[calc(100vh-3rem)]">
-      <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
+      <GoogleMap mapContainerStyle={containerStyle} center={center} zoom={11}>
+        {/* Region rectangles */}
+        {(regions || []).map(r => (
+          <Rectangle
+            key={r.id}
+            bounds={{ north: r.bounds_north, south: r.bounds_south, east: r.bounds_east, west: r.bounds_west }}
+            options={{ strokeColor: 'hsl(150,80%,45%)', strokeWeight: 2, fillOpacity: 0.1, fillColor: 'hsl(150,80%,45%)', clickable: false }}
+          />
+        ))}
+
+        {/* Mission markers */}
+        {(missions || []).map(m => (
+          <Marker
+            key={m.id}
+            position={{ lat: m.latitude, lng: m.longitude }}
+            icon={{ url: missionIconUrl(m.status), scaledSize: new google.maps.Size(14, 14), anchor: new google.maps.Point(7, 7) }}
+            title={`${m.title} (${m.status})`}
+          />
+        ))}
+
+        {/* Spot rectangles */}
+        {(spots || []).filter(s => s.bounds_north != null).map(spot => {
+          const theme = spot.theme_id ? themeMap.get(spot.theme_id) : null;
+          const color = theme?.color_primary || '#7b8da6';
+          return (
+            <Rectangle
+              key={spot.id}
+              bounds={{ north: spot.bounds_north!, south: spot.bounds_south!, east: spot.bounds_east!, west: spot.bounds_west! }}
+              options={{ strokeColor: color, strokeWeight: 2, fillOpacity: 0.2, fillColor: color, clickable: true }}
+              onClick={() => handleSpotClick(spot)}
+            />
+          );
+        })}
+
+        {/* Theme picker InfoWindow */}
+        {infoSpot && (
+          <InfoWindow
+            position={{ lat: infoSpot.latitude, lng: infoSpot.longitude }}
+            onCloseClick={() => setInfoSpot(null)}
+          >
+            <div style={{ minWidth: 200 }}>
+              <strong style={{ fontSize: 14 }}>{infoSpot.name}</strong>
+              <p style={{ color: '#888', fontSize: 12, margin: '4px 0 8px' }}>테마를 선택해주세요</p>
+              <select
+                value={selectedThemeId}
+                onChange={e => setSelectedThemeId(e.target.value)}
+                style={{ width: '100%', padding: 6, border: '1px solid #ccc', borderRadius: 4, marginBottom: 8 }}
+              >
+                <option value="">테마 선택...</option>
+                {(themes || []).filter(t => t.is_active).map(t => (
+                  <option key={t.id} value={t.id}>{t.name} ({t.category})</option>
+                ))}
+              </select>
+              <button
+                onClick={handleThemeSave}
+                style={{ width: '100%', padding: '6px 12px', background: '#d4a843', color: '#0f1d32', border: 'none', borderRadius: 4, fontWeight: 600, cursor: 'pointer' }}
+              >
+                설정 후 관리 페이지로 이동
+              </button>
+            </div>
+          </InfoWindow>
+        )}
+      </GoogleMap>
     </div>
   );
 }

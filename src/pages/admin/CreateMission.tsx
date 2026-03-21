@@ -1,9 +1,8 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useCallback } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { GoogleMap, Rectangle, Marker } from '@react-google-maps/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,19 +12,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { PlusCircle, MapPin } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
-const newMarkerIcon = L.divIcon({
-  html: `<div style="width:18px;height:18px;border-radius:50%;background:hsl(35,90%,55%);border:3px solid white;box-shadow:0 0 10px hsl(35,90%,55%,0.5);"></div>`,
-  className: '',
-  iconSize: [18, 18],
-  iconAnchor: [9, 9],
-});
+const containerStyle = { width: '100%', height: '100%' };
+
+const newMarkerIcon = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><circle cx="9" cy="9" r="7" fill="#e0952d" stroke="white" stroke-width="3"/></svg>`)}`;
 
 export default function CreateMission() {
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const clickMarkerRef = useRef<L.Marker | null>(null);
   const [clickedPos, setClickedPos] = useState<{ lat: number; lng: number } | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [title, setTitle] = useState('');
@@ -44,40 +37,12 @@ export default function CreateMission() {
     enabled: !!profile?.assigned_region,
   });
 
-  // Initialize map
-  useEffect(() => {
-    if (!containerRef.current || mapRef.current || !region) return;
-    const bounds: L.LatLngBoundsExpression = [
-      [region.bounds_south, region.bounds_west],
-      [region.bounds_north, region.bounds_east],
-    ];
-    const map = L.map(containerRef.current).setView([region.center_lat, region.center_lng], 16);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    map.setMaxBounds(bounds);
-    map.fitBounds(bounds);
-    L.rectangle(bounds, { color: 'hsl(150,80%,45%)', weight: 2, fillOpacity: 0.05, dashArray: '8 4' }).addTo(map);
-
-    map.on('click', (e: L.LeafletMouseEvent) => {
-      setClickedPos({ lat: e.latlng.lat, lng: e.latlng.lng });
+  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
+    if (e.latLng) {
+      setClickedPos({ lat: e.latLng.lat(), lng: e.latLng.lng() });
       setShowModal(true);
-    });
-
-    mapRef.current = map;
-    return () => { map.remove(); mapRef.current = null; };
-  }, [region]);
-
-  // Update click marker
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    if (clickMarkerRef.current) {
-      clickMarkerRef.current.remove();
-      clickMarkerRef.current = null;
     }
-    if (clickedPos) {
-      clickMarkerRef.current = L.marker([clickedPos.lat, clickedPos.lng], { icon: newMarkerIcon }).addTo(map);
-    }
-  }, [clickedPos]);
+  }, []);
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -108,12 +73,7 @@ export default function CreateMission() {
   });
 
   const resetForm = () => {
-    setTitle('');
-    setDescription('');
-    setFloor(1);
-    setQuizContent('');
-    setQrInfo('');
-    setClickedPos(null);
+    setTitle(''); setDescription(''); setFloor(1); setQuizContent(''); setQrInfo(''); setClickedPos(null);
   };
 
   if (!profile?.assigned_region || !region) {
@@ -126,12 +86,34 @@ export default function CreateMission() {
 
   return (
     <div className="h-[calc(100vh-3rem)] relative">
-      <div className="absolute top-3 left-3 z-[1000] bg-card/90 backdrop-blur rounded-lg px-3 py-1.5 border border-border flex items-center gap-2">
+      <div className="absolute top-3 left-3 z-10 bg-card/90 backdrop-blur rounded-lg px-3 py-1.5 border border-border flex items-center gap-2">
         <PlusCircle className="h-4 w-4 text-accent" />
         <span className="text-sm font-medium">지도를 클릭하여 미션 추가</span>
       </div>
 
-      <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
+      <GoogleMap
+        mapContainerStyle={containerStyle}
+        center={{ lat: region.center_lat, lng: region.center_lng }}
+        zoom={16}
+        onClick={handleMapClick}
+        options={{
+          restriction: {
+            latLngBounds: { north: region.bounds_north, south: region.bounds_south, east: region.bounds_east, west: region.bounds_west },
+            strictBounds: true,
+          },
+        }}
+      >
+        <Rectangle
+          bounds={{ north: region.bounds_north, south: region.bounds_south, east: region.bounds_east, west: region.bounds_west }}
+          options={{ strokeColor: 'hsl(150,80%,45%)', strokeWeight: 2, fillOpacity: 0.05 }}
+        />
+        {clickedPos && (
+          <Marker
+            position={clickedPos}
+            icon={{ url: newMarkerIcon, scaledSize: new google.maps.Size(18, 18), anchor: new google.maps.Point(9, 9) }}
+          />
+        )}
+      </GoogleMap>
 
       <Dialog open={showModal} onOpenChange={open => { if (!open) { setShowModal(false); setClickedPos(null); } }}>
         <DialogContent className="max-w-md">
