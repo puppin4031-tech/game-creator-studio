@@ -203,12 +203,16 @@ export default function SpotManagement() {
   };
 
   const focusSpot = (spot: Spot) => {
-    if (!mapInstance.current || spot.bounds_north == null) return;
-    const bounds = L.latLngBounds(
-      [spot.bounds_south!, spot.bounds_west!],
-      [spot.bounds_north!, spot.bounds_east!]
-    );
-    mapInstance.current.fitBounds(bounds, { padding: [40, 40] });
+    if (!mapInstance.current) return;
+    if (spot.bounds_north != null && spot.bounds_south != null && spot.bounds_east != null && spot.bounds_west != null) {
+      const bounds = L.latLngBounds(
+        [spot.bounds_south, spot.bounds_west],
+        [spot.bounds_north, spot.bounds_east]
+      );
+      mapInstance.current.fitBounds(bounds, { padding: [40, 40] });
+    } else {
+      mapInstance.current.setView([spot.latitude, spot.longitude], 17);
+    }
   };
 
   // If a spot is selected for detail view
