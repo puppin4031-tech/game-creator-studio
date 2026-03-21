@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,13 +9,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MapPin, Shield } from 'lucide-react';
 
 export default function Login() {
-  const { signIn, signUp } = useAuth();
+  const { user, signIn, signUp, isLoading } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [signUpSuccess, setSignUpSuccess] = useState(false);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!isLoading && user) {
+      navigate('/admin', { replace: true });
+    }
+  }, [user, isLoading, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,9 +39,12 @@ export default function Login() {
     setError(null);
     const { error } = await signUp(email, password, displayName);
     if (error) setError(error);
-    else setSignUpSuccess(true);
+    // If auto-confirm is on, onAuthStateChange will fire and user state will update,
+    // triggering the useEffect redirect above.
     setLoading(false);
   };
+
+  if (!isLoading && user) return null;
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
@@ -73,31 +84,24 @@ export default function Login() {
             </TabsContent>
 
             <TabsContent value="signup">
-              {signUpSuccess ? (
-                <div className="text-center py-6 space-y-2">
-                  <p className="text-primary font-medium">가입 완료!</p>
-                  <p className="text-sm text-muted-foreground">이메일을 확인해주세요.</p>
+              <form onSubmit={handleSignUp} className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">이름</Label>
+                  <Input id="name" value={displayName} onChange={e => setDisplayName(e.target.value)} required />
                 </div>
-              ) : (
-                <form onSubmit={handleSignUp} className="space-y-4 mt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">이름</Label>
-                    <Input id="name" value={displayName} onChange={e => setDisplayName(e.target.value)} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email2">이메일</Label>
-                    <Input id="email2" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="pw2">비밀번호</Label>
-                    <Input id="pw2" type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
-                  </div>
-                  {error && <p className="text-sm text-destructive">{error}</p>}
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? '가입 중...' : '회원가입'}
-                  </Button>
-                </form>
-              )}
+                <div className="space-y-2">
+                  <Label htmlFor="email2">이메일</Label>
+                  <Input id="email2" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pw2">비밀번호</Label>
+                  <Input id="pw2" type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
+                </div>
+                {error && <p className="text-sm text-destructive">{error}</p>}
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? '가입 중...' : '회원가입'}
+                </Button>
+              </form>
             </TabsContent>
           </Tabs>
         </CardContent>
