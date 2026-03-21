@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 const stats = [
   { label: '재앙 스테이지', value: '10', icon: List, color: '#dc2626' },
   { label: 'NPC 캐릭터', value: '4', icon: Users, color: '#d4a843' },
-  { label: '아이템 프리셋', value: '5', icon: Package, color: '#22d3ee' },
+  { label: '아이템 프리셋', value: '5', icon: Package, color: '#0891b2' },
   { label: '퍼즐/퀴즈', value: '∞', icon: Puzzle, color: '#a855f7' },
 ];
 
@@ -22,10 +22,10 @@ export default function ExodusDashboard() {
     <div className="p-4 md:p-6 space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#d4a843]">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-accent">
           ⚡ EXODUS 대시보드
         </h1>
-        <p className="text-[#7b8da6] text-[15px] sm:text-[17px] mt-1">
+        <p className="text-muted-foreground text-[15px] sm:text-[17px] mt-1">
           출애굽기 10대 재앙 — AR 위치 기반 방탈출 게임 프리셋
         </p>
       </div>
@@ -33,33 +33,33 @@ export default function ExodusDashboard() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {stats.map(s => (
-          <div key={s.label} className="rounded-xl bg-[#111f38] border border-[#1e2d4a] p-4">
+          <div key={s.label} className="rounded-xl bg-card border border-border p-4">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: s.color + '20' }}>
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: s.color + '15' }}>
                 <s.icon className="h-5 w-5" style={{ color: s.color }} />
               </div>
             </div>
-            <div className="text-2xl font-bold text-[#e8e0d0]">{s.value}</div>
-            <div className="text-[15px] text-[#7b8da6]">{s.label}</div>
+            <div className="text-2xl font-bold text-foreground">{s.value}</div>
+            <div className="text-[15px] text-muted-foreground">{s.label}</div>
           </div>
         ))}
       </div>
 
       {/* Quick links */}
       <div>
-        <h2 className="text-lg font-semibold text-[#e8e0d0] mb-3">빠른 이동</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-3">빠른 이동</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {quickLinks.map(link => (
             <button
               key={link.path}
               onClick={() => navigate(link.path)}
-              className="text-left rounded-xl bg-[#111f38] border border-[#1e2d4a] hover:border-[#d4a843]/40 p-4 transition-all group"
+              className="text-left rounded-xl bg-card border border-border hover:border-accent/40 p-4 transition-all group"
             >
               <div className="flex items-center gap-3">
-                <link.icon className="h-5 w-5 text-[#d4a843] group-hover:scale-110 transition-transform" />
+                <link.icon className="h-5 w-5 text-accent group-hover:scale-110 transition-transform" />
                 <div>
-                  <div className="text-[16px] font-medium text-[#e8e0d0]">{link.title}</div>
-                  <div className="text-[14px] text-[#7b8da6]">{link.desc}</div>
+                  <div className="text-[16px] font-medium text-foreground">{link.title}</div>
+                  <div className="text-[14px] text-muted-foreground">{link.desc}</div>
                 </div>
               </div>
             </button>
@@ -68,13 +68,13 @@ export default function ExodusDashboard() {
       </div>
 
       {/* Map placeholder */}
-      <div className="rounded-xl bg-[#111f38] border border-[#1e2d4a] p-6">
+      <div className="rounded-xl bg-card border border-border p-6">
         <div className="flex items-center gap-2 mb-3">
-          <MapPin className="h-5 w-5 text-[#d4a843]" />
-          <h2 className="text-lg font-semibold text-[#e8e0d0]">활성 스팟 현황</h2>
+          <MapPin className="h-5 w-5 text-accent" />
+          <h2 className="text-lg font-semibold text-foreground">활성 스팟 현황</h2>
         </div>
-        <div className="h-48 rounded-lg bg-[#0a1628] border border-[#1e2d4a] flex items-center justify-center">
-          <span className="text-[#7b8da6] text-sm">지도에 스팟을 배치하면 여기에 표시됩니다</span>
+        <div className="h-48 rounded-lg bg-muted border border-border flex items-center justify-center">
+          <span className="text-muted-foreground text-sm">지도에 스팟을 배치하면 여기에 표시됩니다</span>
         </div>
       </div>
     </div>

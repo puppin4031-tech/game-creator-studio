@@ -30,7 +30,7 @@ const npcs: NPC[] = [
   {
     id: 'aaron', name: '아론', title: '조력자',
     role: '힌트를 제공하고 퍼즐 규칙을 설명하는 대제사장. 약초 배합 퀴즈를 출제한다.',
-    image: aaronImg, color: '#22d3ee',
+    image: aaronImg, color: '#0891b2',
     dialogues: [
       '"형, 이 약초를 올바르게 섞으면 돌림병을 막을 수 있을 것이오."',
       '"이 지팡이에는 하나님의 능력이 깃들어 있소. 잘 사용하시오."',
@@ -82,7 +82,7 @@ function TypingText({ text, speed = 40 }: { text: string; speed?: number }) {
   return (
     <span>
       {displayed}
-      {!done && <span className="inline-block w-0.5 h-4 bg-[#d4a843] ml-0.5 animate-pulse" />}
+      {!done && <span className="inline-block w-0.5 h-4 bg-accent ml-0.5 animate-pulse" />}
     </span>
   );
 }
@@ -104,8 +104,8 @@ export default function NPCEncyclopedia() {
 
   return (
     <div className="p-4 md:p-6 h-full overflow-y-auto">
-      <h1 className="text-2xl sm:text-3xl font-bold text-[#d4a843] mb-1">NPC 도감</h1>
-      <p className="text-[#7b8da6] text-[15px] sm:text-[17px] mb-6">캐릭터 카드를 클릭하면 대화 미리보기를 확인할 수 있습니다</p>
+      <h1 className="text-2xl sm:text-3xl font-bold text-accent mb-1">NPC 도감</h1>
+      <p className="text-muted-foreground text-[15px] sm:text-[17px] mb-6">캐릭터 카드를 클릭하면 대화 미리보기를 확인할 수 있습니다</p>
 
       {/* NPC Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
@@ -113,24 +113,24 @@ export default function NPCEncyclopedia() {
           <button
             key={npc.id}
             onClick={() => handleSelect(npc)}
-            className="group rounded-lg bg-[#111f38] border border-[#1e2d4a] hover:border-[#d4a843]/40 overflow-hidden transition-all hover:shadow-lg hover:shadow-[#d4a843]/10 text-left"
+            className="group rounded-lg bg-card border border-border hover:border-accent/40 overflow-hidden transition-all hover:shadow-lg hover:shadow-accent/10 text-left"
           >
-            <div className="aspect-[3/4] relative overflow-hidden bg-gradient-to-b from-[#162340] to-[#0a1628] max-h-[120px] sm:max-h-[150px]">
+            <div className="aspect-[3/4] relative overflow-hidden bg-gradient-to-b from-muted to-card max-h-[120px] sm:max-h-[150px]">
               <img
                 src={npc.image}
                 alt={npc.name}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
-              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-[#0a1628] to-transparent h-1/3" />
+              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-card to-transparent h-1/3" />
             </div>
             <div className="p-2">
               <div className="flex items-center gap-1 mb-0.5">
-                <span className="text-[15px] font-bold text-[#e8e0d0]">{npc.name}</span>
-                <Badge className="text-[10px] border-0 px-1" style={{ backgroundColor: npc.color + '20', color: npc.color }}>
+                <span className="text-[15px] font-bold text-foreground">{npc.name}</span>
+                <Badge className="text-[10px] border-0 px-1" style={{ backgroundColor: npc.color + '15', color: npc.color }}>
                   {npc.title}
                 </Badge>
               </div>
-              <p className="text-[12px] text-[#7b8da6] line-clamp-1">{npc.role}</p>
+              <p className="text-[12px] text-muted-foreground line-clamp-1">{npc.role}</p>
             </div>
           </button>
         ))}
@@ -138,37 +138,37 @@ export default function NPCEncyclopedia() {
 
       {/* Slide Panel */}
       <Sheet open={!!selectedNPC} onOpenChange={(open) => !open && setSelectedNPC(null)}>
-        <SheetContent className="bg-[#0f1d32] border-l border-[#1e2d4a] text-[#e8e0d0] w-[400px] sm:w-[450px]">
+        <SheetContent className="bg-card border-l border-border text-foreground w-[400px] sm:w-[450px]">
           {selectedNPC && (
             <div className="h-full flex flex-col">
               <SheetHeader>
-                <SheetTitle className="text-[#d4a843] text-xl flex items-center gap-2">
+                <SheetTitle className="text-accent text-xl flex items-center gap-2">
                   {selectedNPC.name}
-                  <Badge className="text-[11px] border-0" style={{ backgroundColor: selectedNPC.color + '20', color: selectedNPC.color }}>
+                  <Badge className="text-[11px] border-0" style={{ backgroundColor: selectedNPC.color + '15', color: selectedNPC.color }}>
                     {selectedNPC.title}
                   </Badge>
                 </SheetTitle>
               </SheetHeader>
 
               {/* Character image */}
-              <div className="my-4 rounded-xl overflow-hidden bg-gradient-to-b from-[#162340] to-[#0a1628] aspect-[4/3]">
+              <div className="my-4 rounded-xl overflow-hidden bg-gradient-to-b from-muted to-card aspect-[4/3]">
                 <img src={selectedNPC.image} alt={selectedNPC.name} className="w-full h-full object-cover" />
               </div>
 
               {/* Role description */}
-              <p className="text-[14px] text-[#7b8da6] mb-4">{selectedNPC.role}</p>
+              <p className="text-[14px] text-muted-foreground mb-4">{selectedNPC.role}</p>
 
               {/* Dialogue preview */}
               <div className="flex-1">
-                <h3 className="text-[13px] font-semibold text-[#d4a843] mb-2 tracking-wider uppercase">대화 미리보기</h3>
-                <div className="rounded-xl bg-[#111f38] border border-[#1e2d4a] p-4 min-h-[100px]">
+                <h3 className="text-[13px] font-semibold text-accent mb-2 tracking-wider uppercase">대화 미리보기</h3>
+                <div className="rounded-xl bg-muted border border-border p-4 min-h-[100px]">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-[#d4a843]/30">
+                    <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-accent/30">
                       <img src={selectedNPC.image} alt="" className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1">
                       <span className="text-[12px] font-medium" style={{ color: selectedNPC.color }}>{selectedNPC.name}</span>
-                      <p className="text-[14px] text-[#e8e0d0] mt-1 leading-relaxed">
+                      <p className="text-[14px] text-foreground mt-1 leading-relaxed">
                         <TypingText
                           key={`${selectedNPC.id}-${dialogueIndex}`}
                           text={selectedNPC.dialogues[dialogueIndex]}
@@ -179,7 +179,7 @@ export default function NPCEncyclopedia() {
                 </div>
                 <button
                   onClick={nextDialogue}
-                  className="mt-3 w-full rounded-lg bg-[#162340] hover:bg-[#1e2d4a] border border-[#1e2d4a] py-2 text-[13px] text-[#d4a843] transition-colors"
+                  className="mt-3 w-full rounded-lg bg-secondary hover:bg-muted border border-border py-2 text-[13px] text-accent transition-colors"
                 >
                   다음 대사 ▶
                 </button>

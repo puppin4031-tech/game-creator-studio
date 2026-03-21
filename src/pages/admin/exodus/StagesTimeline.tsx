@@ -57,12 +57,12 @@ const stages = [
 export default function StagesTimeline() {
   return (
     <div className="p-4 md:p-6">
-      <h1 className="text-2xl sm:text-3xl font-bold text-[#d4a843] mb-1">10대 재앙 스테이지</h1>
-      <p className="text-[#7b8da6] text-[15px] sm:text-[17px] mb-6">1재앙부터 10재앙까지의 플레이 타임라인</p>
+      <h1 className="text-2xl sm:text-3xl font-bold text-accent mb-1">10대 재앙 스테이지</h1>
+      <p className="text-muted-foreground text-[15px] sm:text-[17px] mb-6">1재앙부터 10재앙까지의 플레이 타임라인</p>
 
       <div className="relative">
         {/* Vertical line */}
-        <div className="absolute left-[23px] top-4 bottom-4 w-0.5 bg-gradient-to-b from-[#d4a843]/60 via-[#d4a843]/30 to-[#d4a843]/10" />
+        <div className="absolute left-[23px] top-4 bottom-4 w-0.5 bg-gradient-to-b from-accent/60 via-accent/30 to-accent/10" />
 
         <div className="space-y-4">
           {stages.map((stage, i) => (
@@ -71,32 +71,32 @@ export default function StagesTimeline() {
               <div
                 className="relative z-10 w-[30px] h-[30px] rounded-full flex items-center justify-center shrink-0 border-2 shadow-lg"
                 style={{
-                  backgroundColor: stage.color + '30',
+                  backgroundColor: stage.color + '20',
                   borderColor: stage.color,
-                  boxShadow: `0 0 12px ${stage.color}40`,
+                  boxShadow: `0 0 12px ${stage.color}30`,
                 }}
               >
                 <span className="text-[13px] font-bold" style={{ color: stage.color }}>{stage.num}</span>
               </div>
 
               {/* Card */}
-              <div className="flex-1 rounded-xl bg-[#111f38] border border-[#1e2d4a] hover:border-[#d4a843]/30 p-4 transition-all group">
+              <div className="flex-1 rounded-xl bg-card border border-border hover:border-accent/30 p-4 transition-all group">
                 <div className="flex items-center gap-2 mb-2">
                   <stage.icon className="h-5 w-5" style={{ color: stage.color }} />
-                  <h3 className="text-[16px] font-semibold text-[#e8e0d0]">{stage.name}</h3>
+                  <h3 className="text-[16px] font-semibold text-foreground">{stage.name}</h3>
                   <Badge
                     className="ml-auto text-[12px] border-0"
-                    style={{ backgroundColor: stage.color + '20', color: stage.color }}
+                    style={{ backgroundColor: stage.color + '15', color: stage.color }}
                   >
                     {stage.type}
                   </Badge>
                   {stage.deferred && (
-                    <Badge variant="outline" className="text-[11px] border-[#7b8da6]/30 text-[#7b8da6]">
+                    <Badge variant="outline" className="text-[11px] border-muted-foreground/30 text-muted-foreground">
                       보류
                     </Badge>
                   )}
                 </div>
-                <p className="text-[14px] text-[#7b8da6] leading-relaxed">{stage.condition}</p>
+                <p className="text-[14px] text-muted-foreground leading-relaxed">{stage.condition}</p>
               </div>
             </div>
           ))}
