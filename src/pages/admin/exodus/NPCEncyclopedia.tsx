@@ -108,14 +108,14 @@ export default function NPCEncyclopedia() {
       <p className="text-[#7b8da6] text-[15px] mb-6">캐릭터 카드를 클릭하면 대화 미리보기를 확인할 수 있습니다</p>
 
       {/* NPC Grid */}
-      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
         {npcs.map(npc => (
           <button
             key={npc.id}
             onClick={() => handleSelect(npc)}
-            className="group rounded-xl bg-[#111f38] border border-[#1e2d4a] hover:border-[#d4a843]/40 overflow-hidden transition-all hover:shadow-lg hover:shadow-[#d4a843]/10 text-left"
+            className="group rounded-lg bg-[#111f38] border border-[#1e2d4a] hover:border-[#d4a843]/40 overflow-hidden transition-all hover:shadow-lg hover:shadow-[#d4a843]/10 text-left"
           >
-            <div className="aspect-[3/4] relative overflow-hidden bg-gradient-to-b from-[#162340] to-[#0a1628] max-h-[180px]">
+            <div className="aspect-[3/4] relative overflow-hidden bg-gradient-to-b from-[#162340] to-[#0a1628] max-h-[120px] sm:max-h-[150px]">
               <img
                 src={npc.image}
                 alt={npc.name}
@@ -123,14 +123,14 @@ export default function NPCEncyclopedia() {
               />
               <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-[#0a1628] to-transparent h-1/3" />
             </div>
-            <div className="p-3">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[15px] font-bold text-[#e8e0d0]">{npc.name}</span>
-                <Badge className="text-[10px] border-0" style={{ backgroundColor: npc.color + '20', color: npc.color }}>
+            <div className="p-2">
+              <div className="flex items-center gap-1 mb-0.5">
+                <span className="text-[13px] font-bold text-[#e8e0d0]">{npc.name}</span>
+                <Badge className="text-[9px] border-0 px-1" style={{ backgroundColor: npc.color + '20', color: npc.color }}>
                   {npc.title}
                 </Badge>
               </div>
-              <p className="text-[12px] text-[#7b8da6] line-clamp-2">{npc.role}</p>
+              <p className="text-[11px] text-[#7b8da6] line-clamp-1">{npc.role}</p>
             </div>
           </button>
         ))}
