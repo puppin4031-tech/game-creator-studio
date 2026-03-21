@@ -13,7 +13,7 @@ import {
   SidebarFooter,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { Map, Users, CheckSquare, LayoutDashboard, PlusCircle, ClipboardList, LogOut, MapPin, Home, Palette } from 'lucide-react';
+import { Map, Users, CheckSquare, LayoutDashboard, PlusCircle, ClipboardList, LogOut, MapPin, Home, Palette, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const mainAdminItems = [
@@ -82,6 +82,30 @@ export function AdminSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* EXODUS 대시보드 */}
+        <SidebarGroup>
+          <SidebarGroupLabel className="flex items-center gap-2">
+            <Zap className="h-4 w-4 text-amber-500" />
+            {!collapsed && <span className="text-xs font-bold text-amber-500 tracking-wider">EXODUS</span>}
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink
+                    to="/admin/exodus"
+                    className="hover:bg-amber-500/10"
+                    activeClassName="bg-amber-500/10 text-amber-600 font-medium"
+                  >
+                    <Zap className="mr-2 h-5 w-5" />
+                    {!collapsed && <span className="text-[15px]">EXODUS 대시보드</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
