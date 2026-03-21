@@ -60,10 +60,8 @@
   }
 }
 
-/* Leaflet overrides */
-.leaflet-container {
-  height: 100% !important;
-  width: 100% !important;
+/* Google Maps overrides */
+.gm-style {
   background: hsl(220, 20%, 15%) !important;
 }
 
