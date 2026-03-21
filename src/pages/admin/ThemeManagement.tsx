@@ -18,6 +18,7 @@ const categoryConfig = {
 type ThemeCategory = keyof typeof categoryConfig;
 
 export default function ThemeManagement() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<string>('all');
 
   const { data: themes = [], isLoading } = useQuery({
