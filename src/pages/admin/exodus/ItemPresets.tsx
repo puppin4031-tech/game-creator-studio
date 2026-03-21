@@ -58,7 +58,7 @@ export default function ItemPresets() {
             style={{ animationDelay: `${i * 80}ms` }}
           >
             {/* Trading Card (3:4 ratio) */}
-            <div className="aspect-[3/4] rounded-2xl border-2 overflow-hidden flex flex-col transition-all hover:shadow-xl relative"
+            <div className="aspect-[3/4] rounded-xl border overflow-hidden flex flex-col transition-all hover:shadow-xl relative max-h-[200px] sm:max-h-[240px]"
               style={{
                 borderColor: item.color + '40',
                 background: `linear-gradient(180deg, ${item.color}15 0%, #111f38 40%, #0a1628 100%)`,
