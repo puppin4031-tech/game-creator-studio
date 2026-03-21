@@ -140,7 +140,7 @@ export default function SpotDetail({ spot, onBack, isMainAdmin, userId }: Props)
             {spot.bounds_north != null && (
               <Rectangle
                 bounds={{ north: spot.bounds_north, south: spot.bounds_south!, east: spot.bounds_east!, west: spot.bounds_west! }}
-                options={{ strokeColor: '#d4a843', strokeWeight: 2, fillOpacity: 0.1, fillColor: '#d4a843' }}
+                options={{ strokeColor: '#d4a843', strokeWeight: 2, fillOpacity: 0.1, fillColor: '#d4a843', clickable: false }}
               />
             )}
             {spotElements.map(se => {
