@@ -125,12 +125,12 @@ export default function NPCEncyclopedia() {
             </div>
             <div className="p-2">
               <div className="flex items-center gap-1 mb-0.5">
-                <span className="text-[13px] font-bold text-[#e8e0d0]">{npc.name}</span>
-                <Badge className="text-[9px] border-0 px-1" style={{ backgroundColor: npc.color + '20', color: npc.color }}>
+                <span className="text-[15px] font-bold text-[#e8e0d0]">{npc.name}</span>
+                <Badge className="text-[10px] border-0 px-1" style={{ backgroundColor: npc.color + '20', color: npc.color }}>
                   {npc.title}
                 </Badge>
               </div>
-              <p className="text-[11px] text-[#7b8da6] line-clamp-1">{npc.role}</p>
+              <p className="text-[12px] text-[#7b8da6] line-clamp-1">{npc.role}</p>
             </div>
           </button>
         ))}

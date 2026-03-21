@@ -78,16 +78,16 @@ export default function ItemPresets() {
 
               {/* Info */}
               <div className="px-2 pb-2 relative z-10">
-                <h3 className="text-[10px] sm:text-[12px] font-bold text-[#e8e0d0] truncate">{item.name}</h3>
-                <p className="text-[8px] sm:text-[9px] text-[#7b8da6] truncate">{item.stageHint}</p>
-                <p className="text-[8px] sm:text-[9px] text-[#7b8da6] leading-tight line-clamp-2 mt-0.5 hidden sm:block">
+                <h3 className="text-[12px] sm:text-[14px] font-bold text-[#e8e0d0] truncate">{item.name}</h3>
+                <p className="text-[10px] sm:text-[11px] text-[#7b8da6] truncate">{item.stageHint}</p>
+                <p className="text-[10px] sm:text-[11px] text-[#7b8da6] leading-tight line-clamp-2 mt-0.5 hidden sm:block">
                   {item.description}
                 </p>
                 <div className="flex flex-wrap gap-0.5 mt-1">
                   {item.tags.map(tag => (
                     <Badge
                       key={tag}
-                      className="text-[7px] sm:text-[8px] px-1 py-0 border-0 font-normal"
+                      className="text-[8px] sm:text-[10px] px-1 py-0 border-0 font-normal"
                       style={{ backgroundColor: item.color + '20', color: item.color }}
                     >
                       {tag}
