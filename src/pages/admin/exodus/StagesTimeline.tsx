@@ -76,7 +76,7 @@ export default function StagesTimeline() {
                   boxShadow: `0 0 12px ${stage.color}40`,
                 }}
               >
-                <span className="text-[11px] font-bold" style={{ color: stage.color }}>{stage.num}</span>
+                <span className="text-[13px] font-bold" style={{ color: stage.color }}>{stage.num}</span>
               </div>
 
               {/* Card */}
