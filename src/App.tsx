@@ -22,6 +22,7 @@ import StagesTimeline from "./pages/admin/exodus/StagesTimeline";
 import NPCEncyclopedia from "./pages/admin/exodus/NPCEncyclopedia";
 import ItemPresets from "./pages/admin/exodus/ItemPresets";
 import PuzzleQuizMaker from "./pages/admin/exodus/PuzzleQuizMaker";
+import SpotManagement from "./pages/admin/exodus/SpotManagement";
 
 const queryClient = new QueryClient();
 
