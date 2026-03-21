@@ -1,5 +1,4 @@
-import { useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from 'react-leaflet';
+import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { DetectedSpot } from '@/hooks/useSpotDetection';
@@ -26,12 +25,6 @@ const spotIcon = (inRange: boolean) => L.divIcon({
   iconAnchor: [8, 8],
 });
 
-function MapFollower({ lat, lng }: { lat: number; lng: number }) {
-  const map = useMap();
-  useEffect(() => { map.setView([lat, lng], map.getZoom()); }, [lat, lng, map]);
-  return null;
-}
-
 interface GameMapProps {
   userLat: number;
   userLng: number;
@@ -40,47 +33,75 @@ interface GameMapProps {
 }
 
 export function GameMap({ userLat, userLng, detectedSpots, onSpotClick }: GameMapProps) {
-  return (
-    <MapContainer
-      center={[userLat, userLng]}
-      zoom={18}
-      style={{ height: '100%', width: '100%' }}
-      zoomControl={false}
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      <MapFollower lat={userLat} lng={userLng} />
-      
-      {/* User position */}
-      <Marker position={[userLat, userLng]} icon={userIcon}>
-        <Popup>내 위치</Popup>
-      </Marker>
-      <Circle
-        center={[userLat, userLng]}
-        radius={10}
-        pathOptions={{ color: 'hsl(150,80%,45%)', fillColor: 'hsl(150,80%,45%)', fillOpacity: 0.1, weight: 1 }}
-      />
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const userMarkerRef = useRef<L.Marker | null>(null);
+  const userCircleRef = useRef<L.Circle | null>(null);
+  const spotMarkersRef = useRef<L.Marker[]>([]);
 
-      {/* Spots */}
-      {detectedSpots.map(ds => (
-        <Marker
-          key={ds.spot.id}
-          position={[ds.spot.latitude, ds.spot.longitude]}
-          icon={spotIcon(ds.isInRange)}
-          eventHandlers={{ click: () => onSpotClick(ds) }}
-        >
-          <Popup>
-            <div className="text-sm">
-              <strong>{ds.spot.name}</strong>
-              <br />
-              {Math.round(ds.distance)}m · {ds.spot.floor}층
-              {ds.isInRange && <span className="ml-1 text-green-500">● 탐색 가능</span>}
-            </div>
-          </Popup>
-        </Marker>
-      ))}
-    </MapContainer>
-  );
+  // Initialize map
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+    const map = L.map(containerRef.current, { zoomControl: false }).setView([userLat, userLng], 18);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+    }).addTo(map);
+    mapRef.current = map;
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Update user position
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    map.setView([userLat, userLng], map.getZoom());
+
+    if (userMarkerRef.current) {
+      userMarkerRef.current.setLatLng([userLat, userLng]);
+    } else {
+      userMarkerRef.current = L.marker([userLat, userLng], { icon: userIcon })
+        .addTo(map)
+        .bindPopup('내 위치');
+    }
+
+    if (userCircleRef.current) {
+      userCircleRef.current.setLatLng([userLat, userLng]);
+    } else {
+      userCircleRef.current = L.circle([userLat, userLng], {
+        radius: 10,
+        color: 'hsl(150,80%,45%)',
+        fillColor: 'hsl(150,80%,45%)',
+        fillOpacity: 0.1,
+        weight: 1,
+      }).addTo(map);
+    }
+  }, [userLat, userLng]);
+
+  // Update spot markers
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Clear old markers
+    spotMarkersRef.current.forEach(m => m.remove());
+    spotMarkersRef.current = [];
+
+    detectedSpots.forEach(ds => {
+      const marker = L.marker([ds.spot.latitude, ds.spot.longitude], {
+        icon: spotIcon(ds.isInRange),
+      })
+        .addTo(map)
+        .bindPopup(`<div class="text-sm"><strong>${ds.spot.name}</strong><br/>${Math.round(ds.distance)}m · ${ds.spot.floor}층${ds.isInRange ? '<span style="color:green;margin-left:4px;">● 탐색 가능</span>' : ''}</div>`)
+        .on('click', () => onSpotClick(ds));
+      spotMarkersRef.current.push(marker);
+    });
+  }, [detectedSpots, onSpotClick]);
+
+  return <div ref={containerRef} style={{ height: '100%', width: '100%' }} />;
 }

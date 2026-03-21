@@ -1,6 +1,6 @@
+import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { MapContainer, TileLayer, Marker, Popup, Rectangle } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -16,6 +16,9 @@ const missionIcon = (status: string) => L.divIcon({
 });
 
 export default function GlobalMapView() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+
   const { data: regions } = useQuery({
     queryKey: ['regions'],
     queryFn: async () => {
@@ -32,34 +35,40 @@ export default function GlobalMapView() {
     },
   });
 
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+    const map = L.map(containerRef.current, { zoomControl: true }).setView([37.5665, 126.978], 11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OSM',
+    }).addTo(map);
+    mapRef.current = map;
+    return () => { map.remove(); mapRef.current = null; };
+  }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !regions) return;
+    regions.forEach(r => {
+      L.rectangle(
+        [[r.bounds_south, r.bounds_west], [r.bounds_north, r.bounds_east]],
+        { color: 'hsl(150,80%,45%)', weight: 2, fillOpacity: 0.1 }
+      ).addTo(map).bindPopup(`<strong>${r.name}</strong><br/>${r.description || ''}`);
+    });
+  }, [regions]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !missions) return;
+    missions.forEach(m => {
+      L.marker([m.latitude, m.longitude], { icon: missionIcon(m.status) })
+        .addTo(map)
+        .bindPopup(`<div class="text-sm"><strong>${m.title}</strong><br/>상태: ${m.status}<br/>${m.floor}층</div>`);
+    });
+  }, [missions]);
+
   return (
     <div className="h-[calc(100vh-3rem)]">
-      <MapContainer center={[37.5665, 126.978]} zoom={11} className="h-full w-full" zoomControl={true}>
-        <TileLayer
-          attribution='&copy; OSM'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        {regions?.map(r => (
-          <Rectangle
-            key={r.id}
-            bounds={[[r.bounds_south, r.bounds_west], [r.bounds_north, r.bounds_east]]}
-            pathOptions={{ color: 'hsl(150,80%,45%)', weight: 2, fillOpacity: 0.1 }}
-          >
-            <Popup><strong>{r.name}</strong><br />{r.description}</Popup>
-          </Rectangle>
-        ))}
-        {missions?.map(m => (
-          <Marker key={m.id} position={[m.latitude, m.longitude]} icon={missionIcon(m.status)}>
-            <Popup>
-              <div className="text-sm">
-                <strong>{m.title}</strong><br />
-                상태: {m.status}<br />
-                {m.floor}층
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
+      <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
     </div>
   );
 }
