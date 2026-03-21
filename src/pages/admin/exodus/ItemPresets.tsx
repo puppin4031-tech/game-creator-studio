@@ -50,7 +50,7 @@ export default function ItemPresets() {
       <h1 className="text-2xl font-bold text-[#d4a843] mb-1">아이템 프리셋</h1>
       <p className="text-[#7b8da6] text-[15px] mb-6">트레이딩 카드 스타일의 수집품 목록</p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         {items.map((item, i) => (
           <div
             key={item.id}
