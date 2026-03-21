@@ -62,11 +62,11 @@
 
 /* Leaflet overrides */
 .leaflet-container {
-  background: hsl(220 20% 10%) !important;
+  background: hsl(220, 20%, 15%) !important;
 }
 
 .leaflet-tile-pane {
-  filter: brightness(0.7) contrast(1.1) saturate(0.8);
+  filter: brightness(0.85) contrast(1.05) saturate(0.9);
 }
 
 /* Game animations */
