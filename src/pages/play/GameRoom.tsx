@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTagRoom } from '@/hooks/useTagRoom';
 import { useLocationShare } from '@/hooks/useLocationShare';
