@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTagRoom } from '@/hooks/useTagRoom';
 import { useLocationShare } from '@/hooks/useLocationShare';
@@ -37,6 +37,8 @@ export default function GameRoom() {
 
   // Pings state
   const [pings, setPings] = useState<Ping[]>([]);
+  const [pingCooldown, setPingCooldown] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handlePingExpire = useCallback((id: string) => {
     setPings(prev => prev.filter(p => p.id !== id));
@@ -63,13 +65,16 @@ export default function GameRoom() {
     return () => { supabase.removeChannel(channel); };
   }, [room?.id, room?.status, myTeam]);
 
+  const PING_COOLDOWN = 10; // seconds
+
   const sendPing = useCallback(() => {
-    if (!room || !myTeam) return;
+    if (!room || !myTeam || pingCooldown > 0) return;
     const ping: Ping = {
       id: crypto.randomUUID(),
       lat: position.latitude,
       lng: position.longitude,
       team: myTeam,
+      nickname,
       timestamp: Date.now(),
     };
     // Show locally too
@@ -79,7 +84,21 @@ export default function GameRoom() {
       event: 'ping',
       payload: ping,
     });
-  }, [room?.id, myTeam, position.latitude, position.longitude]);
+
+    // Start cooldown
+    setPingCooldown(PING_COOLDOWN);
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
+    cooldownRef.current = setInterval(() => {
+      setPingCooldown(prev => {
+        if (prev <= 1) {
+          clearInterval(cooldownRef.current!);
+          cooldownRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, [room?.id, myTeam, nickname, position.latitude, position.longitude, pingCooldown]);
 
   // Redirect if no nickname
   useEffect(() => {
@@ -169,11 +188,16 @@ export default function GameRoom() {
         <Button
           size="icon"
           variant="secondary"
-          className="h-12 w-12 rounded-full shadow-lg"
+          className="h-12 w-12 rounded-full shadow-lg relative"
           onClick={sendPing}
+          disabled={pingCooldown > 0}
           title="내 위치 신호 보내기"
         >
-          <Radio className="w-5 h-5" />
+          {pingCooldown > 0 ? (
+            <span className="text-xs font-bold">{pingCooldown}</span>
+          ) : (
+            <Radio className="w-5 h-5" />
+          )}
         </Button>
       </div>
 
