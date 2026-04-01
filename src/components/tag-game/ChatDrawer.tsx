@@ -43,10 +43,10 @@ export default function ChatDrawer({ room, messages, currentNickname, currentTea
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button size="icon" variant="secondary" className="rounded-full shadow-lg relative">
-          <MessageCircle className="w-5 h-5" />
+        <Button size="icon" variant="secondary" className="h-16 w-16 rounded-full shadow-lg relative">
+          <MessageCircle className="w-7 h-7" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 text-[10px] bg-destructive text-destructive-foreground rounded-full flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 w-5 h-5 text-xs bg-destructive text-destructive-foreground rounded-full flex items-center justify-center">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
@@ -54,14 +54,14 @@ export default function ChatDrawer({ room, messages, currentNickname, currentTea
       </SheetTrigger>
       <SheetContent side="bottom" className="h-[70vh] flex flex-col">
         <SheetHeader>
-          <SheetTitle>채팅</SheetTitle>
+          <SheetTitle className="text-lg">채팅</SheetTitle>
         </SheetHeader>
 
         {/* Tabs */}
         <div className="flex gap-2 py-2">
           <Badge
             variant={tab === teamChannel ? 'default' : 'outline'}
-            className="cursor-pointer"
+            className="cursor-pointer text-sm px-3 py-1"
             onClick={() => setTab(teamChannel)}
           >
             팀 채팅
@@ -69,7 +69,7 @@ export default function ChatDrawer({ room, messages, currentNickname, currentTea
           {isHost && (
             <Badge
               variant={tab === 'all' ? 'default' : 'outline'}
-              className="cursor-pointer"
+              className="cursor-pointer text-sm px-3 py-1"
               onClick={() => setTab('all')}
             >
               전체 채팅
@@ -80,9 +80,9 @@ export default function ChatDrawer({ room, messages, currentNickname, currentTea
         {/* Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-2 py-2">
           {filteredMessages.map(m => (
-            <div key={m.id} className={`text-sm ${m.sender_nickname === currentNickname ? 'text-right' : ''}`}>
-              <span className="text-xs text-muted-foreground">{m.sender_nickname}</span>
-              <div className={`inline-block px-3 py-1.5 rounded-lg max-w-[80%] ${
+            <div key={m.id} className={`text-base ${m.sender_nickname === currentNickname ? 'text-right' : ''}`}>
+              <span className="text-sm text-muted-foreground">{m.sender_nickname}</span>
+              <div className={`inline-block px-3 py-2 rounded-lg max-w-[80%] ${
                 m.sender_nickname === currentNickname
                   ? 'bg-primary text-primary-foreground ml-auto'
                   : 'bg-muted'
@@ -92,7 +92,7 @@ export default function ChatDrawer({ room, messages, currentNickname, currentTea
             </div>
           ))}
           {filteredMessages.length === 0 && (
-            <p className="text-center text-sm text-muted-foreground py-8">메시지가 없습니다</p>
+            <p className="text-center text-base text-muted-foreground py-8">메시지가 없습니다</p>
           )}
         </div>
 
@@ -103,9 +103,10 @@ export default function ChatDrawer({ room, messages, currentNickname, currentTea
             value={text}
             onChange={e => setText(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
+            className="text-base h-11"
           />
-          <Button size="icon" onClick={handleSend}>
-            <Send className="w-4 h-4" />
+          <Button size="icon" onClick={handleSend} className="h-11 w-11">
+            <Send className="w-5 h-5" />
           </Button>
         </div>
       </SheetContent>
