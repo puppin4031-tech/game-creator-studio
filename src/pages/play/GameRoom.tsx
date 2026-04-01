@@ -8,6 +8,7 @@ import GameTimer from '@/components/tag-game/GameTimer';
 import TeamScoreboard from '@/components/tag-game/TeamScoreboard';
 import ChatDrawer from '@/components/tag-game/ChatDrawer';
 import { Ping } from '@/components/tag-game/PingOverlay';
+import { playPingSound } from '@/lib/pingSound';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy, Radio } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
