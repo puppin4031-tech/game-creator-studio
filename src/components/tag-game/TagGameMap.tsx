@@ -93,6 +93,20 @@ export default function TagGameMap({ room, players, currentPlayerId, myTeam, pos
         );
       })}
 
+      {/* Debug test circle */}
+      <Circle
+        center={center}
+        radius={200}
+        options={{
+          fillColor: '#FF0000',
+          fillOpacity: 0.5,
+          strokeColor: '#FF0000',
+          strokeOpacity: 1,
+          strokeWeight: 3,
+          zIndex: 200,
+        }}
+      />
+
       {/* Pings */}
       <PingOverlay pings={pings} onExpire={onPingExpire} />
     </GoogleMap>
