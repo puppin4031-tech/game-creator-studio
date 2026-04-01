@@ -72,6 +72,7 @@ function PingCircle({ ping, onExpire }: { ping: Ping; onExpire: () => void }) {
           strokeOpacity: opacity * 0.5,
           strokeWeight: 2,
           clickable: false,
+          zIndex: 100,
         }}
       />
       {/* Inner solid circle */}
