@@ -92,6 +92,9 @@ export default function TagGameMap({ room, players, currentPlayerId, myTeam, pos
           />
         );
       })}
+
+      {/* Pings */}
+      <PingOverlay pings={pings} onExpire={onPingExpire} />
     </GoogleMap>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTagRoom } from '@/hooks/useTagRoom';
 import { useLocationShare } from '@/hooks/useLocationShare';
@@ -7,9 +7,11 @@ import TagGameMap from '@/components/tag-game/TagGameMap';
 import GameTimer from '@/components/tag-game/GameTimer';
 import TeamScoreboard from '@/components/tag-game/TeamScoreboard';
 import ChatDrawer from '@/components/tag-game/ChatDrawer';
+import { Ping } from '@/components/tag-game/PingOverlay';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trophy } from 'lucide-react';
+import { ArrowLeft, Trophy, Radio } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function GameRoom() {
   const { roomCode } = useParams<{ roomCode: string }>();
