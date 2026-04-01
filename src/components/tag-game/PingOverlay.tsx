@@ -58,7 +58,7 @@ function usePingCircle(ping: Ping, map: google.maps.Map | null, onExpire: () => 
         scale: 0,
       },
       label: {
-        text: `📡 ${ping.nickname}`,
+        text: `📡 ${ping.nickname}의 신호`,
         color: color,
         fontSize: '12px',
         fontWeight: 'bold',
