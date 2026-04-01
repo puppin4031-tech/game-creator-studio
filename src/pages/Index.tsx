@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useGeolocation } from '@/hooks/useGeolocation';
@@ -114,6 +115,14 @@ const Index = () => {
     <div className="h-screen w-screen relative overflow-hidden">
       {/* Game menu */}
       <GameMenu />
+
+      {/* Tag game link */}
+      <Link
+        to="/play"
+        className="fixed top-4 right-4 z-[1000] bg-primary text-primary-foreground px-4 py-2 rounded-full text-sm font-bold shadow-lg hover:opacity-90 transition"
+      >
+        🏃 술래잡기
+      </Link>
 
       {/* Map */}
       <GameMap
