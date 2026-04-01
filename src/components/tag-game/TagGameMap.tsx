@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { GoogleMap, Marker, Circle } from '@react-google-maps/api';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
 import { haversineDistance } from '@/lib/haversine';
@@ -42,17 +42,8 @@ export default function TagGameMap({ room, players, currentPlayerId, myTeam, pos
     });
   }, [players, currentPlayerId, myTeam, position.latitude, position.longitude]);
 
-  const [mapRef, setMapRef] = useMemo(() => {
-    let ref: google.maps.Map | null = null;
-    const setter = (map: google.maps.Map) => { ref = map; setMapState(map); };
-    return [ref, setter];
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const [mapState, setMapState] = useState<google.maps.Map | null>(null);
 
-  // Use state for map ref to trigger re-renders
-  const [mapState, setMapState] = __import_useState<google.maps.Map | null>(null);
-
-  // Rotate map based on heading
   useEffect(() => {
     if (mapState && isCompassActive && heading !== null) {
       mapState.setHeading(heading);
