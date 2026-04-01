@@ -5,6 +5,7 @@ export interface Ping {
   lat: number;
   lng: number;
   team: number;
+  nickname: string;
   timestamp: number;
 }
 
