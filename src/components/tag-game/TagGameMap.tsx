@@ -22,7 +22,7 @@ const TEAM_COLORS: Record<number, string> = {
   2: '#EF4444', // red
 };
 
-export default function TagGameMap({ room, players, currentPlayerId, myTeam, position }: Props) {
+export default function TagGameMap({ room, players, currentPlayerId, myTeam, position, pings, onPingExpire }: Props) {
   const center = useMemo(() => ({
     lat: position.latitude,
     lng: position.longitude,
