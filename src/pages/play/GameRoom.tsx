@@ -56,10 +56,12 @@ export default function GameRoom() {
   useEffect(() => {
     if (!room || room.status !== 'playing') return;
 
+   // Broadcast channel for signals
     const channel = supabase.channel(`pings_${room.id}`);
     channel.on('broadcast', { event: 'ping' }, ({ payload }) => {
       if (payload.team === myTeam) {
         setPings(prev => [...prev, payload as Ping]);
+        playPingSound();
       }
     }).subscribe();
 
