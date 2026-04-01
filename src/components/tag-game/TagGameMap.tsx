@@ -3,6 +3,7 @@ import { GoogleMap, Marker, Circle } from '@react-google-maps/api';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
 import { haversineDistance } from '@/lib/haversine';
 import { GeoPosition } from '@/hooks/useGeolocation';
+import PingOverlay, { Ping } from './PingOverlay';
 
 interface Props {
   room: TagRoom;
@@ -10,6 +11,8 @@ interface Props {
   currentPlayerId: string;
   myTeam: number | null;
   position: GeoPosition;
+  pings: Ping[];
+  onPingExpire: (id: string) => void;
 }
 
 const mapContainerStyle = { width: '100%', height: '100%' };
