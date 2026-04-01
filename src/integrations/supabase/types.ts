@@ -310,6 +310,124 @@ export type Database = {
           },
         ]
       }
+      tag_messages: {
+        Row: {
+          channel: string
+          created_at: string
+          id: string
+          message: string
+          room_id: string
+          sender_nickname: string
+        }
+        Insert: {
+          channel?: string
+          created_at?: string
+          id?: string
+          message: string
+          room_id: string
+          sender_nickname: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          id?: string
+          message?: string
+          room_id?: string
+          sender_nickname?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tag_messages_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "tag_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tag_players: {
+        Row: {
+          id: string
+          is_caught: boolean
+          is_host: boolean
+          latitude: number | null
+          longitude: number | null
+          nickname: string
+          room_id: string
+          team: number | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          is_caught?: boolean
+          is_host?: boolean
+          latitude?: number | null
+          longitude?: number | null
+          nickname: string
+          room_id: string
+          team?: number | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          is_caught?: boolean
+          is_host?: boolean
+          latitude?: number | null
+          longitude?: number | null
+          nickname?: string
+          room_id?: string
+          team?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tag_players_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "tag_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tag_rooms: {
+        Row: {
+          created_at: string
+          host_id: string
+          id: string
+          room_code: string
+          started_at: string | null
+          status: string
+          team1_name: string
+          team2_name: string
+          timer_seconds: number
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          host_id: string
+          id?: string
+          room_code: string
+          started_at?: string | null
+          status?: string
+          team1_name?: string
+          team2_name?: string
+          timer_seconds?: number
+          title: string
+        }
+        Update: {
+          created_at?: string
+          host_id?: string
+          id?: string
+          room_code?: string
+          started_at?: string | null
+          status?: string
+          team1_name?: string
+          team2_name?: string
+          timer_seconds?: number
+          title?: string
+        }
+        Relationships: []
+      }
       theme_elements: {
         Row: {
           content: Json | null
