@@ -8,6 +8,7 @@ import GameTimer from '@/components/tag-game/GameTimer';
 import TeamScoreboard from '@/components/tag-game/TeamScoreboard';
 import ChatDrawer from '@/components/tag-game/ChatDrawer';
 import { Ping } from '@/components/tag-game/PingOverlay';
+import { playPingSound } from '@/lib/pingSound';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy, Radio } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -55,10 +56,12 @@ export default function GameRoom() {
   useEffect(() => {
     if (!room || room.status !== 'playing') return;
 
+   // Broadcast channel for signals
     const channel = supabase.channel(`pings_${room.id}`);
     channel.on('broadcast', { event: 'ping' }, ({ payload }) => {
       if (payload.team === myTeam) {
         setPings(prev => [...prev, payload as Ping]);
+        playPingSound();
       }
     }).subscribe();
 
@@ -79,6 +82,7 @@ export default function GameRoom() {
     };
     // Show locally too
     setPings(prev => [...prev, ping]);
+    playPingSound();
     supabase.channel(`pings_${room.id}`).send({
       type: 'broadcast',
       event: 'ping',
