@@ -154,12 +154,27 @@ export default function GameRoom() {
         currentPlayerId={playerId || ''}
         myTeam={myTeam}
         position={position}
+        pings={pings}
+        onPingExpire={handlePingExpire}
       />
 
       {/* Top bar */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2">
         <GameTimer room={room} isHost={isHost} onEndGame={() => endGame(room.id)} />
         <TeamScoreboard room={room} players={players} />
+      </div>
+
+      {/* Ping button */}
+      <div className="absolute bottom-6 left-4 z-10">
+        <Button
+          size="icon"
+          variant="secondary"
+          className="h-12 w-12 rounded-full shadow-lg"
+          onClick={sendPing}
+          title="내 위치 신호 보내기"
+        >
+          <Radio className="w-5 h-5" />
+        </Button>
       </div>
 
       {/* Chat button */}
