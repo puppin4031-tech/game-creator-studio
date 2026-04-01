@@ -54,7 +54,7 @@ function PingCircle({ ping, onExpire }: { ping: Ping; onExpire: () => void }) {
     const fadeOut = Math.max(0, 1 - progress);
     
     setOpacity(pulsePhase * fadeOut * 0.6);
-    setRadius(30 + pulsePhase * 60 * fadeOut);
+    setRadius(100 + pulsePhase * 200 * fadeOut);
   }, [tick]);
 
   const color = TEAM_COLORS[ping.team] || '#EF4444';
