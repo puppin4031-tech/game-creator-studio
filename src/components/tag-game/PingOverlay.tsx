@@ -26,6 +26,7 @@ interface Props {
 function usePingCircle(ping: Ping, map: google.maps.Map | null, onExpire: () => void) {
   const outerRef = useRef<google.maps.Circle | null>(null);
   const innerRef = useRef<google.maps.Circle | null>(null);
+  const markerRef = useRef<google.maps.Marker | null>(null);
   const rafRef = useRef<number>(0);
   const startRef = useRef<number>(Date.now());
 
@@ -36,33 +37,40 @@ function usePingCircle(ping: Ping, map: google.maps.Map | null, onExpire: () => 
     const center = { lat: ping.lat, lng: ping.lng };
 
     const outer = new google.maps.Circle({
-      map,
-      center,
-      radius: 200,
-      fillColor: color,
-      fillOpacity: 0.2,
-      strokeColor: color,
-      strokeOpacity: 0.3,
-      strokeWeight: 2,
-      clickable: false,
-      zIndex: 100,
+      map, center, radius: 200,
+      fillColor: color, fillOpacity: 0.2,
+      strokeColor: color, strokeOpacity: 0.3, strokeWeight: 2,
+      clickable: false, zIndex: 100,
     });
 
     const inner = new google.maps.Circle({
-      map,
-      center,
-      radius: 100,
-      fillColor: color,
-      fillOpacity: 0.5,
-      strokeColor: color,
-      strokeOpacity: 0.8,
-      strokeWeight: 2,
+      map, center, radius: 100,
+      fillColor: color, fillOpacity: 0.5,
+      strokeColor: color, strokeOpacity: 0.8, strokeWeight: 2,
+      clickable: false, zIndex: 101,
+    });
+
+    // Nickname label marker
+    const marker = new google.maps.Marker({
+      map, position: center,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 0,
+      },
+      label: {
+        text: `📡 ${ping.nickname}`,
+        color: color,
+        fontSize: '12px',
+        fontWeight: 'bold',
+        className: 'ping-label',
+      },
       clickable: false,
-      zIndex: 101,
+      zIndex: 102,
     });
 
     outerRef.current = outer;
     innerRef.current = inner;
+    markerRef.current = marker;
     startRef.current = Date.now();
 
     const animate = () => {
@@ -72,6 +80,7 @@ function usePingCircle(ping: Ping, map: google.maps.Map | null, onExpire: () => 
       if (progress >= 1) {
         outer.setMap(null);
         inner.setMap(null);
+        marker.setMap(null);
         onExpire();
         return;
       }
@@ -79,22 +88,10 @@ function usePingCircle(ping: Ping, map: google.maps.Map | null, onExpire: () => 
       const pulsePhase = Math.sin(elapsed * 0.005) * 0.5 + 0.5;
       const fadeOut = Math.max(0, 1 - progress);
 
-      const outerRadius = 150 + pulsePhase * 250 * fadeOut;
-      const innerRadius = 80 + pulsePhase * 120 * fadeOut;
-      const outerOpacity = pulsePhase * fadeOut * 0.25;
-      const innerOpacity = pulsePhase * fadeOut * 0.5;
-
-      outer.setRadius(outerRadius);
-      outer.setOptions({
-        fillOpacity: outerOpacity,
-        strokeOpacity: outerOpacity * 1.5,
-      });
-
-      inner.setRadius(innerRadius);
-      inner.setOptions({
-        fillOpacity: innerOpacity,
-        strokeOpacity: Math.min(innerOpacity * 1.5, 1),
-      });
+      outer.setRadius(150 + pulsePhase * 250 * fadeOut);
+      outer.setOptions({ fillOpacity: pulsePhase * fadeOut * 0.25, strokeOpacity: pulsePhase * fadeOut * 0.375 });
+      inner.setRadius(80 + pulsePhase * 120 * fadeOut);
+      inner.setOptions({ fillOpacity: pulsePhase * fadeOut * 0.5, strokeOpacity: Math.min(pulsePhase * fadeOut * 0.75, 1) });
 
       rafRef.current = requestAnimationFrame(animate);
     };
@@ -105,6 +102,7 @@ function usePingCircle(ping: Ping, map: google.maps.Map | null, onExpire: () => 
       cancelAnimationFrame(rafRef.current);
       outer.setMap(null);
       inner.setMap(null);
+      marker.setMap(null);
     };
   }, [map, ping.id]);
 }
