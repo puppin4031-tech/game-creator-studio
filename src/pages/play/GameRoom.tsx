@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTagRoom } from '@/hooks/useTagRoom';
 import { useLocationShare } from '@/hooks/useLocationShare';
@@ -7,9 +7,11 @@ import TagGameMap from '@/components/tag-game/TagGameMap';
 import GameTimer from '@/components/tag-game/GameTimer';
 import TeamScoreboard from '@/components/tag-game/TeamScoreboard';
 import ChatDrawer from '@/components/tag-game/ChatDrawer';
+import { Ping } from '@/components/tag-game/PingOverlay';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trophy } from 'lucide-react';
+import { ArrowLeft, Trophy, Radio } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function GameRoom() {
   const { roomCode } = useParams<{ roomCode: string }>();
@@ -33,12 +35,51 @@ export default function GameRoom() {
   const playerId = myPlayer?.id || null;
   const myTeam = myPlayer?.team || null;
 
+  // Pings state
+  const [pings, setPings] = useState<Ping[]>([]);
+
+  const handlePingExpire = useCallback((id: string) => {
+    setPings(prev => prev.filter(p => p.id !== id));
+  }, []);
+
   // Location sharing during game
   const { position } = useLocationShare({
     playerId,
     updatePosition,
     isActive: room?.status === 'playing',
   });
+
+  // Broadcast channel for pings
+  useEffect(() => {
+    if (!room || room.status !== 'playing') return;
+
+    const channel = supabase.channel(`pings_${room.id}`);
+    channel.on('broadcast', { event: 'ping' }, ({ payload }) => {
+      if (payload.team === myTeam) {
+        setPings(prev => [...prev, payload as Ping]);
+      }
+    }).subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [room?.id, room?.status, myTeam]);
+
+  const sendPing = useCallback(() => {
+    if (!room || !myTeam) return;
+    const ping: Ping = {
+      id: crypto.randomUUID(),
+      lat: position.latitude,
+      lng: position.longitude,
+      team: myTeam,
+      timestamp: Date.now(),
+    };
+    // Show locally too
+    setPings(prev => [...prev, ping]);
+    supabase.channel(`pings_${room.id}`).send({
+      type: 'broadcast',
+      event: 'ping',
+      payload: ping,
+    });
+  }, [room?.id, myTeam, position.latitude, position.longitude]);
 
   // Redirect if no nickname
   useEffect(() => {
@@ -113,12 +154,27 @@ export default function GameRoom() {
         currentPlayerId={playerId || ''}
         myTeam={myTeam}
         position={position}
+        pings={pings}
+        onPingExpire={handlePingExpire}
       />
 
       {/* Top bar */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2">
         <GameTimer room={room} isHost={isHost} onEndGame={() => endGame(room.id)} />
         <TeamScoreboard room={room} players={players} />
+      </div>
+
+      {/* Ping button */}
+      <div className="absolute bottom-6 left-4 z-10">
+        <Button
+          size="icon"
+          variant="secondary"
+          className="h-12 w-12 rounded-full shadow-lg"
+          onClick={sendPing}
+          title="내 위치 신호 보내기"
+        >
+          <Radio className="w-5 h-5" />
+        </Button>
       </div>
 
       {/* Chat button */}
