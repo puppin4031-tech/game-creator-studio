@@ -62,31 +62,24 @@ const Index = () => {
   const nearbyInRange = detectedSpots.filter(s => s.isInRange);
 
   const handleCollectItem = useCallback(async (ds: DetectedSpot) => {
-    // Save to inventory
     await supabase.from('user_inventory').insert({
       user_id: MOCK_USER_ID,
       spot_id: ds.spot.id,
       item_name: ds.spot.item_name || '알 수 없는 아이템',
       item_icon: ds.spot.item_icon,
     });
-
-    // Log the action
     await supabase.from('game_logs').insert({
       user_id: MOCK_USER_ID,
       spot_id: ds.spot.id,
       action: 'collect_item',
       floor: currentFloor,
     });
-
-    // Show toast
     setAcquiredItem(ds.spot.item_name || '아이템');
     setTimeout(() => setAcquiredItem(null), 2000);
-
     refetchInventory();
   }, [currentFloor, refetchInventory]);
 
   const handleQRScan = useCallback(() => {
-    // Simulate QR scan — pick a random spot on current floor
     const floorSpots = spots?.filter(s => s.floor === currentFloor) || [];
     if (floorSpots.length > 0) {
       const spot = floorSpots[Math.floor(Math.random() * floorSpots.length)];
@@ -110,21 +103,9 @@ const Index = () => {
     }
   }, []);
 
-
   return (
     <div className="h-screen w-screen relative overflow-hidden">
-      {/* Game menu */}
-      <GameMenu />
-
-      {/* Tag game link */}
-      <Link
-        to="/play"
-        className="fixed top-4 right-4 z-[1000] bg-primary text-primary-foreground px-4 py-2 rounded-full text-sm font-bold shadow-lg hover:opacity-90 transition"
-      >
-        🏃 술래잡기
-      </Link>
-
-      {/* Map */}
+      {/* Map (background) */}
       <GameMap
         userLat={position.latitude}
         userLng={position.longitude}
@@ -132,27 +113,48 @@ const Index = () => {
         onSpotClick={handleSpotClick}
       />
 
-      {/* Floor selector */}
-      <FloorSelector currentFloor={currentFloor} onFloorChange={setCurrentFloor} />
-
-      {/* Mock movement controls */}
-      <MockControls onMove={mockMove} />
-
-      {/* Floating action bar */}
-      <FloatingBar
-        onInventory={() => setShowInventory(true)}
-        onQuest={() => setShowQuest(true)}
-        onExplore={() => setShowCamera(true)}
-        canExplore={nearbyInRange.length > 0}
-      />
-
-      {/* Status bar */}
-      <div className="fixed top-4 left-4 z-[1000] flex items-center gap-2 bg-card/90 backdrop-blur rounded-full px-3 py-1.5 border border-border text-xs">
-        <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+      {/* ===== TOP-LEFT HUD: status bar ===== */}
+      <div className="fixed top-[calc(0.75rem+env(safe-area-inset-top))] left-4 z-[1000] flex items-center gap-2 bg-card/90 backdrop-blur rounded-full px-3 py-2 border border-border text-xs">
+        <div className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
         <span className="text-muted-foreground">
           {position.latitude.toFixed(4)}, {position.longitude.toFixed(4)}
         </span>
         <span className="text-primary font-medium">{nearbyInRange.length} 스팟</span>
+      </div>
+
+      {/* ===== TOP-RIGHT HUD: stacked controls ===== */}
+      <div className="fixed top-[calc(0.75rem+env(safe-area-inset-top))] right-4 z-[1100] flex flex-col items-end gap-3">
+        {/* Row 1: Menu + Tag game side by side */}
+        <div className="flex items-center gap-2">
+          <Link
+            to="/play"
+            className="h-12 px-5 flex items-center gap-2 bg-primary text-primary-foreground rounded-full text-base font-bold shadow-lg hover:opacity-90 transition active:scale-95"
+          >
+            🏃 술래잡기
+          </Link>
+          <GameMenu />
+        </div>
+
+        {/* Row 2: Floor selector */}
+        <FloorSelector currentFloor={currentFloor} onFloorChange={setCurrentFloor} />
+      </div>
+
+      {/* ===== BOTTOM HUD ===== */}
+      <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-0 right-0 z-[1000] flex flex-col items-center gap-3 pointer-events-none">
+        {/* Mock controls - right aligned */}
+        <div className="self-end mr-4 pointer-events-auto">
+          <MockControls onMove={mockMove} />
+        </div>
+
+        {/* Floating action bar - centered */}
+        <div className="pointer-events-auto">
+          <FloatingBar
+            onInventory={() => setShowInventory(true)}
+            onQuest={() => setShowQuest(true)}
+            onExplore={() => setShowCamera(true)}
+            canExplore={nearbyInRange.length > 0}
+          />
+        </div>
       </div>
 
       {/* Camera AR view */}
@@ -166,32 +168,14 @@ const Index = () => {
       )}
 
       {/* Drawers */}
-      <InventoryDrawer
-        open={showInventory}
-        onOpenChange={setShowInventory}
-        items={inventory}
-      />
-      <QuestDrawer
-        open={showQuest}
-        onOpenChange={setShowQuest}
-        detectedSpots={detectedSpots}
-        currentFloor={currentFloor}
-      />
+      <InventoryDrawer open={showInventory} onOpenChange={setShowInventory} items={inventory} />
+      <QuestDrawer open={showQuest} onOpenChange={setShowQuest} detectedSpots={detectedSpots} currentFloor={currentFloor} />
 
       {/* Hint popup */}
-      <HintPopup
-        open={showHint}
-        onOpenChange={setShowHint}
-        title={hintData.title}
-        hint={hintData.hint}
-        floor={hintData.floor}
-      />
+      <HintPopup open={showHint} onOpenChange={setShowHint} title={hintData.title} hint={hintData.hint} floor={hintData.floor} />
 
       {/* Item acquired toast */}
-      <ItemAcquiredToast
-        itemName={acquiredItem || ''}
-        visible={!!acquiredItem}
-      />
+      <ItemAcquiredToast itemName={acquiredItem || ''} visible={!!acquiredItem} />
     </div>
   );
 };

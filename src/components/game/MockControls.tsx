@@ -7,22 +7,22 @@ interface MockControlsProps {
 
 export function MockControls({ onMove }: MockControlsProps) {
   return (
-    <div className="fixed bottom-24 right-3 z-[1000] grid grid-cols-3 gap-0.5 opacity-50 hover:opacity-100 transition-opacity">
+    <div className="grid grid-cols-3 gap-1 opacity-50 hover:opacity-100 transition-opacity">
       <div />
-      <Button variant="outline" size="icon" className="h-7 w-7 bg-card/80" onClick={() => onMove('north')}>
-        <ArrowUp className="h-3 w-3" />
+      <Button variant="outline" size="icon" className="h-9 w-9 bg-card/80" onClick={() => onMove('north')}>
+        <ArrowUp className="!h-4 !w-4" />
       </Button>
       <div />
-      <Button variant="outline" size="icon" className="h-7 w-7 bg-card/80" onClick={() => onMove('west')}>
-        <ArrowLeft className="h-3 w-3" />
+      <Button variant="outline" size="icon" className="h-9 w-9 bg-card/80" onClick={() => onMove('west')}>
+        <ArrowLeft className="!h-4 !w-4" />
       </Button>
-      <div className="h-7 w-7" />
-      <Button variant="outline" size="icon" className="h-7 w-7 bg-card/80" onClick={() => onMove('east')}>
-        <ArrowRight className="h-3 w-3" />
+      <div className="h-9 w-9" />
+      <Button variant="outline" size="icon" className="h-9 w-9 bg-card/80" onClick={() => onMove('east')}>
+        <ArrowRight className="!h-4 !w-4" />
       </Button>
       <div />
-      <Button variant="outline" size="icon" className="h-7 w-7 bg-card/80" onClick={() => onMove('south')}>
-        <ArrowDown className="h-3 w-3" />
+      <Button variant="outline" size="icon" className="h-9 w-9 bg-card/80" onClick={() => onMove('south')}>
+        <ArrowDown className="!h-4 !w-4" />
       </Button>
       <div />
     </div>
