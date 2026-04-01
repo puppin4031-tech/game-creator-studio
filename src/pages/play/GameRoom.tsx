@@ -6,7 +6,7 @@ import { useDeviceHeading } from '@/hooks/useDeviceHeading';
 import WaitingRoom from '@/components/tag-game/WaitingRoom';
 import TagGameMap from '@/components/tag-game/TagGameMap';
 import GameTimer from '@/components/tag-game/GameTimer';
-import TeamScoreboard from '@/components/tag-game/TeamScoreboard';
+import { Team1Score, Team2Score } from '@/components/tag-game/TeamScoreboard';
 import ChatDrawer from '@/components/tag-game/ChatDrawer';
 import { Ping } from '@/components/tag-game/PingOverlay';
 import { playPingSound } from '@/lib/pingSound';
@@ -27,7 +27,6 @@ export default function GameRoom() {
     startGame, endGame, sendMessage, updatePosition, setRoom, fetchRoom,
   } = useTagRoom(roomCode);
 
-  // Find my player
   const myPlayer = useMemo(
     () => players.find(p => p.nickname === nickname),
     [players, nickname]
@@ -193,27 +192,30 @@ export default function GameRoom() {
         isCompassActive={compassActive}
       />
 
-      {/* Top bar */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2">
-        <GameTimer room={room} isHost={isHost} onEndGame={() => endGame(room.id)} />
-        <TeamScoreboard room={room} players={players} />
+      {/* Top navigation bar */}
+      <div className="absolute top-0 left-0 right-0 z-10 bg-background/85 backdrop-blur-md border-b shadow-sm">
+        <div className="flex items-center justify-between px-3 py-2">
+          <Team1Score room={room} players={players} />
+          <GameTimer room={room} isHost={isHost} onEndGame={() => endGame(room.id)} />
+          <Team2Score room={room} players={players} />
+        </div>
       </div>
 
       {/* Bottom bar - signal, compass, chat */}
-      <div className="absolute bottom-8 left-4 right-4 z-10 flex items-end justify-between">
+      <div className="absolute bottom-6 left-3 right-3 z-10 flex items-end justify-between">
         {/* Signal button */}
         <Button
           size="icon"
           variant="secondary"
-          className="h-16 w-16 rounded-full shadow-lg relative"
+          className="h-20 w-20 rounded-full shadow-lg relative"
           onClick={sendPing}
           disabled={pingCooldown > 0}
           title="내 위치 신호 보내기"
         >
           {pingCooldown > 0 ? (
-            <span className="text-base font-bold">{pingCooldown}</span>
+            <span className="text-xl font-bold">{pingCooldown}</span>
           ) : (
-            <Radio className="w-7 h-7" />
+            <Radio className="w-9 h-9" />
           )}
         </Button>
 
@@ -221,11 +223,11 @@ export default function GameRoom() {
         <Button
           size="icon"
           variant={compassActive ? 'default' : 'secondary'}
-          className="h-16 w-16 rounded-full shadow-lg"
+          className="h-20 w-20 rounded-full shadow-lg"
           onClick={toggleCompass}
           title="나침반 모드"
         >
-          <Compass className="w-7 h-7" />
+          <Compass className="w-9 h-9" />
         </Button>
 
         {/* Chat button */}

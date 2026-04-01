@@ -33,14 +33,16 @@ export default function GameTimer({ room, isHost, onEndGame }: Props) {
   const secs = remaining % 60;
 
   return (
-    <div className="flex items-center gap-3 bg-background/90 backdrop-blur rounded-full px-5 py-2.5 shadow-lg border">
-      <Clock className="w-6 h-6 text-primary" />
-      <span className="font-mono text-2xl font-bold tabular-nums">
-        {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
-      </span>
+    <div className="flex flex-col items-center gap-1">
+      <div className="flex items-center gap-2">
+        <Clock className="w-5 h-5 text-primary" />
+        <span className="font-mono text-3xl font-bold tabular-nums">
+          {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
+        </span>
+      </div>
       {isHost && (
-        <Button size="sm" variant="destructive" onClick={onEndGame} className="h-9 gap-1 text-base">
-          <Square className="w-4 h-4" /> 종료
+        <Button size="sm" variant="destructive" onClick={onEndGame} className="h-9 gap-1 text-sm">
+          <Square className="w-3.5 h-3.5" /> 종료
         </Button>
       )}
     </div>
