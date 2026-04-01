@@ -27,8 +27,6 @@ export default function Lobby() {
     if (result) {
       sessionStorage.setItem('tag_nickname', nickname.trim());
       sessionStorage.setItem('tag_host_id', result.hostId);
-      sessionStorage.setItem('tag_player_id', result.player?.id || '');
-      // We need to get the player id after creation
       navigate(`/play/${result.room.room_code}`);
     } else {
       toast.error('방 생성에 실패했습니다');

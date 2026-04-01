@@ -75,6 +75,8 @@ const App = () => (
           <AuthProvider>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/play" element={<Lobby />} />
+              <Route path="/play/:roomCode" element={<GameRoom />} />
               <Route path="/login" element={<Login />} />
               <Route
                 path="/admin/exodus"
