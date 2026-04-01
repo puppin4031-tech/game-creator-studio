@@ -35,12 +35,51 @@ export default function GameRoom() {
   const playerId = myPlayer?.id || null;
   const myTeam = myPlayer?.team || null;
 
+  // Pings state
+  const [pings, setPings] = useState<Ping[]>([]);
+
+  const handlePingExpire = useCallback((id: string) => {
+    setPings(prev => prev.filter(p => p.id !== id));
+  }, []);
+
   // Location sharing during game
   const { position } = useLocationShare({
     playerId,
     updatePosition,
     isActive: room?.status === 'playing',
   });
+
+  // Broadcast channel for pings
+  useEffect(() => {
+    if (!room || room.status !== 'playing') return;
+
+    const channel = supabase.channel(`pings_${room.id}`);
+    channel.on('broadcast', { event: 'ping' }, ({ payload }) => {
+      if (payload.team === myTeam) {
+        setPings(prev => [...prev, payload as Ping]);
+      }
+    }).subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [room?.id, room?.status, myTeam]);
+
+  const sendPing = useCallback(() => {
+    if (!room || !myTeam) return;
+    const ping: Ping = {
+      id: crypto.randomUUID(),
+      lat: position.latitude,
+      lng: position.longitude,
+      team: myTeam,
+      timestamp: Date.now(),
+    };
+    // Show locally too
+    setPings(prev => [...prev, ping]);
+    supabase.channel(`pings_${room.id}`).send({
+      type: 'broadcast',
+      event: 'ping',
+      payload: ping,
+    });
+  }, [room?.id, myTeam, position.latitude, position.longitude]);
 
   // Redirect if no nickname
   useEffect(() => {
