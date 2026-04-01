@@ -188,11 +188,16 @@ export default function GameRoom() {
         <Button
           size="icon"
           variant="secondary"
-          className="h-12 w-12 rounded-full shadow-lg"
+          className="h-12 w-12 rounded-full shadow-lg relative"
           onClick={sendPing}
+          disabled={pingCooldown > 0}
           title="내 위치 신호 보내기"
         >
-          <Radio className="w-5 h-5" />
+          {pingCooldown > 0 ? (
+            <span className="text-xs font-bold">{pingCooldown}</span>
+          ) : (
+            <Radio className="w-5 h-5" />
+          )}
         </Button>
       </div>
 
