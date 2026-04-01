@@ -72,7 +72,6 @@ export default function GameRoom() {
       team: myTeam,
       timestamp: Date.now(),
     };
-    console.log('📡 Ping sent:', ping);
     // Show locally too
     setPings(prev => [...prev, ping]);
     supabase.channel(`pings_${room.id}`).send({

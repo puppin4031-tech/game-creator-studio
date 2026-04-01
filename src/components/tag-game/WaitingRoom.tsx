@@ -31,7 +31,7 @@ export default function WaitingRoom({
   const team2Players = players.filter(p => p.team === 2);
   const unassigned = players.filter(p => p.team === null);
 
-  const allAssigned = unassigned.length === 0 && players.length >= 1;
+  const allAssigned = unassigned.length === 0 && players.length >= 2;
 
   const copyCode = () => {
     navigator.clipboard.writeText(room.room_code);
