@@ -82,6 +82,7 @@ export default function GameRoom() {
     };
     // Show locally too
     setPings(prev => [...prev, ping]);
+    playPingSound();
     supabase.channel(`pings_${room.id}`).send({
       type: 'broadcast',
       event: 'ping',
