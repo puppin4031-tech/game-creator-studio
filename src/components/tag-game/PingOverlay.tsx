@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { Circle } from '@react-google-maps/api';
+import { useEffect, useRef, useCallback } from 'react';
 
 export interface Ping {
   id: string;
@@ -9,8 +8,8 @@ export interface Ping {
   timestamp: number;
 }
 
-const PING_DURATION = 4000; // 4 seconds total
-const PING_INTERVAL = 200;
+const PING_DURATION = 4000;
+const PING_INTERVAL = 50;
 
 const TEAM_COLORS: Record<number, string> = {
   1: '#3B82F6',
@@ -20,84 +19,105 @@ const TEAM_COLORS: Record<number, string> = {
 interface Props {
   pings: Ping[];
   onExpire: (id: string) => void;
+  map: google.maps.Map | null;
 }
 
-function PingCircle({ ping, onExpire }: { ping: Ping; onExpire: () => void }) {
-  const [opacity, setOpacity] = useState(0.6);
-  const [radius, setRadius] = useState(30);
-  const [tick, setTick] = useState(0);
+function usePingCircle(ping: Ping, map: google.maps.Map | null, onExpire: () => void) {
+  const outerRef = useRef<google.maps.Circle | null>(null);
+  const innerRef = useRef<google.maps.Circle | null>(null);
+  const rafRef = useRef<number>(0);
+  const startRef = useRef<number>(Date.now());
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTick(t => t + 1);
-    }, PING_INTERVAL);
+    if (!map) return;
 
-    const timeout = setTimeout(() => {
-      clearInterval(interval);
-      onExpire();
-    }, PING_DURATION);
+    const color = TEAM_COLORS[ping.team] || '#EF4444';
+    const center = { lat: ping.lat, lng: ping.lng };
+
+    const outer = new google.maps.Circle({
+      map,
+      center,
+      radius: 200,
+      fillColor: color,
+      fillOpacity: 0.2,
+      strokeColor: color,
+      strokeOpacity: 0.3,
+      strokeWeight: 2,
+      clickable: false,
+      zIndex: 100,
+    });
+
+    const inner = new google.maps.Circle({
+      map,
+      center,
+      radius: 100,
+      fillColor: color,
+      fillOpacity: 0.5,
+      strokeColor: color,
+      strokeOpacity: 0.8,
+      strokeWeight: 2,
+      clickable: false,
+      zIndex: 101,
+    });
+
+    outerRef.current = outer;
+    innerRef.current = inner;
+    startRef.current = Date.now();
+
+    const animate = () => {
+      const elapsed = Date.now() - startRef.current;
+      const progress = elapsed / PING_DURATION;
+
+      if (progress >= 1) {
+        outer.setMap(null);
+        inner.setMap(null);
+        onExpire();
+        return;
+      }
+
+      const pulsePhase = Math.sin(elapsed * 0.005) * 0.5 + 0.5;
+      const fadeOut = Math.max(0, 1 - progress);
+
+      const outerRadius = 150 + pulsePhase * 250 * fadeOut;
+      const innerRadius = 80 + pulsePhase * 120 * fadeOut;
+      const outerOpacity = pulsePhase * fadeOut * 0.25;
+      const innerOpacity = pulsePhase * fadeOut * 0.5;
+
+      outer.setRadius(outerRadius);
+      outer.setOptions({
+        fillOpacity: outerOpacity,
+        strokeOpacity: outerOpacity * 1.5,
+      });
+
+      inner.setRadius(innerRadius);
+      inner.setOptions({
+        fillOpacity: innerOpacity,
+        strokeOpacity: Math.min(innerOpacity * 1.5, 1),
+      });
+
+      rafRef.current = requestAnimationFrame(animate);
+    };
+
+    rafRef.current = requestAnimationFrame(animate);
 
     return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
+      cancelAnimationFrame(rafRef.current);
+      outer.setMap(null);
+      inner.setMap(null);
     };
-  }, []);
-
-  useEffect(() => {
-    const elapsed = tick * PING_INTERVAL;
-    const progress = elapsed / PING_DURATION;
-
-    // Pulsing effect: oscillate between visible and invisible
-    const pulsePhase = Math.sin(tick * 0.8) * 0.5 + 0.5;
-    
-    // Fade out over time
-    const fadeOut = Math.max(0, 1 - progress);
-    
-    setOpacity(pulsePhase * fadeOut * 0.6);
-    setRadius(100 + pulsePhase * 200 * fadeOut);
-  }, [tick]);
-
-  const color = TEAM_COLORS[ping.team] || '#EF4444';
-
-  return (
-    <>
-      {/* Outer pulse ring */}
-      <Circle
-        center={{ lat: ping.lat, lng: ping.lng }}
-        radius={radius * 2}
-        options={{
-          fillColor: color,
-          fillOpacity: opacity * 0.3,
-          strokeColor: color,
-          strokeOpacity: opacity * 0.5,
-          strokeWeight: 2,
-          clickable: false,
-          zIndex: 100,
-        }}
-      />
-      {/* Inner solid circle */}
-      <Circle
-        center={{ lat: ping.lat, lng: ping.lng }}
-        radius={radius}
-        options={{
-          fillColor: color,
-          fillOpacity: opacity,
-          strokeColor: color,
-          strokeOpacity: Math.min(opacity * 1.2, 1),
-          strokeWeight: 2,
-          clickable: false,
-          zIndex: 101,
-        }}
-      />
-    </>
-  );
+  }, [map, ping.id]);
 }
 
-export default function PingOverlay({ pings, onExpire }: Props) {
+function PingCircle({ ping, map, onExpire }: { ping: Ping; map: google.maps.Map | null; onExpire: () => void }) {
+  usePingCircle(ping, map, onExpire);
+  return null;
+}
+
+export default function PingOverlay({ pings, onExpire, map }: Props) {
   return (
     <>
       {pings.map(ping => (
-        <PingCircle key={ping.id} ping={ping} onExpire={() => onExpire(ping.id)} />
+        <PingCircle key={ping.id} ping={ping} map={map} onExpire={() => onExpire(ping.id)} />
       ))}
     </>
   );
