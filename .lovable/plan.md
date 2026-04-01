@@ -1,44 +1,80 @@
 
 
-## Plan: 다크 테마 → 라이트 테마 전환
+## Plan: GPS 술래잡기 팀전 시스템 구축
 
 ### 개요
-현재 앱 전체가 다크 테마(어두운 배경 + 밝은 텍스트)로 되어 있습니다. CSS 변수와 하드코딩된 색상을 모두 밝은 테마로 변경합니다.
+닉네임만 입력하면 바로 참여 가능한 실시간 GPS 술래잡기 팀전 게임. 방 만들기 → 팀 나누기 → 게임 시작/종료 → 실시간 위치 공유 + 팀/전체 채팅.
 
-### 변경 사항
+### 새로운 DB 테이블 (4개)
 
-**1. CSS 변수 변경 (`src/index.css`)**
-- `:root` 변수를 밝은 색상으로 교체
-- 배경: 흰색/밝은 회색 계열
-- 텍스트: 어두운 색 계열
-- 카드/사이드바: 밝은 배경
-- Primary(녹색), Accent(금색), Destructive(빨간색) 유지하되 밝은 배경에 맞게 조정
-- Google Maps 배경 오버라이드 제거
+**1. `tag_rooms`** — 방 정보
+- id, room_code (6자리 코드), title, host_id (text), status (waiting/playing/ended), timer_seconds, team1_name, team2_name, created_at
 
-**2. Exodus 레이아웃 라이트 전환 (`src/layouts/ExodusLayout.tsx`)**
-- 하드코딩된 다크 색상(`#0a1628`, `#0f1d32`, `#1e2d4a`) → Tailwind 시맨틱 클래스(`bg-background`, `border-border` 등)로 교체
+**2. `tag_players`** — 참가자
+- id, room_id (FK → tag_rooms), nickname, team (1 or 2), latitude, longitude, updated_at, is_caught (boolean), is_host (boolean)
 
-**3. Exodus 사이드바 (`src/components/admin/ExodusSidebar.tsx`)**
-- 동일하게 하드코딩 다크 색상 → 시맨틱 클래스로 교체
-- 금색 악센트(`#d4a843`) 유지
+**3. `tag_messages`** — 채팅
+- id, room_id (FK → tag_rooms), sender_nickname, message, channel (team1/team2/all), created_at
 
-**4. Exodus 페이지들 (7개 파일)**
-- `StagesTimeline.tsx`, `NPCEncyclopedia.tsx`, `PuzzleQuizMaker.tsx`, `SpotManagement.tsx`, `SpotDetail.tsx`, `ExodusDashboard.tsx`, `ItemPresets.tsx`
-- `bg-[#0a1628]` → `bg-background`, `bg-[#111f38]` → `bg-card`, `border-[#1e2d4a]` → `border-border`, `text-[#e8e0d0]` → `text-foreground`, `text-[#7b8da6]` → `text-muted-foreground`
+Realtime 활성화: `tag_players`, `tag_messages` 테이블
+
+RLS: 모든 테이블에 anon/authenticated 접근 허용 (닉네임 기반이므로 별도 인증 없음)
+
+### 새로운 페이지 & 컴포넌트
+
+**1. `/play` — 로비 페이지**
+- 닉네임 입력
+- "방 만들기" 버튼 → 방 제목 입력 → 방 코드 생성
+- "방 참여" 버튼 → 방 코드 입력하여 참가
+
+**2. `/play/:roomCode` — 게임 방 페이지**
+- **대기 상태**: 참가자 목록, 방장이 팀1/팀2 이름 설정, 참가자 팀 배정, 게임 시작 버튼
+- **게임 중**: 
+  - 전체 화면 Google Map에 GPS 위치 표시
+  - 같은 팀원은 항상 보임, 상대팀은 반경 1km 내일 때만 보임
+  - 상단: 타이머 (카운트다운), 팀별 생존자 수
+  - 하단: 채팅 버튼
+- **게임 종료**: 결과 화면
+
+**3. 채팅 컴포넌트**
+- 팀 채팅 탭 + 전체 채팅 탭
+- 방장만 전체 채팅 가능, 일반 참가자는 팀 채팅만
+- Supabase Realtime 구독으로 실시간 메시지
+
+**4. 위치 공유 시스템**
+- `useGeolocation` 훅으로 GPS 추적
+- 5초마다 `tag_players` 테이블에 위치 업데이트
+- Realtime 구독으로 다른 플레이어 위치 수신
+- 같은 팀: 항상 마커 표시 / 상대팀: 1km 내일 때만 표시
+
+### 라우팅 변경 (`App.tsx`)
+- `/play` → 로비 페이지
+- `/play/:roomCode` → 게임 방 페이지
+- 기존 `/` (Index) 및 `/admin` 루트는 유지
+
+### 파일 구조
+```text
+src/pages/play/
+  Lobby.tsx          — 닉네임 입력 + 방 생성/참여
+  GameRoom.tsx       — 게임 방 메인 (대기/진행/종료)
+
+src/components/tag-game/
+  WaitingRoom.tsx    — 대기실 UI (팀 배정, 설정)
+  TagGameMap.tsx     — 게임 지도 (팀별 마커, 1km 범위)
+  GameTimer.tsx      — 타이머 + 상태바
+  ChatDrawer.tsx     — 팀/전체 채팅 Drawer
+  TeamScoreboard.tsx — 팀별 생존자 현황
+
+src/hooks/
+  useTagRoom.ts      — 방 CRUD, Realtime 구독
+  useLocationShare.ts — 위치 공유 (주기적 업데이트 + 수신)
+```
 
 ### 기술 세부사항
 
-라이트 테마 CSS 변수 (예시):
-```text
---background:    0 0% 100%      (흰색)
---foreground:    220 20% 15%    (어두운 남색)
---card:          220 15% 97%    (밝은 회색)
---primary:       150 80% 40%    (녹색 유지)
---accent:        35 90% 50%     (금색 유지)
---sidebar-bg:    220 15% 96%    (밝은 사이드바)
---border:        220 15% 88%    (밝은 테두리)
-```
-
-- 하드코딩된 색상 274곳을 시맨틱 Tailwind 클래스로 일괄 교체
-- 게임 관련 glow 애니메이션 색상은 유지
+- 인증 없이 닉네임 + 방 코드로 식별 → RLS는 `anon` role에도 허용 필요
+- 위치 업데이트: `setInterval` 5초 주기로 `tag_players` upsert
+- 상대팀 1km 필터: 클라이언트 사이드에서 haversine 계산 (기존 `src/lib/haversine.ts` 활용)
+- 타이머: 방장이 설정한 시간 기준, 클라이언트에서 `tag_rooms.timer_seconds` + 시작 시간으로 계산
+- Realtime: `tag_players` 위치 변경 + `tag_messages` 새 메시지 구독
 
