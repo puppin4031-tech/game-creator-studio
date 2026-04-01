@@ -83,9 +83,10 @@ function PingCircle({ ping, onExpire }: { ping: Ping; onExpire: () => void }) {
           fillColor: color,
           fillOpacity: opacity,
           strokeColor: color,
-          strokeOpacity: opacity * 1.2,
+          strokeOpacity: Math.min(opacity * 1.2, 1),
           strokeWeight: 2,
           clickable: false,
+          zIndex: 101,
         }}
       />
     </>
