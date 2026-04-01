@@ -37,6 +37,8 @@ export default function GameRoom() {
 
   // Pings state
   const [pings, setPings] = useState<Ping[]>([]);
+  const [pingCooldown, setPingCooldown] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handlePingExpire = useCallback((id: string) => {
     setPings(prev => prev.filter(p => p.id !== id));
