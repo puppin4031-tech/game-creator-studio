@@ -41,11 +41,14 @@ export default function TagGameMap({ room, players, currentPlayerId, myTeam, pos
     });
   }, [players, currentPlayerId, myTeam, position.latitude, position.longitude]);
 
+  const [mapRef, setMapRef] = useState<google.maps.Map | null>(null);
+
   return (
     <GoogleMap
       mapContainerStyle={mapContainerStyle}
       center={center}
       zoom={16}
+      onLoad={setMapRef}
       options={{
         disableDefaultUI: true,
         zoomControl: true,
