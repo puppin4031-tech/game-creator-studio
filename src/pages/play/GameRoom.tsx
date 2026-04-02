@@ -194,6 +194,11 @@ export default function GameRoom() {
 
       {/* Top navigation bar */}
       <div className="absolute top-0 left-0 right-0 z-10 bg-background/85 backdrop-blur-md border-b shadow-sm">
+        <div className="flex items-center justify-center gap-1 pt-1">
+          <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">
+            방 코드: {room.room_code}
+          </span>
+        </div>
         <div className="flex items-center justify-between px-3 py-2">
           <Team1Score room={room} players={players} />
           <GameTimer room={room} isHost={isHost} onEndGame={() => endGame(room.id)} />

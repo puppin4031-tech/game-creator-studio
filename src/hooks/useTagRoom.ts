@@ -175,7 +175,11 @@ export function useTagRoom(roomCode?: string, playerId?: string) {
     const messageChannel = supabase
       .channel(`tag_messages_${room.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tag_messages', filter: `room_id=eq.${room.id}` }, (payload) => {
-        setMessages(prev => [...prev, payload.new as TagMessage]);
+        const newMsg = payload.new as TagMessage;
+        setMessages(prev => {
+          if (prev.some(m => m.id === newMsg.id)) return prev;
+          return [...prev, newMsg];
+        });
       })
       .subscribe();
 
