@@ -66,15 +66,13 @@ export default function ChatDrawer({ room, messages, currentNickname, currentTea
           >
             팀 채팅
           </Badge>
-          {isHost && (
-            <Badge
-              variant={tab === 'all' ? 'default' : 'outline'}
-              className="cursor-pointer text-sm px-3 py-1"
-              onClick={() => setTab('all')}
-            >
-              전체 채팅
-            </Badge>
-          )}
+          <Badge
+            variant={tab === 'all' ? 'default' : 'outline'}
+            className="cursor-pointer text-sm px-3 py-1"
+            onClick={() => setTab('all')}
+          >
+            전체 채팅
+          </Badge>
         </div>
 
         {/* Messages */}
