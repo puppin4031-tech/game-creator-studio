@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
-import { Copy, Play, Users, Settings, Crown } from 'lucide-react';
+import { ArrowLeft, Copy, Play, Users, Settings, Crown } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
