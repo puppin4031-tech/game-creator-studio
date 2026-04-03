@@ -16,6 +16,7 @@ interface Props {
   onUpdateTeamNames: (team1: string, team2: string) => void;
   onUpdateTimer: (seconds: number) => void;
   onStartGame: () => void;
+  onLeave: () => void;
 }
 
 export default function WaitingRoom({
