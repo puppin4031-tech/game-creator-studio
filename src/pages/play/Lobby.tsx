@@ -105,6 +105,9 @@ export default function Lobby() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center p-4 pt-8 gap-4">
+      <Button variant="ghost" size="sm" className="self-start" onClick={() => navigate('/')}>
+        <ArrowLeft className="!w-5 !h-5 mr-1" /> 뒤로가기
+      </Button>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center pb-3">
           <div className="mx-auto mb-3 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
