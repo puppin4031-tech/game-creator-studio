@@ -21,7 +21,7 @@ interface Props {
 
 export default function WaitingRoom({
   room, players, isHost, currentPlayerId,
-  onAssignTeam, onUpdateTeamNames, onUpdateTimer, onStartGame,
+  onAssignTeam, onUpdateTeamNames, onUpdateTimer, onStartGame, onLeave,
 }: Props) {
   const [team1Name, setTeam1Name] = useState(room.team1_name);
   const [team2Name, setTeam2Name] = useState(room.team2_name);
