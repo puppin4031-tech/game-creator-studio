@@ -138,6 +138,7 @@ export default function GameRoom() {
         onUpdateTeamNames={(t1, t2) => updateTeamNames(room.id, t1, t2)}
         onUpdateTimer={(s) => updateTimer(room.id, s)}
         onStartGame={() => startGame(room.id)}
+        onLeave={() => navigate('/play')}
       />
     );
   }
