@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
-import { Copy, Play, Users, Settings, Crown } from 'lucide-react';
+import { ArrowLeft, Copy, Play, Users, Settings, Crown } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
@@ -16,11 +16,12 @@ interface Props {
   onUpdateTeamNames: (team1: string, team2: string) => void;
   onUpdateTimer: (seconds: number) => void;
   onStartGame: () => void;
+  onLeave: () => void;
 }
 
 export default function WaitingRoom({
   room, players, isHost, currentPlayerId,
-  onAssignTeam, onUpdateTeamNames, onUpdateTimer, onStartGame,
+  onAssignTeam, onUpdateTeamNames, onUpdateTimer, onStartGame, onLeave,
 }: Props) {
   const [team1Name, setTeam1Name] = useState(room.team1_name);
   const [team2Name, setTeam2Name] = useState(room.team2_name);
@@ -47,6 +48,11 @@ export default function WaitingRoom({
 
   return (
     <div className="min-h-screen bg-background p-4 pb-24">
+      {/* Back button */}
+      <Button variant="ghost" size="sm" className="self-start mb-2" onClick={onLeave}>
+        <ArrowLeft className="!w-5 !h-5 mr-1" /> 뒤로가기
+      </Button>
+
       {/* Header */}
       <div className="text-center mb-6">
         <h1 className="text-xl font-bold">{room.title}</h1>
