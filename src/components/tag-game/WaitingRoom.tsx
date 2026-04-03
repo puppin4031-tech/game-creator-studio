@@ -48,6 +48,11 @@ export default function WaitingRoom({
 
   return (
     <div className="min-h-screen bg-background p-4 pb-24">
+      {/* Back button */}
+      <Button variant="ghost" size="sm" className="self-start mb-2" onClick={onLeave}>
+        <ArrowLeft className="!w-5 !h-5 mr-1" /> 뒤로가기
+      </Button>
+
       {/* Header */}
       <div className="text-center mb-6">
         <h1 className="text-xl font-bold">{room.title}</h1>
