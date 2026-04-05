@@ -1,88 +1,43 @@
 
 
-## 보물찾기 모드 구현 계획
+## 슬라이드 퍼즐 프리셋 & 타이머 구현 계획
 
-이전에 승인된 보물찾기 기본 구조 위에, 사용자가 요청한 **근접 거리별 시각 효과**와 **보물 발견 UI**를 구현합니다.
+### 변경 사항 요약
 
-### 핵심 UX 흐름
+1. **4개 명화 이미지를 프리셋으로 추가** — 고흐(별이 빛나는 밤), 램브란트(돌아온 탕자), 뭉크(절규), 미켈란젤로(천지창조)를 `public/presets/` 폴더에 복사
+2. **5x5 격자 지원 추가** — `SlidingPuzzle` 컴포넌트의 `gridSize` 타입을 `3 | 4 | 5`로 확장
+3. **30초 타이머 추가** — `SlidingPuzzle`에 `timeLimit` prop 추가, 시간 초과 시 실패 콜백
+4. **프리셋 선택 UI 개선** — `TreasureSetup`에서 3x3/4x4/5x5 선택 가능, 4개 명화 프리셋을 하드코딩으로 제공
+5. **시뮬레이션 페이지** — 퍼즐을 바로 테스트할 수 있는 간단한 시뮬레이션 UI 추가
 
-```text
-30m 이내 → 화면 테두리 초록색 글로우 반짝임
-10m 이내 → 화면 테두리 노란색 글로우 반짝임
- 5m 이내 → 화면 중앙에 보물 오브제(글로우+그림자) 등장
-           + "보물찾기 시도" 버튼 표시
-           → 클릭 시 퀴즈 팝업
-           → 정답: 키워드 획득 (선착순)
-           → 오답: 15초 쿨타임 (비활성화 + 타이머 표시)
-```
+### 파일별 변경
 
-### DB 변경 (마이그레이션)
-
-1. **`tag_rooms`에 `game_mode` 컬럼 추가** — `'tag'`(기본값) 또는 `'treasure'`
-2. **`treasure_items` 테이블 생성**:
-   - `id`, `room_id` (FK → tag_rooms), `keyword` (보물 키워드)
-   - `latitude`, `longitude` (보물 위치)
-   - `quiz_question`, `quiz_answer` (퀴즈)
-   - `found_by` (nullable, 찾은 플레이어 ID)
-   - `found_at` (nullable, 찾은 시간)
-   - RLS: anon/authenticated 모두 SELECT/INSERT/UPDATE 가능 (tag 게임과 동일한 공개 정책)
-   - Realtime 활성화 (선착순 갱신 실시간 반영)
-
-### 수정/생성 파일
-
-| 파일 | 설명 |
+| 파일 | 변경 |
 |---|---|
-| **DB 마이그레이션** | `game_mode` 컬럼 + `treasure_items` 테이블 |
-| `src/hooks/useTagRoom.ts` | `TagRoom` 인터페이스에 `game_mode` 추가, `createRoom`에 모드 파라미터 |
-| `src/pages/play/Lobby.tsx` | 방 생성 시 모드 선택 (술래잡기/보물찾기) UI |
-| `src/components/tag-game/WaitingRoom.tsx` | 보물찾기 모드일 때 보물 등록 UI (키워드, 위치, 퀴즈) 표시 |
-| **새: `src/hooks/useTreasureHunt.ts`** | 보물 CRUD, 근접 거리 계산, 퀴즈 정답 처리, 실시간 구독 |
-| **새: `src/components/treasure/ProximityGlow.tsx`** | 화면 테두리 글로우 효과 (30m=초록, 10m=노란) |
-| **새: `src/components/treasure/TreasureReveal.tsx`** | 5m 이내 보물 오브제 + "보물찾기 시도" 버튼 + 쿨타임 |
-| **새: `src/components/treasure/TreasureQuizPopup.tsx`** | 퀴즈 다이얼로그, 정답/오답 처리 |
-| **새: `src/components/treasure/TreasureHUD.tsx`** | 상단 키워드 현황 표시 (🔑 3/8) |
-| **새: `src/components/treasure/TreasureSetup.tsx`** | 대기실 방장용 보물 등록 폼 |
-| **새: `src/components/treasure/TreasureGameMap.tsx`** | 보물찾기 전용 지도 (보물 마커 미표시, 근접 시에만 반응) |
-| `src/pages/play/GameRoom.tsx` | `game_mode`에 따라 태그/보물찾기 뷰 분기 |
-| `src/index.css` (또는 tailwind.config.ts) | 글로우 애니메이션 keyframes 추가 |
+| `public/presets/gogh.jpeg` | 고흐 이미지 복사 |
+| `public/presets/rembrandt.jpg` | 램브란트 이미지 복사 |
+| `public/presets/munch.jpeg` | 뭉크 이미지 복사 |
+| `public/presets/creation.jpg` | 천지창조 이미지 복사 |
+| `src/components/treasure/SlidingPuzzle.tsx` | gridSize `3|4|5` 지원, `timeLimit` prop(초) 추가, 타이머 UI + 시간 초과 시 `onTimeout` 콜백 |
+| `src/components/treasure/TreasureSetup.tsx` | 격자 크기 `3|4|5` 선택, 하드코딩된 4개 프리셋 (명화) 표시, 커스텀 이미지 업로드 시 격자 크기 선택 |
+| `src/components/treasure/TreasureQuizPopup.tsx` | `gridSize` 타입을 `3|4|5`로 확장, 퍼즐 실패(타임아웃) 처리 추가 |
+| `src/pages/play/PuzzleSimulator.tsx` | 새 페이지 — 프리셋 이미지 선택 → 격자 크기 선택 → 퍼즐 플레이 시뮬레이션 |
+| `src/App.tsx` | `/play/puzzle-sim` 라우트 추가 |
 
-### 주요 컴포넌트 상세
+### SlidingPuzzle 타이머 동작
+- `timeLimit` prop이 있으면 상단에 카운트다운 바 + 남은 초 표시
+- 0초 도달 시 `onTimeout()` 호출 → 퍼즐 팝업에서 실패 처리 (15초 쿨타임)
+- 타이머 바는 progress bar 형태로 시간에 따라 줄어듦
+- 색상: 10초 이상 초록 → 5~10초 노랑 → 5초 미만 빨강
 
-#### ProximityGlow (화면 테두리 글로우)
-- `position: fixed` 전체화면 오버레이, `pointer-events: none`
-- `box-shadow: inset 0 0 60px` 으로 테두리 글로우 구현
-- 30m 이내: 초록색 (`#22c55e`) 맥동 애니메이션 (1.5초 주기)
-- 10m 이내: 노란색 (`#eab308`) 더 강한 맥동
-- 거리에 따라 글로우 강도(opacity) 점진적 변화
-
-#### TreasureReveal (5m 보물 오브제)
-- 화면 중앙에 보물상자 이모지/SVG 오브제 등장
-- CSS `filter: drop-shadow()` + `box-shadow` 글로우 효과
-- 빛 파티클: CSS keyframe으로 여러 작은 원이 원형 궤도로 회전
-- 아래에 "보물찾기 시도" 버튼
-- 보물 오브제 클릭 또는 버튼 클릭 모두 퀴즈 팝업 트리거
-- 오답 시: 버튼 비활성화 + 15초 카운트다운 표시, 오브제도 흐리게 처리
-
-#### TreasureQuizPopup (퀴즈)
-- Dialog 컴포넌트 사용
-- 퀴즈 질문 표시 + 텍스트 입력
-- 정답: 축하 애니메이션 + 키워드 표시 + DB 업데이트 (`found_by` 설정)
-- 오답: "틀렸습니다!" + 15초 쿨타임 시작
-- 선착순 보호: update 시 `found_by IS NULL` 조건 (이미 찾은 경우 실패 처리)
-
-#### TreasureHUD (상단 키워드 현황)
-- 게임 화면 상단바에 자신이 찾은 키워드 목록과 전체 개수 표시
-- 예: `🔑 내 키워드: 사과, 바나나 (2/8)`
-
-### 근접 감지 로직 (`useTreasureHunt`)
+### 프리셋 데이터 구조
 ```typescript
-// 매 위치 업데이트마다 모든 미발견 보물과 거리 계산
-const nearestTreasure = treasures
-  .filter(t => !t.found_by)
-  .map(t => ({ ...t, distance: haversineDistance(...) }))
-  .sort((a, b) => a.distance - b.distance)[0];
-
-// 가장 가까운 보물 기준으로 글로우 단계 결정
-proximityLevel = distance <= 5 ? 'close' : distance <= 10 ? 'near' : distance <= 30 ? 'far' : null;
+const PUZZLE_PRESETS = [
+  { id: 'gogh', name: '별이 빛나는 밤', image_url: '/presets/gogh.jpeg' },
+  { id: 'rembrandt', name: '돌아온 탕자', image_url: '/presets/rembrandt.jpg' },
+  { id: 'munch', name: '절규', image_url: '/presets/munch.jpeg' },
+  { id: 'creation', name: '천지창조', image_url: '/presets/creation.jpg' },
+];
 ```
+프리셋 선택 시 격자 크기는 별도로 3x3/4x4/5x5 중 선택 가능 (프리셋 자체에 격자 크기가 고정되지 않음).
 
