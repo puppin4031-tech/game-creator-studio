@@ -20,7 +20,7 @@ export default function Lobby() {
   const [roomsLoading, setRoomsLoading] = useState(true);
 
   // Session-based return info
-  const savedRoomCode = sessionStorage.getItem('tag_room_code');
+  const [savedRoomCode, setSavedRoomCode] = useState(sessionStorage.getItem('tag_room_code'));
   const savedPlayerId = sessionStorage.getItem('tag_player_id');
 
   // Auto-clear session if saved room is ended or doesn't exist
