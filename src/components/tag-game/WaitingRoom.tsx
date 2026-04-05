@@ -94,6 +94,11 @@ export default function WaitingRoom({
         </p>
       </div>
 
+      {/* Treasure setup (host only, treasure mode) */}
+      {isHost && isTreasure && (
+        <TreasureSetup treasures={treasures} onAdd={addTreasure} onRemove={removeTreasure} />
+      )}
+
       {/* Settings (host only) */}
       {isHost && (
         <div className="mb-4">
