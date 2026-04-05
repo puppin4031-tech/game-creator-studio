@@ -147,9 +147,7 @@ export default function TreasureGameMap({
         ))}
 
         {/* Ping overlays */}
-        {pings.map(p => (
-          <PingOverlay key={p.id} ping={p} myTeam={myTeam} onExpire={handlePingExpire} />
-        ))}
+        <PingOverlay pings={pings} onExpire={handlePingExpire} map={mapRef.current} />
       </GoogleMap>
 
       {/* Proximity glow overlay */}
