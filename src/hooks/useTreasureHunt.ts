@@ -13,6 +13,9 @@ export interface TreasureItem {
   found_by: string | null;
   found_at: string | null;
   created_at: string;
+  challenge_type: string;
+  puzzle_image_url: string | null;
+  puzzle_grid_size: number;
 }
 
 export type ProximityLevel = 'close' | 'near' | 'far' | null;
@@ -97,9 +100,18 @@ export function useTreasureHunt(roomId: string | undefined, myPlayerId: string |
   );
 
   // Add treasure (host)
-  const addTreasure = useCallback(async (item: { keyword: string; latitude: number; longitude: number; quiz_question: string; quiz_answer: string }) => {
+  const addTreasure = useCallback(async (item: {
+    keyword: string; latitude: number; longitude: number;
+    quiz_question: string; quiz_answer: string;
+    challenge_type?: string; puzzle_image_url?: string; puzzle_grid_size?: number;
+  }) => {
     if (!roomId) return;
-    await supabase.from('treasure_items').insert({ ...item, room_id: roomId });
+    await supabase.from('treasure_items').insert({
+      ...item,
+      room_id: roomId,
+      challenge_type: item.challenge_type || 'quiz',
+      puzzle_grid_size: item.puzzle_grid_size || 3,
+    });
   }, [roomId]);
 
   // Remove treasure (host)

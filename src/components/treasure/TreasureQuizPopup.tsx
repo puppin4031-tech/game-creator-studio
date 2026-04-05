@@ -8,23 +8,27 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NearestTreasure } from '@/hooks/useTreasureHunt';
+import SlidingPuzzle from './SlidingPuzzle';
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   treasure: NearestTreasure;
-  onSubmit: (answer: string) => Promise<{ success: boolean; alreadyFound?: boolean }>;
+  onQuizSubmit: (answer: string) => Promise<{ success: boolean; alreadyFound?: boolean }>;
+  onPuzzleSolve: () => Promise<{ success: boolean; alreadyFound?: boolean }>;
 }
 
-export default function TreasureQuizPopup({ open, onOpenChange, treasure, onSubmit }: Props) {
+export default function TreasureQuizPopup({ open, onOpenChange, treasure, onQuizSubmit, onPuzzleSolve }: Props) {
   const [answer, setAnswer] = useState('');
   const [result, setResult] = useState<'idle' | 'correct' | 'wrong' | 'taken'>('idle');
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = async () => {
+  const isPuzzle = treasure.challenge_type === 'puzzle';
+
+  const handleQuizSubmit = async () => {
     if (!answer.trim() || submitting) return;
     setSubmitting(true);
-    const res = await onSubmit(answer.trim());
+    const res = await onQuizSubmit(answer.trim());
     setSubmitting(false);
 
     if (res.success) {
@@ -41,6 +45,17 @@ export default function TreasureQuizPopup({ open, onOpenChange, treasure, onSubm
     }
   };
 
+  const handlePuzzleSolve = async () => {
+    setSubmitting(true);
+    const res = await onPuzzleSolve();
+    setSubmitting(false);
+    if (res.success) {
+      setResult('correct');
+    } else if (res.alreadyFound) {
+      setResult('taken');
+    }
+  };
+
   const handleClose = () => {
     onOpenChange(false);
     setResult('idle');
@@ -49,10 +64,10 @@ export default function TreasureQuizPopup({ open, onOpenChange, treasure, onSubm
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className={isPuzzle ? 'max-w-sm p-4' : 'max-w-sm'}>
         <DialogHeader>
           <DialogTitle className="text-center">
-            {result === 'correct' ? '🎉 정답!' : result === 'taken' ? '😢 아쉽게도...' : '❓ 퀴즈'}
+            {result === 'correct' ? '🎉 성공!' : result === 'taken' ? '😢 아쉽게도...' : isPuzzle ? '🧩 슬라이드 퍼즐' : '❓ 퀴즈'}
           </DialogTitle>
         </DialogHeader>
 
@@ -80,7 +95,18 @@ export default function TreasureQuizPopup({ open, onOpenChange, treasure, onSubm
           </div>
         )}
 
-        {result === 'idle' && (
+        {result === 'idle' && isPuzzle && treasure.puzzle_image_url && (
+          <div className="space-y-3">
+            <SlidingPuzzle
+              imageUrl={treasure.puzzle_image_url}
+              gridSize={(treasure.puzzle_grid_size || 3) as 3 | 4}
+              onSolve={handlePuzzleSolve}
+            />
+            <Button variant="ghost" onClick={handleClose} className="w-full">취소</Button>
+          </div>
+        )}
+
+        {result === 'idle' && !isPuzzle && (
           <div className="space-y-4">
             <div className="bg-muted p-4 rounded-lg">
               <p className="text-sm font-medium text-center">{treasure.quiz_question}</p>
@@ -89,12 +115,12 @@ export default function TreasureQuizPopup({ open, onOpenChange, treasure, onSubm
               placeholder="정답을 입력하세요"
               value={answer}
               onChange={e => setAnswer(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+              onKeyDown={e => e.key === 'Enter' && handleQuizSubmit()}
               autoFocus
             />
             <div className="flex gap-2">
               <Button variant="ghost" onClick={handleClose} className="flex-1">취소</Button>
-              <Button onClick={handleSubmit} disabled={!answer.trim() || submitting} className="flex-1">
+              <Button onClick={handleQuizSubmit} disabled={!answer.trim() || submitting} className="flex-1">
                 {submitting ? '확인 중...' : '정답 제출'}
               </Button>
             </div>

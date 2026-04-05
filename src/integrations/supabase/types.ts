@@ -516,6 +516,7 @@ export type Database = {
       }
       treasure_items: {
         Row: {
+          challenge_type: string
           created_at: string
           found_at: string | null
           found_by: string | null
@@ -523,11 +524,14 @@ export type Database = {
           keyword: string
           latitude: number
           longitude: number
+          puzzle_grid_size: number
+          puzzle_image_url: string | null
           quiz_answer: string
           quiz_question: string
           room_id: string
         }
         Insert: {
+          challenge_type?: string
           created_at?: string
           found_at?: string | null
           found_by?: string | null
@@ -535,11 +539,14 @@ export type Database = {
           keyword: string
           latitude: number
           longitude: number
+          puzzle_grid_size?: number
+          puzzle_image_url?: string | null
           quiz_answer: string
           quiz_question: string
           room_id: string
         }
         Update: {
+          challenge_type?: string
           created_at?: string
           found_at?: string | null
           found_by?: string | null
@@ -547,6 +554,8 @@ export type Database = {
           keyword?: string
           latitude?: number
           longitude?: number
+          puzzle_grid_size?: number
+          puzzle_image_url?: string | null
           quiz_answer?: string
           quiz_question?: string
           room_id?: string
