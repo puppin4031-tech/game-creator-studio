@@ -38,7 +38,7 @@ export default function Lobby() {
         sessionStorage.removeItem('tag_host_id');
         // Force re-render
         window.dispatchEvent(new Event('storage'));
-        setSavedSession(null);
+        setSavedRoomCode(null);
       }
     };
     checkSavedRoom();
