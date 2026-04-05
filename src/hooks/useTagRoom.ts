@@ -158,6 +158,39 @@ export function useTagRoom(roomCode?: string, playerId?: string) {
     }).eq('id', pId);
   }, []);
 
+  // Rejoin room — find existing player by nickname, or insert new
+  const rejoinRoom = useCallback(async (code: string, nick: string) => {
+    const roomData = await fetchRoom(code);
+    if (!roomData) return null;
+
+    // Check if player already exists in this room
+    const { data: existing } = await supabase
+      .from('tag_players')
+      .select('*')
+      .eq('room_id', roomData.id)
+      .eq('nickname', nick)
+      .maybeSingle();
+
+    if (existing) {
+      return { room: roomData, player: existing as TagPlayer, isRejoin: true };
+    }
+
+    // Otherwise insert new player
+    const { data: player } = await supabase
+      .from('tag_players')
+      .insert({ room_id: roomData.id, nickname: nick })
+      .select()
+      .single();
+
+    return { room: roomData, player: player as TagPlayer, isRejoin: false };
+  }, [fetchRoom]);
+
+  // Delete room (cascade deletes players & messages)
+  const deleteRoom = useCallback(async (roomId: string) => {
+    const { error } = await supabase.from('tag_rooms').delete().eq('id', roomId);
+    return !error;
+  }, []);
+
   // Subscribe to realtime
   useEffect(() => {
     if (!room) return;
@@ -207,9 +240,9 @@ export function useTagRoom(roomCode?: string, playerId?: string) {
 
   return {
     room, players, messages, loading,
-    createRoom, joinRoom, fetchRoom,
+    createRoom, joinRoom, rejoinRoom, fetchRoom,
     assignTeam, updateTeamNames, updateTimer,
-    startGame, endGame,
+    startGame, endGame, deleteRoom,
     sendMessage, updatePosition,
     setRoom,
   };
