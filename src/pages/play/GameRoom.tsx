@@ -192,7 +192,25 @@ export default function GameRoom() {
     );
   }
 
-  // PLAYING STATE
+  // PLAYING STATE — Treasure Hunt mode
+  if (room.game_mode === 'treasure') {
+    return (
+      <TreasureGameMap
+        room={room}
+        players={players}
+        messages={messages}
+        currentPlayerId={playerId || ''}
+        myTeam={myTeam}
+        position={position}
+        nickname={nickname}
+        isHost={isHost}
+        onEndGame={() => endGame(room.id)}
+        onSendMessage={(msg, channel) => sendMessage(room.id, nickname, msg, channel)}
+      />
+    );
+  }
+
+  // PLAYING STATE — Tag mode
   return (
     <div className="h-screen w-screen relative text-[1.3em]">
       {/* Map */}
