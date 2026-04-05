@@ -24,7 +24,7 @@ export default function GameRoom() {
   const {
     room, players, messages, loading,
     assignTeam, updateTeamNames, updateTimer,
-    startGame, endGame, sendMessage, updatePosition, setRoom, fetchRoom,
+    startGame, endGame, deleteRoom, sendMessage, updatePosition, setRoom, fetchRoom,
   } = useTagRoom(roomCode);
 
   const myPlayer = useMemo(
@@ -139,6 +139,15 @@ export default function GameRoom() {
         onUpdateTimer={(s) => updateTimer(room.id, s)}
         onStartGame={() => startGame(room.id)}
         onLeave={() => navigate('/play')}
+        onDeleteRoom={isHost ? async () => {
+          const ok = await deleteRoom(room.id);
+          if (ok) {
+            sessionStorage.removeItem('tag_room_code');
+            sessionStorage.removeItem('tag_player_id');
+            sessionStorage.removeItem('tag_host_id');
+            navigate('/play');
+          }
+        } : undefined}
       />
     );
   }
@@ -168,7 +177,12 @@ export default function GameRoom() {
                 <p className="text-sm text-muted-foreground">생존</p>
               </div>
             </div>
-            <Button onClick={() => navigate('/play')} className="w-full gap-2 text-base h-12">
+            <Button onClick={() => {
+              sessionStorage.removeItem('tag_room_code');
+              sessionStorage.removeItem('tag_player_id');
+              sessionStorage.removeItem('tag_host_id');
+              navigate('/play');
+            }} className="w-full gap-2 text-base h-12">
               <ArrowLeft className="w-5 h-5" /> 로비로 돌아가기
             </Button>
           </CardContent>

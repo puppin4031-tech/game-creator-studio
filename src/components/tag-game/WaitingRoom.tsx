@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
-import { ArrowLeft, Copy, Play, Users, Settings, Crown } from 'lucide-react';
+import { ArrowLeft, Copy, Play, Users, Settings, Crown, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
@@ -17,16 +17,18 @@ interface Props {
   onUpdateTimer: (seconds: number) => void;
   onStartGame: () => void;
   onLeave: () => void;
+  onDeleteRoom?: () => void;
 }
 
 export default function WaitingRoom({
   room, players, isHost, currentPlayerId,
-  onAssignTeam, onUpdateTeamNames, onUpdateTimer, onStartGame, onLeave,
+  onAssignTeam, onUpdateTeamNames, onUpdateTimer, onStartGame, onLeave, onDeleteRoom,
 }: Props) {
   const [team1Name, setTeam1Name] = useState(room.team1_name);
   const [team2Name, setTeam2Name] = useState(room.team2_name);
   const [timerMin, setTimerMin] = useState(Math.floor(room.timer_seconds / 60));
   const [showSettings, setShowSettings] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const team1Players = players.filter(p => p.team === 1);
   const team2Players = players.filter(p => p.team === 2);
@@ -48,10 +50,25 @@ export default function WaitingRoom({
 
   return (
     <div className="min-h-screen bg-background p-4 pb-24">
-      {/* Back button */}
-      <Button variant="ghost" size="sm" className="self-start mb-2" onClick={onLeave}>
-        <ArrowLeft className="!w-5 !h-5 mr-1" /> 뒤로가기
-      </Button>
+      {/* Top bar */}
+      <div className="flex items-center justify-between mb-2">
+        <Button variant="ghost" size="sm" onClick={onLeave}>
+          <ArrowLeft className="!w-5 !h-5 mr-1" /> 뒤로가기
+        </Button>
+        {isHost && onDeleteRoom && (
+          confirmDelete ? (
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-destructive">삭제할까요?</span>
+              <Button variant="destructive" size="sm" onClick={onDeleteRoom}>확인</Button>
+              <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>취소</Button>
+            </div>
+          ) : (
+            <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(true)} className="text-destructive hover:text-destructive">
+              <Trash2 className="w-4 h-4 mr-1" /> 방 삭제
+            </Button>
+          )
+        )}
+      </div>
 
       {/* Header */}
       <div className="text-center mb-6">
