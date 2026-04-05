@@ -5,6 +5,7 @@ import { useLocationShare } from '@/hooks/useLocationShare';
 import { useDeviceHeading } from '@/hooks/useDeviceHeading';
 import WaitingRoom from '@/components/tag-game/WaitingRoom';
 import TagGameMap from '@/components/tag-game/TagGameMap';
+import TreasureGameMap from '@/components/treasure/TreasureGameMap';
 import GameTimer from '@/components/tag-game/GameTimer';
 import { Team1Score, Team2Score } from '@/components/tag-game/TeamScoreboard';
 import ChatDrawer from '@/components/tag-game/ChatDrawer';
