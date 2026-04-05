@@ -1,21 +1,23 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { Progress } from '@/components/ui/progress';
 
 interface Props {
   imageUrl: string;
-  gridSize: 3 | 4;
+  gridSize: 3 | 4 | 5;
   onSolve: () => void;
+  timeLimit?: number;
+  onTimeout?: () => void;
 }
 
 function createSolvedBoard(size: number): number[] {
   const tiles: number[] = [];
   for (let i = 1; i < size * size; i++) tiles.push(i);
-  tiles.push(0); // 0 = empty
+  tiles.push(0);
   return tiles;
 }
 
 function shuffleBoard(size: number): number[] {
   const board = createSolvedBoard(size);
-  // Fisher-Yates + solvability check
   let inversions: number;
   do {
     for (let i = board.length - 1; i > 0; i--) {
@@ -44,12 +46,27 @@ function isSolved(board: number[]): boolean {
   return board[board.length - 1] === 0;
 }
 
-export default function SlidingPuzzle({ imageUrl, gridSize, onSolve }: Props) {
+export default function SlidingPuzzle({ imageUrl, gridSize, onSolve, timeLimit, onTimeout }: Props) {
   const [board, setBoard] = useState<number[]>(() => shuffleBoard(gridSize));
   const [moves, setMoves] = useState(0);
   const [solved, setSolved] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(timeLimit ?? 0);
   const tileSize = Math.floor(280 / gridSize);
   const totalSize = tileSize * gridSize;
+
+  // Timer
+  useEffect(() => {
+    if (!timeLimit || solved) return;
+    if (timeLeft <= 0) {
+      onTimeout?.();
+      return;
+    }
+    const t = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+    return () => clearInterval(t);
+  }, [timeLeft, timeLimit, solved, onTimeout]);
+
+  const timerPercent = timeLimit ? (timeLeft / timeLimit) * 100 : 100;
+  const timerColor = timeLeft > 10 ? 'bg-green-500' : timeLeft > 5 ? 'bg-yellow-500' : 'bg-red-500';
 
   const handleTileClick = useCallback((index: number) => {
     if (solved) return;
@@ -78,6 +95,22 @@ export default function SlidingPuzzle({ imageUrl, gridSize, onSolve }: Props) {
 
   return (
     <div className="flex flex-col items-center gap-3">
+      {/* Timer bar */}
+      {timeLimit && !solved && (
+        <div className="w-full space-y-1">
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>⏱ {timeLeft}초</span>
+            <span>{gridSize}×{gridSize}</span>
+          </div>
+          <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-1000 ease-linear ${timerColor}`}
+              style={{ width: `${timerPercent}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-4 text-sm text-muted-foreground">
         <span>이동: <strong className="text-foreground">{moves}</strong></span>
         <span>{gridSize}×{gridSize}</span>
@@ -122,7 +155,6 @@ export default function SlidingPuzzle({ imageUrl, gridSize, onSolve }: Props) {
         </div>
       )}
 
-      {/* Reference image (small) */}
       <details className="w-full">
         <summary className="text-xs text-muted-foreground cursor-pointer text-center">원본 이미지 보기</summary>
         <img src={imageUrl} alt="원본" className="mt-2 rounded-lg border w-full max-w-[200px] mx-auto" />

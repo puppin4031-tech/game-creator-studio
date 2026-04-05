@@ -27,6 +27,7 @@ import PuzzleQuizMaker from "./pages/admin/exodus/PuzzleQuizMaker";
 import SpotManagement from "./pages/admin/exodus/SpotManagement";
 import Lobby from "./pages/play/Lobby";
 import GameRoom from "./pages/play/GameRoom";
+import PuzzleSimulator from "./pages/play/PuzzleSimulator";
 
 const queryClient = new QueryClient();
 
@@ -77,6 +78,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/play" element={<Lobby />} />
               <Route path="/play/:roomCode" element={<GameRoom />} />
+              <Route path="/play/puzzle-sim" element={<PuzzleSimulator />} />
               <Route path="/login" element={<Login />} />
               <Route
                 path="/admin/exodus"
