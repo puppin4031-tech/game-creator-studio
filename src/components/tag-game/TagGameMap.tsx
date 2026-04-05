@@ -4,6 +4,7 @@ import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
 import { haversineDistance } from '@/lib/haversine';
 import { GeoPosition } from '@/hooks/useGeolocation';
 import PingOverlay, { Ping } from './PingOverlay';
+import DirectionCone from './DirectionCone';
 
 interface Props {
   room: TagRoom;
@@ -44,13 +45,7 @@ export default function TagGameMap({ room, players, currentPlayerId, myTeam, pos
 
   const [mapState, setMapState] = useState<google.maps.Map | null>(null);
 
-  useEffect(() => {
-    if (mapState && isCompassActive && heading !== null) {
-      mapState.setHeading(heading);
-    } else if (mapState && !isCompassActive) {
-      mapState.setHeading(0);
-    }
-  }, [mapState, heading, isCompassActive]);
+  // No longer rotating the map — using DirectionCone overlay instead
 
   return (
     <GoogleMap
@@ -103,6 +98,14 @@ export default function TagGameMap({ room, players, currentPlayerId, myTeam, pos
           />
         );
       })}
+
+      {isCompassActive && heading !== null && (
+        <DirectionCone
+          position={center}
+          heading={heading}
+          color={TEAM_COLORS[myTeam || 1]}
+        />
+      )}
 
       <PingOverlay pings={pings} onExpire={onPingExpire} map={mapState} />
     </GoogleMap>
