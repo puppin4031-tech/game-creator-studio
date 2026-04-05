@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTagRoom, TagRoom } from '@/hooks/useTagRoom';
-import { MapPin, Plus, LogIn, Gamepad2, Users, RefreshCw, ArrowLeft, RotateCcw } from 'lucide-react';
+import { MapPin, Plus, LogIn, Gamepad2, Users, RefreshCw, ArrowLeft, RotateCcw, Gem } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -14,6 +14,7 @@ export default function Lobby() {
   const [nickname, setNickname] = useState(sessionStorage.getItem('tag_nickname') || '');
   const [mode, setMode] = useState<'menu' | 'create' | 'join'>('menu');
   const [roomTitle, setRoomTitle] = useState('');
+  const [gameMode, setGameMode] = useState<'tag' | 'treasure'>('tag');
   const [joinCode, setJoinCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [openRooms, setOpenRooms] = useState<(TagRoom & { player_count: number })[]>([]);
@@ -82,7 +83,7 @@ export default function Lobby() {
       return;
     }
     setLoading(true);
-    const result = await createRoom(roomTitle.trim(), nickname.trim());
+    const result = await createRoom(roomTitle.trim(), nickname.trim(), gameMode);
     setLoading(false);
     if (result) {
       sessionStorage.setItem('tag_nickname', nickname.trim());
@@ -154,8 +155,8 @@ export default function Lobby() {
           <div className="mx-auto mb-3 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
             <Gamepad2 className="w-8 h-8 text-primary" />
           </div>
-          <CardTitle className="text-2xl">🏃 술래잡기</CardTitle>
-          <p className="text-sm text-muted-foreground">GPS 기반 실시간 팀전 술래잡기</p>
+          <CardTitle className="text-2xl">🎮 플레이</CardTitle>
+          <p className="text-sm text-muted-foreground">GPS 기반 실시간 팀 게임</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
@@ -189,6 +190,29 @@ export default function Lobby() {
                   onChange={e => setRoomTitle(e.target.value)}
                   maxLength={30}
                 />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">게임 모드</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setGameMode('tag')}
+                    className={`p-3 rounded-lg border-2 text-center transition-all ${
+                      gameMode === 'tag' ? 'border-primary bg-primary/10' : 'border-muted hover:border-muted-foreground/30'
+                    }`}
+                  >
+                    <span className="text-2xl block mb-1">🏃</span>
+                    <span className="text-sm font-medium">술래잡기</span>
+                  </button>
+                  <button
+                    onClick={() => setGameMode('treasure')}
+                    className={`p-3 rounded-lg border-2 text-center transition-all ${
+                      gameMode === 'treasure' ? 'border-primary bg-primary/10' : 'border-muted hover:border-muted-foreground/30'
+                    }`}
+                  >
+                    <span className="text-2xl block mb-1">💎</span>
+                    <span className="text-sm font-medium">보물찾기</span>
+                  </button>
+                </div>
               </div>
               <div className="flex gap-2">
                 <Button variant="ghost" onClick={() => setMode('menu')} className="flex-1">뒤로</Button>
@@ -255,6 +279,9 @@ export default function Lobby() {
                     <span className="flex items-center gap-1">
                       <Users className="w-3.5 h-3.5" /> {room.player_count}명
                     </span>
+                    {(room as any).game_mode === 'treasure' && (
+                      <span className="text-xs bg-amber-500/15 text-amber-700 px-1.5 py-0.5 rounded font-medium">💎 보물찾기</span>
+                    )}
                     {room.status === 'playing' && (
                       <span className="text-xs text-green-600 font-medium">게임 중</span>
                     )}

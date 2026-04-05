@@ -12,6 +12,7 @@ export interface TagRoom {
   team2_name: string;
   started_at: string | null;
   created_at: string;
+  game_mode: string;
 }
 
 export interface TagPlayer {
@@ -76,13 +77,13 @@ export function useTagRoom(roomCode?: string, playerId?: string) {
   }, []);
 
   // Create room
-  const createRoom = useCallback(async (title: string, hostNickname: string) => {
+  const createRoom = useCallback(async (title: string, hostNickname: string, gameMode: string = 'tag') => {
     const code = generateRoomCode();
     const hostId = crypto.randomUUID();
 
     const { data: roomData, error } = await supabase
       .from('tag_rooms')
-      .insert({ room_code: code, title, host_id: hostId })
+      .insert({ room_code: code, title, host_id: hostId, game_mode: gameMode })
       .select()
       .single();
 

@@ -392,6 +392,7 @@ export type Database = {
       tag_rooms: {
         Row: {
           created_at: string
+          game_mode: string
           host_id: string
           id: string
           room_code: string
@@ -404,6 +405,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          game_mode?: string
           host_id: string
           id?: string
           room_code: string
@@ -416,6 +418,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          game_mode?: string
           host_id?: string
           id?: string
           room_code?: string
@@ -510,6 +513,60 @@ export type Database = {
           thumbnail_url?: string | null
         }
         Relationships: []
+      }
+      treasure_items: {
+        Row: {
+          created_at: string
+          found_at: string | null
+          found_by: string | null
+          id: string
+          keyword: string
+          latitude: number
+          longitude: number
+          quiz_answer: string
+          quiz_question: string
+          room_id: string
+        }
+        Insert: {
+          created_at?: string
+          found_at?: string | null
+          found_by?: string | null
+          id?: string
+          keyword: string
+          latitude: number
+          longitude: number
+          quiz_answer: string
+          quiz_question: string
+          room_id: string
+        }
+        Update: {
+          created_at?: string
+          found_at?: string | null
+          found_by?: string | null
+          id?: string
+          keyword?: string
+          latitude?: number
+          longitude?: number
+          quiz_answer?: string
+          quiz_question?: string
+          room_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treasure_items_found_by_fkey"
+            columns: ["found_by"]
+            isOneToOne: false
+            referencedRelation: "tag_players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "treasure_items_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "tag_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_inventory: {
         Row: {
