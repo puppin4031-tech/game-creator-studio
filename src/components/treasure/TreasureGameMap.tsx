@@ -168,7 +168,20 @@ export default function TreasureGameMap({
           open={quizOpen}
           onOpenChange={setQuizOpen}
           treasure={nearest}
-          onSubmit={handleQuizSubmit}
+          onQuizSubmit={handleQuizSubmit}
+          onPuzzleSolve={async () => {
+            if (!nearest) return { success: false };
+            // Puzzle solved → claim the treasure
+            const { data, error } = await supabase
+              .from('treasure_items')
+              .update({ found_by: currentPlayerId, found_at: new Date().toISOString() })
+              .eq('id', nearest.id)
+              .is('found_by', null)
+              .select()
+              .single();
+            if (error || !data) return { success: false, alreadyFound: true };
+            return { success: true };
+          }}
         />
       )}
 
