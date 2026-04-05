@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
 import { ArrowLeft, Copy, Play, Users, Settings, Crown, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import TreasureSetup from '@/components/treasure/TreasureSetup';
+import { useTreasureHunt } from '@/hooks/useTreasureHunt';
 
 interface Props {
   room: TagRoom;
@@ -29,6 +31,11 @@ export default function WaitingRoom({
   const [timerMin, setTimerMin] = useState(Math.floor(room.timer_seconds / 60));
   const [showSettings, setShowSettings] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const isTreasure = room.game_mode === 'treasure';
+  const { treasures, addTreasure, removeTreasure } = useTreasureHunt(
+    isTreasure ? room.id : undefined, currentPlayerId, 0, 0
+  );
 
   const team1Players = players.filter(p => p.team === 1);
   const team2Players = players.filter(p => p.team === 2);
@@ -73,6 +80,7 @@ export default function WaitingRoom({
       {/* Header */}
       <div className="text-center mb-6">
         <h1 className="text-xl font-bold">{room.title}</h1>
+        {isTreasure && <Badge className="mt-1">💎 보물찾기</Badge>}
         <div className="flex items-center justify-center gap-2 mt-2">
           <Badge variant="outline" className="text-lg font-mono tracking-widest px-4 py-1">
             {room.room_code}
