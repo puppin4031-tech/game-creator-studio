@@ -16,23 +16,22 @@ interface Props {
     challenge_type: string; puzzle_image_url?: string; puzzle_grid_size?: number;
   }) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
-  puzzlePresets: PuzzlePreset[];
 }
 
-export interface PuzzlePreset {
-  id: string;
-  name: string;
-  image_url: string;
-  grid_size: number;
-}
+const PUZZLE_PRESETS = [
+  { id: 'gogh', name: '별이 빛나는 밤', image_url: '/presets/gogh.jpeg' },
+  { id: 'rembrandt', name: '돌아온 탕자', image_url: '/presets/rembrandt.jpg' },
+  { id: 'munch', name: '절규', image_url: '/presets/munch.jpeg' },
+  { id: 'creation', name: '천지창조', image_url: '/presets/creation.jpg' },
+];
 
-export default function TreasureSetup({ treasures, onAdd, onRemove, puzzlePresets }: Props) {
+export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
   const [keyword, setKeyword] = useState('');
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [challengeType, setChallengeType] = useState<'quiz' | 'puzzle'>('quiz');
   const [puzzleImageUrl, setPuzzleImageUrl] = useState('');
-  const [puzzleGridSize, setPuzzleGridSize] = useState<3 | 4>(3);
+  const [puzzleGridSize, setPuzzleGridSize] = useState<3 | 4 | 5>(3);
   const [adding, setAdding] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -100,12 +99,6 @@ export default function TreasureSetup({ treasures, onAdd, onRemove, puzzlePreset
       },
       { enableHighAccuracy: true }
     );
-  };
-
-  const selectPreset = (preset: PuzzlePreset) => {
-    setPuzzleImageUrl(preset.image_url);
-    setPuzzleGridSize(preset.grid_size as 3 | 4);
-    toast.success(`프리셋 "${preset.name}" 선택됨`);
   };
 
   return (
@@ -179,44 +172,45 @@ export default function TreasureSetup({ treasures, onAdd, onRemove, puzzlePreset
                 <div>
                   <label className="text-xs font-medium mb-1 block">격자 크기</label>
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => setPuzzleGridSize(3)}
-                      className={`flex-1 py-1.5 rounded text-sm font-medium transition-colors ${
-                        puzzleGridSize === 3 ? 'bg-primary text-primary-foreground' : 'bg-muted'
-                      }`}
-                    >
-                      3×3
-                    </button>
-                    <button
-                      onClick={() => setPuzzleGridSize(4)}
-                      className={`flex-1 py-1.5 rounded text-sm font-medium transition-colors ${
-                        puzzleGridSize === 4 ? 'bg-primary text-primary-foreground' : 'bg-muted'
-                      }`}
-                    >
-                      4×4
-                    </button>
+                    {([3, 4, 5] as const).map(size => (
+                      <button
+                        key={size}
+                        onClick={() => setPuzzleGridSize(size)}
+                        className={`flex-1 py-1.5 rounded text-sm font-medium transition-colors ${
+                          puzzleGridSize === size ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                        }`}
+                      >
+                        {size}×{size}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
                 {/* Presets */}
-                {puzzlePresets.length > 0 && (
-                  <div>
-                    <label className="text-xs font-medium mb-1 block">프리셋</label>
-                    <div className="flex gap-2 overflow-x-auto pb-1">
-                      {puzzlePresets.map(p => (
-                        <button
-                          key={p.id}
-                          onClick={() => selectPreset(p)}
-                          className={`shrink-0 w-16 h-16 rounded-lg border-2 overflow-hidden transition-all ${
-                            puzzleImageUrl === p.image_url ? 'border-primary ring-2 ring-primary/30' : 'border-muted'
-                          }`}
-                        >
-                          <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
-                        </button>
-                      ))}
-                    </div>
+                <div>
+                  <label className="text-xs font-medium mb-1 block">프리셋</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {PUZZLE_PRESETS.map(p => (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          setPuzzleImageUrl(p.image_url);
+                          toast.success(`"${p.name}" 선택됨`);
+                        }}
+                        className={`rounded-lg border-2 overflow-hidden transition-all aspect-square ${
+                          puzzleImageUrl === p.image_url ? 'border-primary ring-2 ring-primary/30' : 'border-muted'
+                        }`}
+                      >
+                        <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
                   </div>
-                )}
+                  <div className="flex gap-1 mt-1">
+                    {PUZZLE_PRESETS.map(p => (
+                      <span key={p.id} className="flex-1 text-[10px] text-muted-foreground text-center truncate">{p.name}</span>
+                    ))}
+                  </div>
+                </div>
 
                 {/* Image upload */}
                 <div>
@@ -244,7 +238,10 @@ export default function TreasureSetup({ treasures, onAdd, onRemove, puzzlePreset
                 {puzzleImageUrl && (
                   <div className="flex items-center gap-2 bg-background rounded p-2 border">
                     <img src={puzzleImageUrl} alt="퍼즐" className="w-12 h-12 rounded object-cover" />
-                    <span className="text-xs text-muted-foreground flex-1 truncate">이미지 선택됨</span>
+                    <span className="text-xs text-muted-foreground flex-1 truncate">
+                      {PUZZLE_PRESETS.find(p => p.image_url === puzzleImageUrl)?.name || '커스텀 이미지'}
+                      {' · '}{puzzleGridSize}×{puzzleGridSize}
+                    </span>
                     <button onClick={() => setPuzzleImageUrl('')} className="text-destructive text-xs">삭제</button>
                   </div>
                 )}
@@ -271,6 +268,9 @@ export default function TreasureSetup({ treasures, onAdd, onRemove, puzzlePreset
                   #{i + 1}
                   {t.challenge_type === 'puzzle' ? <Puzzle className="w-3.5 h-3.5" /> : <HelpCircle className="w-3.5 h-3.5" />}
                   <strong>{t.keyword}</strong>
+                  {t.challenge_type === 'puzzle' && (
+                    <span className="text-xs text-muted-foreground">{t.puzzle_grid_size}×{t.puzzle_grid_size}</span>
+                  )}
                 </span>
                 <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => onRemove(t.id)}>
                   <Trash2 className="w-3.5 h-3.5 text-destructive" />

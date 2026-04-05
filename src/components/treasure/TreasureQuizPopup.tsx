@@ -20,7 +20,7 @@ interface Props {
 
 export default function TreasureQuizPopup({ open, onOpenChange, treasure, onQuizSubmit, onPuzzleSolve }: Props) {
   const [answer, setAnswer] = useState('');
-  const [result, setResult] = useState<'idle' | 'correct' | 'wrong' | 'taken'>('idle');
+  const [result, setResult] = useState<'idle' | 'correct' | 'wrong' | 'taken' | 'timeout'>('idle');
   const [submitting, setSubmitting] = useState(false);
 
   const isPuzzle = treasure.challenge_type === 'puzzle';
@@ -56,6 +56,14 @@ export default function TreasureQuizPopup({ open, onOpenChange, treasure, onQuiz
     }
   };
 
+  const handlePuzzleTimeout = () => {
+    setResult('timeout');
+    setTimeout(() => {
+      onOpenChange(false);
+      setResult('idle');
+    }, 1500);
+  };
+
   const handleClose = () => {
     onOpenChange(false);
     setResult('idle');
@@ -67,7 +75,10 @@ export default function TreasureQuizPopup({ open, onOpenChange, treasure, onQuiz
       <DialogContent className={isPuzzle ? 'max-w-sm p-4' : 'max-w-sm'}>
         <DialogHeader>
           <DialogTitle className="text-center">
-            {result === 'correct' ? '🎉 성공!' : result === 'taken' ? '😢 아쉽게도...' : isPuzzle ? '🧩 슬라이드 퍼즐' : '❓ 퀴즈'}
+            {result === 'correct' ? '🎉 성공!' :
+             result === 'taken' ? '😢 아쉽게도...' :
+             result === 'timeout' ? '⏱ 시간 초과!' :
+             isPuzzle ? '🧩 슬라이드 퍼즐' : '❓ 퀴즈'}
           </DialogTitle>
         </DialogHeader>
 
@@ -95,12 +106,22 @@ export default function TreasureQuizPopup({ open, onOpenChange, treasure, onQuiz
           </div>
         )}
 
+        {result === 'timeout' && (
+          <div className="text-center space-y-3 py-4">
+            <div className="text-5xl">⏱</div>
+            <p className="text-lg font-bold text-destructive">시간 초과!</p>
+            <p className="text-sm text-muted-foreground">15초 후 재시도할 수 있습니다</p>
+          </div>
+        )}
+
         {result === 'idle' && isPuzzle && treasure.puzzle_image_url && (
           <div className="space-y-3">
             <SlidingPuzzle
               imageUrl={treasure.puzzle_image_url}
-              gridSize={(treasure.puzzle_grid_size || 3) as 3 | 4}
+              gridSize={(treasure.puzzle_grid_size || 3) as 3 | 4 | 5}
               onSolve={handlePuzzleSolve}
+              timeLimit={30}
+              onTimeout={handlePuzzleTimeout}
             />
             <Button variant="ghost" onClick={handleClose} className="w-full">취소</Button>
           </div>
