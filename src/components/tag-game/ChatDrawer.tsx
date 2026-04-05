@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,15 +18,27 @@ interface Props {
 export default function ChatDrawer({ room, messages, currentNickname, currentTeam, isHost, onSend }: Props) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
-  const [tab, setTab] = useState<string>(currentTeam === 1 ? 'team1' : currentTeam === 2 ? 'team2' : 'all');
+  const teamChannel = currentTeam === 1 ? 'team1' : 'team2';
+  const [tab, setTab] = useState<string>(teamChannel);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const teamChannel = currentTeam === 1 ? 'team1' : 'team2';
+  // Track how many messages the user has "seen" (only messages visible to them)
+  const [lastSeenCount, setLastSeenCount] = useState(0);
+
+  // Messages this user is allowed to see: 'all' channel + their own team channel
+  const myVisibleMessages = messages.filter(m => m.channel === 'all' || m.channel === teamChannel);
 
   const filteredMessages = messages.filter(m => {
     if (tab === 'all') return m.channel === 'all';
     return m.channel === tab;
   });
+
+  // Mark as read when drawer opens or new messages arrive while open
+  useEffect(() => {
+    if (open) {
+      setLastSeenCount(myVisibleMessages.length);
+    }
+  }, [open, myVisibleMessages.length]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -38,7 +50,7 @@ export default function ChatDrawer({ room, messages, currentNickname, currentTea
     setText('');
   };
 
-  const unreadCount = messages.length;
+  const unreadCount = open ? 0 : Math.max(0, myVisibleMessages.length - lastSeenCount);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
