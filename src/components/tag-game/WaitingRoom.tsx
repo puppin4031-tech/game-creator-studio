@@ -96,7 +96,7 @@ export default function WaitingRoom({
 
       {/* Treasure setup (host only, treasure mode) */}
       {isHost && isTreasure && (
-        <TreasureSetup treasures={treasures} onAdd={addTreasure} onRemove={removeTreasure} puzzlePresets={[]} />
+        <TreasureSetup treasures={treasures} onAdd={addTreasure} onRemove={removeTreasure} />
       )}
 
       {/* Settings (host only) */}
