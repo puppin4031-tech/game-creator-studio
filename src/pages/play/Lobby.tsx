@@ -23,6 +23,27 @@ export default function Lobby() {
   const savedRoomCode = sessionStorage.getItem('tag_room_code');
   const savedPlayerId = sessionStorage.getItem('tag_player_id');
 
+  // Auto-clear session if saved room is ended or doesn't exist
+  useEffect(() => {
+    const checkSavedRoom = async () => {
+      if (!savedRoomCode) return;
+      const { data } = await supabase
+        .from('tag_rooms')
+        .select('status')
+        .eq('room_code', savedRoomCode)
+        .maybeSingle();
+      if (!data || data.status === 'ended') {
+        sessionStorage.removeItem('tag_room_code');
+        sessionStorage.removeItem('tag_player_id');
+        sessionStorage.removeItem('tag_host_id');
+        // Force re-render
+        window.dispatchEvent(new Event('storage'));
+        setSavedSession(null);
+      }
+    };
+    checkSavedRoom();
+  }, [savedRoomCode]);
+
   // Fetch open rooms
   const fetchOpenRooms = async () => {
     setRoomsLoading(true);
