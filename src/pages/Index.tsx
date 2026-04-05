@@ -119,6 +119,11 @@ const Index = () => {
         <span className="text-muted-foreground">
           {position.latitude.toFixed(4)}, {position.longitude.toFixed(4)}
         </span>
+        {position.accuracy != null && (
+          <span className={`font-medium ${position.accuracy <= 10 ? 'text-green-500' : position.accuracy <= 25 ? 'text-yellow-500' : 'text-destructive'}`}>
+            ±{position.accuracy.toFixed(1)}m
+          </span>
+        )}
         <span className="text-primary font-medium">{nearbyInRange.length} 스팟</span>
       </div>
 
