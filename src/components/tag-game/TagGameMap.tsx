@@ -4,6 +4,7 @@ import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
 import { haversineDistance } from '@/lib/haversine';
 import { GeoPosition } from '@/hooks/useGeolocation';
 import PingOverlay, { Ping } from './PingOverlay';
+import DirectionCone from './DirectionCone';
 
 interface Props {
   room: TagRoom;
