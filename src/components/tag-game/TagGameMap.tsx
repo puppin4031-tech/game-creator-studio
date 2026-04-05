@@ -99,6 +99,14 @@ export default function TagGameMap({ room, players, currentPlayerId, myTeam, pos
         );
       })}
 
+      {isCompassActive && heading !== null && (
+        <DirectionCone
+          position={center}
+          heading={heading}
+          color={TEAM_COLORS[myTeam || 1]}
+        />
+      )}
+
       <PingOverlay pings={pings} onExpire={onPingExpire} map={mapState} />
     </GoogleMap>
   );
