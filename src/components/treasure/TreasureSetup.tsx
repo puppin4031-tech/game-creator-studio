@@ -299,9 +299,64 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
               </div>
             )}
 
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <MapPin className="w-3 h-3" /> 현재 위치에 보물이 등록됩니다
-            </p>
+            {/* Location picker */}
+            <div>
+              <label className="text-xs font-medium mb-1.5 block">위치 설정</label>
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <button
+                  onClick={() => setLocMode('map')}
+                  className={`p-2 rounded-lg border-2 text-center transition-all text-sm ${
+                    locMode === 'map' ? 'border-primary bg-primary/10' : 'border-muted hover:border-muted-foreground/30'
+                  }`}
+                >
+                  <MapPin className="w-5 h-5 mx-auto mb-1" />
+                  지도에서 선택
+                </button>
+                <button
+                  onClick={() => setLocMode('gps')}
+                  className={`p-2 rounded-lg border-2 text-center transition-all text-sm ${
+                    locMode === 'gps' ? 'border-primary bg-primary/10' : 'border-muted hover:border-muted-foreground/30'
+                  }`}
+                >
+                  <Navigation className="w-5 h-5 mx-auto mb-1" />
+                  현재 GPS 위치
+                </button>
+              </div>
+
+              {locMode === 'map' && (
+                <div className="space-y-1.5">
+                  <GoogleMap
+                    mapContainerStyle={mapContainerStyle}
+                    center={pickedLat != null ? { lat: pickedLat, lng: pickedLng! } : mapCenter}
+                    zoom={17}
+                    onClick={handleMapClick}
+                    options={{ zoomControl: true, mapTypeControl: false, streetViewControl: false, fullscreenControl: false }}
+                  >
+                    {pickedLat != null && pickedLng != null && (
+                      <Marker
+                        position={{ lat: pickedLat, lng: pickedLng }}
+                        icon={{ url: pinIconUrl, scaledSize: new google.maps.Size(28, 28), anchor: new google.maps.Point(14, 14) }}
+                      />
+                    )}
+                  </GoogleMap>
+                  {pickedLat != null ? (
+                    <p className="text-xs text-green-600 flex items-center gap-1">
+                      <MapPin className="w-3 h-3" />
+                      위치 선택됨: {pickedLat.toFixed(6)}, {pickedLng!.toFixed(6)}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">지도를 탭하여 보물 위치를 지정하세요</p>
+                  )}
+                </div>
+              )}
+
+              {locMode === 'gps' && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Navigation className="w-3 h-3" /> 등록 시 현재 GPS 위치가 사용됩니다
+                </p>
+              )}
+            </div>
+
             <div className="flex gap-2">
               <Button variant="ghost" size="sm" onClick={() => setShowForm(false)} className="flex-1">취소</Button>
               <Button size="sm" onClick={handleAdd} disabled={adding} className="flex-1">
