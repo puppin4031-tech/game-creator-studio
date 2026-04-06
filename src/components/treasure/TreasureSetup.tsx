@@ -158,7 +158,7 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
         <div className="flex items-center justify-between">
           <p className="text-sm font-bold">💎 보물 등록 ({treasures.length}개)</p>
           {!showForm && (
-            <Button size="sm" variant="outline" onClick={() => setShowForm(true)} className="gap-1">
+            <Button size="sm" variant="outline" onClick={handleShowForm} className="gap-1">
               <Plus className="w-4 h-4" /> 추가
             </Button>
           )}
