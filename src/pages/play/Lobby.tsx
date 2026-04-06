@@ -130,7 +130,7 @@ export default function Lobby() {
   const isMyRoom = (room: TagRoom) => savedRoomCode === room.room_code;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center p-4 pt-8 gap-4">
+    <div className="min-h-screen bg-background flex flex-col items-center p-4 pt-8 gap-4 overflow-y-auto">
       <Button variant="ghost" size="sm" className="self-start" onClick={() => navigate('/')}>
         <ArrowLeft className="!w-5 !h-5 mr-1" /> 뒤로가기
       </Button>
