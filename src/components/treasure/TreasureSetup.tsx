@@ -1,12 +1,13 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Trash2, MapPin, Image, HelpCircle, Puzzle } from 'lucide-react';
+import { Plus, Trash2, MapPin, Image, HelpCircle, Puzzle, Navigation } from 'lucide-react';
 import { TreasureItem } from '@/hooks/useTreasureHunt';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { GoogleMap, Marker } from '@react-google-maps/api';
 
 interface Props {
   treasures: TreasureItem[];
@@ -25,6 +26,10 @@ const PUZZLE_PRESETS = [
   { id: 'creation', name: '천지창조', image_url: '/presets/creation.jpg' },
 ];
 
+const mapContainerStyle = { width: '100%', height: '200px', borderRadius: '8px' };
+
+const pinIconUrl = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><circle cx="14" cy="14" r="10" fill="hsl(0,80%,55%)" stroke="white" stroke-width="3"/><circle cx="14" cy="14" r="4" fill="white"/></svg>`)}`;
+
 export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
   const [keyword, setKeyword] = useState('');
   const [question, setQuestion] = useState('');
@@ -36,6 +41,36 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Location picker state
+  const [locMode, setLocMode] = useState<'gps' | 'map'>('map');
+  const [pickedLat, setPickedLat] = useState<number | null>(null);
+  const [pickedLng, setPickedLng] = useState<number | null>(null);
+  const [mapCenter, setMapCenter] = useState({ lat: 37.5665, lng: 126.978 });
+
+  // Initialize map center to current GPS
+  const initMapCenter = useCallback(() => {
+    navigator.geolocation?.getCurrentPosition(
+      (pos) => {
+        setMapCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      },
+      () => {},
+      { enableHighAccuracy: true }
+    );
+  }, []);
+
+  // Run once when form opens
+  const handleShowForm = () => {
+    setShowForm(true);
+    initMapCenter();
+  };
+
+  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
+    if (e.latLng) {
+      setPickedLat(e.latLng.lat());
+      setPickedLng(e.latLng.lng());
+    }
+  }, []);
 
   const handleImageUpload = async (file: File) => {
     setUploading(true);
@@ -53,6 +88,28 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
     toast.success('이미지가 업로드되었습니다');
   };
 
+  const doAdd = async (lat: number, lng: number) => {
+    await onAdd({
+      keyword: keyword.trim(),
+      latitude: lat,
+      longitude: lng,
+      quiz_question: challengeType === 'quiz' ? question.trim() : '슬라이드 퍼즐을 완성하세요!',
+      quiz_answer: challengeType === 'quiz' ? answer.trim() : '__PUZZLE__',
+      challenge_type: challengeType,
+      puzzle_image_url: challengeType === 'puzzle' ? puzzleImageUrl : undefined,
+      puzzle_grid_size: challengeType === 'puzzle' ? puzzleGridSize : undefined,
+    });
+    setKeyword('');
+    setQuestion('');
+    setAnswer('');
+    setPuzzleImageUrl('');
+    setPickedLat(null);
+    setPickedLng(null);
+    setShowForm(false);
+    setAdding(false);
+    toast.success('보물이 등록되었습니다');
+  };
+
   const handleAdd = async () => {
     if (!keyword.trim()) {
       toast.error('키워드를 입력해주세요');
@@ -67,38 +124,32 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
       return;
     }
 
-    if (!navigator.geolocation) {
-      toast.error('GPS를 사용할 수 없습니다');
-      return;
-    }
-
     setAdding(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        await onAdd({
-          keyword: keyword.trim(),
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          quiz_question: challengeType === 'quiz' ? question.trim() : '슬라이드 퍼즐을 완성하세요!',
-          quiz_answer: challengeType === 'quiz' ? answer.trim() : '__PUZZLE__',
-          challenge_type: challengeType,
-          puzzle_image_url: challengeType === 'puzzle' ? puzzleImageUrl : undefined,
-          puzzle_grid_size: challengeType === 'puzzle' ? puzzleGridSize : undefined,
-        });
-        setKeyword('');
-        setQuestion('');
-        setAnswer('');
-        setPuzzleImageUrl('');
-        setShowForm(false);
+
+    if (locMode === 'map') {
+      if (pickedLat == null || pickedLng == null) {
+        toast.error('지도에서 보물 위치를 탭해주세요');
         setAdding(false);
-        toast.success('보물이 등록되었습니다');
-      },
-      () => {
-        toast.error('위치를 가져올 수 없습니다');
+        return;
+      }
+      await doAdd(pickedLat, pickedLng);
+    } else {
+      if (!navigator.geolocation) {
+        toast.error('GPS를 사용할 수 없습니다');
         setAdding(false);
-      },
-      { enableHighAccuracy: true }
-    );
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          await doAdd(pos.coords.latitude, pos.coords.longitude);
+        },
+        () => {
+          toast.error('위치를 가져올 수 없습니다');
+          setAdding(false);
+        },
+        { enableHighAccuracy: true }
+      );
+    }
   };
 
   return (
@@ -107,7 +158,7 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
         <div className="flex items-center justify-between">
           <p className="text-sm font-bold">💎 보물 등록 ({treasures.length}개)</p>
           {!showForm && (
-            <Button size="sm" variant="outline" onClick={() => setShowForm(true)} className="gap-1">
+            <Button size="sm" variant="outline" onClick={handleShowForm} className="gap-1">
               <Plus className="w-4 h-4" /> 추가
             </Button>
           )}
@@ -248,9 +299,64 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
               </div>
             )}
 
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <MapPin className="w-3 h-3" /> 현재 위치에 보물이 등록됩니다
-            </p>
+            {/* Location picker */}
+            <div>
+              <label className="text-xs font-medium mb-1.5 block">위치 설정</label>
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <button
+                  onClick={() => setLocMode('map')}
+                  className={`p-2 rounded-lg border-2 text-center transition-all text-sm ${
+                    locMode === 'map' ? 'border-primary bg-primary/10' : 'border-muted hover:border-muted-foreground/30'
+                  }`}
+                >
+                  <MapPin className="w-5 h-5 mx-auto mb-1" />
+                  지도에서 선택
+                </button>
+                <button
+                  onClick={() => setLocMode('gps')}
+                  className={`p-2 rounded-lg border-2 text-center transition-all text-sm ${
+                    locMode === 'gps' ? 'border-primary bg-primary/10' : 'border-muted hover:border-muted-foreground/30'
+                  }`}
+                >
+                  <Navigation className="w-5 h-5 mx-auto mb-1" />
+                  현재 GPS 위치
+                </button>
+              </div>
+
+              {locMode === 'map' && (
+                <div className="space-y-1.5">
+                  <GoogleMap
+                    mapContainerStyle={mapContainerStyle}
+                    center={pickedLat != null ? { lat: pickedLat, lng: pickedLng! } : mapCenter}
+                    zoom={17}
+                    onClick={handleMapClick}
+                    options={{ zoomControl: true, mapTypeControl: false, streetViewControl: false, fullscreenControl: false }}
+                  >
+                    {pickedLat != null && pickedLng != null && (
+                      <Marker
+                        position={{ lat: pickedLat, lng: pickedLng }}
+                        icon={{ url: pinIconUrl, scaledSize: new google.maps.Size(28, 28), anchor: new google.maps.Point(14, 14) }}
+                      />
+                    )}
+                  </GoogleMap>
+                  {pickedLat != null ? (
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                      <MapPin className="w-3 h-3" />
+                      위치 선택됨: {pickedLat.toFixed(6)}, {pickedLng!.toFixed(6)}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">지도를 탭하여 보물 위치를 지정하세요</p>
+                  )}
+                </div>
+              )}
+
+              {locMode === 'gps' && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Navigation className="w-3 h-3" /> 등록 시 현재 GPS 위치가 사용됩니다
+                </p>
+              )}
+            </div>
+
             <div className="flex gap-2">
               <Button variant="ghost" size="sm" onClick={() => setShowForm(false)} className="flex-1">취소</Button>
               <Button size="sm" onClick={handleAdd} disabled={adding} className="flex-1">
