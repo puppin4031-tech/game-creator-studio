@@ -340,7 +340,7 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
                     )}
                   </GoogleMap>
                   {pickedLat != null ? (
-                    <p className="text-xs text-green-600 flex items-center gap-1">
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                       <MapPin className="w-3 h-3" />
                       위치 선택됨: {pickedLat.toFixed(6)}, {pickedLng!.toFixed(6)}
                     </p>
