@@ -56,7 +56,7 @@ export default function WaitingRoom({
   };
 
   return (
-    <div className="min-h-screen bg-background p-4 pb-24">
+    <div className="min-h-screen bg-background p-4 pb-24 overflow-y-auto">
       {/* Top bar */}
       <div className="flex items-center justify-between mb-2">
         <Button variant="ghost" size="sm" onClick={onLeave}>
