@@ -1,12 +1,13 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Trash2, MapPin, Image, HelpCircle, Puzzle } from 'lucide-react';
+import { Plus, Trash2, MapPin, Image, HelpCircle, Puzzle, Navigation } from 'lucide-react';
 import { TreasureItem } from '@/hooks/useTreasureHunt';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { GoogleMap, Marker } from '@react-google-maps/api';
 
 interface Props {
   treasures: TreasureItem[];
@@ -25,6 +26,10 @@ const PUZZLE_PRESETS = [
   { id: 'creation', name: '천지창조', image_url: '/presets/creation.jpg' },
 ];
 
+const mapContainerStyle = { width: '100%', height: '200px', borderRadius: '8px' };
+
+const pinIconUrl = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><circle cx="14" cy="14" r="10" fill="hsl(0,80%,55%)" stroke="white" stroke-width="3"/><circle cx="14" cy="14" r="4" fill="white"/></svg>`)}`;
+
 export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
   const [keyword, setKeyword] = useState('');
   const [question, setQuestion] = useState('');
@@ -36,6 +41,36 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Location picker state
+  const [locMode, setLocMode] = useState<'gps' | 'map'>('map');
+  const [pickedLat, setPickedLat] = useState<number | null>(null);
+  const [pickedLng, setPickedLng] = useState<number | null>(null);
+  const [mapCenter, setMapCenter] = useState({ lat: 37.5665, lng: 126.978 });
+
+  // Initialize map center to current GPS
+  const initMapCenter = useCallback(() => {
+    navigator.geolocation?.getCurrentPosition(
+      (pos) => {
+        setMapCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      },
+      () => {},
+      { enableHighAccuracy: true }
+    );
+  }, []);
+
+  // Run once when form opens
+  const handleShowForm = () => {
+    setShowForm(true);
+    initMapCenter();
+  };
+
+  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
+    if (e.latLng) {
+      setPickedLat(e.latLng.lat());
+      setPickedLng(e.latLng.lng());
+    }
+  }, []);
 
   const handleImageUpload = async (file: File) => {
     setUploading(true);
@@ -53,6 +88,28 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
     toast.success('이미지가 업로드되었습니다');
   };
 
+  const doAdd = async (lat: number, lng: number) => {
+    await onAdd({
+      keyword: keyword.trim(),
+      latitude: lat,
+      longitude: lng,
+      quiz_question: challengeType === 'quiz' ? question.trim() : '슬라이드 퍼즐을 완성하세요!',
+      quiz_answer: challengeType === 'quiz' ? answer.trim() : '__PUZZLE__',
+      challenge_type: challengeType,
+      puzzle_image_url: challengeType === 'puzzle' ? puzzleImageUrl : undefined,
+      puzzle_grid_size: challengeType === 'puzzle' ? puzzleGridSize : undefined,
+    });
+    setKeyword('');
+    setQuestion('');
+    setAnswer('');
+    setPuzzleImageUrl('');
+    setPickedLat(null);
+    setPickedLng(null);
+    setShowForm(false);
+    setAdding(false);
+    toast.success('보물이 등록되었습니다');
+  };
+
   const handleAdd = async () => {
     if (!keyword.trim()) {
       toast.error('키워드를 입력해주세요');
@@ -67,38 +124,32 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
       return;
     }
 
-    if (!navigator.geolocation) {
-      toast.error('GPS를 사용할 수 없습니다');
-      return;
-    }
-
     setAdding(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        await onAdd({
-          keyword: keyword.trim(),
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          quiz_question: challengeType === 'quiz' ? question.trim() : '슬라이드 퍼즐을 완성하세요!',
-          quiz_answer: challengeType === 'quiz' ? answer.trim() : '__PUZZLE__',
-          challenge_type: challengeType,
-          puzzle_image_url: challengeType === 'puzzle' ? puzzleImageUrl : undefined,
-          puzzle_grid_size: challengeType === 'puzzle' ? puzzleGridSize : undefined,
-        });
-        setKeyword('');
-        setQuestion('');
-        setAnswer('');
-        setPuzzleImageUrl('');
-        setShowForm(false);
+
+    if (locMode === 'map') {
+      if (pickedLat == null || pickedLng == null) {
+        toast.error('지도에서 보물 위치를 탭해주세요');
         setAdding(false);
-        toast.success('보물이 등록되었습니다');
-      },
-      () => {
-        toast.error('위치를 가져올 수 없습니다');
+        return;
+      }
+      await doAdd(pickedLat, pickedLng);
+    } else {
+      if (!navigator.geolocation) {
+        toast.error('GPS를 사용할 수 없습니다');
         setAdding(false);
-      },
-      { enableHighAccuracy: true }
-    );
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          await doAdd(pos.coords.latitude, pos.coords.longitude);
+        },
+        () => {
+          toast.error('위치를 가져올 수 없습니다');
+          setAdding(false);
+        },
+        { enableHighAccuracy: true }
+      );
+    }
   };
 
   return (
