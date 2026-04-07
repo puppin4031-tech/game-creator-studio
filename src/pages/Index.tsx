@@ -27,7 +27,7 @@ const Index = () => {
   const [hintData, setHintData] = useState({ title: '', hint: '', floor: 1 });
   const [acquiredItem, setAcquiredItem] = useState<string | null>(null);
 
-  const { position, mockMove } = useGeolocation();
+  const { position, mockMove, isSimulated, setMockStep } = useGeolocation();
 
   // Fetch spots
   const { data: spots } = useQuery({
