@@ -172,7 +172,7 @@ export default function GameRoom() {
   }, []);
 
   // Location sharing during game
-  const { position } = useLocationShare({
+  const { position, isSimulated, mockMove, setMockStep } = useLocationShare({
     playerId,
     updatePosition,
     isActive: room?.status === 'playing',
