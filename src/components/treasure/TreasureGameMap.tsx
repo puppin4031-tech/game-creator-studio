@@ -59,6 +59,8 @@ export default function TreasureGameMap({
   const [chestDialogOpen, setChestDialogOpen] = useState(false);
   // Gem claim dialog
   const [gemDialogOpen, setGemDialogOpen] = useState(false);
+  // Victory overlay
+  const [victoryOverlay, setVictoryOverlay] = useState(false);
 
   // Pings
   const [pings, setPings] = useState<Ping[]>([]);
