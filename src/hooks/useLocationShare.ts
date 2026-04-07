@@ -9,7 +9,7 @@ interface UseLocationShareOptions {
 }
 
 export function useLocationShare({ playerId, updatePosition, isActive, intervalMs = 5000 }: UseLocationShareOptions) {
-  const { position, error } = useGeolocation();
+  const { position, error, isSimulated, mockMove, setMockStep } = useGeolocation();
   const lastUpdate = useRef<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
@@ -33,5 +33,5 @@ export function useLocationShare({ playerId, updatePosition, isActive, intervalM
     return () => clearInterval(interval);
   }, [playerId, isActive, position.latitude, position.longitude, intervalMs]);
 
-  return { position, geoError: error };
+  return { position, geoError: error, isSimulated, mockMove, setMockStep };
 }
