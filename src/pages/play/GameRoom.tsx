@@ -18,25 +18,110 @@ import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
 
+const SUBTYPE_ICONS: Record<string, string> = {
+  diamond: '💎', gold: '🥇', ruby: '❤️', sapphire: '💙', key: '🔑', chest: '📦',
+};
+const CHALLENGE_ICONS: Record<string, string> = {
+  quiz: '❓', puzzle: '🧩', treasure: '💎',
+};
+
 function TreasureEndScreen({ roomId, players, room }: { roomId: string; players: TagPlayer[]; room: TagRoom }) {
-  const { teamScores } = useTreasureHunt(roomId, null, 0, 0, players);
+  const { treasures, teamScores, teamWithKey } = useTreasureHunt(roomId, null, 0, 0, players);
+  const playerTeamMap = new Map(players.map(p => [p.id, p.team]));
+  const playerNameMap = new Map(players.map(p => [p.id, p.nickname]));
+
   const winner = teamScores.team1 > teamScores.team2 ? room.team1_name
     : teamScores.team2 > teamScores.team1 ? room.team2_name
     : '무승부';
 
+  const foundTreasures = treasures.filter(t => t.found_by);
+  const team1Items = foundTreasures.filter(t => playerTeamMap.get(t.found_by!) === 1);
+  const team2Items = foundTreasures.filter(t => playerTeamMap.get(t.found_by!) === 2);
+
+  const chestOpener = treasures.find(t => t.treasure_subtype === 'chest' && t.found_by);
+  const chestOpenerTeam = chestOpener ? playerTeamMap.get(chestOpener.found_by!) : null;
+
+  const getIcon = (t: { treasure_subtype: string | null; challenge_type: string }) => {
+    if (t.treasure_subtype && SUBTYPE_ICONS[t.treasure_subtype]) return SUBTYPE_ICONS[t.treasure_subtype];
+    return CHALLENGE_ICONS[t.challenge_type] || '💎';
+  };
+
+  const renderTeamItems = (items: typeof foundTreasures) => {
+    if (items.length === 0) return <p className="text-xs text-muted-foreground py-2">획득한 보물 없음</p>;
+    return (
+      <div className="space-y-1 mt-2">
+        {items.map(t => (
+          <div key={t.id} className="flex items-center gap-2 text-sm bg-background/60 rounded px-2 py-1.5">
+            <span>{getIcon(t)}</span>
+            <span className="flex-1 truncate text-xs">{t.keyword}</span>
+            <span className="text-xs text-muted-foreground">{playerNameMap.get(t.found_by!) || '?'}</span>
+            <span className="text-xs font-bold text-primary">+{t.points}</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
-    <div className="space-y-3">
-      {winner !== '무승부' && (
-        <p className="text-lg font-bold text-primary">🏆 {winner} 승리!</p>
-      )}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-blue-500/10 rounded-lg p-3">
-          <p className="font-bold text-blue-600">{room.team1_name}</p>
-          <p className="text-2xl font-mono">{teamScores.team1}점</p>
+    <div className="space-y-4">
+      {/* Victory banner */}
+      {chestOpenerTeam && (
+        <div className="text-center bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+          <p className="text-2xl">📦🔑</p>
+          <p className="text-sm font-bold">
+            {playerNameMap.get(chestOpener!.found_by!) || '?'}님이 보물상자를 열었습니다!
+          </p>
         </div>
-        <div className="bg-red-500/10 rounded-lg p-3">
-          <p className="font-bold text-red-600">{room.team2_name}</p>
-          <p className="text-2xl font-mono">{teamScores.team2}점</p>
+      )}
+
+      {winner !== '무승부' ? (
+        <p className="text-xl font-black text-center text-primary">🏆 {winner} 승리!</p>
+      ) : (
+        <p className="text-xl font-black text-center">🤝 무승부!</p>
+      )}
+
+      {/* Key holder */}
+      {teamWithKey && (
+        <p className="text-xs text-center text-muted-foreground">
+          🔑 열쇠 보유: {teamWithKey === 1 ? room.team1_name : room.team2_name}
+        </p>
+      )}
+
+      {/* Team 1 */}
+      <div className="rounded-xl border-2 border-blue-300 dark:border-blue-700 overflow-hidden">
+        <div className="bg-blue-500/10 px-4 py-3 flex items-center justify-between">
+          <p className="font-bold text-blue-600 dark:text-blue-400">{room.team1_name}</p>
+          <p className="text-2xl font-mono font-black">{teamScores.team1}<span className="text-sm font-normal ml-1">점</span></p>
+        </div>
+        <div className="px-3 pb-3">
+          {renderTeamItems(team1Items)}
+        </div>
+      </div>
+
+      {/* Team 2 */}
+      <div className="rounded-xl border-2 border-red-300 dark:border-red-700 overflow-hidden">
+        <div className="bg-red-500/10 px-4 py-3 flex items-center justify-between">
+          <p className="font-bold text-red-600 dark:text-red-400">{room.team2_name}</p>
+          <p className="text-2xl font-mono font-black">{teamScores.team2}<span className="text-sm font-normal ml-1">점</span></p>
+        </div>
+        <div className="px-3 pb-3">
+          {renderTeamItems(team2Items)}
+        </div>
+      </div>
+
+      {/* Stats summary */}
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <div className="bg-muted rounded-lg p-2">
+          <p className="text-lg font-bold">{treasures.length}</p>
+          <p className="text-[10px] text-muted-foreground">전체 보물</p>
+        </div>
+        <div className="bg-muted rounded-lg p-2">
+          <p className="text-lg font-bold">{foundTreasures.length}</p>
+          <p className="text-[10px] text-muted-foreground">발견됨</p>
+        </div>
+        <div className="bg-muted rounded-lg p-2">
+          <p className="text-lg font-bold">{treasures.length - foundTreasures.length}</p>
+          <p className="text-[10px] text-muted-foreground">미발견</p>
         </div>
       </div>
     </div>
