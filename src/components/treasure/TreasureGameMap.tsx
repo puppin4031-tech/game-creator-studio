@@ -334,6 +334,14 @@ export default function TreasureGameMap({
           onSend={onSendMessage}
         />
       </div>
+
+      {/* Victory overlay */}
+      {victoryOverlay && (
+        <ChestVictoryOverlay
+          winnerTeam={myTeamName}
+          onComplete={onEndGame}
+        />
+      )}
     </div>
   );
 }
