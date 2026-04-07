@@ -160,24 +160,30 @@ export default function GameRoom() {
     const team1Alive = team1.filter(p => !p.is_caught).length;
     const team2Alive = team2.filter(p => !p.is_caught).length;
 
+    const isTreasureMode = room.game_mode === 'treasure';
+
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-6 text-center space-y-4">
             <Trophy className="w-12 h-12 text-yellow-500 mx-auto" />
             <h2 className="text-xl font-bold">게임 종료!</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-blue-500/10 rounded-lg p-3">
-                <p className="font-bold text-blue-600">{room.team1_name}</p>
-                <p className="text-2xl font-mono">{team1Alive}/{team1.length}</p>
-                <p className="text-sm text-muted-foreground">생존</p>
+            {isTreasureMode ? (
+              <TreasureEndScreen roomId={room.id} players={players} room={room} />
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-blue-500/10 rounded-lg p-3">
+                  <p className="font-bold text-blue-600">{room.team1_name}</p>
+                  <p className="text-2xl font-mono">{team1Alive}/{team1.length}</p>
+                  <p className="text-sm text-muted-foreground">생존</p>
+                </div>
+                <div className="bg-red-500/10 rounded-lg p-3">
+                  <p className="font-bold text-red-600">{room.team2_name}</p>
+                  <p className="text-2xl font-mono">{team2Alive}/{team2.length}</p>
+                  <p className="text-sm text-muted-foreground">생존</p>
+                </div>
               </div>
-              <div className="bg-red-500/10 rounded-lg p-3">
-                <p className="font-bold text-red-600">{room.team2_name}</p>
-                <p className="text-2xl font-mono">{team2Alive}/{team2.length}</p>
-                <p className="text-sm text-muted-foreground">생존</p>
-              </div>
-            </div>
+            )}
             <Button onClick={() => {
               sessionStorage.removeItem('tag_room_code');
               sessionStorage.removeItem('tag_player_id');
