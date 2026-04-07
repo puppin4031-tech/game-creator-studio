@@ -6,6 +6,7 @@ import ProximityGlow from './ProximityGlow';
 import TreasureQuizPopup from './TreasureQuizPopup';
 import TreasureHUD from './TreasureHUD';
 import ShovelButton from './ShovelButton';
+import TreasureInventoryDrawer from './TreasureInventoryDrawer';
 import GameTimer from '@/components/tag-game/GameTimer';
 import ChatDrawer from '@/components/tag-game/ChatDrawer';
 import { Ping } from '@/components/tag-game/PingOverlay';
