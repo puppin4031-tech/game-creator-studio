@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import GoogleMapsProvider from "@/components/GoogleMapsProvider";
 import Index from "./pages/Index";
+import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import AdminLayout from "./layouts/AdminLayout";
@@ -75,7 +76,8 @@ const App = () => (
         <BrowserRouter>
           <AuthProvider>
             <Routes>
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/world" element={<Index />} />
               <Route path="/play" element={<Lobby />} />
               <Route path="/play/:roomCode" element={<GameRoom />} />
               <Route path="/play/puzzle-sim" element={<PuzzleSimulator />} />
