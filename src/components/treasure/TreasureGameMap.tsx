@@ -159,12 +159,13 @@ export default function TreasureGameMap({
     if (result.noKey) {
       toast.error('🔑 열쇠가 필요합니다! 먼저 열쇠를 찾으세요.');
     } else if (result.success) {
-      toast.success('📦 보물상자를 열었습니다! 게임 승리!');
-      onEndGame();
+      setVictoryOverlay(true);
     } else if (result.alreadyFound) {
       toast.error('이미 다른 팀이 열었습니다!');
     }
   };
+
+  const myTeamName = myTeam === 1 ? room.team1_name : room.team2_name;
 
   const handleQuizSubmit = async (answer: string) => {
     if (!activeTreasure) return { success: false };
