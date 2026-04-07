@@ -524,11 +524,13 @@ export type Database = {
           keyword: string
           latitude: number
           longitude: number
+          points: number
           puzzle_grid_size: number
           puzzle_image_url: string | null
           quiz_answer: string
           quiz_question: string
           room_id: string
+          treasure_subtype: string | null
         }
         Insert: {
           challenge_type?: string
@@ -539,11 +541,13 @@ export type Database = {
           keyword: string
           latitude: number
           longitude: number
+          points?: number
           puzzle_grid_size?: number
           puzzle_image_url?: string | null
           quiz_answer: string
           quiz_question: string
           room_id: string
+          treasure_subtype?: string | null
         }
         Update: {
           challenge_type?: string
@@ -554,11 +558,13 @@ export type Database = {
           keyword?: string
           latitude?: number
           longitude?: number
+          points?: number
           puzzle_grid_size?: number
           puzzle_image_url?: string | null
           quiz_answer?: string
           quiz_question?: string
           room_id?: string
+          treasure_subtype?: string | null
         }
         Relationships: [
           {

@@ -1,14 +1,13 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
 import { GoogleMap, Marker } from '@react-google-maps/api';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
-import { useTreasureHunt } from '@/hooks/useTreasureHunt';
+import { useTreasureHunt, NearestTreasure } from '@/hooks/useTreasureHunt';
 import ProximityGlow from './ProximityGlow';
-import TreasureReveal from './TreasureReveal';
 import TreasureQuizPopup from './TreasureQuizPopup';
 import TreasureHUD from './TreasureHUD';
+import ShovelButton from './ShovelButton';
 import GameTimer from '@/components/tag-game/GameTimer';
 import ChatDrawer from '@/components/tag-game/ChatDrawer';
-import { Team1Score, Team2Score } from '@/components/tag-game/TeamScoreboard';
 import { Ping } from '@/components/tag-game/PingOverlay';
 import PingOverlay from '@/components/tag-game/PingOverlay';
 import { Button } from '@/components/ui/button';
@@ -16,8 +15,23 @@ import { Radio } from 'lucide-react';
 import { TagMessage } from '@/hooks/useTagRoom';
 import { playPingSound } from '@/lib/pingSound';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const containerStyle = { width: '100%', height: '100%' };
+
+const SUBTYPE_ICONS: Record<string, string> = {
+  diamond: '💎', gold: '🥇', ruby: '❤️', sapphire: '💙', key: '🔑', chest: '📦',
+};
 
 interface Props {
   room: TagRoom;
@@ -37,6 +51,12 @@ export default function TreasureGameMap({
 }: Props) {
   const mapRef = useRef<google.maps.Map | null>(null);
   const [quizOpen, setQuizOpen] = useState(false);
+  const [activeTreasure, setActiveTreasure] = useState<NearestTreasure | null>(null);
+
+  // Chest dialog
+  const [chestDialogOpen, setChestDialogOpen] = useState(false);
+  // Gem claim dialog
+  const [gemDialogOpen, setGemDialogOpen] = useState(false);
 
   // Pings
   const [pings, setPings] = useState<Ping[]>([]);
@@ -45,12 +65,11 @@ export default function TreasureGameMap({
 
   const {
     treasures, nearest, proximityLevel, myFoundTreasures, cooldownLeft,
-    attemptAnswer,
-  } = useTreasureHunt(room.id, currentPlayerId, position.latitude, position.longitude);
+    hasKey, teamScores, attemptAnswer, claimTreasure, attemptChest,
+  } = useTreasureHunt(room.id, currentPlayerId, position.latitude, position.longitude, players);
 
   const onLoad = useCallback((map: google.maps.Map) => { mapRef.current = map; }, []);
 
-  // Center map on my position
   useEffect(() => {
     if (mapRef.current && position.latitude && position.longitude) {
       mapRef.current.panTo({ lat: position.latitude, lng: position.longitude });
@@ -100,11 +119,52 @@ export default function TreasureGameMap({
     setPings(prev => prev.filter(p => p.id !== id));
   }, []);
 
-  const handleAttempt = () => setQuizOpen(true);
+  // Shovel dig result handler
+  const handleDigSuccess = (treasure: NearestTreasure) => {
+    setActiveTreasure(treasure);
+
+    if (treasure.challenge_type === 'treasure') {
+      if (treasure.treasure_subtype === 'chest') {
+        setChestDialogOpen(true);
+      } else {
+        // Gem or key — direct claim dialog
+        setGemDialogOpen(true);
+      }
+    } else {
+      // Quiz or puzzle
+      setQuizOpen(true);
+    }
+  };
+
+  const handleGemClaim = async () => {
+    if (!activeTreasure) return;
+    const result = await claimTreasure(activeTreasure.id);
+    setGemDialogOpen(false);
+    if (result.success) {
+      const icon = activeTreasure.treasure_subtype ? SUBTYPE_ICONS[activeTreasure.treasure_subtype] || '💎' : '💎';
+      toast.success(`${icon} ${activeTreasure.keyword}을(를) 획득했습니다! (+${activeTreasure.points}점)`);
+    } else if (result.alreadyFound) {
+      toast.error('이미 다른 플레이어가 획득했습니다!');
+    }
+  };
+
+  const handleChestOpen = async () => {
+    if (!activeTreasure) return;
+    const result = await attemptChest(activeTreasure.id);
+    setChestDialogOpen(false);
+    if (result.noKey) {
+      toast.error('🔑 열쇠가 필요합니다! 먼저 열쇠를 찾으세요.');
+    } else if (result.success) {
+      toast.success('📦 보물상자를 열었습니다! 게임 승리!');
+      onEndGame();
+    } else if (result.alreadyFound) {
+      toast.error('이미 다른 팀이 열었습니다!');
+    }
+  };
 
   const handleQuizSubmit = async (answer: string) => {
-    if (!nearest) return { success: false };
-    return attemptAnswer(nearest.id, answer);
+    if (!activeTreasure) return { success: false };
+    return attemptAnswer(activeTreasure.id, answer);
   };
 
   const center = { lat: position.latitude || 37.5665, lng: position.longitude || 126.978 };
@@ -114,7 +174,6 @@ export default function TreasureGameMap({
       <GoogleMap mapContainerStyle={containerStyle} center={center} zoom={18} onLoad={onLoad}
         options={{ disableDefaultUI: true, zoomControl: true, gestureHandling: 'greedy' }}
       >
-        {/* My marker */}
         {position.latitude !== 0 && (
           <Marker
             position={{ lat: position.latitude, lng: position.longitude }}
@@ -129,7 +188,6 @@ export default function TreasureGameMap({
           />
         )}
 
-        {/* Team markers */}
         {players.filter(p => p.id !== currentPlayerId && p.team === myTeam && p.latitude).map(p => (
           <Marker
             key={p.id}
@@ -146,36 +204,25 @@ export default function TreasureGameMap({
           />
         ))}
 
-        {/* Ping overlays */}
         <PingOverlay pings={pings} onExpire={handlePingExpire} map={mapRef.current} />
       </GoogleMap>
 
       {/* Proximity glow overlay */}
       <ProximityGlow level={proximityLevel} />
 
-      {/* Treasure reveal (5m) */}
-      {proximityLevel === 'close' && nearest && (
-        <TreasureReveal
-          treasure={nearest}
-          cooldownLeft={cooldownLeft}
-          onAttempt={handleAttempt}
-        />
-      )}
-
-      {/* Quiz popup */}
-      {nearest && (
+      {/* Quiz/Puzzle popup */}
+      {activeTreasure && (
         <TreasureQuizPopup
           open={quizOpen}
           onOpenChange={setQuizOpen}
-          treasure={nearest}
+          treasure={activeTreasure}
           onQuizSubmit={handleQuizSubmit}
           onPuzzleSolve={async () => {
-            if (!nearest) return { success: false };
-            // Puzzle solved → claim the treasure
+            if (!activeTreasure) return { success: false };
             const { data, error } = await supabase
               .from('treasure_items')
               .update({ found_by: currentPlayerId, found_at: new Date().toISOString() })
-              .eq('id', nearest.id)
+              .eq('id', activeTreasure.id)
               .is('found_by', null)
               .select()
               .single();
@@ -185,18 +232,66 @@ export default function TreasureGameMap({
         />
       )}
 
+      {/* Gem claim dialog */}
+      <AlertDialog open={gemDialogOpen} onOpenChange={setGemDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-center text-2xl">
+              {activeTreasure?.treasure_subtype ? SUBTYPE_ICONS[activeTreasure.treasure_subtype] || '💎' : '💎'}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-center">
+              <strong>{activeTreasure?.keyword}</strong>을(를) 발견했습니다!
+              <br />
+              <span className="text-lg font-bold text-primary">+{activeTreasure?.points}점</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={handleGemClaim}>획득하기</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Chest dialog */}
+      <AlertDialog open={chestDialogOpen} onOpenChange={setChestDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-center text-2xl">📦 보물상자</AlertDialogTitle>
+            <AlertDialogDescription className="text-center">
+              보물상자를 발견했습니다!
+              <br />
+              {hasKey ? (
+                <span className="text-emerald-600 font-bold">🔑 열쇠를 보유하고 있습니다. 상자를 여시겠습니까?</span>
+              ) : (
+                <span className="text-destructive font-bold">🔒 열쇠가 없습니다. 먼저 열쇠를 찾아야 합니다!</span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>닫기</AlertDialogCancel>
+            {hasKey && (
+              <AlertDialogAction onClick={handleChestOpen}>상자 열기</AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Top bar */}
       <div className="absolute top-0 left-0 right-0 z-50 bg-background/85 backdrop-blur-md border-b shadow-sm">
         <div className="flex items-center justify-center gap-2 pt-1">
           <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">
             방 코드: {room.room_code}
           </span>
-          <TreasureHUD myFound={myFoundTreasures} total={treasures.length} />
+          {hasKey && <span className="text-xs bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 rounded-full">🔑 열쇠 보유</span>}
         </div>
         <div className="flex items-center justify-between px-3 py-2">
-          <Team1Score room={room} players={players} />
+          <TreasureHUD
+            teamScores={teamScores}
+            team1Name={room.team1_name}
+            team2Name={room.team2_name}
+            hasKey={hasKey}
+          />
           <GameTimer room={room} isHost={isHost} onEndGame={onEndGame} />
-          <Team2Score room={room} players={players} />
         </div>
       </div>
 
@@ -215,6 +310,12 @@ export default function TreasureGameMap({
             <Radio className="w-9 h-9" />
           )}
         </Button>
+
+        <ShovelButton
+          nearest={nearest}
+          onDigSuccess={handleDigSuccess}
+          disabled={cooldownLeft > 0}
+        />
 
         <ChatDrawer
           room={room}

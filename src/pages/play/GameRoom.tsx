@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTagRoom } from '@/hooks/useTagRoom';
 import { useLocationShare } from '@/hooks/useLocationShare';
 import { useDeviceHeading } from '@/hooks/useDeviceHeading';
+import { useTreasureHunt, TeamScores } from '@/hooks/useTreasureHunt';
 import WaitingRoom from '@/components/tag-game/WaitingRoom';
 import TagGameMap from '@/components/tag-game/TagGameMap';
 import TreasureGameMap from '@/components/treasure/TreasureGameMap';
@@ -15,6 +16,32 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy, Radio, Compass } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
+import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
+
+function TreasureEndScreen({ roomId, players, room }: { roomId: string; players: TagPlayer[]; room: TagRoom }) {
+  const { teamScores } = useTreasureHunt(roomId, null, 0, 0, players);
+  const winner = teamScores.team1 > teamScores.team2 ? room.team1_name
+    : teamScores.team2 > teamScores.team1 ? room.team2_name
+    : '무승부';
+
+  return (
+    <div className="space-y-3">
+      {winner !== '무승부' && (
+        <p className="text-lg font-bold text-primary">🏆 {winner} 승리!</p>
+      )}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-blue-500/10 rounded-lg p-3">
+          <p className="font-bold text-blue-600">{room.team1_name}</p>
+          <p className="text-2xl font-mono">{teamScores.team1}점</p>
+        </div>
+        <div className="bg-red-500/10 rounded-lg p-3">
+          <p className="font-bold text-red-600">{room.team2_name}</p>
+          <p className="text-2xl font-mono">{teamScores.team2}점</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function GameRoom() {
   const { roomCode } = useParams<{ roomCode: string }>();
@@ -160,24 +187,30 @@ export default function GameRoom() {
     const team1Alive = team1.filter(p => !p.is_caught).length;
     const team2Alive = team2.filter(p => !p.is_caught).length;
 
+    const isTreasureMode = room.game_mode === 'treasure';
+
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-6 text-center space-y-4">
             <Trophy className="w-12 h-12 text-yellow-500 mx-auto" />
             <h2 className="text-xl font-bold">게임 종료!</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-blue-500/10 rounded-lg p-3">
-                <p className="font-bold text-blue-600">{room.team1_name}</p>
-                <p className="text-2xl font-mono">{team1Alive}/{team1.length}</p>
-                <p className="text-sm text-muted-foreground">생존</p>
+            {isTreasureMode ? (
+              <TreasureEndScreen roomId={room.id} players={players} room={room} />
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-blue-500/10 rounded-lg p-3">
+                  <p className="font-bold text-blue-600">{room.team1_name}</p>
+                  <p className="text-2xl font-mono">{team1Alive}/{team1.length}</p>
+                  <p className="text-sm text-muted-foreground">생존</p>
+                </div>
+                <div className="bg-red-500/10 rounded-lg p-3">
+                  <p className="font-bold text-red-600">{room.team2_name}</p>
+                  <p className="text-2xl font-mono">{team2Alive}/{team2.length}</p>
+                  <p className="text-sm text-muted-foreground">생존</p>
+                </div>
               </div>
-              <div className="bg-red-500/10 rounded-lg p-3">
-                <p className="font-bold text-red-600">{room.team2_name}</p>
-                <p className="text-2xl font-mono">{team2Alive}/{team2.length}</p>
-                <p className="text-sm text-muted-foreground">생존</p>
-              </div>
-            </div>
+            )}
             <Button onClick={() => {
               sessionStorage.removeItem('tag_room_code');
               sessionStorage.removeItem('tag_player_id');
