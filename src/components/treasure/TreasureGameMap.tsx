@@ -298,19 +298,22 @@ export default function TreasureGameMap({
 
       {/* Bottom bar */}
       <div className="absolute bottom-6 left-3 right-3 z-50 flex items-end justify-between">
-        <Button
-          size="icon"
-          variant="secondary"
-          className="h-20 w-20 rounded-full shadow-lg"
-          onClick={sendPing}
-          disabled={pingCooldown > 0}
-        >
-          {pingCooldown > 0 ? (
-            <span className="text-xl font-bold">{pingCooldown}</span>
-          ) : (
-            <Radio className="w-9 h-9" />
-          )}
-        </Button>
+        <div className="flex flex-col gap-2 items-center">
+          <TreasureInventoryDrawer foundTreasures={myFoundTreasures} hasKey={hasKey} />
+          <Button
+            size="icon"
+            variant="secondary"
+            className="h-12 w-12 rounded-full shadow-lg"
+            onClick={sendPing}
+            disabled={pingCooldown > 0}
+          >
+            {pingCooldown > 0 ? (
+              <span className="text-base font-bold">{pingCooldown}</span>
+            ) : (
+              <Radio className="w-5 h-5" />
+            )}
+          </Button>
+        </div>
 
         <ShovelButton
           nearest={nearest}
