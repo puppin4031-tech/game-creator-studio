@@ -26,6 +26,7 @@ import NPCEncyclopedia from "./pages/admin/exodus/NPCEncyclopedia";
 import ItemPresets from "./pages/admin/exodus/ItemPresets";
 import PuzzleQuizMaker from "./pages/admin/exodus/PuzzleQuizMaker";
 import SpotManagement from "./pages/admin/exodus/SpotManagement";
+import WorldMap from "./pages/WorldMap";
 import Lobby from "./pages/play/Lobby";
 import GameRoom from "./pages/play/GameRoom";
 import PuzzleSimulator from "./pages/play/PuzzleSimulator";
