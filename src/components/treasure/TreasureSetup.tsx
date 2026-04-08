@@ -232,11 +232,18 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
       <CardContent className="p-4 space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm font-bold">💎 보물 등록 ({treasures.length}개)</p>
-          {!showForm && (
-            <Button size="sm" variant="outline" onClick={handleShowForm} className="gap-1">
-              <Plus className="w-4 h-4" /> 추가
-            </Button>
-          )}
+          <div className="flex gap-1.5">
+            {treasures.length > 0 && (
+              <Button size="sm" variant="outline" onClick={() => { setShowOverview(true); initMapCenter(); }} className="gap-1">
+                <Map className="w-4 h-4" /> 보물현황
+              </Button>
+            )}
+            {!showForm && (
+              <Button size="sm" variant="outline" onClick={handleShowForm} className="gap-1">
+                <Plus className="w-4 h-4" /> 추가
+              </Button>
+            )}
+          </div>
         </div>
 
         {showForm && (
