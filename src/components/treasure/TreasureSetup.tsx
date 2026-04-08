@@ -63,6 +63,9 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
   const [pickedLng, setPickedLng] = useState<number | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 37.5665, lng: 126.978 });
   const [showFullMap, setShowFullMap] = useState(false);
+  const [showOverview, setShowOverview] = useState(false);
+  const [selectedTreasureId, setSelectedTreasureId] = useState<string | null>(null);
+  const [movingTreasureId, setMovingTreasureId] = useState<string | null>(null);
 
   const initMapCenter = useCallback(() => {
     navigator.geolocation?.getCurrentPosition(
