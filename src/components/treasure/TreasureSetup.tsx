@@ -216,8 +216,6 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
     toast.success('보물 위치가 변경되었습니다');
     setMovingTreasureId(null);
     setSelectedTreasureId(null);
-    // Force re-render by triggering parent refetch — treasures prop will update
-    window.dispatchEvent(new Event('treasure-updated'));
   }, []);
 
   const getItemIcon = (t: TreasureItem) => {
