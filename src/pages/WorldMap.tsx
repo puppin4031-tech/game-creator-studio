@@ -8,10 +8,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { MockControls } from '@/components/game/MockControls';
 import { GameMenu } from '@/components/game/GameMenu';
 import { haversineDistance } from '@/lib/haversine';
-import { Pickaxe, Package, ArrowLeft, Sparkles, Gem, X } from 'lucide-react';
+import { Pickaxe, Package, ArrowLeft, Sparkles, Gem, X, Hammer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import CraftingDrawer from '@/components/world/CraftingDrawer';
 
 const COLLECT_RADIUS_M = 20;
 const FETCH_RADIUS_M = 500;
@@ -62,6 +63,7 @@ export default function WorldMap() {
   const { position, mockMove, isSimulated, setMockStep } = useGeolocation();
   const [selectedSpawn, setSelectedSpawn] = useState<SpawnWithDist | null>(null);
   const [collecting, setCollecting] = useState(false);
+  const [showCrafting, setShowCrafting] = useState(false);
   const mapRef = useRef<google.maps.Map | null>(null);
 
   // Fetch nearby spawns via RPC
@@ -309,7 +311,15 @@ export default function WorldMap() {
 
       {/* ===== BOTTOM HUD ===== */}
       <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-0 right-0 z-[1000] flex flex-col items-center gap-3 pointer-events-none">
-        <div className="self-end mr-4 pointer-events-auto">
+        {/* Crafting button + Mock controls */}
+        <div className="w-full flex items-end justify-between px-4 pointer-events-auto">
+          <Button
+            onClick={() => setShowCrafting(true)}
+            className="h-12 w-12 rounded-full bg-amber-600 hover:bg-amber-700 text-white shadow-lg"
+            size="icon"
+          >
+            <Hammer size={22} />
+          </Button>
           <MockControls
             onMove={mockMove}
             isSimulated={isSimulated}
@@ -318,6 +328,9 @@ export default function WorldMap() {
           />
         </div>
       </div>
+
+      {/* Crafting drawer */}
+      <CraftingDrawer open={showCrafting} onOpenChange={setShowCrafting} />
     </div>
   );
 }
