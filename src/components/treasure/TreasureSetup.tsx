@@ -4,12 +4,13 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, MapPin, Image, HelpCircle, Puzzle, Navigation, Gem, Key, Package } from 'lucide-react';
+import { Plus, Trash2, MapPin, Image, HelpCircle, Puzzle, Navigation, Gem, Key, Package, X, Check } from 'lucide-react';
 import { TreasureItem } from '@/hooks/useTreasureHunt';
 import { QUIZ_PRESETS, TREASURE_PRESETS, SPECIAL_ITEMS } from '@/lib/quizPresets';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { GoogleMap, Marker } from '@react-google-maps/api';
+import { AnimatePresence, motion } from 'framer-motion';
 
 interface Props {
   treasures: TreasureItem[];
@@ -31,6 +32,7 @@ const PUZZLE_PRESETS = [
 ];
 
 const mapContainerStyle = { width: '100%', height: '200px', borderRadius: '8px' };
+const fullscreenMapStyle = { width: '100%', height: '100%' };
 
 const pinIconUrl = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><circle cx="14" cy="14" r="10" fill="hsl(0,80%,55%)" stroke="white" stroke-width="3"/><circle cx="14" cy="14" r="4" fill="white"/></svg>`)}`;
 
@@ -60,6 +62,7 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
   const [pickedLat, setPickedLat] = useState<number | null>(null);
   const [pickedLng, setPickedLng] = useState<number | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 37.5665, lng: 126.978 });
+  const [showFullMap, setShowFullMap] = useState(false);
 
   const initMapCenter = useCallback(() => {
     navigator.geolocation?.getCurrentPosition(
@@ -449,7 +452,7 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
               <label className="text-xs font-medium mb-1.5 block">위치 설정</label>
               <div className="grid grid-cols-2 gap-2 mb-2">
                 <button
-                  onClick={() => setLocMode('map')}
+                  onClick={() => { setLocMode('map'); setShowFullMap(true); initMapCenter(); }}
                   className={`p-2 rounded-lg border-2 text-center transition-all text-sm ${
                     locMode === 'map' ? 'border-primary bg-primary/10' : 'border-muted hover:border-muted-foreground/30'
                   }`}
@@ -468,32 +471,15 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
                 </button>
               </div>
 
-              {locMode === 'map' && (
-                <div className="space-y-1.5">
-                  <GoogleMap
-                    mapContainerStyle={mapContainerStyle}
-                    center={pickedLat != null ? { lat: pickedLat, lng: pickedLng! } : mapCenter}
-                    zoom={17}
-                    onClick={handleMapClick}
-                    options={{ zoomControl: true, mapTypeControl: false, streetViewControl: false, fullscreenControl: false }}
-                  >
-                    {pickedLat != null && pickedLng != null && (
-                      <Marker
-                        position={{ lat: pickedLat, lng: pickedLng }}
-                        icon={{ url: pinIconUrl, scaledSize: new google.maps.Size(28, 28), anchor: new google.maps.Point(14, 14) }}
-                      />
-                    )}
-                  </GoogleMap>
-                  {pickedLat != null ? (
-                    <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                      <MapPin className="w-3 h-3" />
-                      위치 선택됨: {pickedLat.toFixed(6)}, {pickedLng!.toFixed(6)}
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">지도를 탭하여 보물 위치를 지정하세요</p>
-                  )}
-                </div>
-              )}
+              {locMode === 'map' && pickedLat != null ? (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />
+                  위치 선택됨: {pickedLat.toFixed(6)}, {pickedLng!.toFixed(6)}
+                  <button onClick={() => { setShowFullMap(true); initMapCenter(); }} className="ml-1 underline text-primary text-xs">변경</button>
+                </p>
+              ) : locMode === 'map' ? (
+                <p className="text-xs text-muted-foreground">지도에서 선택 버튼을 눌러 위치를 지정하세요</p>
+              ) : null}
 
               {locMode === 'gps' && (
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -534,6 +520,70 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
           </div>
         )}
       </CardContent>
+
+      {/* Fullscreen map overlay */}
+      <AnimatePresence>
+        {showFullMap && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] bg-background flex flex-col"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
+              <h3 className="font-bold text-sm">📍 보물 위치 선택</h3>
+              <button onClick={() => setShowFullMap(false)} className="text-muted-foreground hover:text-foreground">
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Map */}
+            <div className="flex-1 relative">
+              <GoogleMap
+                mapContainerStyle={fullscreenMapStyle}
+                center={pickedLat != null ? { lat: pickedLat, lng: pickedLng! } : mapCenter}
+                zoom={17}
+                onClick={handleMapClick}
+                options={{ zoomControl: true, mapTypeControl: false, streetViewControl: false, fullscreenControl: false }}
+              >
+                {pickedLat != null && pickedLng != null && (
+                  <Marker
+                    position={{ lat: pickedLat, lng: pickedLng }}
+                    icon={{ url: pinIconUrl, scaledSize: new google.maps.Size(28, 28), anchor: new google.maps.Point(14, 14) }}
+                  />
+                )}
+              </GoogleMap>
+            </div>
+
+            {/* Bottom panel */}
+            <div className="px-4 py-4 border-t border-border bg-card space-y-3">
+              {pickedLat != null ? (
+                <div className="flex items-center gap-2 text-sm">
+                  <MapPin className="w-4 h-4 text-emerald-500" />
+                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                    {pickedLat.toFixed(6)}, {pickedLng!.toFixed(6)}
+                  </span>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center">지도를 탭하여 보물 위치를 지정하세요</p>
+              )}
+              <div className="flex gap-2">
+                <Button variant="ghost" className="flex-1" onClick={() => { setPickedLat(null); setPickedLng(null); setShowFullMap(false); }}>
+                  취소
+                </Button>
+                <Button
+                  className="flex-1 gap-1"
+                  disabled={pickedLat == null}
+                  onClick={() => setShowFullMap(false)}
+                >
+                  <Check className="w-4 h-4" /> 확인
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Card>
   );
 }

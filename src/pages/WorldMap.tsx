@@ -270,7 +270,12 @@ export default function WorldMap() {
       </div>
 
       {/* ===== TOP-RIGHT HUD ===== */}
-      <div className="fixed top-[calc(0.75rem+env(safe-area-inset-top))] right-4 z-[1100]">
+      <div className="fixed top-[calc(0.75rem+env(safe-area-inset-top))] right-4 z-[1100] flex items-center gap-2">
+        <Link to="/play">
+          <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-3 py-1 text-xs font-bold shadow-lg gap-1">
+            🎮 GPS 게임
+          </Button>
+        </Link>
         <GameMenu />
       </div>
 
