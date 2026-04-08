@@ -453,41 +453,24 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
             {/* Location picker */}
             <div>
               <label className="text-xs font-medium mb-1.5 block">위치 설정</label>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <button
-                  onClick={() => { setLocMode('map'); setShowFullMap(true); initMapCenter(); }}
-                  className={`p-2 rounded-lg border-2 text-center transition-all text-sm ${
-                    locMode === 'map' ? 'border-primary bg-primary/10' : 'border-muted hover:border-muted-foreground/30'
-                  }`}
-                >
-                  <MapPin className="w-5 h-5 mx-auto mb-1" />
-                  지도에서 선택
-                </button>
-                <button
-                  onClick={() => setLocMode('gps')}
-                  className={`p-2 rounded-lg border-2 text-center transition-all text-sm ${
-                    locMode === 'gps' ? 'border-primary bg-primary/10' : 'border-muted hover:border-muted-foreground/30'
-                  }`}
-                >
-                  <Navigation className="w-5 h-5 mx-auto mb-1" />
-                  현재 GPS 위치
-                </button>
-              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => { setLocMode('map'); setShowFullMap(true); initMapCenter(); }}
+                className="w-full gap-1"
+              >
+                <MapPin className="w-4 h-4" />
+                지도에서 선택
+              </Button>
 
-              {locMode === 'map' && pickedLat != null ? (
-                <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+              {pickedLat != null ? (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-1.5">
                   <MapPin className="w-3 h-3" />
                   위치 선택됨: {pickedLat.toFixed(6)}, {pickedLng!.toFixed(6)}
                   <button onClick={() => { setShowFullMap(true); initMapCenter(); }} className="ml-1 underline text-primary text-xs">변경</button>
                 </p>
-              ) : locMode === 'map' ? (
-                <p className="text-xs text-muted-foreground">지도에서 선택 버튼을 눌러 위치를 지정하세요</p>
-              ) : null}
-
-              {locMode === 'gps' && (
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Navigation className="w-3 h-3" /> 등록 시 현재 GPS 위치가 사용됩니다
-                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1.5">지도에서 선택 버튼을 눌러 위치를 지정하세요</p>
               )}
             </div>
 
