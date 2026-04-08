@@ -1,20 +1,22 @@
 
 
-# crafting_recipes 보너스 70% 감축
+# 세 가지 UI 개선
 
-## 현재 → 변경 후 (30%만 유지)
+## 1. 월드맵(/world) 상단에 "GPS 게임" 버튼 추가
+- `WorldMap.tsx` 상단 HUD 영역에 `/play`로 이동하는 "GPS 게임" 버튼 추가
+- 기존 GameMenu 옆이나 좌측 상단에 배치
 
-| 아이템 | bonus_type | 현재 bonus | 감축 후 | 현재 XP | 감축 후 XP |
-|--------|-----------|-----------|---------|---------|-----------|
-| 루비 반지 | search_radius | 50 | 15 | 80 | 24 |
-| 사파이어 목걸이 | detect_range | 30 | 9 | 80 | 24 |
-| 오팔 귀걸이 | respawn_reduction | 15 | 5 | 60 | 18 |
-| 에메랄드 팔찌 | xp_multiplier | 20 | 6 | 100 | 30 |
-| 자수정 브로치 | move_speed | 10 | 3 | 120 | 36 |
-| 토파즈 반지 | rare_chance | 15 | 5 | 150 | 45 |
-| 진주 목걸이 | search_radius | 80 | 24 | 200 | 60 |
-| 다이아몬드 왕관 | all_bonus | 10 | 3 | 300 | 90 |
+## 2. 보물찾기 지도 선택 UI 확대 (TreasureSetup.tsx)
+- 현재: `mapContainerStyle` 높이 200px로 고정된 인라인 지도 — 너무 작음
+- 변경: "지도에서 선택" 클릭 시 **전체화면 오버레이 지도**를 띄움 (2번 이미지 참고)
+  - 화면 전체를 덮는 지도 + 하단에 "찾아오시는 길" 스타일 안내 패널
+  - 지도 탭으로 핀 설정 → 하단에 좌표 표시 + "등록" / "취소" 버튼
+  - 핀 확정 후 오버레이 닫히고 기존 폼으로 복귀
 
-## 변경 방법
-- DB 마이그레이션으로 각 레코드의 `bonus_value`와 `xp_reward`를 UPDATE
+## 3. 랜딩페이지 조절 — 다음 단계에서 진행
+- 이번 구현 후 랜딩페이지 논의
+
+### 수정 파일
+- `src/pages/WorldMap.tsx` — 상단에 GPS 게임 Link 버튼 추가
+- `src/components/treasure/TreasureSetup.tsx` — 지도 선택 시 fullscreen 오버레이 모드로 전환, 기존 200px 인라인 지도 제거
 
