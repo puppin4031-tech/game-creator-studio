@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, MapPin, Image, HelpCircle, Puzzle, Navigation, Gem, Key, Package, X, Check } from 'lucide-react';
+import { Plus, Trash2, MapPin, Image, HelpCircle, Puzzle, Navigation, Gem, Key, Package, X, Check, Map, Move } from 'lucide-react';
 import { TreasureItem } from '@/hooks/useTreasureHunt';
 import { QUIZ_PRESETS, TREASURE_PRESETS, SPECIAL_ITEMS } from '@/lib/quizPresets';
 import { toast } from 'sonner';
@@ -63,6 +63,9 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
   const [pickedLng, setPickedLng] = useState<number | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 37.5665, lng: 126.978 });
   const [showFullMap, setShowFullMap] = useState(false);
+  const [showOverview, setShowOverview] = useState(false);
+  const [selectedTreasureId, setSelectedTreasureId] = useState<string | null>(null);
+  const [movingTreasureId, setMovingTreasureId] = useState<string | null>(null);
 
   const initMapCenter = useCallback(() => {
     navigator.geolocation?.getCurrentPosition(
@@ -192,32 +195,28 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
       toast.error('퍼즐 이미지를 선택해주세요');
       return;
     }
+    if (pickedLat == null || pickedLng == null) {
+      toast.error('지도에서 보물 위치를 탭해주세요');
+      return;
+    }
 
     setAdding(true);
-
-    if (locMode === 'map') {
-      if (pickedLat == null || pickedLng == null) {
-        toast.error('지도에서 보물 위치를 탭해주세요');
-        setAdding(false);
-        return;
-      }
-      await doAdd(pickedLat, pickedLng);
-    } else {
-      if (!navigator.geolocation) {
-        toast.error('GPS를 사용할 수 없습니다');
-        setAdding(false);
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => await doAdd(pos.coords.latitude, pos.coords.longitude),
-        () => {
-          toast.error('위치를 가져올 수 없습니다');
-          setAdding(false);
-        },
-        { enableHighAccuracy: true }
-      );
-    }
+    await doAdd(pickedLat, pickedLng);
   };
+
+  const handleMoveTreasure = useCallback(async (treasureId: string, newLat: number, newLng: number) => {
+    const { error } = await supabase
+      .from('treasure_items')
+      .update({ latitude: newLat, longitude: newLng })
+      .eq('id', treasureId);
+    if (error) {
+      toast.error('위치 변경 실패');
+      return;
+    }
+    toast.success('보물 위치가 변경되었습니다');
+    setMovingTreasureId(null);
+    setSelectedTreasureId(null);
+  }, []);
 
   const getItemIcon = (t: TreasureItem) => {
     if (t.treasure_subtype && SUBTYPE_ICONS[t.treasure_subtype]) return SUBTYPE_ICONS[t.treasure_subtype];
@@ -231,11 +230,18 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
       <CardContent className="p-4 space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm font-bold">💎 보물 등록 ({treasures.length}개)</p>
-          {!showForm && (
-            <Button size="sm" variant="outline" onClick={handleShowForm} className="gap-1">
-              <Plus className="w-4 h-4" /> 추가
-            </Button>
-          )}
+          <div className="flex gap-1.5">
+            {treasures.length > 0 && (
+              <Button size="sm" variant="outline" onClick={() => { setShowOverview(true); initMapCenter(); }} className="gap-1">
+                <Map className="w-4 h-4" /> 보물현황
+              </Button>
+            )}
+            {!showForm && (
+              <Button size="sm" variant="outline" onClick={handleShowForm} className="gap-1">
+                <Plus className="w-4 h-4" /> 추가
+              </Button>
+            )}
+          </div>
         </div>
 
         {showForm && (
@@ -450,41 +456,24 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
             {/* Location picker */}
             <div>
               <label className="text-xs font-medium mb-1.5 block">위치 설정</label>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <button
-                  onClick={() => { setLocMode('map'); setShowFullMap(true); initMapCenter(); }}
-                  className={`p-2 rounded-lg border-2 text-center transition-all text-sm ${
-                    locMode === 'map' ? 'border-primary bg-primary/10' : 'border-muted hover:border-muted-foreground/30'
-                  }`}
-                >
-                  <MapPin className="w-5 h-5 mx-auto mb-1" />
-                  지도에서 선택
-                </button>
-                <button
-                  onClick={() => setLocMode('gps')}
-                  className={`p-2 rounded-lg border-2 text-center transition-all text-sm ${
-                    locMode === 'gps' ? 'border-primary bg-primary/10' : 'border-muted hover:border-muted-foreground/30'
-                  }`}
-                >
-                  <Navigation className="w-5 h-5 mx-auto mb-1" />
-                  현재 GPS 위치
-                </button>
-              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => { setLocMode('map'); setShowFullMap(true); initMapCenter(); }}
+                className="w-full gap-1"
+              >
+                <MapPin className="w-4 h-4" />
+                지도에서 선택
+              </Button>
 
-              {locMode === 'map' && pickedLat != null ? (
-                <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+              {pickedLat != null ? (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-1.5">
                   <MapPin className="w-3 h-3" />
                   위치 선택됨: {pickedLat.toFixed(6)}, {pickedLng!.toFixed(6)}
                   <button onClick={() => { setShowFullMap(true); initMapCenter(); }} className="ml-1 underline text-primary text-xs">변경</button>
                 </p>
-              ) : locMode === 'map' ? (
-                <p className="text-xs text-muted-foreground">지도에서 선택 버튼을 눌러 위치를 지정하세요</p>
-              ) : null}
-
-              {locMode === 'gps' && (
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Navigation className="w-3 h-3" /> 등록 시 현재 GPS 위치가 사용됩니다
-                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1.5">지도에서 선택 버튼을 눌러 위치를 지정하세요</p>
               )}
             </div>
 
@@ -580,6 +569,124 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
                   <Check className="w-4 h-4" /> 확인
                 </Button>
               </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Treasure Overview Map */}
+      <AnimatePresence>
+        {showOverview && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] bg-background flex flex-col"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
+              <h3 className="font-bold text-sm">
+                {movingTreasureId ? '📍 새 위치를 탭하세요' : `🗺️ 보물현황 (${treasures.length}개)`}
+              </h3>
+              <div className="flex items-center gap-2">
+                {movingTreasureId && (
+                  <Button size="sm" variant="ghost" onClick={() => setMovingTreasureId(null)} className="text-xs">
+                    취소
+                  </Button>
+                )}
+                <button onClick={() => { setShowOverview(false); setSelectedTreasureId(null); setMovingTreasureId(null); }} className="text-muted-foreground hover:text-foreground">
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Map */}
+            <div className="flex-1 relative">
+              <GoogleMap
+                mapContainerStyle={fullscreenMapStyle}
+                center={treasures.length > 0 ? { lat: treasures[0].latitude, lng: treasures[0].longitude } : mapCenter}
+                zoom={16}
+                onClick={(e) => {
+                  if (movingTreasureId && e.latLng) {
+                    handleMoveTreasure(movingTreasureId, e.latLng.lat(), e.latLng.lng());
+                  } else {
+                    setSelectedTreasureId(null);
+                  }
+                }}
+                options={{ zoomControl: true, mapTypeControl: false, streetViewControl: false, fullscreenControl: false }}
+              >
+                {treasures.map((t, i) => {
+                  const isSelected = selectedTreasureId === t.id;
+                  const isMoving = movingTreasureId === t.id;
+                  const iconColor = isMoving ? 'hsl(45,90%,50%)' : isSelected ? 'hsl(200,80%,55%)' : 'hsl(0,80%,55%)';
+                  const iconSize = isSelected || isMoving ? 32 : 24;
+                  const iconUrl = `data:image/svg+xml,${encodeURIComponent(
+                    `<svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}">` +
+                    `<circle cx="${iconSize/2}" cy="${iconSize/2}" r="${iconSize/2 - 3}" fill="${iconColor}" stroke="white" stroke-width="3"/>` +
+                    `<text x="${iconSize/2}" y="${iconSize/2 + 4}" text-anchor="middle" fill="white" font-size="${iconSize * 0.4}" font-weight="bold">${i + 1}</text>` +
+                    `</svg>`
+                  )}`;
+                  return (
+                    <Marker
+                      key={t.id}
+                      position={{ lat: t.latitude, lng: t.longitude }}
+                      icon={{ url: iconUrl, scaledSize: new google.maps.Size(iconSize, iconSize), anchor: new google.maps.Point(iconSize/2, iconSize/2) }}
+                      onClick={() => { if (!movingTreasureId) setSelectedTreasureId(t.id); }}
+                    />
+                  );
+                })}
+              </GoogleMap>
+            </div>
+
+            {/* Bottom info panel */}
+            <div className="px-4 py-3 border-t border-border bg-card">
+              {movingTreasureId ? (
+                <p className="text-sm text-center text-amber-600 dark:text-amber-400 font-medium">
+                  🗺️ 지도를 탭하여 새 위치를 지정하세요
+                </p>
+              ) : selectedTreasureId ? (() => {
+                const t = treasures.find(x => x.id === selectedTreasureId);
+                if (!t) return null;
+                const idx = treasures.indexOf(t);
+                return (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{getItemIcon(t)}</span>
+                      <div className="flex-1">
+                        <div className="font-bold text-sm">#{idx + 1} {t.keyword}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {t.challenge_type === 'quiz' ? '퀴즈' : t.challenge_type === 'puzzle' ? '퍼즐' : '보물'}
+                          {' · '}{t.points}점 · {t.latitude.toFixed(5)}, {t.longitude.toFixed(5)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 gap-1"
+                        onClick={() => setMovingTreasureId(t.id)}
+                      >
+                        <Move className="w-3.5 h-3.5" /> 위치 변경
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="gap-1"
+                        onClick={async () => {
+                          await onRemove(t.id);
+                          setSelectedTreasureId(null);
+                          toast.success('보물이 삭제되었습니다');
+                        }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> 삭제
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })() : (
+                <p className="text-sm text-muted-foreground text-center">보물 마커를 탭하여 수정하세요</p>
+              )}
             </div>
           </motion.div>
         )}
