@@ -520,6 +520,70 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
           </div>
         )}
       </CardContent>
+
+      {/* Fullscreen map overlay */}
+      <AnimatePresence>
+        {showFullMap && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] bg-background flex flex-col"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
+              <h3 className="font-bold text-sm">📍 보물 위치 선택</h3>
+              <button onClick={() => setShowFullMap(false)} className="text-muted-foreground hover:text-foreground">
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Map */}
+            <div className="flex-1 relative">
+              <GoogleMap
+                mapContainerStyle={fullscreenMapStyle}
+                center={pickedLat != null ? { lat: pickedLat, lng: pickedLng! } : mapCenter}
+                zoom={17}
+                onClick={handleMapClick}
+                options={{ zoomControl: true, mapTypeControl: false, streetViewControl: false, fullscreenControl: false }}
+              >
+                {pickedLat != null && pickedLng != null && (
+                  <Marker
+                    position={{ lat: pickedLat, lng: pickedLng }}
+                    icon={{ url: pinIconUrl, scaledSize: new google.maps.Size(28, 28), anchor: new google.maps.Point(14, 14) }}
+                  />
+                )}
+              </GoogleMap>
+            </div>
+
+            {/* Bottom panel */}
+            <div className="px-4 py-4 border-t border-border bg-card space-y-3">
+              {pickedLat != null ? (
+                <div className="flex items-center gap-2 text-sm">
+                  <MapPin className="w-4 h-4 text-emerald-500" />
+                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                    {pickedLat.toFixed(6)}, {pickedLng!.toFixed(6)}
+                  </span>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center">지도를 탭하여 보물 위치를 지정하세요</p>
+              )}
+              <div className="flex gap-2">
+                <Button variant="ghost" className="flex-1" onClick={() => { setPickedLat(null); setPickedLng(null); setShowFullMap(false); }}>
+                  취소
+                </Button>
+                <Button
+                  className="flex-1 gap-1"
+                  disabled={pickedLat == null}
+                  onClick={() => setShowFullMap(false)}
+                >
+                  <Check className="w-4 h-4" /> 확인
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Card>
   );
 }
