@@ -575,6 +575,124 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Treasure Overview Map */}
+      <AnimatePresence>
+        {showOverview && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] bg-background flex flex-col"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
+              <h3 className="font-bold text-sm">
+                {movingTreasureId ? '📍 새 위치를 탭하세요' : `🗺️ 보물현황 (${treasures.length}개)`}
+              </h3>
+              <div className="flex items-center gap-2">
+                {movingTreasureId && (
+                  <Button size="sm" variant="ghost" onClick={() => setMovingTreasureId(null)} className="text-xs">
+                    취소
+                  </Button>
+                )}
+                <button onClick={() => { setShowOverview(false); setSelectedTreasureId(null); setMovingTreasureId(null); }} className="text-muted-foreground hover:text-foreground">
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Map */}
+            <div className="flex-1 relative">
+              <GoogleMap
+                mapContainerStyle={fullscreenMapStyle}
+                center={treasures.length > 0 ? { lat: treasures[0].latitude, lng: treasures[0].longitude } : mapCenter}
+                zoom={16}
+                onClick={(e) => {
+                  if (movingTreasureId && e.latLng) {
+                    handleMoveTreasure(movingTreasureId, e.latLng.lat(), e.latLng.lng());
+                  } else {
+                    setSelectedTreasureId(null);
+                  }
+                }}
+                options={{ zoomControl: true, mapTypeControl: false, streetViewControl: false, fullscreenControl: false }}
+              >
+                {treasures.map((t, i) => {
+                  const isSelected = selectedTreasureId === t.id;
+                  const isMoving = movingTreasureId === t.id;
+                  const iconColor = isMoving ? 'hsl(45,90%,50%)' : isSelected ? 'hsl(200,80%,55%)' : 'hsl(0,80%,55%)';
+                  const iconSize = isSelected || isMoving ? 32 : 24;
+                  const iconUrl = `data:image/svg+xml,${encodeURIComponent(
+                    `<svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}">` +
+                    `<circle cx="${iconSize/2}" cy="${iconSize/2}" r="${iconSize/2 - 3}" fill="${iconColor}" stroke="white" stroke-width="3"/>` +
+                    `<text x="${iconSize/2}" y="${iconSize/2 + 4}" text-anchor="middle" fill="white" font-size="${iconSize * 0.4}" font-weight="bold">${i + 1}</text>` +
+                    `</svg>`
+                  )}`;
+                  return (
+                    <Marker
+                      key={t.id}
+                      position={{ lat: t.latitude, lng: t.longitude }}
+                      icon={{ url: iconUrl, scaledSize: new google.maps.Size(iconSize, iconSize), anchor: new google.maps.Point(iconSize/2, iconSize/2) }}
+                      onClick={() => { if (!movingTreasureId) setSelectedTreasureId(t.id); }}
+                    />
+                  );
+                })}
+              </GoogleMap>
+            </div>
+
+            {/* Bottom info panel */}
+            <div className="px-4 py-3 border-t border-border bg-card">
+              {movingTreasureId ? (
+                <p className="text-sm text-center text-amber-600 dark:text-amber-400 font-medium">
+                  🗺️ 지도를 탭하여 새 위치를 지정하세요
+                </p>
+              ) : selectedTreasureId ? (() => {
+                const t = treasures.find(x => x.id === selectedTreasureId);
+                if (!t) return null;
+                const idx = treasures.indexOf(t);
+                return (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{getItemIcon(t)}</span>
+                      <div className="flex-1">
+                        <div className="font-bold text-sm">#{idx + 1} {t.keyword}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {t.challenge_type === 'quiz' ? '퀴즈' : t.challenge_type === 'puzzle' ? '퍼즐' : '보물'}
+                          {' · '}{t.points}점 · {t.latitude.toFixed(5)}, {t.longitude.toFixed(5)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 gap-1"
+                        onClick={() => setMovingTreasureId(t.id)}
+                      >
+                        <Move className="w-3.5 h-3.5" /> 위치 변경
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="gap-1"
+                        onClick={async () => {
+                          await onRemove(t.id);
+                          setSelectedTreasureId(null);
+                          toast.success('보물이 삭제되었습니다');
+                        }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> 삭제
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })() : (
+                <p className="text-sm text-muted-foreground text-center">보물 마커를 탭하여 수정하세요</p>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Card>
   );
 }
