@@ -65,6 +65,9 @@ export default function WorldMap() {
   const [collecting, setCollecting] = useState(false);
   const [showCrafting, setShowCrafting] = useState(false);
   const mapRef = useRef<google.maps.Map | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    return !localStorage.getItem('world_onboarding_done');
+  });
 
   // Fetch nearby spawns via RPC
   const { data: rawSpawns = [] } = useQuery({
