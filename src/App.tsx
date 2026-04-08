@@ -78,7 +78,8 @@ const App = () => (
           <AuthProvider>
             <Routes>
               <Route path="/" element={<LandingPage />} />
-              <Route path="/world" element={<Index />} />
+              <Route path="/world" element={<WorldMap />} />
+              <Route path="/exodus" element={<Index />} />
               <Route path="/play" element={<Lobby />} />
               <Route path="/play/:roomCode" element={<GameRoom />} />
               <Route path="/play/puzzle-sim" element={<PuzzleSimulator />} />
