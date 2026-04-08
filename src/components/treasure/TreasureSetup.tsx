@@ -195,32 +195,30 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
       toast.error('퍼즐 이미지를 선택해주세요');
       return;
     }
+    if (pickedLat == null || pickedLng == null) {
+      toast.error('지도에서 보물 위치를 탭해주세요');
+      return;
+    }
 
     setAdding(true);
-
-    if (locMode === 'map') {
-      if (pickedLat == null || pickedLng == null) {
-        toast.error('지도에서 보물 위치를 탭해주세요');
-        setAdding(false);
-        return;
-      }
-      await doAdd(pickedLat, pickedLng);
-    } else {
-      if (!navigator.geolocation) {
-        toast.error('GPS를 사용할 수 없습니다');
-        setAdding(false);
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => await doAdd(pos.coords.latitude, pos.coords.longitude),
-        () => {
-          toast.error('위치를 가져올 수 없습니다');
-          setAdding(false);
-        },
-        { enableHighAccuracy: true }
-      );
-    }
+    await doAdd(pickedLat, pickedLng);
   };
+
+  const handleMoveTreasure = useCallback(async (treasureId: string, newLat: number, newLng: number) => {
+    const { error } = await supabase
+      .from('treasure_items')
+      .update({ latitude: newLat, longitude: newLng })
+      .eq('id', treasureId);
+    if (error) {
+      toast.error('위치 변경 실패');
+      return;
+    }
+    toast.success('보물 위치가 변경되었습니다');
+    setMovingTreasureId(null);
+    setSelectedTreasureId(null);
+    // Force re-render by triggering parent refetch — treasures prop will update
+    window.dispatchEvent(new Event('treasure-updated'));
+  }, []);
 
   const getItemIcon = (t: TreasureItem) => {
     if (t.treasure_subtype && SUBTYPE_ICONS[t.treasure_subtype]) return SUBTYPE_ICONS[t.treasure_subtype];
