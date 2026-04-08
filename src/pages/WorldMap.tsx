@@ -339,6 +339,92 @@ export default function WorldMap() {
 
       {/* Crafting drawer */}
       <CraftingDrawer open={showCrafting} onOpenChange={setShowCrafting} />
+
+      {/* ===== ONBOARDING OVERLAY ===== */}
+      <AnimatePresence>
+        {showOnboarding && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999]"
+            onClick={() => {
+              setShowOnboarding(false);
+              localStorage.setItem('world_onboarding_done', '1');
+            }}
+          >
+            {/* Dark backdrop */}
+            <div className="absolute inset-0 bg-black/70" />
+
+            {/* Top-left: Stats highlight */}
+            <div className="absolute top-[calc(3.5rem+env(safe-area-inset-top))] left-4 z-10">
+              <div className="rounded-full px-3 py-2 ring-2 ring-emerald-400/80 shadow-[0_0_20px_4px_rgba(34,197,94,0.35)]">
+                <div className="flex items-center gap-3 text-xs text-white">
+                  <span className="flex items-center gap-1">⭐ 레벨 & XP</span>
+                  <span className="flex items-center gap-1">📦 보유 원석</span>
+                  <span className="flex items-center gap-1">💎 근처 아이템</span>
+                </div>
+              </div>
+              <p className="text-xs text-emerald-300 mt-2 ml-1 font-medium drop-shadow-lg">
+                내 탐험 현황을 확인하세요
+              </p>
+            </div>
+
+            {/* Top-right: GPS Game button highlight */}
+            <div className="absolute top-[calc(0.75rem+env(safe-area-inset-top))] right-4 z-10">
+              <div className="rounded-full px-3 py-1.5 ring-2 ring-blue-400/80 shadow-[0_0_20px_4px_rgba(59,130,246,0.35)]">
+                <span className="text-xs font-bold text-white">🎮 GPS 게임</span>
+              </div>
+              <p className="text-xs text-blue-300 mt-2 text-right font-medium drop-shadow-lg">
+                술래잡기 & 보물찾기
+              </p>
+            </div>
+
+            {/* Center: Map explanation */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 text-center max-w-[280px]">
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                className="space-y-3"
+              >
+                <div className="text-4xl">🗺️</div>
+                <h2 className="text-lg font-bold text-white">오픈 월드에 오신 걸 환영해요!</h2>
+                <div className="space-y-2 text-sm text-white/80">
+                  <p>🚶 <span className="text-white font-medium">주변을 걸으며</span> 원석을 찾으세요</p>
+                  <p>📍 <span className="text-white font-medium">20m 이내</span>로 접근하면 채집 가능</p>
+                  <p>⚒️ 원석을 모아 <span className="text-white font-medium">장신구를 세공</span>하세요</p>
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Bottom-left: Crafting button highlight */}
+            <div className="absolute bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-4 z-10">
+              <div className="h-12 w-12 rounded-full ring-2 ring-amber-400/80 shadow-[0_0_20px_4px_rgba(245,158,11,0.4)] flex items-center justify-center">
+                <Hammer size={22} className="text-amber-300" />
+              </div>
+              <p className="text-xs text-amber-300 mt-2 font-medium drop-shadow-lg">
+                세공 & 조합
+              </p>
+            </div>
+
+            {/* Green circle explanation */}
+            <div className="absolute top-[calc(50%+80px)] left-1/2 -translate-x-1/2 z-10">
+              <div className="w-16 h-16 rounded-full border-2 border-emerald-400/60 bg-emerald-400/10 mx-auto shadow-[0_0_15px_2px_rgba(34,197,94,0.3)]" />
+              <p className="text-xs text-emerald-300 mt-1.5 text-center font-medium drop-shadow-lg">
+                수집 범위 (20m)
+              </p>
+            </div>
+
+            {/* Skip button */}
+            <div className="absolute bottom-[calc(2rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-10">
+              <button className="text-xs text-white/60 hover:text-white transition-colors px-4 py-2 rounded-full border border-white/20 backdrop-blur-sm">
+                화면을 탭하여 시작하기
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
