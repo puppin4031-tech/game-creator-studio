@@ -32,6 +32,7 @@ const PUZZLE_PRESETS = [
 ];
 
 const mapContainerStyle = { width: '100%', height: '200px', borderRadius: '8px' };
+const fullscreenMapStyle = { width: '100%', height: '100%' };
 
 const pinIconUrl = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><circle cx="14" cy="14" r="10" fill="hsl(0,80%,55%)" stroke="white" stroke-width="3"/><circle cx="14" cy="14" r="4" fill="white"/></svg>`)}`;
 
@@ -61,6 +62,7 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
   const [pickedLat, setPickedLat] = useState<number | null>(null);
   const [pickedLng, setPickedLng] = useState<number | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 37.5665, lng: 126.978 });
+  const [showFullMap, setShowFullMap] = useState(false);
 
   const initMapCenter = useCallback(() => {
     navigator.geolocation?.getCurrentPosition(
