@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      crafting_recipes: {
+        Row: {
+          bonus_type: string | null
+          bonus_value: number | null
+          created_at: string
+          id: string
+          level_required: number
+          required_materials: Json
+          result_description: string | null
+          result_item_icon: string
+          result_item_name: string
+          result_item_type: string
+          xp_reward: number
+        }
+        Insert: {
+          bonus_type?: string | null
+          bonus_value?: number | null
+          created_at?: string
+          id?: string
+          level_required?: number
+          required_materials?: Json
+          result_description?: string | null
+          result_item_icon?: string
+          result_item_name: string
+          result_item_type?: string
+          xp_reward?: number
+        }
+        Update: {
+          bonus_type?: string | null
+          bonus_value?: number | null
+          created_at?: string
+          id?: string
+          level_required?: number
+          required_materials?: Json
+          result_description?: string | null
+          result_item_icon?: string
+          result_item_name?: string
+          result_item_type?: string
+          xp_reward?: number
+        }
+        Relationships: []
+      }
       game_logs: {
         Row: {
           action: string
@@ -48,6 +90,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      global_spawns: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          item_icon: string
+          item_type: string
+          last_collected_at: string | null
+          last_collected_by: string | null
+          location: unknown
+          rarity: string
+          respawn_seconds: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          item_icon?: string
+          item_type: string
+          last_collected_at?: string | null
+          last_collected_by?: string | null
+          location: unknown
+          rarity?: string
+          respawn_seconds?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          item_icon?: string
+          item_type?: string
+          last_collected_at?: string | null
+          last_collected_by?: string | null
+          location?: unknown
+          rarity?: string
+          respawn_seconds?: number
+        }
+        Relationships: []
       }
       missions: {
         Row: {
@@ -589,6 +670,8 @@ export type Database = {
           id: string
           item_icon: string | null
           item_name: string
+          item_type: string
+          quantity: number
           spot_id: string | null
           user_id: string
         }
@@ -597,6 +680,8 @@ export type Database = {
           id?: string
           item_icon?: string | null
           item_name: string
+          item_type?: string
+          quantity?: number
           spot_id?: string | null
           user_id: string
         }
@@ -605,6 +690,8 @@ export type Database = {
           id?: string
           item_icon?: string | null
           item_name?: string
+          item_type?: string
+          quantity?: number
           spot_id?: string | null
           user_id?: string
         }
@@ -618,11 +705,62 @@ export type Database = {
           },
         ]
       }
+      user_stats: {
+        Row: {
+          created_at: string
+          current_xp: number
+          id: string
+          level: number
+          total_distance: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_xp?: number
+          id?: string
+          level?: number
+          total_distance?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_xp?: number
+          id?: string
+          level?: number
+          total_distance?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      get_nearby_spawns: {
+        Args: { _lat: number; _lng: number; _radius_m?: number }
+        Returns: {
+          created_at: string
+          id: string
+          is_active: boolean
+          item_icon: string
+          item_type: string
+          last_collected_at: string | null
+          last_collected_by: string | null
+          location: unknown
+          rarity: string
+          respawn_seconds: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "global_spawns"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_user_region: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
