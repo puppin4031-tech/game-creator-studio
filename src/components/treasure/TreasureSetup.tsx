@@ -4,12 +4,13 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, MapPin, Image, HelpCircle, Puzzle, Navigation, Gem, Key, Package } from 'lucide-react';
+import { Plus, Trash2, MapPin, Image, HelpCircle, Puzzle, Navigation, Gem, Key, Package, X, Check } from 'lucide-react';
 import { TreasureItem } from '@/hooks/useTreasureHunt';
 import { QUIZ_PRESETS, TREASURE_PRESETS, SPECIAL_ITEMS } from '@/lib/quizPresets';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { GoogleMap, Marker } from '@react-google-maps/api';
+import { AnimatePresence, motion } from 'framer-motion';
 
 interface Props {
   treasures: TreasureItem[];
