@@ -4,7 +4,15 @@ import { useNavigate, Link } from "react-router-dom";
 import { Globe, Users, Gamepad2, Church, Building2, GraduationCap, Gem, Swords, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-function AnimatedSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
+function AnimatedSection({
+  children,
+  className = "",
+  delay = 0,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  delay?: number;
+}) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-80px" });
   return (
@@ -24,7 +32,8 @@ const features = [
   {
     icon: Gem,
     title: "오픈 월드 수집 & 세공",
-    description: "지도 곳곳에 숨겨진 원석을 수집하고, 나만의 주얼리(장신구)로 세공하세요. 특별한 능력치를 가진 아이템을 만들어보세요.",
+    description:
+      "지도 곳곳에 숨겨진 원석을 수집하고, 나만의 주얼리(장신구)로 세공하세요. 특별한 능력치를 가진 아이템을 만들어보세요.",
     gradient: "from-purple-500/20 to-pink-500/20",
     iconColor: "text-purple-400",
   },
@@ -88,7 +97,7 @@ export default function LandingPage() {
             transition={{ duration: 0.9, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
             className="text-4xl sm:text-5xl md:text-6xl font-extrabold leading-tight tracking-tight text-white mb-6"
           >
-            일상이 게임이 되는 순간,
+            일상이 모험이 되는 순간,
             <br />
             <span className="bg-gradient-to-r from-[hsl(150,80%,55%)] to-[hsl(35,90%,60%)] bg-clip-text text-transparent">
               GPS 리얼타임 액션
@@ -147,8 +156,12 @@ export default function LandingPage() {
           <div className="grid gap-6 md:grid-cols-3">
             {features.map((f, i) => (
               <AnimatedSection key={f.title} delay={i * 0.15}>
-                <div className={`relative group h-full rounded-2xl border border-border/60 bg-gradient-to-br ${f.gradient} backdrop-blur-sm p-8 transition-all duration-300 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5`}>
-                  <div className={`w-14 h-14 rounded-xl bg-background/80 border border-border/60 flex items-center justify-center mb-6 ${f.iconColor}`}>
+                <div
+                  className={`relative group h-full rounded-2xl border border-border/60 bg-gradient-to-br ${f.gradient} backdrop-blur-sm p-8 transition-all duration-300 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5`}
+                >
+                  <div
+                    className={`w-14 h-14 rounded-xl bg-background/80 border border-border/60 flex items-center justify-center mb-6 ${f.iconColor}`}
+                  >
                     <f.icon className="w-7 h-7" />
                   </div>
                   <h3 className="text-xl font-bold mb-3">{f.title}</h3>
@@ -189,8 +202,12 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <p>© 2026 GPS Real-Time Action. All rights reserved.</p>
           <div className="flex gap-6">
-            <Link to="/play" className="hover:text-foreground transition-colors">게임 로비</Link>
-            <Link to="/admin" className="hover:text-foreground transition-colors">관리자 로그인</Link>
+            <Link to="/play" className="hover:text-foreground transition-colors">
+              게임 로비
+            </Link>
+            <Link to="/admin" className="hover:text-foreground transition-colors">
+              관리자 로그인
+            </Link>
           </div>
         </div>
       </footer>
