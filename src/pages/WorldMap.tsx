@@ -76,8 +76,60 @@ export default function WorldMap() {
 
   const { heading, requestPermission, permissionGranted } = useDeviceHeading(compassActive);
 
-  // Compute map rotation angle for CSS transform
-  const mapRotation = compassActive && heading !== null ? -heading : 0;
+  // Accumulated angle to avoid 360→0 wrap-around spin
+  const accumulatedAngle = useRef(0);
+  const smoothedAngle = useRef(0);
+  const prevHeading = useRef<number | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const [mapRotation, setMapRotation] = useState(0);
+
+  useEffect(() => {
+    if (!compassActive || heading === null) {
+      // Reset when compass is off
+      accumulatedAngle.current = 0;
+      smoothedAngle.current = 0;
+      prevHeading.current = null;
+      setMapRotation(0);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      return;
+    }
+
+    // Calculate shortest-path diff and accumulate
+    if (prevHeading.current === null) {
+      accumulatedAngle.current = -heading;
+      smoothedAngle.current = -heading;
+    } else {
+      let diff = heading - prevHeading.current;
+      if (diff > 180) diff -= 360;
+      if (diff < -180) diff += 360;
+      accumulatedAngle.current -= diff; // target rotation (negative heading)
+    }
+    prevHeading.current = heading;
+
+    // LERP animation loop
+    const SMOOTHING = 0.12; // lower = smoother/heavier
+    const animate = () => {
+      const delta = accumulatedAngle.current - smoothedAngle.current;
+      if (Math.abs(delta) < 0.05) {
+        smoothedAngle.current = accumulatedAngle.current;
+      } else {
+        smoothedAngle.current += delta * SMOOTHING;
+      }
+      setMapRotation(Math.round(smoothedAngle.current * 100) / 100);
+      rafRef.current = requestAnimationFrame(animate);
+    };
+
+    if (!rafRef.current) {
+      rafRef.current = requestAnimationFrame(animate);
+    }
+
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [compassActive, heading]);
 
   // Fetch nearby spawns via RPC
   const { data: rawSpawns = [] } = useQuery({
@@ -211,7 +263,6 @@ export default function WorldMap() {
           width: '150vmax',
           height: '150vmax',
           transform: `translate(-50%, -50%) rotate(${mapRotation}deg)`,
-          transition: 'transform 0.15s linear',
         }}
       >
         <GoogleMap
