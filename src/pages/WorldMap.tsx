@@ -205,13 +205,13 @@ export default function WorldMap() {
       {/* Google Map - rotated via CSS when compass active */}
       <div
         style={{
-          height: '100%',
-          width: '100%',
-          transform: `rotate(${mapRotation}deg)`,
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          width: '150vmax',
+          height: '150vmax',
+          transform: `translate(-50%, -50%) rotate(${mapRotation}deg)`,
           transition: 'transform 0.15s linear',
-          transformOrigin: 'center center',
-          // Scale up slightly to hide corners when rotated
-          ...(mapRotation !== 0 ? { scale: '1.42' } : {}),
         }}
       >
         <GoogleMap
@@ -236,7 +236,16 @@ export default function WorldMap() {
           <Marker
             position={{ lat: position.latitude, lng: position.longitude }}
             icon={compassActive && heading !== null
-              ? { url: userArrowIcon, scaledSize: new google.maps.Size(48, 48), anchor: new google.maps.Point(24, 24) }
+              ? {
+                  path: 'M 0,-16 L 12,16 L 0,10 L -12,16 Z',
+                  fillColor: '#4ade80',
+                  fillOpacity: 1,
+                  strokeColor: 'white',
+                  strokeWeight: 2,
+                  scale: 1.2,
+                  rotation: heading,
+                  anchor: new google.maps.Point(0, 0),
+                }
               : { url: userDotIcon, scaledSize: new google.maps.Size(24, 24), anchor: new google.maps.Point(12, 12) }
             }
           />
