@@ -263,7 +263,6 @@ export default function WorldMap() {
           width: '150vmax',
           height: '150vmax',
           transform: `translate(-50%, -50%) rotate(${mapRotation}deg)`,
-          transition: 'transform 0.15s linear',
         }}
       >
         <GoogleMap
