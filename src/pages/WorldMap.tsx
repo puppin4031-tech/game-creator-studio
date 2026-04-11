@@ -228,10 +228,13 @@ export default function WorldMap() {
         }}
         onLoad={(map) => { mapRef.current = map; }}
       >
-        {/* User marker */}
+        {/* User marker - arrow when compass active, dot otherwise */}
         <Marker
           position={{ lat: position.latitude, lng: position.longitude }}
-          icon={{ url: userIconUrl, scaledSize: new google.maps.Size(24, 24), anchor: new google.maps.Point(12, 12) }}
+          icon={compassActive && heading !== null
+            ? { url: userArrowIconUrl(heading), scaledSize: new google.maps.Size(48, 48), anchor: new google.maps.Point(24, 24) }
+            : { url: userDotIcon, scaledSize: new google.maps.Size(24, 24), anchor: new google.maps.Point(12, 12) }
+          }
         />
         {/* User radius */}
         <Circle
@@ -259,14 +262,6 @@ export default function WorldMap() {
           />
         ))}
 
-        {/* Direction cone overlay */}
-        {compassActive && heading !== null && (
-          <DirectionCone
-            position={{ lat: position.latitude, lng: position.longitude }}
-            heading={heading}
-            color="#22c55e"
-          />
-        )}
       </GoogleMap>
 
       {/* ===== TOP-LEFT HUD ===== */}
