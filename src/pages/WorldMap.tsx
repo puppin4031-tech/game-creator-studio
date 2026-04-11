@@ -78,14 +78,8 @@ export default function WorldMap() {
 
   const { heading, requestPermission, permissionGranted } = useDeviceHeading(compassActive);
 
-  // Rotate map based on heading
-  useEffect(() => {
-    if (mapRef.current && compassActive && heading !== null) {
-      mapRef.current.setOptions({ heading });
-    } else if (mapRef.current && !compassActive) {
-      mapRef.current.setOptions({ heading: 0 });
-    }
-  }, [heading, compassActive]);
+  // Compute map rotation angle for CSS transform
+  const mapRotation = compassActive && heading !== null ? -heading : 0;
 
   // Fetch nearby spawns via RPC
   const { data: rawSpawns = [] } = useQuery({
