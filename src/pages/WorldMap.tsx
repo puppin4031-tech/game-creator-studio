@@ -8,11 +8,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { MockControls } from '@/components/game/MockControls';
 import { GameMenu } from '@/components/game/GameMenu';
 import { haversineDistance } from '@/lib/haversine';
-import { Pickaxe, Package, ArrowLeft, Sparkles, Gem, X, Hammer } from 'lucide-react';
+import { Pickaxe, Package, ArrowLeft, Sparkles, Gem, X, Hammer, Compass } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import CraftingDrawer from '@/components/world/CraftingDrawer';
+import { useDeviceHeading } from '@/hooks/useDeviceHeading';
+import DirectionCone from '@/components/tag-game/DirectionCone';
 
 const COLLECT_RADIUS_M = 20;
 const FETCH_RADIUS_M = 500;
@@ -64,10 +66,22 @@ export default function WorldMap() {
   const [selectedSpawn, setSelectedSpawn] = useState<SpawnWithDist | null>(null);
   const [collecting, setCollecting] = useState(false);
   const [showCrafting, setShowCrafting] = useState(false);
+  const [compassActive, setCompassActive] = useState(false);
   const mapRef = useRef<google.maps.Map | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return !localStorage.getItem('world_onboarding_done');
   });
+
+  const { heading, requestPermission, permissionGranted } = useDeviceHeading(compassActive);
+
+  // Rotate map based on heading
+  useEffect(() => {
+    if (mapRef.current && compassActive && heading !== null) {
+      mapRef.current.setOptions({ heading });
+    } else if (mapRef.current && !compassActive) {
+      mapRef.current.setOptions({ heading: 0 });
+    }
+  }, [heading, compassActive]);
 
   // Fetch nearby spawns via RPC
   const { data: rawSpawns = [] } = useQuery({
@@ -240,6 +254,15 @@ export default function WorldMap() {
             onClick={() => { if (s.inRange) setSelectedSpawn(s); }}
           />
         ))}
+
+        {/* Direction cone overlay */}
+        {compassActive && heading !== null && (
+          <DirectionCone
+            position={{ lat: position.latitude, lng: position.longitude }}
+            heading={heading}
+            color="#22c55e"
+          />
+        )}
       </GoogleMap>
 
       {/* ===== TOP-LEFT HUD ===== */}
@@ -321,13 +344,34 @@ export default function WorldMap() {
       <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-0 right-0 z-[1000] flex flex-col items-center gap-3 pointer-events-none">
         {/* Crafting button + Mock controls */}
         <div className="w-full flex items-end justify-between px-4 pointer-events-auto">
-          <Button
-            onClick={() => setShowCrafting(true)}
-            className="h-12 w-12 rounded-full bg-amber-600 hover:bg-amber-700 text-white shadow-lg"
-            size="icon"
-          >
-            <Hammer size={22} />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setShowCrafting(true)}
+              className="h-12 w-12 rounded-full bg-amber-600 hover:bg-amber-700 text-white shadow-lg"
+              size="icon"
+            >
+              <Hammer size={22} />
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!compassActive) {
+                  const ok = await requestPermission();
+                  if (ok) setCompassActive(true);
+                  else toast.error('방향 센서 권한이 필요합니다');
+                } else {
+                  setCompassActive(false);
+                }
+              }}
+              className={`h-12 w-12 rounded-full shadow-lg ${
+                compassActive
+                  ? 'bg-green-600 hover:bg-green-700 text-white'
+                  : 'bg-card/90 hover:bg-card text-muted-foreground border border-border'
+              }`}
+              size="icon"
+            >
+              <Compass size={22} />
+            </Button>
+          </div>
           <MockControls
             onMove={mockMove}
             isSimulated={isSimulated}
