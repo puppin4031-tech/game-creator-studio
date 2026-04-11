@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import CraftingDrawer from '@/components/world/CraftingDrawer';
 import { useDeviceHeading } from '@/hooks/useDeviceHeading';
-import DirectionCone from '@/components/tag-game/DirectionCone';
+
 
 const COLLECT_RADIUS_M = 20;
 const FETCH_RADIUS_M = 500;
