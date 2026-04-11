@@ -1,26 +1,49 @@
 
 
-# 월드맵 나침반 모드 추가
+# 월드맵 나침반 모드 수정 — 빈 화면 + 화살표 방향
 
-## 개요
-하단 HUD에 나침반 버튼을 추가하고, 활성화 시 스마트폰 방향에 맞게 지도가 회전하며 유저 마커 위에 방향 삼각형(DirectionCone)을 표시합니다.
+## 문제
+1. 지도 회전 시 모서리에 흰 바탕 노출 (`scale: 1.42`로 부족)
+2. 화살표 마커가 지도와 함께 회전되어 12시 방향 고정이 안 됨
 
-## 구현 내용
+## 수정 내용 (`src/pages/WorldMap.tsx`)
 
-### 1. `src/pages/WorldMap.tsx` 수정
-- `useDeviceHeading` 훅과 `DirectionCone` 컴포넌트 import
-- 나침반 활성 상태(`compassActive`) state 추가
-- 나침반 버튼 클릭 시 `requestPermission()` 호출 후 활성화 토글
-- **지도 회전**: `compassActive && heading !== null`일 때 GoogleMap `options.heading`을 heading 값으로 설정하고, `mapRef.current.setOptions({ heading })` 호출하여 지도를 실시간 회전
-- **방향 삼각형**: 활성 시 `DirectionCone` 컴포넌트를 유저 위치에 은은한 초록색(`#22c55e`)으로 렌더링
-- 하단 HUD 세공 버튼 옆에 나침반 아이콘 버튼 배치 (활성 시 색상 변경)
+### 1. 지도 컨테이너 CSS 변경
+현재 `width/height: 100%` + `scale: 1.42` 방식을 **150vmax 거대 정사각형 + translate 센터링** 방식으로 교체:
+```tsx
+<div style={{
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  width: '150vmax',
+  height: '150vmax',
+  transform: `translate(-50%, -50%) rotate(${mapRotation}deg)`,
+  transition: 'transform 0.15s linear',
+}}>
+```
+- `scale` 속성 제거
+- 화면 대각선보다 큰 사이즈로 회전 시 빈 모서리 완전 방지
 
-### 2. 수정 파일
-- `src/pages/WorldMap.tsx` — 나침반 버튼 + 지도 회전 + DirectionCone 통합
+### 2. 화살표 마커를 Google Maps Symbol로 변경
+기존 SVG 이미지 URL(`userArrowIcon`) 대신 **`google.maps.Symbol`** 객체 사용:
+```tsx
+<Marker
+  icon={compassActive && heading !== null
+    ? {
+        path: 'M 0,-16 L 12,16 L 0,10 L -12,16 Z',
+        fillColor: '#4ade80',
+        fillOpacity: 1,
+        strokeColor: 'white',
+        strokeWeight: 2,
+        scale: 1.2,
+        rotation: heading,  // 지도 CSS 회전을 상쇄하여 항상 12시 방향
+      }
+    : { url: userDotIcon, ... }
+  }
+/>
+```
+- Symbol의 `rotation` 속성에 `heading` 값을 넣으면 지도의 `-heading` CSS 회전과 상쇄되어 화살표가 항상 화면 위쪽(12시)을 가리킴
 
-### 기술 상세
-- `useDeviceHeading(compassActive)`로 heading 값 수신
-- heading 변경 시 `mapRef.current.setOptions({ heading: compassHeading })` 호출 (Google Maps API heading 속성으로 지도 자체를 회전)
-- 비활성화 시 heading을 0으로 리셋하여 북쪽 정렬 복구
-- DirectionCone은 기존 태그 게임에서 사용 중인 컴포넌트를 그대로 재사용
+### 수정 파일
+- `src/pages/WorldMap.tsx` (1개 파일만 수정)
 
