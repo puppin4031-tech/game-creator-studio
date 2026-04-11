@@ -254,6 +254,15 @@ export default function WorldMap() {
             onClick={() => { if (s.inRange) setSelectedSpawn(s); }}
           />
         ))}
+
+        {/* Direction cone overlay */}
+        {compassActive && heading !== null && (
+          <DirectionCone
+            position={{ lat: position.latitude, lng: position.longitude }}
+            heading={heading}
+            color="#22c55e"
+          />
+        )}
       </GoogleMap>
 
       {/* ===== TOP-LEFT HUD ===== */}
