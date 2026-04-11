@@ -24,9 +24,7 @@ const containerStyle = { height: '100%', width: '100%' };
 
 const userDotIcon = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="8" fill="#22c55e" stroke="white" stroke-width="3"/></svg>`)}`;
 
-function userArrowIconUrl(heading: number) {
-  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><defs><filter id="s" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.3"/></filter></defs><g transform="rotate(${heading} 24 24)" filter="url(#s)"><polygon points="24,6 34,38 24,32 14,38" fill="#4ade80" stroke="white" stroke-width="2" stroke-linejoin="round"/></g></svg>`)}`;
-}
+const userArrowIcon = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><defs><filter id="s" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.3"/></filter></defs><g filter="url(#s)"><polygon points="24,6 34,38 24,32 14,38" fill="#4ade80" stroke="white" stroke-width="2" stroke-linejoin="round"/></g></svg>`)}`;
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#9ca3af',
@@ -78,14 +76,8 @@ export default function WorldMap() {
 
   const { heading, requestPermission, permissionGranted } = useDeviceHeading(compassActive);
 
-  // Rotate map based on heading
-  useEffect(() => {
-    if (mapRef.current && compassActive && heading !== null) {
-      mapRef.current.setOptions({ heading });
-    } else if (mapRef.current && !compassActive) {
-      mapRef.current.setOptions({ heading: 0 });
-    }
-  }, [heading, compassActive]);
+  // Compute map rotation angle for CSS transform
+  const mapRotation = compassActive && heading !== null ? -heading : 0;
 
   // Fetch nearby spawns via RPC
   const { data: rawSpawns = [] } = useQuery({
@@ -210,59 +202,72 @@ export default function WorldMap() {
 
   return (
     <div className="h-screen w-screen relative overflow-hidden bg-background">
-      {/* Google Map */}
-      <GoogleMap
-        mapContainerStyle={containerStyle}
-        center={{ lat: position.latitude, lng: position.longitude }}
-        zoom={18}
-        options={{
-          zoomControl: false, mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
-          styles: [
-            { elementType: 'geometry', stylers: [{ color: '#1a1a2e' }] },
-            { elementType: 'labels.text.stroke', stylers: [{ color: '#1a1a2e' }] },
-            { elementType: 'labels.text.fill', stylers: [{ color: '#8892b0' }] },
-            { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2d2d44' }] },
-            { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f0f23' }] },
-            { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-          ],
+      {/* Google Map - rotated via CSS when compass active */}
+      <div
+        style={{
+          height: '100%',
+          width: '100%',
+          transform: `rotate(${mapRotation}deg)`,
+          transition: 'transform 0.15s linear',
+          transformOrigin: 'center center',
+          // Scale up slightly to hide corners when rotated
+          ...(mapRotation !== 0 ? { scale: '1.42' } : {}),
         }}
-        onLoad={(map) => { mapRef.current = map; }}
       >
-        {/* User marker - arrow when compass active, dot otherwise */}
-        <Marker
-          position={{ lat: position.latitude, lng: position.longitude }}
-          icon={compassActive && heading !== null
-            ? { url: userArrowIconUrl(heading), scaledSize: new google.maps.Size(48, 48), anchor: new google.maps.Point(24, 24) }
-            : { url: userDotIcon, scaledSize: new google.maps.Size(24, 24), anchor: new google.maps.Point(12, 12) }
-          }
-        />
-        {/* User radius */}
-        <Circle
+        <GoogleMap
+          mapContainerStyle={containerStyle}
           center={{ lat: position.latitude, lng: position.longitude }}
-          radius={COLLECT_RADIUS_M}
-          options={{ strokeColor: '#22c55e', fillColor: '#22c55e', fillOpacity: 0.08, strokeWeight: 1, strokeOpacity: 0.4 }}
-        />
-        <Circle
-          center={{ lat: position.latitude, lng: position.longitude }}
-          radius={FETCH_RADIUS_M}
-          options={{ strokeColor: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.03, strokeWeight: 0.5, strokeOpacity: 0.2 }}
-        />
-        {/* Spawn markers */}
-        {spawns.map(s => (
+          zoom={18}
+          options={{
+            zoomControl: false, mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
+            gestureHandling: compassActive ? 'none' : 'auto',
+            styles: [
+              { elementType: 'geometry', stylers: [{ color: '#1a1a2e' }] },
+              { elementType: 'labels.text.stroke', stylers: [{ color: '#1a1a2e' }] },
+              { elementType: 'labels.text.fill', stylers: [{ color: '#8892b0' }] },
+              { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2d2d44' }] },
+              { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f0f23' }] },
+              { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+            ],
+          }}
+          onLoad={(map) => { mapRef.current = map; }}
+        >
+          {/* User marker - arrow when compass active, dot otherwise */}
           <Marker
-            key={s.id}
-            position={{ lat: s.lat, lng: s.lng }}
-            icon={{
-              url: spawnIconUrl(s.rarity, s.inRange),
-              scaledSize: new google.maps.Size(s.inRange ? 20 : 14, s.inRange ? 20 : 14),
-              anchor: new google.maps.Point(s.inRange ? 10 : 7, s.inRange ? 10 : 7),
-            }}
-            title={`${ITEM_ICONS[s.item_type] || '✨'} ${s.item_type} (${Math.round(s.distance)}m)`}
-            onClick={() => { if (s.inRange) setSelectedSpawn(s); }}
+            position={{ lat: position.latitude, lng: position.longitude }}
+            icon={compassActive && heading !== null
+              ? { url: userArrowIcon, scaledSize: new google.maps.Size(48, 48), anchor: new google.maps.Point(24, 24) }
+              : { url: userDotIcon, scaledSize: new google.maps.Size(24, 24), anchor: new google.maps.Point(12, 12) }
+            }
           />
-        ))}
+          {/* User radius */}
+          <Circle
+            center={{ lat: position.latitude, lng: position.longitude }}
+            radius={COLLECT_RADIUS_M}
+            options={{ strokeColor: '#22c55e', fillColor: '#22c55e', fillOpacity: 0.08, strokeWeight: 1, strokeOpacity: 0.4 }}
+          />
+          <Circle
+            center={{ lat: position.latitude, lng: position.longitude }}
+            radius={FETCH_RADIUS_M}
+            options={{ strokeColor: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.03, strokeWeight: 0.5, strokeOpacity: 0.2 }}
+          />
+          {/* Spawn markers */}
+          {spawns.map(s => (
+            <Marker
+              key={s.id}
+              position={{ lat: s.lat, lng: s.lng }}
+              icon={{
+                url: spawnIconUrl(s.rarity, s.inRange),
+                scaledSize: new google.maps.Size(s.inRange ? 20 : 14, s.inRange ? 20 : 14),
+                anchor: new google.maps.Point(s.inRange ? 10 : 7, s.inRange ? 10 : 7),
+              }}
+              title={`${ITEM_ICONS[s.item_type] || '✨'} ${s.item_type} (${Math.round(s.distance)}m)`}
+              onClick={() => { if (s.inRange) setSelectedSpawn(s); }}
+            />
+          ))}
 
-      </GoogleMap>
+        </GoogleMap>
+      </div>
 
       {/* ===== TOP-LEFT HUD ===== */}
       <div className="fixed top-[calc(0.75rem+env(safe-area-inset-top))] left-4 z-[1000] flex flex-col gap-2">
