@@ -22,7 +22,11 @@ const REFETCH_INTERVAL = 10_000;
 
 const containerStyle = { height: '100%', width: '100%' };
 
-const userIconUrl = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="8" fill="#22c55e" stroke="white" stroke-width="3"/></svg>`)}`;
+const userDotIcon = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="8" fill="#22c55e" stroke="white" stroke-width="3"/></svg>`)}`;
+
+function userArrowIconUrl(heading: number) {
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><defs><filter id="s" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.3"/></filter></defs><g transform="rotate(${heading} 24 24)" filter="url(#s)"><polygon points="24,6 34,38 24,32 14,38" fill="#4ade80" stroke="white" stroke-width="2" stroke-linejoin="round"/></g></svg>`)}`;
+}
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#9ca3af',
