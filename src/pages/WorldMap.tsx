@@ -66,10 +66,22 @@ export default function WorldMap() {
   const [selectedSpawn, setSelectedSpawn] = useState<SpawnWithDist | null>(null);
   const [collecting, setCollecting] = useState(false);
   const [showCrafting, setShowCrafting] = useState(false);
+  const [compassActive, setCompassActive] = useState(false);
   const mapRef = useRef<google.maps.Map | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return !localStorage.getItem('world_onboarding_done');
   });
+
+  const { heading, requestPermission, permissionGranted } = useDeviceHeading(compassActive);
+
+  // Rotate map based on heading
+  useEffect(() => {
+    if (mapRef.current && compassActive && heading !== null) {
+      mapRef.current.setOptions({ heading });
+    } else if (mapRef.current && !compassActive) {
+      mapRef.current.setOptions({ heading: 0 });
+    }
+  }, [heading, compassActive]);
 
   // Fetch nearby spawns via RPC
   const { data: rawSpawns = [] } = useQuery({
