@@ -2,14 +2,7 @@ import { TreasureItem } from '@/hooks/useTreasureHunt';
 import { Button } from '@/components/ui/button';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { Backpack } from 'lucide-react';
-
-const SUBTYPE_ICONS: Record<string, string> = {
-  diamond: '💎', gold: '🥇', ruby: '❤️', sapphire: '💙', key: '🔑', chest: '📦',
-};
-
-const CHALLENGE_ICONS: Record<string, string> = {
-  quiz: '❓', puzzle: '🧩', treasure: '💎',
-};
+import { getTreasureIconSrc } from '@/lib/treasureIcons';
 
 interface Props {
   foundTreasures: TreasureItem[];
@@ -47,7 +40,7 @@ export default function TreasureInventoryDrawer({ foundTreasures, hasKey }: Prop
         <div className="px-4 pb-6 overflow-y-auto">
           {hasKey && (
             <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mb-3">
-              <span className="text-2xl">🔑</span>
+              <img src={getTreasureIconSrc('treasure', 'key')} alt="열쇠" className="w-8 h-8 object-contain" />
               <div>
                 <p className="text-sm font-bold">열쇠 보유 중</p>
                 <p className="text-xs text-muted-foreground">보물상자를 열 수 있습니다!</p>
@@ -63,27 +56,26 @@ export default function TreasureInventoryDrawer({ foundTreasures, hasKey }: Prop
             </div>
           ) : (
             <div className="space-y-2">
-              {foundTreasures.map(t => {
-                const icon = t.treasure_subtype && SUBTYPE_ICONS[t.treasure_subtype]
-                  ? SUBTYPE_ICONS[t.treasure_subtype]
-                  : CHALLENGE_ICONS[t.challenge_type] || '💎';
-                return (
-                  <div
-                    key={t.id}
-                    className="flex items-center gap-3 bg-muted/50 rounded-lg p-3 border"
-                  >
-                    <span className="text-2xl">{icon}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{t.keyword}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {t.challenge_type === 'quiz' ? '퀴즈' : t.challenge_type === 'puzzle' ? '퍼즐' : '보물'}
-                        {t.found_at && ` · ${new Date(t.found_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`}
-                      </p>
-                    </div>
-                    <span className="text-sm font-bold text-primary whitespace-nowrap">+{t.points}점</span>
+              {foundTreasures.map(t => (
+                <div
+                  key={t.id}
+                  className="flex items-center gap-3 bg-muted/50 rounded-lg p-3 border"
+                >
+                  <img
+                    src={getTreasureIconSrc(t.challenge_type, t.treasure_subtype)}
+                    alt={t.keyword}
+                    className="w-8 h-8 object-contain"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{t.keyword}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t.challenge_type === 'quiz' ? '퀴즈' : t.challenge_type === 'puzzle' ? '퍼즐' : '보물'}
+                      {t.found_at && ` · ${new Date(t.found_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`}
+                    </p>
                   </div>
-                );
-              })}
+                  <span className="text-sm font-bold text-primary whitespace-nowrap">+{t.points}점</span>
+                </div>
+              ))}
             </div>
           )}
         </div>

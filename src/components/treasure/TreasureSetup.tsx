@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Trash2, MapPin, Image, HelpCircle, Puzzle, Navigation, Gem, Key, Package, X, Check, Map as MapIcon, Move } from 'lucide-react';
 import { TreasureItem } from '@/hooks/useTreasureHunt';
 import { QUIZ_PRESETS, TREASURE_PRESETS, SPECIAL_ITEMS } from '@/lib/quizPresets';
+import { getTreasureIconSrc } from '@/lib/treasureIcons';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Map, MapMarker } from 'react-kakao-maps-sdk';
@@ -33,9 +34,7 @@ const PUZZLE_PRESETS = [
 
 const pinIconUrl = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><circle cx="14" cy="14" r="10" fill="hsl(0,80%,55%)" stroke="white" stroke-width="3"/><circle cx="14" cy="14" r="4" fill="white"/></svg>`)}`;
 
-const SUBTYPE_ICONS: Record<string, string> = {
-  diamond: '💎', gold: '🥇', ruby: '❤️', sapphire: '💙', key: '🔑', chest: '📦',
-};
+// Icon map removed — using getTreasureIconSrc from treasureIcons.ts
 
 export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
   const [keyword, setKeyword] = useState('');
@@ -158,10 +157,7 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
   }, []);
 
   const getItemIcon = (t: TreasureItem) => {
-    if (t.treasure_subtype && SUBTYPE_ICONS[t.treasure_subtype]) return SUBTYPE_ICONS[t.treasure_subtype];
-    if (t.challenge_type === 'puzzle') return '🧩';
-    if (t.challenge_type === 'quiz') return '❓';
-    return '💎';
+    return <img src={getTreasureIconSrc(t.challenge_type, t.treasure_subtype)} alt="" className="w-5 h-5 inline-block object-contain" />;
   };
 
   return (
