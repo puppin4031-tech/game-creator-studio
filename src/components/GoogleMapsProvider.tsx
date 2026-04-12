@@ -7,7 +7,7 @@ interface Props {
 
 export default function GoogleMapsProvider({ children }: Props) {
   const [loading, error] = useKakaoLoader({
-    appkey: 'dca9db976cffa9c5b926112d49058efd',
+    appkey: '19011b5025994c098412aad00af53134',
   });
 
   if (loading) {
@@ -20,8 +20,16 @@ export default function GoogleMapsProvider({ children }: Props) {
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-destructive">
-        지도 로딩 실패
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <div className="text-center space-y-2">
+          <p className="text-destructive font-semibold">지도 로딩 실패</p>
+          <p className="text-xs text-muted-foreground">
+            현재 도메인: <code className="bg-muted px-1 rounded">{window.location.origin}</code>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            카카오 개발자 콘솔 → 내 애플리케이션 → 플랫폼 → Web에 위 도메인이 등록되어 있는지 확인하세요.
+          </p>
+        </div>
       </div>
     );
   }
