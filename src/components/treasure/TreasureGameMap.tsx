@@ -1,5 +1,5 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
-import { GoogleMap, Marker } from '@react-google-maps/api';
+import { Map, CustomOverlayMap } from 'react-kakao-maps-sdk';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
 import { useTreasureHunt, NearestTreasure } from '@/hooks/useTreasureHunt';
 import ProximityGlow from './ProximityGlow';
@@ -29,8 +29,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-const containerStyle = { width: '100%', height: '100%' };
-
 const SUBTYPE_ICONS: Record<string, string> = {
   diamond: '💎', gold: '🥇', ruby: '❤️', sapphire: '💙', key: '🔑', chest: '📦',
 };
@@ -51,18 +49,12 @@ interface Props {
 export default function TreasureGameMap({
   room, players, messages, currentPlayerId, myTeam, position, nickname, isHost, onEndGame, onSendMessage,
 }: Props) {
-  const mapRef = useRef<google.maps.Map | null>(null);
+  const mapRef = useRef<kakao.maps.Map | null>(null);
   const [quizOpen, setQuizOpen] = useState(false);
   const [activeTreasure, setActiveTreasure] = useState<NearestTreasure | null>(null);
-
-  // Chest dialog
   const [chestDialogOpen, setChestDialogOpen] = useState(false);
-  // Gem claim dialog
   const [gemDialogOpen, setGemDialogOpen] = useState(false);
-  // Victory overlay
   const [victoryOverlay, setVictoryOverlay] = useState(false);
-
-  // Pings
   const [pings, setPings] = useState<Ping[]>([]);
   const [pingCooldown, setPingCooldown] = useState(0);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -72,11 +64,9 @@ export default function TreasureGameMap({
     hasKey, teamScores, attemptAnswer, claimTreasure, attemptChest,
   } = useTreasureHunt(room.id, currentPlayerId, position.latitude, position.longitude, players);
 
-  const onLoad = useCallback((map: google.maps.Map) => { mapRef.current = map; }, []);
-
   useEffect(() => {
     if (mapRef.current && position.latitude && position.longitude) {
-      mapRef.current.panTo({ lat: position.latitude, lng: position.longitude });
+      mapRef.current.panTo(new kakao.maps.LatLng(position.latitude, position.longitude));
     }
   }, [position.latitude, position.longitude]);
 
@@ -123,19 +113,15 @@ export default function TreasureGameMap({
     setPings(prev => prev.filter(p => p.id !== id));
   }, []);
 
-  // Shovel dig result handler
   const handleDigSuccess = (treasure: NearestTreasure) => {
     setActiveTreasure(treasure);
-
     if (treasure.challenge_type === 'treasure') {
       if (treasure.treasure_subtype === 'chest') {
         setChestDialogOpen(true);
       } else {
-        // Gem or key — direct claim dialog
         setGemDialogOpen(true);
       }
     } else {
-      // Quiz or puzzle
       setQuizOpen(true);
     }
   };
@@ -176,46 +162,37 @@ export default function TreasureGameMap({
 
   return (
     <div className="h-screen w-screen relative text-[1.3em]">
-      <GoogleMap mapContainerStyle={containerStyle} center={center} zoom={18} onLoad={onLoad}
-        options={{ disableDefaultUI: true, zoomControl: true, gestureHandling: 'greedy' }}
+      <Map
+        center={center}
+        style={{ width: '100%', height: '100%' }}
+        level={2}
+        onCreate={(map) => { mapRef.current = map; }}
       >
         {position.latitude !== 0 && (
-          <Marker
-            position={{ lat: position.latitude, lng: position.longitude }}
-            icon={{
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 10,
-              fillColor: '#3b82f6',
-              fillOpacity: 1,
-              strokeColor: '#fff',
-              strokeWeight: 3,
-            }}
-          />
+          <CustomOverlayMap position={{ lat: position.latitude, lng: position.longitude }} zIndex={10}>
+            <div style={{
+              width: 20, height: 20, borderRadius: '50%',
+              backgroundColor: '#3b82f6', border: '3px solid white',
+              transform: 'translate(-50%, -50%)',
+            }} />
+          </CustomOverlayMap>
         )}
 
         {players.filter(p => p.id !== currentPlayerId && p.team === myTeam && p.latitude).map(p => (
-          <Marker
-            key={p.id}
-            position={{ lat: p.latitude, lng: p.longitude }}
-            icon={{
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 7,
-              fillColor: '#94a3b8',
-              fillOpacity: 0.8,
-              strokeColor: '#fff',
-              strokeWeight: 2,
-            }}
-            title={p.nickname}
-          />
+          <CustomOverlayMap key={p.id} position={{ lat: p.latitude, lng: p.longitude }} zIndex={5}>
+            <div style={{
+              width: 14, height: 14, borderRadius: '50%',
+              backgroundColor: '#94a3b8', border: '2px solid white', opacity: 0.8,
+              transform: 'translate(-50%, -50%)',
+            }} title={p.nickname} />
+          </CustomOverlayMap>
         ))}
 
-        <PingOverlay pings={pings} onExpire={handlePingExpire} map={mapRef.current} />
-      </GoogleMap>
+        <PingOverlay pings={pings} onExpire={handlePingExpire} />
+      </Map>
 
-      {/* Proximity glow overlay */}
       <ProximityGlow level={proximityLevel} />
 
-      {/* Quiz/Puzzle popup */}
       {activeTreasure && (
         <TreasureQuizPopup
           open={quizOpen}
@@ -237,7 +214,6 @@ export default function TreasureGameMap({
         />
       )}
 
-      {/* Gem claim dialog */}
       <AlertDialog open={gemDialogOpen} onOpenChange={setGemDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -257,7 +233,6 @@ export default function TreasureGameMap({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Chest dialog */}
       <AlertDialog open={chestDialogOpen} onOpenChange={setChestDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -281,7 +256,6 @@ export default function TreasureGameMap({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Top bar */}
       <div className="absolute top-0 left-0 right-0 z-50 bg-background/85 backdrop-blur-md border-b shadow-sm">
         <div className="flex items-center justify-center gap-2 pt-1">
           <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">
@@ -300,7 +274,6 @@ export default function TreasureGameMap({
         </div>
       </div>
 
-      {/* Bottom bar */}
       <div className="absolute bottom-6 left-3 right-3 z-50 flex items-end justify-between">
         <div className="flex flex-col gap-2 items-center">
           <TreasureInventoryDrawer foundTreasures={myFoundTreasures} hasKey={hasKey} />
@@ -335,7 +308,6 @@ export default function TreasureGameMap({
         />
       </div>
 
-      {/* Victory overlay */}
       {victoryOverlay && (
         <ChestVictoryOverlay
           winnerTeam={myTeamName}

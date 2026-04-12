@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { OverlayView } from '@react-google-maps/api';
+import { CustomOverlayMap } from 'react-kakao-maps-sdk';
 
 interface Props {
   position: { lat: number; lng: number };
@@ -9,17 +9,13 @@ interface Props {
 
 export default function DirectionCone({ position, heading, color }: Props) {
   const style = useMemo(() => ({
-    transform: `rotate(${heading}deg)`,
+    transform: `translate(-40px, -70px) rotate(${heading}deg)`,
     transformOrigin: 'center bottom',
     transition: 'transform 0.15s linear',
   }), [heading]);
 
   return (
-    <OverlayView
-      position={position}
-      mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-      getPixelPositionOffset={() => ({ x: -40, y: -70 })}
-    >
+    <CustomOverlayMap position={position} zIndex={5}>
       <div style={style}>
         <svg width="80" height="70" viewBox="0 0 80 70">
           <path
@@ -32,6 +28,6 @@ export default function DirectionCone({ position, heading, color }: Props) {
           />
         </svg>
       </div>
-    </OverlayView>
+    </CustomOverlayMap>
   );
 }

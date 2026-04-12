@@ -2,11 +2,9 @@ import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { GoogleMap, Rectangle, Marker } from '@react-google-maps/api';
+import { Map, Rectangle, MapMarker } from 'react-kakao-maps-sdk';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-
-const containerStyle = { width: '100%', height: '100%' };
 
 const statusColors: Record<string, string> = {
   '작성중': '#5a6a80',
@@ -15,7 +13,7 @@ const statusColors: Record<string, string> = {
   '반려': '#dc3545',
 };
 
-const missionIconUrl = (status: string) => {
+const missionMarkerImage = (status: string) => {
   const color = statusColors[status]?.replace('#', '') || '888888';
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"><circle cx="7" cy="7" r="5" fill="#${color}" stroke="white" stroke-width="2"/></svg>`)}`;
 };
@@ -63,30 +61,30 @@ export default function SubRegionMap() {
         </div>
       )}
       {region && (
-        <GoogleMap
-          mapContainerStyle={containerStyle}
+        <Map
           center={{ lat: region.center_lat, lng: region.center_lng }}
-          zoom={16}
-          options={{
-            restriction: {
-              latLngBounds: { north: region.bounds_north, south: region.bounds_south, east: region.bounds_east, west: region.bounds_west },
-              strictBounds: true,
-            },
-          }}
+          style={{ width: '100%', height: '100%' }}
+          level={4}
         >
           <Rectangle
-            bounds={{ north: region.bounds_north, south: region.bounds_south, east: region.bounds_east, west: region.bounds_west }}
-            options={{ strokeColor: 'hsl(150,80%,45%)', strokeWeight: 2, fillOpacity: 0.05, strokeOpacity: 1 }}
+            bounds={{
+              sw: { lat: region.bounds_south, lng: region.bounds_west },
+              ne: { lat: region.bounds_north, lng: region.bounds_east },
+            }}
+            strokeWeight={2}
+            strokeColor="hsl(150,80%,45%)"
+            fillOpacity={0.05}
+            strokeOpacity={1}
           />
           {missions.map(m => (
-            <Marker
+            <MapMarker
               key={m.id}
               position={{ lat: m.latitude, lng: m.longitude }}
-              icon={{ url: missionIconUrl(m.status), scaledSize: new google.maps.Size(14, 14), anchor: new google.maps.Point(7, 7) }}
+              image={{ src: missionMarkerImage(m.status), size: { width: 14, height: 14 }, options: { offset: { x: 7, y: 7 } } }}
               title={`${m.title} (${m.status}) ${m.floor}층`}
             />
           ))}
-        </GoogleMap>
+        </Map>
       )}
       <div className="absolute bottom-3 left-3 z-10 flex gap-2">
         {Object.entries(statusColors).map(([status, color]) => (
