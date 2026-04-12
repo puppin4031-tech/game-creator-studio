@@ -263,6 +263,11 @@ export default function TreasureGameMap({
             방 코드: {room.room_code}
           </span>
           {hasKey && <span className="text-xs bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 rounded-full">🔑 열쇠 보유</span>}
+          <AddressSearchBar onSelect={(lat, lng) => {
+            if (mapRef.current) {
+              mapRef.current.panTo(new kakao.maps.LatLng(lat, lng));
+            }
+          }} />
         </div>
         <div className="flex items-center justify-between px-3 py-2">
           <TreasureHUD
