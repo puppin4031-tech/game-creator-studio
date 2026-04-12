@@ -9,6 +9,7 @@ import { MockControls } from '@/components/game/MockControls';
 import { GameMenu } from '@/components/game/GameMenu';
 import { haversineDistance } from '@/lib/haversine';
 import { Pickaxe, Package, ArrowLeft, Sparkles, Gem, X, Hammer, Compass } from 'lucide-react';
+import { TREASURE_ICON_MAP } from '@/lib/treasureIcons';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -31,6 +32,14 @@ const ITEM_ICONS: Record<string, string> = {
   ruby: '❤️', sapphire: '💙', emerald: '💚', diamond: '💎',
   gold: '🥇', silver: '🥈', copper: '🟤', alloy: '⚙️',
   opal: '🤍', amethyst: '💜', topaz: '🧡', pearl: '🫧', tin: '🪨',
+};
+
+const RARITY_GLOW: Record<string, string> = {
+  common: 'rgba(156,163,175,0.4)',
+  uncommon: 'rgba(34,197,94,0.5)',
+  rare: 'rgba(59,130,246,0.5)',
+  epic: 'rgba(168,85,247,0.6)',
+  legendary: 'rgba(245,158,11,0.7)',
 };
 
 function spawnMarkerImage(rarity: string, inRange: boolean) {
