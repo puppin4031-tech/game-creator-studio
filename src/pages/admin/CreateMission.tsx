@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { GoogleMap, Rectangle, Marker } from '@react-google-maps/api';
+import { Map, Rectangle, MapMarker } from 'react-kakao-maps-sdk';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,8 +11,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Card, CardContent } from '@/components/ui/card';
 import { PlusCircle, MapPin } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-
-const containerStyle = { width: '100%', height: '100%' };
 
 const newMarkerIcon = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><circle cx="9" cy="9" r="7" fill="#e0952d" stroke="white" stroke-width="3"/></svg>`)}`;
 
@@ -37,11 +35,10 @@ export default function CreateMission() {
     enabled: !!profile?.assigned_region,
   });
 
-  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
-    if (e.latLng) {
-      setClickedPos({ lat: e.latLng.lat(), lng: e.latLng.lng() });
-      setShowModal(true);
-    }
+  const handleMapClick = useCallback((_map: kakao.maps.Map, e: kakao.maps.event.MouseEvent) => {
+    const latlng = e.latLng;
+    setClickedPos({ lat: latlng.getLat(), lng: latlng.getLng() });
+    setShowModal(true);
   }, []);
 
   const createMutation = useMutation({
@@ -91,29 +88,28 @@ export default function CreateMission() {
         <span className="text-sm font-medium">지도를 클릭하여 미션 추가</span>
       </div>
 
-      <GoogleMap
-        mapContainerStyle={containerStyle}
+      <Map
         center={{ lat: region.center_lat, lng: region.center_lng }}
-        zoom={16}
+        style={{ width: '100%', height: '100%' }}
+        level={2}
         onClick={handleMapClick}
-        options={{
-          restriction: {
-            latLngBounds: { north: region.bounds_north, south: region.bounds_south, east: region.bounds_east, west: region.bounds_west },
-            strictBounds: true,
-          },
-        }}
       >
         <Rectangle
-          bounds={{ north: region.bounds_north, south: region.bounds_south, east: region.bounds_east, west: region.bounds_west }}
-          options={{ strokeColor: 'hsl(150,80%,45%)', strokeWeight: 2, fillOpacity: 0.05 }}
+          bounds={{
+            sw: { lat: region.bounds_south, lng: region.bounds_west },
+            ne: { lat: region.bounds_north, lng: region.bounds_east },
+          }}
+          strokeWeight={2}
+          strokeColor="hsl(150,80%,45%)"
+          fillOpacity={0.05}
         />
         {clickedPos && (
-          <Marker
+          <MapMarker
             position={clickedPos}
-            icon={{ url: newMarkerIcon, scaledSize: new google.maps.Size(18, 18), anchor: new google.maps.Point(9, 9) }}
+            image={{ src: newMarkerIcon, size: { width: 18, height: 18 }, options: { offset: { x: 9, y: 9 } } }}
           />
         )}
-      </GoogleMap>
+      </Map>
 
       <Dialog open={showModal} onOpenChange={open => { if (!open) { setShowModal(false); setClickedPos(null); } }}>
         <DialogContent className="max-w-md">
