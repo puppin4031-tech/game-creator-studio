@@ -9,6 +9,7 @@ import { MockControls } from '@/components/game/MockControls';
 import { GameMenu } from '@/components/game/GameMenu';
 import { haversineDistance } from '@/lib/haversine';
 import { Pickaxe, Package, ArrowLeft, Sparkles, Gem, X, Hammer, Compass } from 'lucide-react';
+import { TREASURE_ICON_MAP } from '@/lib/treasureIcons';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -31,6 +32,14 @@ const ITEM_ICONS: Record<string, string> = {
   ruby: '❤️', sapphire: '💙', emerald: '💚', diamond: '💎',
   gold: '🥇', silver: '🥈', copper: '🟤', alloy: '⚙️',
   opal: '🤍', amethyst: '💜', topaz: '🧡', pearl: '🫧', tin: '🪨',
+};
+
+const RARITY_GLOW: Record<string, string> = {
+  common: 'rgba(156,163,175,0.4)',
+  uncommon: 'rgba(34,197,94,0.5)',
+  rare: 'rgba(59,130,246,0.5)',
+  epic: 'rgba(168,85,247,0.6)',
+  legendary: 'rgba(245,158,11,0.7)',
 };
 
 function spawnMarkerImage(rarity: string, inRange: boolean) {
@@ -224,6 +233,17 @@ export default function WorldMap() {
 
   return (
     <div className="h-screen w-screen relative overflow-hidden bg-background">
+      {/* Floating spawn animation */}
+      <style>{`
+        @keyframes spawn-float {
+          0%, 100% { transform: translate(-50%, -100%) translateY(0px); }
+          50% { transform: translate(-50%, -100%) translateY(-5px); }
+        }
+        @keyframes spawn-glow-pulse {
+          0%, 100% { opacity: 0.6; }
+          50% { opacity: 1; }
+        }
+      `}</style>
       {/* Kakao Map - rotated via CSS when compass active */}
       <div
         style={{
@@ -286,17 +306,56 @@ export default function WorldMap() {
             )}
           </CustomOverlayMap>
 
-          {/* Spawn markers */}
+          {/* Spawn markers with icon images, glow & float */}
           {spawns.map(s => {
-            const size = s.inRange ? 20 : 14;
+            const iconSrc = TREASURE_ICON_MAP[s.item_type];
+            const glowColor = RARITY_GLOW[s.rarity] || RARITY_GLOW.common;
+            const size = s.inRange ? 40 : 28;
+
+            if (iconSrc) {
+              return (
+                <CustomOverlayMap key={s.id} position={{ lat: s.lat, lng: s.lng }} zIndex={s.inRange ? 9 : 7}>
+                  <div
+                    onClick={() => { if (s.inRange) setSelectedSpawn(s); }}
+                    style={{
+                      cursor: s.inRange ? 'pointer' : 'default',
+                      animation: s.inRange ? 'spawn-float 2s ease-in-out infinite' : 'spawn-float 3s ease-in-out infinite',
+                      filter: `drop-shadow(0 3px 4px rgba(0,0,0,0.35))`,
+                    }}
+                  >
+                    {/* Glow ring behind icon */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '50%', left: '50%',
+                      width: size + 12, height: size + 12,
+                      transform: 'translate(-50%, -50%)',
+                      borderRadius: '50%',
+                      background: `radial-gradient(circle, ${glowColor} 0%, transparent 70%)`,
+                      animation: 'spawn-glow-pulse 2s ease-in-out infinite',
+                      pointerEvents: 'none',
+                    }} />
+                    <img
+                      src={iconSrc}
+                      alt={s.item_type}
+                      style={{
+                        width: size, height: size, objectFit: 'contain',
+                        position: 'relative', zIndex: 1,
+                      }}
+                    />
+                  </div>
+                </CustomOverlayMap>
+              );
+            }
+            // Fallback for items without custom icons
+            const dotSize = s.inRange ? 20 : 14;
             return (
               <MapMarker
                 key={s.id}
                 position={{ lat: s.lat, lng: s.lng }}
                 image={{
                   src: spawnMarkerImage(s.rarity, s.inRange),
-                  size: { width: size, height: size },
-                  options: { offset: { x: size / 2, y: size / 2 } },
+                  size: { width: dotSize, height: dotSize },
+                  options: { offset: { x: dotSize / 2, y: dotSize / 2 } },
                 }}
                 title={`${ITEM_ICONS[s.item_type] || '✨'} ${s.item_type} (${Math.round(s.distance)}m)`}
                 onClick={() => { if (s.inRange) setSelectedSpawn(s); }}
@@ -358,7 +417,11 @@ export default function WorldMap() {
                 <X size={14} />
               </button>
               <div className="flex items-center gap-3 mb-3">
-                <span className="text-3xl">{ITEM_ICONS[selectedSpawn.item_type] || '✨'}</span>
+                {TREASURE_ICON_MAP[selectedSpawn.item_type] ? (
+                  <img src={TREASURE_ICON_MAP[selectedSpawn.item_type]} alt={selectedSpawn.item_type} className="w-10 h-10 object-contain" />
+                ) : (
+                  <span className="text-3xl">{ITEM_ICONS[selectedSpawn.item_type] || '✨'}</span>
+                )}
                 <div>
                   <div className="font-bold text-foreground capitalize">{selectedSpawn.item_type}</div>
                   <div className="text-xs capitalize" style={{ color: RARITY_COLORS[selectedSpawn.rarity] }}>
