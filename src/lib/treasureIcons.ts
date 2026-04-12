@@ -14,11 +14,18 @@ export const TREASURE_ICON_MAP: Record<string, string> = {
   gold: goldImg,
   silver: silverImg,
   ruby: rubyImg,
-  sapphire: topazImg, // topaz used for sapphire variant
+  sapphire: topazImg,
   topaz: topazImg,
   emerald: emeraldImg,
   key: keyImg,
   chest: chestImg,
+  // World-map additional types mapped to closest icon
+  amethyst: rubyImg,
+  opal: diamondImg,
+  pearl: silverImg,
+  copper: goldImg,
+  tin: silverImg,
+  alloy: silverImg,
 };
 
 export const CHALLENGE_ICON_MAP: Record<string, string> = {
