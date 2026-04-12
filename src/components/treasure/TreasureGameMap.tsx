@@ -14,6 +14,7 @@ import { Ping } from '@/components/tag-game/PingOverlay';
 import PingOverlay from '@/components/tag-game/PingOverlay';
 import { Button } from '@/components/ui/button';
 import { Radio } from 'lucide-react';
+import AddressSearchBar from './AddressSearchBar';
 import { TagMessage } from '@/hooks/useTagRoom';
 import { playPingSound } from '@/lib/pingSound';
 import { supabase } from '@/integrations/supabase/client';
@@ -262,6 +263,11 @@ export default function TreasureGameMap({
             방 코드: {room.room_code}
           </span>
           {hasKey && <span className="text-xs bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 rounded-full">🔑 열쇠 보유</span>}
+          <AddressSearchBar onSelect={(lat, lng) => {
+            if (mapRef.current) {
+              mapRef.current.panTo(new kakao.maps.LatLng(lat, lng));
+            }
+          }} />
         </div>
         <div className="flex items-center justify-between px-3 py-2">
           <TreasureHUD
