@@ -417,7 +417,11 @@ export default function WorldMap() {
                 <X size={14} />
               </button>
               <div className="flex items-center gap-3 mb-3">
-                <span className="text-3xl">{ITEM_ICONS[selectedSpawn.item_type] || '✨'}</span>
+                {TREASURE_ICON_MAP[selectedSpawn.item_type] ? (
+                  <img src={TREASURE_ICON_MAP[selectedSpawn.item_type]} alt={selectedSpawn.item_type} className="w-10 h-10 object-contain" />
+                ) : (
+                  <span className="text-3xl">{ITEM_ICONS[selectedSpawn.item_type] || '✨'}</span>
+                )}
                 <div>
                   <div className="font-bold text-foreground capitalize">{selectedSpawn.item_type}</div>
                   <div className="text-xs capitalize" style={{ color: RARITY_COLORS[selectedSpawn.rarity] }}>
