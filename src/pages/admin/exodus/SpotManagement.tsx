@@ -60,15 +60,15 @@ export default function SpotManagement() {
     const map = mapRef.current;
     if (!map || !isDrawing) return;
 
-    const listeners: any[] = [];
+    const handlers: { type: string; handler: any }[] = [];
 
-    listeners.push(kakao.maps.event.addListener(map, 'mousedown', (e: kakao.maps.event.MouseEvent) => {
+    const onMouseDown = (e: kakao.maps.event.MouseEvent) => {
       const latlng = e.latLng;
       drawStartRef.current = { lat: latlng.getLat(), lng: latlng.getLng() };
       map.setDraggable(false);
-    }));
+    };
 
-    listeners.push(kakao.maps.event.addListener(map, 'mousemove', (e: kakao.maps.event.MouseEvent) => {
+    const onMouseMove = (e: kakao.maps.event.MouseEvent) => {
       if (!drawStartRef.current) return;
       const latlng = e.latLng;
       const bounds = new kakao.maps.LatLngBounds(
@@ -93,9 +93,9 @@ export default function SpotManagement() {
         });
         drawRectRef.current.setMap(map);
       }
-    }));
+    };
 
-    listeners.push(kakao.maps.event.addListener(map, 'mouseup', (e: kakao.maps.event.MouseEvent) => {
+    const onMouseUp = (e: kakao.maps.event.MouseEvent) => {
       map.setDraggable(true);
       if (!drawStartRef.current) return;
       const latlng = e.latLng;
@@ -115,10 +115,16 @@ export default function SpotManagement() {
       setPendingBounds(bounds);
       setShowForm(true);
       setIsDrawing(false);
-    }));
+    };
+
+    kakao.maps.event.addListener(map, 'mousedown', onMouseDown);
+    kakao.maps.event.addListener(map, 'mousemove', onMouseMove);
+    kakao.maps.event.addListener(map, 'mouseup', onMouseUp);
 
     return () => {
-      listeners.forEach(l => kakao.maps.event.removeListener(l));
+      kakao.maps.event.removeListener(map, 'mousedown', onMouseDown);
+      kakao.maps.event.removeListener(map, 'mousemove', onMouseMove);
+      kakao.maps.event.removeListener(map, 'mouseup', onMouseUp);
     };
   }, [isDrawing]);
 
