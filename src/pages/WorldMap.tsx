@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { GoogleMap, Marker, Circle } from '@react-google-maps/api';
+import { Map, MapMarker, Circle, CustomOverlayMap } from 'react-kakao-maps-sdk';
 import { supabase } from '@/integrations/supabase/client';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,16 +15,9 @@ import { toast } from 'sonner';
 import CraftingDrawer from '@/components/world/CraftingDrawer';
 import { useDeviceHeading } from '@/hooks/useDeviceHeading';
 
-
 const COLLECT_RADIUS_M = 20;
 const FETCH_RADIUS_M = 500;
 const REFETCH_INTERVAL = 10_000;
-
-const containerStyle = { height: '100%', width: '100%' };
-
-const userDotIcon = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="8" fill="#22c55e" stroke="white" stroke-width="3"/></svg>`)}`;
-
-const userArrowIcon = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><defs><filter id="s" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.3"/></filter></defs><g filter="url(#s)"><polygon points="24,6 34,38 24,32 14,38" fill="#4ade80" stroke="white" stroke-width="2" stroke-linejoin="round"/></g></svg>`)}`;
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#9ca3af',
@@ -40,7 +33,7 @@ const ITEM_ICONS: Record<string, string> = {
   opal: '🤍', amethyst: '💜', topaz: '🧡', pearl: '🫧', tin: '🪨',
 };
 
-function spawnIconUrl(rarity: string, inRange: boolean) {
+function spawnMarkerImage(rarity: string, inRange: boolean) {
   const color = RARITY_COLORS[rarity] || '#9ca3af';
   const ring = inRange ? 'white' : '#1f2937';
   const size = inRange ? 20 : 14;
@@ -69,7 +62,6 @@ export default function WorldMap() {
   const [collecting, setCollecting] = useState(false);
   const [showCrafting, setShowCrafting] = useState(false);
   const [compassActive, setCompassActive] = useState(false);
-  const mapRef = useRef<google.maps.Map | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return !localStorage.getItem('world_onboarding_done');
   });
@@ -85,7 +77,6 @@ export default function WorldMap() {
 
   useEffect(() => {
     if (!compassActive || heading === null) {
-      // Reset when compass is off
       accumulatedAngle.current = 0;
       smoothedAngle.current = 0;
       prevHeading.current = null;
@@ -94,7 +85,6 @@ export default function WorldMap() {
       return;
     }
 
-    // Calculate shortest-path diff and accumulate
     if (prevHeading.current === null) {
       accumulatedAngle.current = -heading;
       smoothedAngle.current = -heading;
@@ -102,12 +92,11 @@ export default function WorldMap() {
       let diff = heading - prevHeading.current;
       if (diff > 180) diff -= 360;
       if (diff < -180) diff += 360;
-      accumulatedAngle.current -= diff; // target rotation (negative heading)
+      accumulatedAngle.current -= diff;
     }
     prevHeading.current = heading;
 
-    // LERP animation loop
-    const SMOOTHING = 0.12; // lower = smoother/heavier
+    const SMOOTHING = 0.12;
     const animate = () => {
       const delta = accumulatedAngle.current - smoothedAngle.current;
       if (Math.abs(delta) < 0.05) {
@@ -146,7 +135,6 @@ export default function WorldMap() {
     refetchInterval: REFETCH_INTERVAL,
   });
 
-  // Fetch user stats
   const { data: userStats } = useQuery({
     queryKey: ['user_stats', user?.id],
     queryFn: async () => {
@@ -157,7 +145,6 @@ export default function WorldMap() {
     enabled: !!user,
   });
 
-  // Fetch inventory count
   const { data: inventoryItems = [] } = useQuery({
     queryKey: ['user_inventory', user?.id],
     queryFn: async () => {
@@ -168,9 +155,7 @@ export default function WorldMap() {
     enabled: !!user,
   });
 
-  // Enrich spawns with distance
   const spawns: SpawnWithDist[] = rawSpawns.map((s: any) => {
-    // location comes as GeoJSON or WKT; parse lng/lat
     let lat = 0, lng = 0;
     if (s.location) {
       if (typeof s.location === 'object' && s.location.coordinates) {
@@ -186,7 +171,6 @@ export default function WorldMap() {
 
   const nearbyCount = spawns.filter(s => s.inRange).length;
 
-  // Auto-deselect if moved out of range
   useEffect(() => {
     if (selectedSpawn) {
       const updated = spawns.find(s => s.id === selectedSpawn.id);
@@ -200,35 +184,19 @@ export default function WorldMap() {
     if (!selectedSpawn || !user || collecting) return;
     setCollecting(true);
     try {
-      // Mark spawn as collected
       await supabase.from('global_spawns').update({
         last_collected_by: user.id,
         last_collected_at: new Date().toISOString(),
       }).eq('id', selectedSpawn.id);
 
-      // Add to inventory
-      // Check if user already has this item type
-      const existing = inventoryItems.find(i => i.item_name === selectedSpawn.item_type && i.item_type === 'material');
-      if (existing) {
-        // Can't update via RLS, insert new row instead
-        await supabase.from('user_inventory').insert({
-          user_id: user.id,
-          item_name: selectedSpawn.item_type,
-          item_icon: selectedSpawn.item_icon,
-          item_type: 'material',
-          quantity: 1,
-        });
-      } else {
-        await supabase.from('user_inventory').insert({
-          user_id: user.id,
-          item_name: selectedSpawn.item_type,
-          item_icon: selectedSpawn.item_icon,
-          item_type: 'material',
-          quantity: 1,
-        });
-      }
+      await supabase.from('user_inventory').insert({
+        user_id: user.id,
+        item_name: selectedSpawn.item_type,
+        item_icon: selectedSpawn.item_icon,
+        item_type: 'material',
+        quantity: 1,
+      });
 
-      // Award XP
       if (userStats) {
         const xpGain = selectedSpawn.rarity === 'legendary' ? 25 : selectedSpawn.rarity === 'epic' ? 15 : selectedSpawn.rarity === 'rare' ? 10 : selectedSpawn.rarity === 'uncommon' ? 5 : 3;
         await supabase.from('user_stats').update({
@@ -252,9 +220,11 @@ export default function WorldMap() {
 
   const totalMaterials = inventoryItems.filter(i => i.item_type === 'material').reduce((sum, i) => sum + (i.quantity || 1), 0);
 
+  const center = { lat: position.latitude, lng: position.longitude };
+
   return (
     <div className="h-screen w-screen relative overflow-hidden bg-background">
-      {/* Google Map - rotated via CSS when compass active */}
+      {/* Kakao Map - rotated via CSS when compass active */}
       <div
         style={{
           position: 'absolute',
@@ -265,73 +235,79 @@ export default function WorldMap() {
           transform: `translate(-50%, -50%) rotate(${mapRotation}deg)`,
         }}
       >
-        <GoogleMap
-          mapContainerStyle={containerStyle}
-          center={{ lat: position.latitude, lng: position.longitude }}
-          zoom={18}
-          options={{
-            zoomControl: false, mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
-            gestureHandling: compassActive ? 'none' : 'auto',
-            styles: [
-              { elementType: 'geometry', stylers: [{ color: '#1a1a2e' }] },
-              { elementType: 'labels.text.stroke', stylers: [{ color: '#1a1a2e' }] },
-              { elementType: 'labels.text.fill', stylers: [{ color: '#8892b0' }] },
-              { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2d2d44' }] },
-              { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f0f23' }] },
-              { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-            ],
-          }}
-          onLoad={(map) => { mapRef.current = map; }}
+        <Map
+          center={center}
+          style={{ width: '100%', height: '100%' }}
+          level={2}
+          draggable={!compassActive}
+          zoomable={!compassActive}
         >
-          {/* User marker - arrow when compass active, dot otherwise */}
-          <Marker
-            position={{ lat: position.latitude, lng: position.longitude }}
-            icon={compassActive && heading !== null
-              ? {
-                  path: 'M 0,-16 L 12,16 L 0,10 L -12,16 Z',
-                  fillColor: '#4ade80',
-                  fillOpacity: 1,
-                  strokeColor: 'white',
-                  strokeWeight: 2,
-                  scale: 1.2,
-                  rotation: heading,
-                  anchor: new google.maps.Point(0, 0),
-                }
-              : { url: userDotIcon, scaledSize: new google.maps.Size(24, 24), anchor: new google.maps.Point(12, 12) }
-            }
-          />
-          {/* User radius */}
+          {/* User radius circles */}
           <Circle
-            center={{ lat: position.latitude, lng: position.longitude }}
+            center={center}
             radius={COLLECT_RADIUS_M}
-            options={{ strokeColor: '#22c55e', fillColor: '#22c55e', fillOpacity: 0.08, strokeWeight: 1, strokeOpacity: 0.4 }}
+            strokeWeight={1}
+            strokeColor="#22c55e"
+            strokeOpacity={0.4}
+            fillColor="#22c55e"
+            fillOpacity={0.08}
           />
           <Circle
-            center={{ lat: position.latitude, lng: position.longitude }}
+            center={center}
             radius={FETCH_RADIUS_M}
-            options={{ strokeColor: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.03, strokeWeight: 0.5, strokeOpacity: 0.2 }}
+            strokeWeight={0.5}
+            strokeColor="#3b82f6"
+            strokeOpacity={0.2}
+            fillColor="#3b82f6"
+            fillOpacity={0.03}
           />
-          {/* Spawn markers */}
-          {spawns.map(s => (
-            <Marker
-              key={s.id}
-              position={{ lat: s.lat, lng: s.lng }}
-              icon={{
-                url: spawnIconUrl(s.rarity, s.inRange),
-                scaledSize: new google.maps.Size(s.inRange ? 20 : 14, s.inRange ? 20 : 14),
-                anchor: new google.maps.Point(s.inRange ? 10 : 7, s.inRange ? 10 : 7),
-              }}
-              title={`${ITEM_ICONS[s.item_type] || '✨'} ${s.item_type} (${Math.round(s.distance)}m)`}
-              onClick={() => { if (s.inRange) setSelectedSpawn(s); }}
-            />
-          ))}
 
-        </GoogleMap>
+          {/* User marker - arrow when compass, dot otherwise */}
+          <CustomOverlayMap position={center} zIndex={10}>
+            {compassActive && heading !== null ? (
+              <div style={{ transform: `rotate(${heading}deg)`, transformOrigin: 'center center' }}>
+                <svg width="48" height="48" viewBox="0 0 48 48">
+                  <defs>
+                    <filter id="s" x="-20%" y="-20%" width="140%" height="140%">
+                      <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#000" floodOpacity="0.3"/>
+                    </filter>
+                  </defs>
+                  <g filter="url(#s)">
+                    <polygon points="24,6 34,38 24,32 14,38" fill="#4ade80" stroke="white" strokeWidth="2" strokeLinejoin="round"/>
+                  </g>
+                </svg>
+              </div>
+            ) : (
+              <div style={{
+                width: 24, height: 24, borderRadius: '50%',
+                backgroundColor: '#22c55e', border: '3px solid white',
+                transform: 'translate(-50%, -50%)',
+              }} />
+            )}
+          </CustomOverlayMap>
+
+          {/* Spawn markers */}
+          {spawns.map(s => {
+            const size = s.inRange ? 20 : 14;
+            return (
+              <MapMarker
+                key={s.id}
+                position={{ lat: s.lat, lng: s.lng }}
+                image={{
+                  src: spawnMarkerImage(s.rarity, s.inRange),
+                  size: { width: size, height: size },
+                  options: { offset: { x: size / 2, y: size / 2 } },
+                }}
+                title={`${ITEM_ICONS[s.item_type] || '✨'} ${s.item_type} (${Math.round(s.distance)}m)`}
+                onClick={() => { if (s.inRange) setSelectedSpawn(s); }}
+              />
+            );
+          })}
+        </Map>
       </div>
 
       {/* ===== TOP-LEFT HUD ===== */}
       <div className="fixed top-[calc(0.75rem+env(safe-area-inset-top))] left-4 z-[1000] flex flex-col gap-2">
-        {/* Back + coords */}
         <div className="flex items-center gap-2 bg-card/90 backdrop-blur rounded-full px-3 py-2 border border-border text-xs">
           <Link to="/" className="text-muted-foreground hover:text-foreground"><ArrowLeft size={14} /></Link>
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
@@ -344,7 +320,6 @@ export default function WorldMap() {
             </span>
           )}
         </div>
-        {/* Stats bar */}
         <div className="flex items-center gap-3 bg-card/90 backdrop-blur rounded-full px-3 py-2 border border-border text-xs">
           <span className="flex items-center gap-1 text-yellow-400">
             <Sparkles size={12} /> Lv.{userStats?.level ?? 1}
@@ -406,7 +381,6 @@ export default function WorldMap() {
 
       {/* ===== BOTTOM HUD ===== */}
       <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-0 right-0 z-[1000] flex flex-col items-center gap-3 pointer-events-none">
-        {/* Crafting button + Mock controls */}
         <div className="w-full flex items-end justify-between px-4 pointer-events-auto">
           <div className="flex items-center gap-2">
             <Button
@@ -461,10 +435,7 @@ export default function WorldMap() {
               localStorage.setItem('world_onboarding_done', '1');
             }}
           >
-            {/* Dark backdrop */}
             <div className="absolute inset-0 bg-black/70" />
-
-            {/* Top-left: Stats highlight */}
             <div className="absolute top-[calc(3.5rem+env(safe-area-inset-top))] left-4 z-10">
               <div className="rounded-full px-3 py-2 ring-2 ring-emerald-400/80 shadow-[0_0_20px_4px_rgba(34,197,94,0.35)]">
                 <div className="flex items-center gap-3 text-xs text-white">
@@ -477,8 +448,6 @@ export default function WorldMap() {
                 내 탐험 현황을 확인하세요
               </p>
             </div>
-
-            {/* Top-right: GPS Game button highlight */}
             <div className="absolute top-[calc(0.75rem+env(safe-area-inset-top))] right-4 z-10">
               <div className="rounded-full px-3 py-1.5 ring-2 ring-blue-400/80 shadow-[0_0_20px_4px_rgba(59,130,246,0.35)]">
                 <span className="text-xs font-bold text-white">🎮 GPS 게임</span>
@@ -487,8 +456,6 @@ export default function WorldMap() {
                 술래잡기 & 보물찾기
               </p>
             </div>
-
-            {/* Center: Map explanation */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 text-center max-w-[280px]">
               <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
@@ -505,8 +472,6 @@ export default function WorldMap() {
                 </div>
               </motion.div>
             </div>
-
-            {/* Bottom-left: Crafting button highlight */}
             <div className="absolute bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-4 z-10">
               <div className="h-12 w-12 rounded-full ring-2 ring-amber-400/80 shadow-[0_0_20px_4px_rgba(245,158,11,0.4)] flex items-center justify-center">
                 <Hammer size={22} className="text-amber-300" />
@@ -515,16 +480,12 @@ export default function WorldMap() {
                 세공 & 조합
               </p>
             </div>
-
-            {/* Green circle explanation */}
             <div className="absolute top-[calc(50%+80px)] left-1/2 -translate-x-1/2 z-10">
               <div className="w-16 h-16 rounded-full border-2 border-emerald-400/60 bg-emerald-400/10 mx-auto shadow-[0_0_15px_2px_rgba(34,197,94,0.3)]" />
               <p className="text-xs text-emerald-300 mt-1.5 text-center font-medium drop-shadow-lg">
                 수집 범위 (20m)
               </p>
             </div>
-
-            {/* Skip button */}
             <div className="absolute bottom-[calc(2rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-10">
               <button className="text-xs text-white/60 hover:text-white transition-colors px-4 py-2 rounded-full border border-white/20 backdrop-blur-sm">
                 화면을 탭하여 시작하기

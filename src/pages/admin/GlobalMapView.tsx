@@ -3,12 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { GoogleMap, Rectangle, Marker, InfoWindow } from '@react-google-maps/api';
+import { Map, Rectangle, MapMarker, CustomOverlayMap } from 'react-kakao-maps-sdk';
 
-const containerStyle = { width: '100%', height: '100%' };
 const center = { lat: 37.5665, lng: 126.978 };
 
-const missionIconUrl = (status: string) => {
+const missionMarkerImage = (status: string) => {
   const color = status === '승인완료' ? '26b34a' : status === '승인대기' ? 'e0952d' : status === '반려' ? 'dc3545' : '7b8da6';
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"><circle cx="7" cy="7" r="5" fill="#${color}" stroke="white" stroke-width="2"/></svg>`)}`;
 };
@@ -53,7 +52,7 @@ export default function GlobalMapView() {
     },
   });
 
-  const themeMap = new Map((themes || []).map(t => [t.id, t]));
+  const themeMap = new window.Map((themes || []).map(t => [t.id, t]));
 
   const handleSpotClick = useCallback((spot: any) => {
     if (spot.theme_id) {
@@ -77,48 +76,56 @@ export default function GlobalMapView() {
 
   return (
     <div className="h-[calc(100vh-3rem)]">
-      <GoogleMap mapContainerStyle={containerStyle} center={center} zoom={11}>
-        {/* Region rectangles */}
+      <Map center={center} style={{ width: '100%', height: '100%' }} level={8}>
         {(regions || []).map(r => (
           <Rectangle
             key={r.id}
-            bounds={{ north: r.bounds_north, south: r.bounds_south, east: r.bounds_east, west: r.bounds_west }}
-            options={{ strokeColor: 'hsl(150,80%,45%)', strokeWeight: 2, fillOpacity: 0.1, fillColor: 'hsl(150,80%,45%)', clickable: false }}
+            bounds={{
+              sw: { lat: r.bounds_south, lng: r.bounds_west },
+              ne: { lat: r.bounds_north, lng: r.bounds_east },
+            }}
+            strokeWeight={2}
+            strokeColor="hsl(150,80%,45%)"
+            fillColor="hsl(150,80%,45%)"
+            fillOpacity={0.1}
           />
         ))}
 
-        {/* Mission markers */}
         {(missions || []).map(m => (
-          <Marker
+          <MapMarker
             key={m.id}
             position={{ lat: m.latitude, lng: m.longitude }}
-            icon={{ url: missionIconUrl(m.status), scaledSize: new google.maps.Size(14, 14), anchor: new google.maps.Point(7, 7) }}
+            image={{ src: missionMarkerImage(m.status), size: { width: 14, height: 14 }, options: { offset: { x: 7, y: 7 } } }}
             title={`${m.title} (${m.status})`}
           />
         ))}
 
-        {/* Spot rectangles */}
         {(spots || []).filter(s => s.bounds_north != null).map(spot => {
           const theme = spot.theme_id ? themeMap.get(spot.theme_id) : null;
           const color = theme?.color_primary || '#7b8da6';
           return (
             <Rectangle
               key={spot.id}
-              bounds={{ north: spot.bounds_north!, south: spot.bounds_south!, east: spot.bounds_east!, west: spot.bounds_west! }}
-              options={{ strokeColor: color, strokeWeight: 2, fillOpacity: 0.2, fillColor: color, clickable: true }}
+              bounds={{
+                sw: { lat: spot.bounds_south!, lng: spot.bounds_west! },
+                ne: { lat: spot.bounds_north!, lng: spot.bounds_east! },
+              }}
+              strokeWeight={2}
+              strokeColor={color}
+              fillColor={color}
+              fillOpacity={0.2}
               onClick={() => handleSpotClick(spot)}
             />
           );
         })}
 
-        {/* Theme picker InfoWindow */}
         {infoSpot && (
-          <InfoWindow
-            position={{ lat: infoSpot.latitude, lng: infoSpot.longitude }}
-            onCloseClick={() => setInfoSpot(null)}
-          >
-            <div style={{ minWidth: 200 }}>
-              <strong style={{ fontSize: 14 }}>{infoSpot.name}</strong>
+          <CustomOverlayMap position={{ lat: infoSpot.latitude, lng: infoSpot.longitude }} zIndex={50}>
+            <div style={{ minWidth: 200, background: 'white', borderRadius: 8, padding: 12, boxShadow: '0 2px 10px rgba(0,0,0,0.2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <strong style={{ fontSize: 14 }}>{infoSpot.name}</strong>
+                <button onClick={() => setInfoSpot(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 }}>✕</button>
+              </div>
               <p style={{ color: '#888', fontSize: 12, margin: '4px 0 8px' }}>테마를 선택해주세요</p>
               <select
                 value={selectedThemeId}
@@ -137,9 +144,9 @@ export default function GlobalMapView() {
                 설정 후 관리 페이지로 이동
               </button>
             </div>
-          </InfoWindow>
+          </CustomOverlayMap>
         )}
-      </GoogleMap>
+      </Map>
     </div>
   );
 }

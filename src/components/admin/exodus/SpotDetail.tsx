@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
 import { ArrowLeft, Package, Puzzle, BookOpen, Sparkles } from 'lucide-react';
-import { GoogleMap, Rectangle, Marker } from '@react-google-maps/api';
+import { Map, Rectangle, MapMarker } from 'react-kakao-maps-sdk';
 
 interface Spot {
   id: string; name: string; description: string | null;
@@ -22,10 +22,9 @@ interface Props { spot: Spot; onBack: () => void; isMainAdmin: boolean; userId: 
 
 const elementTypeIcons: Record<string, typeof Package> = { item: Package, quiz: Puzzle, puzzle: Puzzle, story: BookOpen };
 const elementTypeLabels: Record<string, string> = { item: '아이템', quiz: '퀴즈', puzzle: '퍼즐', story: '스토리' };
-const containerStyle = { width: '100%', height: '100%' };
 
 export default function SpotDetail({ spot, onBack, isMainAdmin, userId }: Props) {
-  const mapRef = useRef<google.maps.Map | null>(null);
+  const mapRef = useRef<kakao.maps.Map | null>(null);
   const [themes, setThemes] = useState<Theme[]>([]);
   const [selectedThemeId, setSelectedThemeId] = useState<string | null>(spot.theme_id);
   const [themeElements, setThemeElements] = useState<ThemeElement[]>([]);
@@ -56,10 +55,10 @@ export default function SpotDetail({ spot, onBack, isMainAdmin, userId }: Props)
     await supabase.from('spots').update({ theme_id: themeId }).eq('id', spot.id);
   };
 
-  const handleMapClick = useCallback(async (e: google.maps.MapMouseEvent) => {
-    if (!placingElement || !e.latLng) return;
-    const lat = e.latLng.lat();
-    const lng = e.latLng.lng();
+  const handleMapClick = useCallback((_map: kakao.maps.Map, e: kakao.maps.event.MouseEvent) => {
+    if (!placingElement) return;
+    const lat = e.latLng.getLat();
+    const lng = e.latLng.getLng();
 
     if (spot.bounds_north != null) {
       if (lat > spot.bounds_north || lat < spot.bounds_south! || lng > spot.bounds_east! || lng < spot.bounds_west!) {
@@ -69,37 +68,14 @@ export default function SpotDetail({ spot, onBack, isMainAdmin, userId }: Props)
     }
 
     setLoading(true);
-    const { error } = await supabase.from('spot_elements').insert({
+    supabase.from('spot_elements').insert({
       spot_id: spot.id, theme_element_id: placingElement.id, latitude: lat, longitude: lng, creator_id: userId,
+    }).then(({ error }) => {
+      setLoading(false);
+      if (error) { toast({ title: '배치 실패', description: error.message, variant: 'destructive' }); }
+      else { toast({ title: `"${placingElement.title}" 배치 완료` }); setPlacingElement(null); fetchSpotElements(); }
     });
-    setLoading(false);
-
-    if (error) { toast({ title: '배치 실패', description: error.message, variant: 'destructive' }); }
-    else { toast({ title: `"${placingElement.title}" 배치 완료` }); setPlacingElement(null); fetchSpotElements(); }
   }, [placingElement, spot, userId, fetchSpotElements]);
-
-  const handleMarkerDragEnd = useCallback(async (se: SpotElement, e: google.maps.MapMouseEvent) => {
-    if (!e.latLng) return;
-    const lat = e.latLng.lat();
-    const lng = e.latLng.lng();
-
-    if (spot.bounds_north != null) {
-      if (lat > spot.bounds_north || lat < spot.bounds_south! || lng > spot.bounds_east! || lng < spot.bounds_west!) {
-        toast({ title: '스팟 경계를 벗어났습니다', variant: 'destructive' });
-        fetchSpotElements(); // reset position
-        return;
-      }
-    }
-    await supabase.from('spot_elements').update({ latitude: lat, longitude: lng }).eq('id', se.id);
-    fetchSpotElements();
-  }, [spot, fetchSpotElements]);
-
-  const handleMarkerRightClick = useCallback(async (se: SpotElement) => {
-    const te = themeElements.find(t => t.id === se.theme_element_id);
-    if (!confirm(`"${te?.title || '요소'}" 요소를 제거하시겠습니까?`)) return;
-    await supabase.from('spot_elements').delete().eq('id', se.id);
-    fetchSpotElements();
-  }, [themeElements, fetchSpotElements]);
 
   const makeMarkerIcon = (te: ThemeElement | undefined) => {
     const typeLabel = te ? (elementTypeLabels[te.element_type] || te.element_type) : '';
@@ -125,38 +101,54 @@ export default function SpotDetail({ spot, onBack, isMainAdmin, userId }: Props)
 
       <div className="flex flex-1 min-h-0">
         <div className="flex-1 relative">
-          <GoogleMap
-            mapContainerStyle={{ ...containerStyle, cursor: placingElement ? 'crosshair' : 'grab' }}
+          <Map
             center={{ lat: spot.latitude, lng: spot.longitude }}
-            zoom={17}
-            onLoad={map => {
+            style={{ width: '100%', height: '100%', cursor: placingElement ? 'crosshair' : 'grab' }}
+            level={3}
+            onCreate={map => {
               mapRef.current = map;
               if (spot.bounds_north != null) {
-                map.fitBounds({ north: spot.bounds_north, south: spot.bounds_south!, east: spot.bounds_east!, west: spot.bounds_west! }, 30);
+                const bounds = new kakao.maps.LatLngBounds(
+                  new kakao.maps.LatLng(spot.bounds_south!, spot.bounds_west!),
+                  new kakao.maps.LatLng(spot.bounds_north, spot.bounds_east!)
+                );
+                map.setBounds(bounds);
               }
             }}
             onClick={handleMapClick}
           >
             {spot.bounds_north != null && (
               <Rectangle
-                bounds={{ north: spot.bounds_north, south: spot.bounds_south!, east: spot.bounds_east!, west: spot.bounds_west! }}
-                options={{ strokeColor: '#d4a843', strokeWeight: 2, fillOpacity: 0.1, fillColor: '#d4a843', clickable: false }}
+                bounds={{
+                  sw: { lat: spot.bounds_south!, lng: spot.bounds_west! },
+                  ne: { lat: spot.bounds_north, lng: spot.bounds_east! },
+                }}
+                strokeWeight={2}
+                strokeColor="#d4a843"
+                fillColor="#d4a843"
+                fillOpacity={0.1}
               />
             )}
             {spotElements.map(se => {
               const te = themeElements.find(t => t.id === se.theme_element_id);
               return (
-                <Marker
+                <MapMarker
                   key={se.id}
                   position={{ lat: se.latitude, lng: se.longitude }}
-                  draggable
-                  icon={{ url: makeMarkerIcon(te), scaledSize: new google.maps.Size(120, 28), anchor: new google.maps.Point(60, 14) }}
-                  onDragEnd={e => handleMarkerDragEnd(se, e)}
-                  onRightClick={() => handleMarkerRightClick(se)}
+                  image={{
+                    src: makeMarkerIcon(te),
+                    size: { width: 120, height: 28 },
+                    options: { offset: { x: 60, y: 14 } },
+                  }}
+                  onClick={() => {
+                    if (confirm(`"${te?.title || '요소'}" 요소를 제거하시겠습니까?`)) {
+                      supabase.from('spot_elements').delete().eq('id', se.id).then(() => fetchSpotElements());
+                    }
+                  }}
                 />
               );
             })}
-          </GoogleMap>
+          </Map>
 
           {placingElement && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-accent text-accent-foreground px-4 py-2 rounded-lg text-sm font-semibold shadow-lg z-10 flex items-center gap-2">
@@ -231,7 +223,7 @@ export default function SpotDetail({ spot, onBack, isMainAdmin, userId }: Props)
                 })}
               </div>
             )}
-            <p className="text-[11px] text-muted-foreground mt-3">💡 마커를 드래그하여 위치 변경, 우클릭으로 제거</p>
+            <p className="text-[11px] text-muted-foreground mt-3">💡 마커를 클릭하여 제거</p>
           </div>
         </div>
       </div>

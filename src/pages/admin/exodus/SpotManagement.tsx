@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
 import { Plus, Trash2, MapPin, Palette } from 'lucide-react';
-import { GoogleMap, Rectangle } from '@react-google-maps/api';
+import { Map, Rectangle } from 'react-kakao-maps-sdk';
 import SpotDetail from '@/components/admin/exodus/SpotDetail';
 
 interface Spot {
@@ -19,13 +19,12 @@ interface Spot {
   is_active: boolean; latitude: number; longitude: number;
 }
 
-const containerStyle = { width: '100%', height: '100%' };
 const defaultCenter = { lat: 37.5665, lng: 126.978 };
 
 export default function SpotManagement() {
   const { user, isMainAdmin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const mapRef = useRef<google.maps.Map | null>(null);
+  const mapRef = useRef<kakao.maps.Map | null>(null);
 
   const [spots, setSpots] = useState<Spot[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -37,8 +36,8 @@ export default function SpotManagement() {
   const [loading, setLoading] = useState(false);
 
   // Drawing state
-  const drawStartRef = useRef<google.maps.LatLng | null>(null);
-  const drawRectRef = useRef<google.maps.Rectangle | null>(null);
+  const drawStartRef = useRef<{ lat: number; lng: number } | null>(null);
+  const drawRectRef = useRef<kakao.maps.Rectangle | null>(null);
 
   const fetchSpots = useCallback(async () => {
     const { data, error } = await supabase.from('spots').select('*');
@@ -48,7 +47,6 @@ export default function SpotManagement() {
 
   useEffect(() => { fetchSpots(); }, [fetchSpots]);
 
-  // Auto-select spot from URL
   useEffect(() => {
     const spotId = searchParams.get('spotId');
     if (spotId && spots.length > 0 && !selectedSpot) {
@@ -57,48 +55,55 @@ export default function SpotManagement() {
     }
   }, [spots, searchParams, selectedSpot, setSearchParams]);
 
-  // Drawing handlers
+  // Drawing handlers using kakao.maps events
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !isDrawing) return;
 
-    const mouseDownListener = map.addListener('mousedown', (e: google.maps.MapMouseEvent) => {
-      if (!e.latLng) return;
-      drawStartRef.current = e.latLng;
-      map.setOptions({ draggable: false });
-    });
+    const handlers: { type: string; handler: any }[] = [];
 
-    const mouseMoveListener = map.addListener('mousemove', (e: google.maps.MapMouseEvent) => {
-      if (!drawStartRef.current || !e.latLng) return;
-      const bounds = {
-        north: Math.max(drawStartRef.current.lat(), e.latLng.lat()),
-        south: Math.min(drawStartRef.current.lat(), e.latLng.lat()),
-        east: Math.max(drawStartRef.current.lng(), e.latLng.lng()),
-        west: Math.min(drawStartRef.current.lng(), e.latLng.lng()),
-      };
+    const onMouseDown = (e: kakao.maps.event.MouseEvent) => {
+      const latlng = e.latLng;
+      drawStartRef.current = { lat: latlng.getLat(), lng: latlng.getLng() };
+      map.setDraggable(false);
+    };
+
+    const onMouseMove = (e: kakao.maps.event.MouseEvent) => {
+      if (!drawStartRef.current) return;
+      const latlng = e.latLng;
+      const bounds = new kakao.maps.LatLngBounds(
+        new kakao.maps.LatLng(
+          Math.min(drawStartRef.current.lat, latlng.getLat()),
+          Math.min(drawStartRef.current.lng, latlng.getLng())
+        ),
+        new kakao.maps.LatLng(
+          Math.max(drawStartRef.current.lat, latlng.getLat()),
+          Math.max(drawStartRef.current.lng, latlng.getLng())
+        )
+      );
       if (drawRectRef.current) {
         drawRectRef.current.setBounds(bounds);
       } else {
-        drawRectRef.current = new google.maps.Rectangle({
+        drawRectRef.current = new kakao.maps.Rectangle({
           bounds,
-          map,
-          strokeColor: '#d4a843',
           strokeWeight: 2,
-          fillOpacity: 0.25,
+          strokeColor: '#d4a843',
           fillColor: '#d4a843',
-          clickable: false,
+          fillOpacity: 0.25,
         });
+        drawRectRef.current.setMap(map);
       }
-    });
+    };
 
-    const mouseUpListener = map.addListener('mouseup', (e: google.maps.MapMouseEvent) => {
-      map.setOptions({ draggable: true });
-      if (!drawStartRef.current || !e.latLng) return;
+    const onMouseUp = (e: kakao.maps.event.MouseEvent) => {
+      map.setDraggable(true);
+      if (!drawStartRef.current) return;
+      const latlng = e.latLng;
       const bounds = {
-        north: Math.max(drawStartRef.current.lat(), e.latLng.lat()),
-        south: Math.min(drawStartRef.current.lat(), e.latLng.lat()),
-        east: Math.max(drawStartRef.current.lng(), e.latLng.lng()),
-        west: Math.min(drawStartRef.current.lng(), e.latLng.lng()),
+        north: Math.max(drawStartRef.current.lat, latlng.getLat()),
+        south: Math.min(drawStartRef.current.lat, latlng.getLat()),
+        east: Math.max(drawStartRef.current.lng, latlng.getLng()),
+        west: Math.min(drawStartRef.current.lng, latlng.getLng()),
       };
       drawStartRef.current = null;
 
@@ -110,12 +115,16 @@ export default function SpotManagement() {
       setPendingBounds(bounds);
       setShowForm(true);
       setIsDrawing(false);
-    });
+    };
+
+    kakao.maps.event.addListener(map, 'mousedown', onMouseDown);
+    kakao.maps.event.addListener(map, 'mousemove', onMouseMove);
+    kakao.maps.event.addListener(map, 'mouseup', onMouseUp);
 
     return () => {
-      google.maps.event.removeListener(mouseDownListener);
-      google.maps.event.removeListener(mouseMoveListener);
-      google.maps.event.removeListener(mouseUpListener);
+      kakao.maps.event.removeListener(map, 'mousedown', onMouseDown);
+      kakao.maps.event.removeListener(map, 'mousemove', onMouseMove);
+      kakao.maps.event.removeListener(map, 'mouseup', onMouseUp);
     };
   }, [isDrawing]);
 
@@ -159,10 +168,14 @@ export default function SpotManagement() {
   const focusSpot = (spot: Spot) => {
     if (!mapRef.current) return;
     if (spot.bounds_north != null && spot.bounds_south != null && spot.bounds_east != null && spot.bounds_west != null) {
-      mapRef.current.fitBounds({ north: spot.bounds_north, south: spot.bounds_south, east: spot.bounds_east, west: spot.bounds_west }, 40);
+      const bounds = new kakao.maps.LatLngBounds(
+        new kakao.maps.LatLng(spot.bounds_south, spot.bounds_west),
+        new kakao.maps.LatLng(spot.bounds_north, spot.bounds_east)
+      );
+      mapRef.current.setBounds(bounds);
     } else {
-      mapRef.current.setCenter({ lat: spot.latitude, lng: spot.longitude });
-      mapRef.current.setZoom(17);
+      mapRef.current.setCenter(new kakao.maps.LatLng(spot.latitude, spot.longitude));
+      mapRef.current.setLevel(3);
     }
   };
 
@@ -190,24 +203,30 @@ export default function SpotManagement() {
 
       <div className="flex flex-1 min-h-0">
         <div className="flex-1 relative">
-          <GoogleMap
-            mapContainerStyle={{ ...containerStyle, cursor: isDrawing ? 'crosshair' : 'grab' }}
+          <Map
             center={defaultCenter}
-            zoom={13}
-            onLoad={map => { mapRef.current = map; }}
+            style={{ width: '100%', height: '100%', cursor: isDrawing ? 'crosshair' : 'grab' }}
+            level={9}
+            onCreate={map => { mapRef.current = map; }}
           >
             {spots.filter(s => s.bounds_north != null).map(spot => {
               const canEdit = isMainAdmin || spot.creator_id === user?.id;
               return (
                 <Rectangle
                   key={spot.id}
-                  bounds={{ north: spot.bounds_north!, south: spot.bounds_south!, east: spot.bounds_east!, west: spot.bounds_west! }}
-                  options={{ strokeColor: canEdit ? '#d4a843' : '#7b8da6', strokeWeight: 2, fillOpacity: 0.15, fillColor: canEdit ? '#d4a843' : '#7b8da6' }}
+                  bounds={{
+                    sw: { lat: spot.bounds_south!, lng: spot.bounds_west! },
+                    ne: { lat: spot.bounds_north!, lng: spot.bounds_east! },
+                  }}
+                  strokeWeight={2}
+                  strokeColor={canEdit ? '#d4a843' : '#7b8da6'}
+                  fillColor={canEdit ? '#d4a843' : '#7b8da6'}
+                  fillOpacity={0.15}
                   onClick={() => { if (canEdit) setSelectedSpot(spot); }}
                 />
               );
             })}
-          </GoogleMap>
+          </Map>
 
           {isDrawing && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-accent text-accent-foreground px-4 py-2 rounded-lg text-sm font-semibold shadow-lg z-10">
