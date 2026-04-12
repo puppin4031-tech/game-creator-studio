@@ -7,7 +7,7 @@ interface Props {
 
 export default function GoogleMapsProvider({ children }: Props) {
   const [loading, error] = useKakaoLoader({
-    appkey: '19011b5025994c098412aad00af53134',
+    appkey: 'dca9db976cffa9c5b926112d49058efd',
   });
 
   if (loading) {
