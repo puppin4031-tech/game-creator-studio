@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Trash2, MapPin, Image, HelpCircle, Puzzle, Navigation, Gem, Key, Package, X, Check, Map as MapIcon, Move } from 'lucide-react';
 import { TreasureItem } from '@/hooks/useTreasureHunt';
 import { QUIZ_PRESETS, TREASURE_PRESETS, SPECIAL_ITEMS } from '@/lib/quizPresets';
+import { getTreasureIconSrc } from '@/lib/treasureIcons';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Map, MapMarker } from 'react-kakao-maps-sdk';

@@ -1,7 +1,9 @@
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useCallback, useEffect, useState, useMemo } from 'react';
 import { Map, CustomOverlayMap } from 'react-kakao-maps-sdk';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
 import { useTreasureHunt, NearestTreasure } from '@/hooks/useTreasureHunt';
+import { haversineDistance } from '@/lib/haversine';
+import { getTreasureIconSrc } from '@/lib/treasureIcons';
 import ProximityGlow from './ProximityGlow';
 import TreasureQuizPopup from './TreasureQuizPopup';
 import TreasureHUD from './TreasureHUD';
@@ -29,10 +31,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-
-const SUBTYPE_ICONS: Record<string, string> = {
-  diamond: '💎', gold: '🥇', ruby: '❤️', sapphire: '💙', key: '🔑', chest: '📦',
-};
 
 interface Props {
   room: TagRoom;
@@ -64,6 +62,18 @@ export default function TreasureGameMap({
     treasures, nearest, proximityLevel, myFoundTreasures, cooldownLeft,
     hasKey, teamScores, attemptAnswer, claimTreasure, attemptChest,
   } = useTreasureHunt(room.id, currentPlayerId, position.latitude, position.longitude, players);
+
+  // Nearby unfound treasures within 100m for map display
+  const nearbyTreasures = useMemo(() => {
+    if (!position.latitude || !position.longitude) return [];
+    return treasures
+      .filter(t => !t.found_by)
+      .map(t => ({
+        ...t,
+        distance: haversineDistance(position.latitude, position.longitude, t.latitude, t.longitude),
+      }))
+      .filter(t => t.distance <= 100);
+  }, [treasures, position.latitude, position.longitude]);
 
   useEffect(() => {
     if (mapRef.current && position.latitude && position.longitude) {
@@ -132,8 +142,7 @@ export default function TreasureGameMap({
     const result = await claimTreasure(activeTreasure.id);
     setGemDialogOpen(false);
     if (result.success) {
-      const icon = activeTreasure.treasure_subtype ? SUBTYPE_ICONS[activeTreasure.treasure_subtype] || '💎' : '💎';
-      toast.success(`${icon} ${activeTreasure.keyword}을(를) 획득했습니다! (+${activeTreasure.points}점)`);
+      toast.success(`${activeTreasure.keyword}을(를) 획득했습니다! (+${activeTreasure.points}점)`);
     } else if (result.alreadyFound) {
       toast.error('이미 다른 플레이어가 획득했습니다!');
     }
@@ -163,6 +172,14 @@ export default function TreasureGameMap({
 
   return (
     <div className="h-screen w-screen relative text-[1.3em]">
+      {/* Floating animation keyframes */}
+      <style>{`
+        @keyframes treasure-float {
+          0%, 100% { transform: translate(-50%, -100%) translateY(0px); }
+          50% { transform: translate(-50%, -100%) translateY(-6px); }
+        }
+      `}</style>
+
       <Map
         center={center}
         style={{ width: '100%', height: '100%' }}
@@ -186,6 +203,22 @@ export default function TreasureGameMap({
               backgroundColor: '#94a3b8', border: '2px solid white', opacity: 0.8,
               transform: 'translate(-50%, -50%)',
             }} title={p.nickname} />
+          </CustomOverlayMap>
+        ))}
+
+        {/* Nearby treasure markers with floating animation */}
+        {nearbyTreasures.map(t => (
+          <CustomOverlayMap key={t.id} position={{ lat: t.latitude, lng: t.longitude }} zIndex={8}>
+            <div style={{
+              animation: 'treasure-float 2s ease-in-out infinite',
+              filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))',
+            }}>
+              <img
+                src={getTreasureIconSrc(t.challenge_type, t.treasure_subtype)}
+                alt={t.keyword}
+                style={{ width: 36, height: 36, objectFit: 'contain' }}
+              />
+            </div>
           </CustomOverlayMap>
         ))}
 
@@ -218,8 +251,12 @@ export default function TreasureGameMap({
       <AlertDialog open={gemDialogOpen} onOpenChange={setGemDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-center text-2xl">
-              {activeTreasure?.treasure_subtype ? SUBTYPE_ICONS[activeTreasure.treasure_subtype] || '💎' : '💎'}
+            <AlertDialogTitle className="text-center">
+              <img
+                src={getTreasureIconSrc('treasure', activeTreasure?.treasure_subtype || null)}
+                alt=""
+                className="w-16 h-16 mx-auto object-contain"
+              />
             </AlertDialogTitle>
             <AlertDialogDescription className="text-center">
               <strong>{activeTreasure?.keyword}</strong>을(를) 발견했습니다!
@@ -237,7 +274,14 @@ export default function TreasureGameMap({
       <AlertDialog open={chestDialogOpen} onOpenChange={setChestDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-center text-2xl">📦 보물상자</AlertDialogTitle>
+            <AlertDialogTitle className="text-center">
+              <img
+                src={getTreasureIconSrc('treasure', 'chest')}
+                alt="보물상자"
+                className="w-16 h-16 mx-auto object-contain"
+              />
+              <span className="block mt-1">보물상자</span>
+            </AlertDialogTitle>
             <AlertDialogDescription className="text-center">
               보물상자를 발견했습니다!
               <br />
