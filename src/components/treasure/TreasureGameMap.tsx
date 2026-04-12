@@ -14,6 +14,7 @@ import { Ping } from '@/components/tag-game/PingOverlay';
 import PingOverlay from '@/components/tag-game/PingOverlay';
 import { Button } from '@/components/ui/button';
 import { Radio } from 'lucide-react';
+import AddressSearchBar from './AddressSearchBar';
 import { TagMessage } from '@/hooks/useTagRoom';
 import { playPingSound } from '@/lib/pingSound';
 import { supabase } from '@/integrations/supabase/client';
