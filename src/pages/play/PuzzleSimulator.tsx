@@ -96,7 +96,7 @@ export default function PuzzleSimulator() {
           <div className="text-center space-y-3">
             <img src={selectedImage} alt="미리보기" className="w-48 h-48 object-cover rounded-xl mx-auto border-2 border-border shadow-md" />
             <Button onClick={() => { setKey(k => k + 1); setPlaying(true); }} className="w-full" size="lg">
-              🧩 퍼즐 시작 (30초)
+              🧩 퍼즐 시작 (60초)
             </Button>
           </div>
         </div>
@@ -107,7 +107,7 @@ export default function PuzzleSimulator() {
             imageUrl={selectedImage}
             gridSize={gridSize}
             onSolve={handleSolve}
-            timeLimit={30}
+            timeLimit={60}
             onTimeout={handleTimeout}
           />
           <div className="flex gap-2">

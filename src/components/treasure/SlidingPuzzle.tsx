@@ -95,25 +95,28 @@ export default function SlidingPuzzle({ imageUrl, gridSize, onSolve, timeLimit, 
 
   return (
     <div className="flex flex-col items-center gap-3">
-      {/* Timer bar */}
-      {timeLimit && !solved && (
-        <div className="w-full space-y-1">
+      {/* Header: thumbnail + timer + moves */}
+      <div className="w-full flex items-center gap-3">
+        <img
+          src={imageUrl}
+          alt="원본"
+          className="w-[60px] h-[60px] rounded-lg border-2 border-border object-cover flex-shrink-0"
+        />
+        <div className="flex-1 space-y-1">
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>⏱ {timeLeft}초</span>
+            <span>이동: <strong className="text-foreground">{moves}</strong></span>
             <span>{gridSize}×{gridSize}</span>
           </div>
-          <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-1000 ease-linear ${timerColor}`}
-              style={{ width: `${timerPercent}%` }}
-            />
-          </div>
+          {timeLimit && !solved && (
+            <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-1000 ease-linear ${timerColor}`}
+                style={{ width: `${timerPercent}%` }}
+              />
+            </div>
+          )}
         </div>
-      )}
-
-      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-        <span>이동: <strong className="text-foreground">{moves}</strong></span>
-        <span>{gridSize}×{gridSize}</span>
       </div>
 
       <div
@@ -155,10 +158,6 @@ export default function SlidingPuzzle({ imageUrl, gridSize, onSolve, timeLimit, 
         </div>
       )}
 
-      <details className="w-full">
-        <summary className="text-xs text-muted-foreground cursor-pointer text-center">원본 이미지 보기</summary>
-        <img src={imageUrl} alt="원본" className="mt-2 rounded-lg border w-full max-w-[200px] mx-auto" />
-      </details>
     </div>
   );
 }
