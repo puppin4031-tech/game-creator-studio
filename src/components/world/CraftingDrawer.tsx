@@ -247,7 +247,7 @@ export default function CraftingDrawer({ open, onOpenChange }: CraftingDrawerPro
                             enough ? 'border-green-500/50 text-green-400' : 'border-destructive/50 text-destructive'
                           }`}
                         >
-                          <span>{ITEM_ICONS[mat.item_type] || '📦'}</span>
+                          <img src={TREASURE_ICON_MAP[mat.item_type] || TREASURE_ICON_MAP['diamond']} alt="" className="w-4 h-4 object-contain" />
                           <span className="capitalize">{mat.item_type}</span>
                           <span className="font-mono">{have}/{mat.quantity}</span>
                           {enough ? <Check size={10} /> : <X size={10} />}
@@ -272,7 +272,7 @@ export default function CraftingDrawer({ open, onOpenChange }: CraftingDrawerPro
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                 {materials.map(([name, count]) => (
                   <div key={name} className="flex flex-col items-center gap-1 p-3 rounded-xl border border-border bg-card">
-                    <span className="text-3xl">{ITEM_ICONS[name] || '📦'}</span>
+                    <img src={TREASURE_ICON_MAP[name] || TREASURE_ICON_MAP['diamond']} alt={name} className="w-10 h-10 object-contain" />
                     <span className="text-xs font-medium capitalize text-foreground">{name}</span>
                     <span className="text-lg font-bold text-primary">×{count}</span>
                   </div>
