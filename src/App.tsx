@@ -30,6 +30,8 @@ import WorldMap from "./pages/WorldMap";
 import Lobby from "./pages/play/Lobby";
 import GameRoom from "./pages/play/GameRoom";
 import PuzzleSimulator from "./pages/play/PuzzleSimulator";
+import TagSimulator from "./pages/play/TagSimulator";
+import TreasureSimulator from "./pages/play/TreasureSimulator";
 
 const queryClient = new QueryClient();
 
@@ -83,6 +85,8 @@ const App = () => (
               <Route path="/play" element={<Lobby />} />
               <Route path="/play/:roomCode" element={<GameRoom />} />
               <Route path="/play/puzzle-sim" element={<PuzzleSimulator />} />
+              <Route path="/play/tag-sim" element={<TagSimulator />} />
+              <Route path="/play/treasure-sim" element={<TreasureSimulator />} />
               <Route path="/login" element={<Login />} />
               <Route
                 path="/admin/exodus"

@@ -301,6 +301,28 @@ export default function Lobby() {
           )}
         </CardContent>
       </Card>
+
+      {/* Simulators */}
+      <Card className="w-full max-w-md">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">🧪 시뮬레이터</CardTitle>
+          <p className="text-sm text-muted-foreground">DB 없이 게임 UI를 테스트합니다</p>
+        </CardHeader>
+        <CardContent className="grid grid-cols-3 gap-2">
+          <Button variant="outline" className="flex flex-col h-auto py-3 gap-1" onClick={() => navigate('/play/tag-sim')}>
+            <span className="text-xl">🏃</span>
+            <span className="text-xs">술래잡기</span>
+          </Button>
+          <Button variant="outline" className="flex flex-col h-auto py-3 gap-1" onClick={() => navigate('/play/treasure-sim')}>
+            <span className="text-xl">💎</span>
+            <span className="text-xs">보물찾기</span>
+          </Button>
+          <Button variant="outline" className="flex flex-col h-auto py-3 gap-1" onClick={() => navigate('/play/puzzle-sim')}>
+            <span className="text-xl">🧩</span>
+            <span className="text-xs">퍼즐</span>
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }
