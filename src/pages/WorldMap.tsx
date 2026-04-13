@@ -28,11 +28,7 @@ const RARITY_COLORS: Record<string, string> = {
   legendary: '#f59e0b',
 };
 
-const ITEM_ICONS: Record<string, string> = {
-  ruby: '❤️', sapphire: '💙', emerald: '💚', diamond: '💎',
-  gold: '🥇', silver: '🥈', copper: '🟤', alloy: '⚙️',
-  opal: '🤍', amethyst: '💜', topaz: '🧡', pearl: '🫧', tin: '🪨',
-};
+// ITEM_ICONS removed — use TREASURE_ICON_MAP from treasureIcons.ts
 
 const RARITY_GLOW: Record<string, string> = {
   common: 'rgba(156,163,175,0.4)',
@@ -213,8 +209,12 @@ export default function WorldMap() {
         }).eq('user_id', user.id);
       }
 
-      const icon = ITEM_ICONS[selectedSpawn.item_type] || '✨';
-      toast.success(`${icon} ${selectedSpawn.item_type} 획득!`, { duration: 2000 });
+      toast.success(`${selectedSpawn.item_type} 획득!`, {
+        duration: 2000,
+        icon: TREASURE_ICON_MAP[selectedSpawn.item_type]
+          ? <img src={TREASURE_ICON_MAP[selectedSpawn.item_type]} alt="" className="w-6 h-6 object-contain" />
+          : undefined,
+      });
 
       setSelectedSpawn(null);
       queryClient.invalidateQueries({ queryKey: ['global_spawns'] });
@@ -357,7 +357,7 @@ export default function WorldMap() {
                   size: { width: dotSize, height: dotSize },
                   options: { offset: { x: dotSize / 2, y: dotSize / 2 } },
                 }}
-                title={`${ITEM_ICONS[s.item_type] || '✨'} ${s.item_type} (${Math.round(s.distance)}m)`}
+                title={`${s.item_type} (${Math.round(s.distance)}m)`}
                 onClick={() => { if (s.inRange) setSelectedSpawn(s); }}
               />
             );
@@ -417,11 +417,7 @@ export default function WorldMap() {
                 <X size={14} />
               </button>
               <div className="flex items-center gap-3 mb-3">
-                {TREASURE_ICON_MAP[selectedSpawn.item_type] ? (
-                  <img src={TREASURE_ICON_MAP[selectedSpawn.item_type]} alt={selectedSpawn.item_type} className="w-10 h-10 object-contain" />
-                ) : (
-                  <span className="text-3xl">{ITEM_ICONS[selectedSpawn.item_type] || '✨'}</span>
-                )}
+                <img src={TREASURE_ICON_MAP[selectedSpawn.item_type] || TREASURE_ICON_MAP['diamond']} alt={selectedSpawn.item_type} className="w-10 h-10 object-contain" />
                 <div>
                   <div className="font-bold text-foreground capitalize">{selectedSpawn.item_type}</div>
                   <div className="text-xs capitalize" style={{ color: RARITY_COLORS[selectedSpawn.rarity] }}>

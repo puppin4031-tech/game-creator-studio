@@ -9,12 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sparkles, Package, Hammer, Lock, Check, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-
-const ITEM_ICONS: Record<string, string> = {
-  ruby: '❤️', sapphire: '💙', emerald: '💚', diamond: '💎',
-  gold: '🥇', silver: '🥈', copper: '🟤', alloy: '⚙️',
-  opal: '🤍', amethyst: '💜', topaz: '🧡', pearl: '🫧', tin: '🪨',
-};
+import { TREASURE_ICON_MAP } from '@/lib/treasureIcons';
 
 const RESULT_ICONS: Record<string, string> = {
   gem: '💍', sparkles: '✨', flower: '🌸', crown: '👑',

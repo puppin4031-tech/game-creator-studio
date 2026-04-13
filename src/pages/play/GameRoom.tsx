@@ -19,12 +19,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
 
-const SUBTYPE_ICONS: Record<string, string> = {
-  diamond: '💎', gold: '🥇', ruby: '❤️', sapphire: '💙', key: '🔑', chest: '📦',
-};
-const CHALLENGE_ICONS: Record<string, string> = {
-  quiz: '❓', puzzle: '🧩', treasure: '💎',
-};
+import { getTreasureIconSrc } from '@/lib/treasureIcons';
 
 function TreasureEndScreen({ roomId, players, room }: { roomId: string; players: TagPlayer[]; room: TagRoom }) {
   const { treasures, teamScores, teamWithKey } = useTreasureHunt(roomId, null, 0, 0, players);
@@ -42,9 +37,8 @@ function TreasureEndScreen({ roomId, players, room }: { roomId: string; players:
   const chestOpener = treasures.find(t => t.treasure_subtype === 'chest' && t.found_by);
   const chestOpenerTeam = chestOpener ? playerTeamMap.get(chestOpener.found_by!) : null;
 
-  const getIcon = (t: { treasure_subtype: string | null; challenge_type: string }) => {
-    if (t.treasure_subtype && SUBTYPE_ICONS[t.treasure_subtype]) return SUBTYPE_ICONS[t.treasure_subtype];
-    return CHALLENGE_ICONS[t.challenge_type] || '💎';
+  const getIconSrc = (t: { treasure_subtype: string | null; challenge_type: string }) => {
+    return getTreasureIconSrc(t.challenge_type, t.treasure_subtype);
   };
 
   const renderTeamItems = (items: typeof foundTreasures) => {
@@ -53,7 +47,7 @@ function TreasureEndScreen({ roomId, players, room }: { roomId: string; players:
       <div className="space-y-1 mt-2">
         {items.map(t => (
           <div key={t.id} className="flex items-center gap-2 text-sm bg-background/60 rounded px-2 py-1.5">
-            <span>{getIcon(t)}</span>
+            <img src={getIconSrc(t)} alt="" className="w-6 h-6 object-contain" />
             <span className="flex-1 truncate text-xs">{t.keyword}</span>
             <span className="text-xs text-muted-foreground">{playerNameMap.get(t.found_by!) || '?'}</span>
             <span className="text-xs font-bold text-primary">+{t.points}</span>
@@ -68,7 +62,10 @@ function TreasureEndScreen({ roomId, players, room }: { roomId: string; players:
       {/* Victory banner */}
       {chestOpenerTeam && (
         <div className="text-center bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-          <p className="text-2xl">📦🔑</p>
+          <div className="flex justify-center gap-2">
+            <img src={getTreasureIconSrc('treasure', 'chest')} alt="상자" className="w-8 h-8 object-contain" />
+            <img src={getTreasureIconSrc('treasure', 'key')} alt="열쇠" className="w-8 h-8 object-contain" />
+          </div>
           <p className="text-sm font-bold">
             {playerNameMap.get(chestOpener!.found_by!) || '?'}님이 보물상자를 열었습니다!
           </p>
@@ -84,7 +81,7 @@ function TreasureEndScreen({ roomId, players, room }: { roomId: string; players:
       {/* Key holder */}
       {teamWithKey && (
         <p className="text-xs text-center text-muted-foreground">
-          🔑 열쇠 보유: {teamWithKey === 1 ? room.team1_name : room.team2_name}
+          <img src={getTreasureIconSrc('treasure', 'key')} alt="열쇠" className="w-4 h-4 inline object-contain mr-1" />열쇠 보유: {teamWithKey === 1 ? room.team1_name : room.team2_name}
         </p>
       )}
 
