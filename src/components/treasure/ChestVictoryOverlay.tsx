@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { getTreasureIconSrc } from '@/lib/treasureIcons';
 
 interface Props {
   winnerTeam: string;
@@ -76,7 +77,7 @@ export default function ChestVictoryOverlay({ winnerTeam, onComplete }: Props) {
               filter: 'drop-shadow(0 0 40px rgba(234,179,8,0.8))',
             }}
           >
-            {phase === 'shake' ? '📦' : '🎁'}
+            <img src={getTreasureIconSrc('treasure', 'chest')} alt="보물상자" className="w-24 h-24 object-contain" />
           </div>
         )}
 

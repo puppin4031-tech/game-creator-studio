@@ -153,7 +153,9 @@ export default function TreasureGameMap({
     const result = await attemptChest(activeTreasure.id);
     setChestDialogOpen(false);
     if (result.noKey) {
-      toast.error('🔑 열쇠가 필요합니다! 먼저 열쇠를 찾으세요.');
+      toast.error('열쇠가 필요합니다! 먼저 열쇠를 찾으세요.', {
+        icon: <img src={getTreasureIconSrc('treasure', 'key')} alt="" className="w-5 h-5 object-contain" />,
+      });
     } else if (result.success) {
       setVictoryOverlay(true);
     } else if (result.alreadyFound) {
@@ -286,7 +288,10 @@ export default function TreasureGameMap({
               보물상자를 발견했습니다!
               <br />
               {hasKey ? (
-                <span className="text-emerald-600 font-bold">🔑 열쇠를 보유하고 있습니다. 상자를 여시겠습니까?</span>
+                <span className="text-emerald-600 font-bold flex items-center gap-1">
+                  <img src={getTreasureIconSrc('treasure', 'key')} alt="" className="w-4 h-4 object-contain inline" />
+                  열쇠를 보유하고 있습니다. 상자를 여시겠습니까?
+                </span>
               ) : (
                 <span className="text-destructive font-bold">🔒 열쇠가 없습니다. 먼저 열쇠를 찾아야 합니다!</span>
               )}
@@ -306,7 +311,11 @@ export default function TreasureGameMap({
           <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">
             방 코드: {room.room_code}
           </span>
-          {hasKey && <span className="text-xs bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 rounded-full">🔑 열쇠 보유</span>}
+          {hasKey && (
+            <span className="text-xs bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <img src={getTreasureIconSrc('treasure', 'key')} alt="" className="w-3.5 h-3.5 object-contain" /> 열쇠 보유
+            </span>
+          )}
           <AddressSearchBar onSelect={(lat, lng) => {
             if (mapRef.current) {
               mapRef.current.panTo(new kakao.maps.LatLng(lat, lng));

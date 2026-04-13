@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getTreasureIconSrc } from '@/lib/treasureIcons';
 import {
   Dialog,
   DialogContent,
@@ -84,7 +85,7 @@ export default function TreasureQuizPopup({ open, onOpenChange, treasure, onQuiz
 
         {result === 'correct' && (
           <div className="text-center space-y-3 py-4">
-            <div className="text-5xl animate-treasure-float">💎</div>
+            <img src={getTreasureIconSrc(treasure.challenge_type, treasure.treasure_subtype)} alt="" className="w-16 h-16 mx-auto object-contain animate-treasure-float" />
             <p className="text-lg font-bold">키워드 발견!</p>
             <p className="text-2xl font-mono font-bold text-primary">"{treasure.keyword}"</p>
             <Button onClick={handleClose} className="w-full mt-4">확인</Button>

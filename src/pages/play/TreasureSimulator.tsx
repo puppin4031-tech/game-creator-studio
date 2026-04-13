@@ -236,7 +236,9 @@ export default function TreasureSimulator() {
     setGemDialogOpen(false);
     if (activeTreasure.treasure_subtype === 'key') {
       setHasKey(true);
-      toast.success('🔑 열쇠를 획득했습니다!');
+      toast.success('열쇠를 획득했습니다!', {
+        icon: <img src={getTreasureIconSrc('treasure', 'key')} alt="" className="w-5 h-5 object-contain" />,
+      });
     } else {
       setTeamScores(prev => ({ ...prev, team1: prev.team1 + activeTreasure.points }));
       toast.success(`${activeTreasure.keyword}을(를) 획득! (+${activeTreasure.points}점)`);
@@ -247,7 +249,9 @@ export default function TreasureSimulator() {
     if (!activeTreasure) return;
     setChestDialogOpen(false);
     if (!hasKey) {
-      toast.error('🔑 열쇠가 필요합니다! 먼저 열쇠를 찾으세요.');
+      toast.error('열쇠가 필요합니다! 먼저 열쇠를 찾으세요.', {
+        icon: <img src={getTreasureIconSrc('treasure', 'key')} alt="" className="w-5 h-5 object-contain" />,
+      });
       return;
     }
     markFound(activeTreasure.id);
@@ -412,7 +416,10 @@ export default function TreasureSimulator() {
               보물상자를 발견했습니다!
               <br />
               {hasKey ? (
-                <span className="text-emerald-600 font-bold">🔑 열쇠를 보유하고 있습니다. 상자를 여시겠습니까?</span>
+                <span className="text-emerald-600 font-bold flex items-center gap-1">
+                  <img src={getTreasureIconSrc('treasure', 'key')} alt="" className="w-4 h-4 object-contain inline" />
+                  열쇠를 보유하고 있습니다. 상자를 여시겠습니까?
+                </span>
               ) : (
                 <span className="text-destructive font-bold">🔒 열쇠가 없습니다. 먼저 열쇠를 찾아야 합니다!</span>
               )}

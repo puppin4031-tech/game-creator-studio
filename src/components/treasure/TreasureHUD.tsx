@@ -1,4 +1,5 @@
 import { TeamScores } from '@/hooks/useTreasureHunt';
+import { getTreasureIconSrc } from '@/lib/treasureIcons';
 
 interface Props {
   teamScores: TeamScores;
@@ -13,7 +14,7 @@ export default function TreasureHUD({ teamScores, team1Name, team2Name, hasKey }
       <span className="text-blue-500 font-bold">{team1Name}: {teamScores.team1}점</span>
       <span className="text-muted-foreground">|</span>
       <span className="text-red-500 font-bold">{team2Name}: {teamScores.team2}점</span>
-      {hasKey && <span title="열쇠 보유">🔑</span>}
+      {hasKey && <img src={getTreasureIconSrc('treasure', 'key')} alt="열쇠" className="w-5 h-5 object-contain" title="열쇠 보유" />}
     </div>
   );
 }
