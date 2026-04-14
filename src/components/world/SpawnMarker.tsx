@@ -15,6 +15,7 @@ export interface SpawnData {
   lat: number;
   lng: number;
   item_type: string;
+  item_icon: string;
   rarity: string;
   inRange: boolean;
   distance: number;
