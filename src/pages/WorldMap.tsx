@@ -9,7 +9,8 @@ import { MockControls } from '@/components/game/MockControls';
 import { GameMenu } from '@/components/game/GameMenu';
 import { haversineDistance } from '@/lib/haversine';
 import { Pickaxe, Package, ArrowLeft, Sparkles, Gem, X, Hammer, Compass } from 'lucide-react';
-import { TREASURE_ICON_MAP } from '@/lib/treasureIcons';
+import SpawnMarker from '@/components/world/SpawnMarker';
+import type { SpawnData } from '@/components/world/SpawnMarker';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -30,23 +31,7 @@ const RARITY_COLORS: Record<string, string> = {
 
 // ITEM_ICONS removed — use TREASURE_ICON_MAP from treasureIcons.ts
 
-const RARITY_GLOW: Record<string, string> = {
-  common: 'rgba(156,163,175,0.4)',
-  uncommon: 'rgba(34,197,94,0.5)',
-  rare: 'rgba(59,130,246,0.5)',
-  epic: 'rgba(168,85,247,0.6)',
-  legendary: 'rgba(245,158,11,0.7)',
-};
-
-function spawnMarkerImage(rarity: string, inRange: boolean) {
-  const color = RARITY_COLORS[rarity] || '#9ca3af';
-  const ring = inRange ? 'white' : '#1f2937';
-  const size = inRange ? 20 : 14;
-  const r = size / 2 - 2;
-  return `data:image/svg+xml,${encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="${color}" stroke="${ring}" stroke-width="2"/></svg>`
-  )}`;
-}
+// RARITY_GLOW & spawnMarkerImage moved to SpawnMarker component
 
 interface SpawnWithDist {
   id: string;
@@ -306,62 +291,10 @@ export default function WorldMap() {
             )}
           </CustomOverlayMap>
 
-          {/* Spawn markers with icon images, glow & float */}
-          {spawns.map(s => {
-            const iconSrc = TREASURE_ICON_MAP[s.item_type];
-            const glowColor = RARITY_GLOW[s.rarity] || RARITY_GLOW.common;
-            const size = s.inRange ? 40 : 28;
-
-            if (iconSrc) {
-              return (
-                <CustomOverlayMap key={s.id} position={{ lat: s.lat, lng: s.lng }} zIndex={s.inRange ? 9 : 7}>
-                  <div
-                    onClick={() => { if (s.inRange) setSelectedSpawn(s); }}
-                    style={{
-                      cursor: s.inRange ? 'pointer' : 'default',
-                      animation: s.inRange ? 'spawn-float 2s ease-in-out infinite' : 'spawn-float 3s ease-in-out infinite',
-                      filter: `drop-shadow(0 3px 4px rgba(0,0,0,0.35))`,
-                    }}
-                  >
-                    {/* Glow ring behind icon */}
-                    <div style={{
-                      position: 'absolute',
-                      top: '50%', left: '50%',
-                      width: size + 12, height: size + 12,
-                      transform: 'translate(-50%, -50%)',
-                      borderRadius: '50%',
-                      background: `radial-gradient(circle, ${glowColor} 0%, transparent 70%)`,
-                      animation: 'spawn-glow-pulse 2s ease-in-out infinite',
-                      pointerEvents: 'none',
-                    }} />
-                    <img
-                      src={iconSrc}
-                      alt={s.item_type}
-                      style={{
-                        width: size, height: size, objectFit: 'contain',
-                        position: 'relative', zIndex: 1,
-                      }}
-                    />
-                  </div>
-                </CustomOverlayMap>
-              );
-            }
-            // Fallback for items without custom icons
-            const dotSize = s.inRange ? 20 : 14;
-            return (
-              <MapMarker
-                key={s.id}
-                position={{ lat: s.lat, lng: s.lng }}
-                image={{
-                  src: spawnMarkerImage(s.rarity, s.inRange),
-                  size: { width: dotSize, height: dotSize },
-                  options: { offset: { x: dotSize / 2, y: dotSize / 2 } },
-                }}
-                title={`${s.item_type} (${Math.round(s.distance)}m)`}
-                onClick={() => { if (s.inRange) setSelectedSpawn(s); }}
-              />
-            );
-          })}
+          {/* Spawn markers */}
+          {spawns.map(s => (
+            <SpawnMarker key={s.id} spawn={s} onSelect={setSelectedSpawn} />
+          ))}
         </Map>
       </div>
 
