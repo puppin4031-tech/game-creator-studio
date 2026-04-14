@@ -10,7 +10,7 @@ import { GameMenu } from '@/components/game/GameMenu';
 import { haversineDistance } from '@/lib/haversine';
 import { Pickaxe, Package, ArrowLeft, Sparkles, Gem, X, Hammer, Compass } from 'lucide-react';
 import SpawnMarker from '@/components/world/SpawnMarker';
-import type { SpawnData } from '@/components/world/SpawnMarker';
+import { TREASURE_ICON_MAP } from '@/lib/treasureIcons';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
