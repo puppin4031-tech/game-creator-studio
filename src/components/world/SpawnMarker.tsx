@@ -29,7 +29,7 @@ interface SpawnMarkerProps {
 export default function SpawnMarker({ spawn, onSelect }: SpawnMarkerProps) {
   const iconSrc = TREASURE_ICON_MAP[spawn.item_type] ?? diamondImg;
   const glowColor = RARITY_GLOW[spawn.rarity] || RARITY_GLOW.common;
-  const size = spawn.inRange ? 55 : 35;
+  const size = spawn.inRange ? 100 : 100;
 
   return (
     <CustomOverlayMap position={{ lat: spawn.lat, lng: spawn.lng }} zIndex={spawn.inRange ? 9 : 7}>
