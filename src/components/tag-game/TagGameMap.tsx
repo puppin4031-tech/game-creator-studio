@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Map, Circle, CustomOverlayMap } from 'react-kakao-maps-sdk';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
 import { haversineDistance } from '@/lib/haversine';
 import { GeoPosition } from '@/hooks/useGeolocation';
 import PingOverlay, { Ping } from './PingOverlay';
-import DirectionCone from './DirectionCone';
+import CompassMapWrapper from '@/components/game/CompassMapWrapper';
+import UserArrowMarker from '@/components/game/UserArrowMarker';
 
 interface Props {
   room: TagRoom;
@@ -23,7 +24,10 @@ const TEAM_COLORS: Record<number, string> = {
   2: '#EF4444',
 };
 
-export default function TagGameMap({ room, players, currentPlayerId, myTeam, position, pings, onPingExpire, heading, isCompassActive }: Props) {
+export default function TagGameMap({
+  room, players, currentPlayerId, myTeam, position,
+  pings, onPingExpire, heading, isCompassActive,
+}: Props) {
   const center = useMemo(() => ({
     lat: position.latitude,
     lng: position.longitude,
@@ -31,7 +35,7 @@ export default function TagGameMap({ room, players, currentPlayerId, myTeam, pos
 
   const visiblePlayers = useMemo(() => {
     return players.filter(p => {
-      if (p.id === currentPlayerId) return true;
+      if (p.id === currentPlayerId) return false; // self drawn separately
       if (p.team === myTeam) return true;
       const dist = haversineDistance(
         position.latitude, position.longitude,
@@ -41,67 +45,72 @@ export default function TagGameMap({ room, players, currentPlayerId, myTeam, pos
     });
   }, [players, currentPlayerId, myTeam, position.latitude, position.longitude]);
 
+  const myColor = TEAM_COLORS[myTeam || 1];
+
   return (
-    <Map
-      center={center}
-      style={{ width: '100%', height: '100%' }}
-      level={5}
-    >
-      <Circle
+    <CompassMapWrapper compassActive={isCompassActive} heading={heading}>
+      <Map
         center={center}
-        radius={1000}
-        fillColor={TEAM_COLORS[myTeam || 1]}
-        fillOpacity={0.05}
-        strokeColor={TEAM_COLORS[myTeam || 1]}
-        strokeOpacity={0.3}
-        strokeWeight={1}
-      />
-
-      {visiblePlayers.map(p => {
-        const isMe = p.id === currentPlayerId;
-        const color = TEAM_COLORS[p.team || 1] || '#888';
-
-        return (
-          <CustomOverlayMap key={p.id} position={{ lat: p.latitude, lng: p.longitude }} zIndex={isMe ? 20 : 10}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', transform: 'translate(-50%, -50%)' }}>
-              <div style={{
-                width: isMe ? 32 : 24,
-                height: isMe ? 32 : 24,
-                borderRadius: '50%',
-                backgroundColor: p.is_caught ? '#888' : color,
-                opacity: p.is_caught ? 0.4 : 1,
-                border: isMe ? '3px solid white' : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-                fontSize: isMe ? 16 : 13,
-                fontWeight: 'bold',
-              }}>
-                {isMe ? '★' : p.nickname.charAt(0)}
-              </div>
-              <span style={{
-                fontSize: 10,
-                color: '#fff',
-                textShadow: '0 1px 3px rgba(0,0,0,0.8)',
-                marginTop: 2,
-              }}>
-                {p.nickname}{p.is_caught ? ' (잡힘)' : ''}
-              </span>
-            </div>
-          </CustomOverlayMap>
-        );
-      })}
-
-      {isCompassActive && heading !== null && (
-        <DirectionCone
-          position={center}
-          heading={heading}
-          color={TEAM_COLORS[myTeam || 1]}
+        style={{ width: '100%', height: '100%' }}
+        level={2}
+      >
+        <Circle
+          center={center}
+          radius={1000}
+          fillColor={myColor}
+          fillOpacity={0.05}
+          strokeColor={myColor}
+          strokeOpacity={0.3}
+          strokeWeight={1}
         />
-      )}
 
-      <PingOverlay pings={pings} onExpire={onPingExpire} />
-    </Map>
+        {/* Other players */}
+        {visiblePlayers.map(p => {
+          const color = TEAM_COLORS[p.team || 1] || '#888';
+          return (
+            <CustomOverlayMap key={p.id} position={{ lat: p.latitude, lng: p.longitude }} zIndex={8}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', transform: 'translate(-50%, -50%)' }}>
+                <div style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: '50%',
+                  backgroundColor: p.is_caught ? '#888' : color,
+                  opacity: p.is_caught ? 0.4 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#fff',
+                  fontSize: 13,
+                  fontWeight: 'bold',
+                  border: '2px solid white',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                }}>
+                  {p.nickname.charAt(0)}
+                </div>
+                <span style={{
+                  fontSize: 10,
+                  color: '#fff',
+                  textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+                  marginTop: 2,
+                }}>
+                  {p.nickname}{p.is_caught ? ' (잡힘)' : ''}
+                </span>
+              </div>
+            </CustomOverlayMap>
+          );
+        })}
+
+        {/* Self - arrow when compass, dot otherwise */}
+        <UserArrowMarker
+          position={center}
+          compassActive={isCompassActive}
+          heading={heading}
+          color={myColor}
+          zIndex={20}
+        />
+
+        <PingOverlay pings={pings} onExpire={onPingExpire} />
+      </Map>
+    </CompassMapWrapper>
   );
 }

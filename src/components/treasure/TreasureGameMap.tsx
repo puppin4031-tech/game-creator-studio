@@ -1,6 +1,8 @@
 import { useRef, useCallback, useEffect, useState, useMemo } from 'react';
-import { Map, CustomOverlayMap } from 'react-kakao-maps-sdk';
+import { Map, CustomOverlayMap, Circle } from 'react-kakao-maps-sdk';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
+import CompassMapWrapper from '@/components/game/CompassMapWrapper';
+import UserArrowMarker from '@/components/game/UserArrowMarker';
 import { useTreasureHunt, NearestTreasure } from '@/hooks/useTreasureHunt';
 import { haversineDistance } from '@/lib/haversine';
 import { getTreasureIconSrc } from '@/lib/treasureIcons';
@@ -41,12 +43,15 @@ interface Props {
   position: { latitude: number; longitude: number };
   nickname: string;
   isHost: boolean;
+  heading: number | null;
+  isCompassActive: boolean;
   onEndGame: () => void;
   onSendMessage: (msg: string, channel: string) => void;
 }
 
 export default function TreasureGameMap({
-  room, players, messages, currentPlayerId, myTeam, position, nickname, isHost, onEndGame, onSendMessage,
+  room, players, messages, currentPlayerId, myTeam, position, nickname, isHost,
+  heading, isCompassActive, onEndGame, onSendMessage,
 }: Props) {
   const mapRef = useRef<kakao.maps.Map | null>(null);
   const [quizOpen, setQuizOpen] = useState(false);
@@ -180,52 +185,91 @@ export default function TreasureGameMap({
           0%, 100% { transform: translate(-50%, -100%) translateY(0px); }
           50% { transform: translate(-50%, -100%) translateY(-6px); }
         }
+        @keyframes treasure-glow {
+          0%, 100% { opacity: 0.5; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.15); }
+        }
       `}</style>
 
-      <Map
-        center={center}
-        style={{ width: '100%', height: '100%' }}
-        level={2}
-        onCreate={(map) => { mapRef.current = map; }}
-      >
-        {position.latitude !== 0 && (
-          <CustomOverlayMap position={{ lat: position.latitude, lng: position.longitude }} zIndex={10}>
-            <div style={{
-              width: 20, height: 20, borderRadius: '50%',
-              backgroundColor: '#3b82f6', border: '3px solid white',
-              transform: 'translate(-50%, -50%)',
-            }} />
-          </CustomOverlayMap>
-        )}
-
-        {players.filter(p => p.id !== currentPlayerId && p.team === myTeam && p.latitude).map(p => (
-          <CustomOverlayMap key={p.id} position={{ lat: p.latitude, lng: p.longitude }} zIndex={5}>
-            <div style={{
-              width: 14, height: 14, borderRadius: '50%',
-              backgroundColor: '#94a3b8', border: '2px solid white', opacity: 0.8,
-              transform: 'translate(-50%, -50%)',
-            }} title={p.nickname} />
-          </CustomOverlayMap>
-        ))}
-
-        {/* Nearby treasure markers with floating animation */}
-        {nearbyTreasures.map(t => (
-          <CustomOverlayMap key={t.id} position={{ lat: t.latitude, lng: t.longitude }} zIndex={8}>
-            <div style={{
-              animation: 'treasure-float 2s ease-in-out infinite',
-              filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))',
-            }}>
-              <img
-                src={getTreasureIconSrc(t.challenge_type, t.treasure_subtype)}
-                alt={t.keyword}
-                style={{ width: 36, height: 36, objectFit: 'contain' }}
+      <CompassMapWrapper compassActive={isCompassActive} heading={heading}>
+        <Map
+          center={center}
+          style={{ width: '100%', height: '100%' }}
+          level={2}
+          onCreate={(map) => { mapRef.current = map; }}
+        >
+          {/* Search radius rings — match WorldMap visual language */}
+          {position.latitude !== 0 && (
+            <>
+              <Circle
+                center={{ lat: position.latitude, lng: position.longitude }}
+                radius={10}
+                strokeWeight={1}
+                strokeColor="#22c55e"
+                strokeOpacity={0.5}
+                fillColor="#22c55e"
+                fillOpacity={0.1}
               />
-            </div>
-          </CustomOverlayMap>
-        ))}
+              <Circle
+                center={{ lat: position.latitude, lng: position.longitude }}
+                radius={30}
+                strokeWeight={0.5}
+                strokeColor="#3b82f6"
+                strokeOpacity={0.25}
+                fillColor="#3b82f6"
+                fillOpacity={0.04}
+              />
+            </>
+          )}
 
-        <PingOverlay pings={pings} onExpire={handlePingExpire} />
-      </Map>
+          {players.filter(p => p.id !== currentPlayerId && p.team === myTeam && p.latitude).map(p => (
+            <CustomOverlayMap key={p.id} position={{ lat: p.latitude, lng: p.longitude }} zIndex={5}>
+              <div style={{
+                width: 14, height: 14, borderRadius: '50%',
+                backgroundColor: '#94a3b8', border: '2px solid white', opacity: 0.8,
+                transform: 'translate(-50%, -50%)',
+              }} title={p.nickname} />
+            </CustomOverlayMap>
+          ))}
+
+          {/* Nearby treasure markers with floating animation + glow */}
+          {nearbyTreasures.map(t => (
+            <CustomOverlayMap key={t.id} position={{ lat: t.latitude, lng: t.longitude }} zIndex={8}>
+              <div style={{
+                position: 'relative',
+                animation: 'treasure-float 2s ease-in-out infinite',
+                filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))',
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  inset: -6,
+                  borderRadius: '50%',
+                  background: 'radial-gradient(circle, rgba(245,158,11,0.4) 0%, rgba(245,158,11,0) 70%)',
+                  animation: 'treasure-glow 1.6s ease-in-out infinite',
+                }} />
+                <img
+                  src={getTreasureIconSrc(t.challenge_type, t.treasure_subtype)}
+                  alt={t.keyword}
+                  style={{ width: 36, height: 36, objectFit: 'contain', position: 'relative' }}
+                />
+              </div>
+            </CustomOverlayMap>
+          ))}
+
+          {/* Self marker — arrow when compass active */}
+          {position.latitude !== 0 && (
+            <UserArrowMarker
+              position={{ lat: position.latitude, lng: position.longitude }}
+              compassActive={isCompassActive}
+              heading={heading}
+              color="#3b82f6"
+              zIndex={10}
+            />
+          )}
+
+          <PingOverlay pings={pings} onExpire={handlePingExpire} />
+        </Map>
+      </CompassMapWrapper>
 
       <ProximityGlow level={proximityLevel} />
 
