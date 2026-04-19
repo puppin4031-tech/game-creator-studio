@@ -321,9 +321,26 @@ export default function GameRoom() {
           position={position}
           nickname={nickname}
           isHost={isHost}
+          heading={heading}
+          isCompassActive={compassActive}
           onEndGame={() => endGame(room.id)}
           onSendMessage={(msg, channel) => sendMessage(room.id, nickname, msg, channel)}
         />
+        {/* Compass toggle — WorldMap-style */}
+        <div className="fixed bottom-[calc(7rem+env(safe-area-inset-bottom))] right-3 z-[1300]">
+          <Button
+            size="icon"
+            onClick={toggleCompass}
+            className={`h-12 w-12 rounded-full shadow-lg ${
+              compassActive
+                ? 'bg-green-600 hover:bg-green-700 text-white'
+                : 'bg-card/90 hover:bg-card text-muted-foreground border border-border'
+            }`}
+            title="나침반 모드"
+          >
+            <Compass className="w-5 h-5" />
+          </Button>
+        </div>
         <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-3 z-[1200]">
           <MockControls onMove={mockMove} isSimulated={isSimulated} position={position} onStepChange={setMockStep} />
         </div>
