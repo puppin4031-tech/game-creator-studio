@@ -112,8 +112,8 @@ export function useTagRoom(roomCode?: string, playerId?: string) {
     return { room: roomData, player: player as TagPlayer };
   }, [fetchRoom]);
 
-  // Assign team
-  const assignTeam = useCallback(async (targetPlayerId: string, team: number) => {
+  // Assign team (pass null to unassign)
+  const assignTeam = useCallback(async (targetPlayerId: string, team: number | null) => {
     await supabase.from('tag_players').update({ team }).eq('id', targetPlayerId);
   }, []);
 
