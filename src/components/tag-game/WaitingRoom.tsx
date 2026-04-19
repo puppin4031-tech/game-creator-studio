@@ -277,23 +277,27 @@ function TeamCard({ name, team, players, isHost, currentPlayerId, onAssign, pend
                 {isHost && (
                   <div className="flex gap-1 shrink-0">
                     <Button
-                      size="icon"
-                      variant="ghost"
+                      type="button"
+                      size="sm"
+                      variant="outline"
                       disabled={isPending}
                       onClick={() => onAssign(p.id, null)}
-                      title="미배정으로"
-                      className="min-w-[36px] min-h-[36px] h-9 w-9"
+                      title="미배정으로 되돌리기"
+                      aria-label="미배정으로 되돌리기"
+                      className="min-w-[44px] min-h-[44px] h-11 w-11 p-0"
                     >
-                      <Undo2 className="w-4 h-4" />
+                      <Undo2 className="!w-4 !h-4" />
                     </Button>
                     <Button
+                      type="button"
                       size="sm"
                       variant="outline"
                       disabled={isPending}
                       onClick={() => onAssign(p.id, otherTeam)}
-                      className="min-h-[36px] h-9 px-2 text-xs gap-1"
+                      aria-label={`${otherTeam}팀으로 이동`}
+                      className="min-w-[44px] min-h-[44px] h-11 px-2 text-xs gap-1 font-bold"
                     >
-                      <ArrowRight className="w-3 h-3" />{otherTeam}
+                      <ArrowRight className="!w-3 !h-3" />{otherTeam}팀
                     </Button>
                   </div>
                 )}
