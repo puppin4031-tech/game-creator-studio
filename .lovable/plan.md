@@ -1,26 +1,31 @@
 
 
-## SpawnMarker 컴포넌트 분리 및 이미지 마커 적용
+## 팀 배정 + 변경 모두 가능 + 모바일 반응성 개선
 
-### 변경 사항
+### 동작 (잘못 배정해도 자유롭게 수정 가능)
 
-**1. 신규: `src/components/world/SpawnMarker.tsx`**
-- `WorldMap.tsx`의 309–364줄(spawns.map 루프)을 별도 컴포넌트로 추출
-- Props: `spawn` 데이터(id, lat, lng, item_type, rarity, inRange, distance), `onSelect` 콜백
-- `TREASURE_ICON_MAP`에서 아이콘을 조회하여 `CustomOverlayMap`으로 렌더링
-- 글로우 링 + 플로팅 애니메이션 유지
-- **폴백 제거**: 매핑에 없는 item_type도 `diamondImg`(기본 이미지)를 사용하여 항상 일러스트 이미지로 표시 — SVG 점 폴백 삭제
-- `RARITY_GLOW`, 사이즈 로직을 컴포넌트 내부에 포함
-
-**2. 수정: `src/pages/WorldMap.tsx`**
-- 309–364줄의 spawns.map 블록을 `<SpawnMarker>` 컴포넌트 호출로 교체
-- `spawnMarkerImage` 함수, `RARITY_GLOW` 상수 제거 (SpawnMarker로 이동)
-- `TREASURE_ICON_MAP` import 제거 (SpawnMarker 내부에서 처리)
-
-### 기술 세부
-
-| 기존 | 변경 후 |
+| 위치 | 가능한 액션 |
 |---|---|
-| `TREASURE_ICON_MAP[s.item_type]` 없으면 SVG dot 폴백 | `TREASURE_ICON_MAP[s.item_type] ?? diamondImg` — 항상 이미지 |
-| 마커 로직 WorldMap에 인라인 | `<SpawnMarker>` 컴포넌트 1개로 깔끔하게 분리 |
+| 미배정 영역 | [1팀] [2팀] 버튼으로 팀 지정 |
+| 1팀 카드 안 | [→ 2팀] 이동 / [미배정] 되돌리기 |
+| 2팀 카드 안 | [→ 1팀] 이동 / [미배정] 되돌리기 |
+| 호스트 본인 | 동일하게 자유 이동 (Crown 아이콘은 유지) |
+
+### 변경
+
+**`src/components/tag-game/WaitingRoom.tsx`**
+- 낙관적 업데이트 `pendingAssignments` state 추가 → 클릭 즉시 카드 이동
+- 미배정 1/2 버튼: `min-w-[44px] min-h-[44px]` 터치 타겟 확보
+- 팀 카드 행 안에 두 개 버튼 배치:
+  - 반대편 팀으로 이동 (`ArrowRight` + 팀 번호)
+  - **미배정으로 되돌리기** (`Undo2` 아이콘) — 신규 추가
+- 호스트 본인 이동 차단 조건 (`!p.is_host`) 제거
+- `onAssignTeam(playerId, null)` 호출로 팀 해제 지원
+
+**`src/hooks/useTagRoom.ts`**
+- `assignTeam` 시그니처를 `(playerId, team: number | null)` 으로 변경하여 미배정 복귀 허용 (DB 컬럼은 이미 nullable)
+
+### 부가
+- `pending` 동안 모든 관련 버튼 `disabled` → 연타 방지
+- 서버 값과 pending이 일치하면 자동 정리
 
