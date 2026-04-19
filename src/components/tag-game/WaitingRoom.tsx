@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
-import { ArrowLeft, Copy, Play, Users, Settings, Crown, Trash2 } from 'lucide-react';
+import { ArrowLeft, Copy, Play, Users, Settings, Crown, Trash2, ArrowRight, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import TreasureSetup from '@/components/treasure/TreasureSetup';
 import { useTreasureHunt } from '@/hooks/useTreasureHunt';
@@ -14,13 +14,15 @@ interface Props {
   players: TagPlayer[];
   isHost: boolean;
   currentPlayerId: string;
-  onAssignTeam: (playerId: string, team: number) => void;
+  onAssignTeam: (playerId: string, team: number | null) => void;
   onUpdateTeamNames: (team1: string, team2: string) => void;
   onUpdateTimer: (seconds: number) => void;
   onStartGame: () => void;
   onLeave: () => void;
   onDeleteRoom?: () => void;
 }
+
+type PendingMap = Record<string, number | null>;
 
 export default function WaitingRoom({
   room, players, isHost, currentPlayerId,
@@ -32,16 +34,45 @@ export default function WaitingRoom({
   const [showSettings, setShowSettings] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Optimistic update state
+  const [pending, setPending] = useState<PendingMap>({});
+
   const isTreasure = room.game_mode === 'treasure';
   const { treasures, addTreasure, removeTreasure } = useTreasureHunt(
     isTreasure ? room.id : undefined, currentPlayerId, 0, 0
   );
 
-  const team1Players = players.filter(p => p.team === 1);
-  const team2Players = players.filter(p => p.team === 2);
-  const unassigned = players.filter(p => p.team === null);
+  // Clean up pending entries when server caught up
+  useEffect(() => {
+    setPending(prev => {
+      let changed = false;
+      const next: PendingMap = { ...prev };
+      players.forEach(p => {
+        if (p.id in next && next[p.id] === p.team) {
+          delete next[p.id];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [players]);
 
-  const allAssigned = unassigned.length === 0 && players.length >= 2;
+  const handleAssign = (playerId: string, team: number | null) => {
+    setPending(prev => ({ ...prev, [playerId]: team }));
+    onAssignTeam(playerId, team);
+  };
+
+  // Apply pending overrides
+  const effective = players.map(p => ({
+    ...p,
+    team: p.id in pending ? pending[p.id] : p.team,
+  }));
+
+  const team1Players = effective.filter(p => p.team === 1);
+  const team2Players = effective.filter(p => p.team === 2);
+  const unassigned = effective.filter(p => p.team === null);
+
+  const allAssigned = unassigned.length === 0 && effective.length >= 2;
 
   const copyCode = () => {
     navigator.clipboard.writeText(room.room_code);
@@ -90,7 +121,7 @@ export default function WaitingRoom({
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
-          <Users className="w-4 h-4 inline mr-1" />{players.length}명 참가 중
+          <Users className="w-4 h-4 inline mr-1" />{effective.length}명 참가 중
         </p>
       </div>
 
@@ -141,7 +172,8 @@ export default function WaitingRoom({
           players={team1Players}
           isHost={isHost}
           currentPlayerId={currentPlayerId}
-          onAssign={onAssignTeam}
+          onAssign={handleAssign}
+          pending={pending}
           color="bg-blue-500/10 border-blue-500/30"
           textColor="text-blue-600"
         />
@@ -151,7 +183,8 @@ export default function WaitingRoom({
           players={team2Players}
           isHost={isHost}
           currentPlayerId={currentPlayerId}
-          onAssign={onAssignTeam}
+          onAssign={handleAssign}
+          pending={pending}
           color="bg-red-500/10 border-red-500/30"
           textColor="text-red-600"
         />
@@ -162,21 +195,40 @@ export default function WaitingRoom({
         <Card className="mb-4">
           <CardContent className="p-3">
             <p className="text-xs font-medium text-muted-foreground mb-2">팀 미배정</p>
-            <div className="flex flex-wrap gap-2">
-              {unassigned.map(p => (
-                <div key={p.id} className="flex items-center gap-1">
-                  <Badge variant="secondary">
-                    {p.is_host && <Crown className="w-3 h-3 mr-1" />}
-                    {p.nickname}
-                  </Badge>
-                  {isHost && (
-                    <div className="flex gap-1">
-                      <button onClick={() => onAssignTeam(p.id, 1)} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-600 hover:bg-blue-500/30">1</button>
-                      <button onClick={() => onAssignTeam(p.id, 2)} className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-600 hover:bg-red-500/30">2</button>
-                    </div>
-                  )}
-                </div>
-              ))}
+            <div className="flex flex-col gap-2">
+              {unassigned.map(p => {
+                const isPending = p.id in pending;
+                return (
+                  <div key={p.id} className="flex items-center justify-between gap-2 min-h-[44px]">
+                    <Badge variant="secondary" className="text-sm py-1.5">
+                      {p.is_host && <Crown className="w-3 h-3 mr-1" />}
+                      {p.nickname}
+                    </Badge>
+                    {isHost && (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isPending}
+                          onClick={() => handleAssign(p.id, 1)}
+                          className="min-w-[44px] min-h-[44px] font-bold bg-blue-500/10 text-blue-600 border-blue-500/30 hover:bg-blue-500/20"
+                        >
+                          1팀
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isPending}
+                          onClick={() => handleAssign(p.id, 2)}
+                          className="min-w-[44px] min-h-[44px] font-bold bg-red-500/10 text-red-600 border-red-500/30 hover:bg-red-500/20"
+                        >
+                          2팀
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -202,32 +254,52 @@ export default function WaitingRoom({
   );
 }
 
-function TeamCard({ name, team, players, isHost, currentPlayerId, onAssign, color, textColor }: {
+function TeamCard({ name, team, players, isHost, currentPlayerId, onAssign, pending, color, textColor }: {
   name: string; team: number; players: TagPlayer[]; isHost: boolean;
-  currentPlayerId: string; onAssign: (id: string, t: number) => void;
+  currentPlayerId: string; onAssign: (id: string, t: number | null) => void;
+  pending: PendingMap;
   color: string; textColor: string;
 }) {
+  const otherTeam = team === 1 ? 2 : 1;
   return (
     <Card className={`border ${color}`}>
       <CardContent className="p-3">
         <p className={`text-sm font-bold ${textColor} mb-2`}>{name} ({players.length})</p>
-        <div className="space-y-1">
-          {players.map(p => (
-            <div key={p.id} className="flex items-center justify-between text-xs">
-              <span className={p.id === currentPlayerId ? 'font-bold' : ''}>
-                {p.is_host && <Crown className="w-3 h-3 inline mr-1" />}
-                {p.nickname}
-              </span>
-              {isHost && !p.is_host && (
-                <button
-                  onClick={() => onAssign(p.id, team === 1 ? 2 : 1)}
-                  className="text-[10px] text-muted-foreground hover:text-foreground"
-                >
-                  →{team === 1 ? '2' : '1'}
-                </button>
-              )}
-            </div>
-          ))}
+        <div className="space-y-2">
+          {players.map(p => {
+            const isPending = p.id in pending;
+            return (
+              <div key={p.id} className="flex items-center justify-between gap-1 min-h-[44px]">
+                <span className={`text-xs truncate ${p.id === currentPlayerId ? 'font-bold' : ''}`}>
+                  {p.is_host && <Crown className="w-3 h-3 inline mr-1" />}
+                  {p.nickname}
+                </span>
+                {isHost && (
+                  <div className="flex gap-1 shrink-0">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      disabled={isPending}
+                      onClick={() => onAssign(p.id, null)}
+                      title="미배정으로"
+                      className="min-w-[36px] min-h-[36px] h-9 w-9"
+                    >
+                      <Undo2 className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isPending}
+                      onClick={() => onAssign(p.id, otherTeam)}
+                      className="min-h-[36px] h-9 px-2 text-xs gap-1"
+                    >
+                      <ArrowRight className="w-3 h-3" />{otherTeam}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
           {players.length === 0 && <p className="text-xs text-muted-foreground">아직 없음</p>}
         </div>
       </CardContent>
