@@ -1,56 +1,50 @@
 
 
-## 술래잡기/보물찾기 맵을 /world 스타일로 통일
+분석 결과, 사용자가 제시한 방향성은 현재 코드 구조와 100% 호환됩니다. 기존 `useTagRoom.ts`, `Lobby.tsx`, `useLocationShare.ts`, `GameRoom.tsx`를 갈아엎지 않고 누락된 부분만 보강하면 됩니다.
 
-### 현재 차이점
+## 구현 계획 (4파일 수정)
 
-| 항목 | /world (WorldMap) | 술래잡기/보물찾기 |
+### 1. `src/pages/play/Lobby.tsx` — 로비 실시간화
+- 기존 `fetchOpenRooms()` 1회 호출 유지
+- `useEffect`에 Supabase 채널 2개 추가:
+  - `tag_rooms` (INSERT/UPDATE/DELETE) → `fetchOpenRooms()` 재호출
+  - `tag_players` (INSERT/DELETE) → `fetchOpenRooms()` 재호출 (인원 수 갱신)
+- 언마운트 시 채널 정리
+
+### 2. `src/hooks/useTagRoom.ts` — 구독 race condition 차단
+- 기존 3개 채널(`tag_players`, `tag_messages`, `tag_rooms`) 구조 유지
+- 각 `.subscribe()` 콜백에서 `status === 'SUBSCRIBED'` 확인 시:
+  - players/messages 채널 → `fetchPlayers(room.id)`, `fetchMessages(room.id)` 재호출
+  - room 채널 → `fetchRoom(room.room_code)` 재호출
+- `console.log` 디버그 (수신 이벤트, 구독 상태) 임시 추가 → 추후 제거 가능
+
+### 3. `src/hooks/useLocationShare.ts` — 스마트 전송 로직
+- 기존 `setInterval` 5초 + 좌표 동일성 체크 **제거**
+- 새 로직 (haversine 거리 사용 — `src/lib/haversine.ts` 이미 존재):
+  - GPS position 변경 감지 useEffect → 마지막 전송 위치 대비 **2m 이상 이동** 시 즉시 전송
+  - 별도 `setInterval(1000)` heartbeat → **마지막 전송 후 5초 경과** 시 현재 위치 전송 (정지 상태 생존 신고)
+  - `isActive` true 전환 후 첫 5초간은 1초 간격 강제 전송 (Fast Sync)
+- ref 활용: `lastSentAt`, `lastSentPos`, `activatedAt`
+
+### 4. `src/pages/play/GameRoom.tsx` — 전환 UX
+- 방장의 "시작"/"종료" 버튼 클릭 시 로컬 `isPending` state로 즉시 비활성화 + Spinner 표시
+- Realtime으로 `room.status` 변경 수신되면 자동 해제 (useEffect로 status 의존성)
+- 중복 클릭 차단
+
+## 영향 없음
+- DB 스키마 변경 없음 (모든 필요 테이블이 이미 supabase_realtime publication에 등록됨)
+- WaitingRoom, ChatDrawer, TagGameMap, TreasureGameMap, 나침반, 채팅 로직 모두 그대로
+- /world 페이지 영향 없음
+
+## 기대 결과
+
+| 시나리오 | 현재 | 개선 후 |
 |---|---|---|
-| 나침반 회전 | ✅ 150vmax 컨테이너 CSS 회전 + LERP 보간 | ❌ 없음 (DirectionCone만) / ❌ 아예 없음 |
-| 사용자 마커 | 🔼 화살표(SVG, heading 회전) / 점 토글 | ⚪ 단순 원형 점 |
-| 줌 레벨 | level 2 (가까움) | 술래잡기 level 5, 보물 level 2 |
-| 채집 반경 표시 | 20m 초록 + 500m 파랑 Circle | 술래잡기만 1000m Circle, 보물 없음 |
-| 나침반 토글 버튼 | ✅ 우하단 동일 스타일 (h-12 둥근 버튼) | 술래잡기 GameRoom에 있음 / 보물 없음 |
-| Spawn 플로팅 | float + glow pulse 애니메이션 | 보물은 float만, 술래잡기는 정적 |
-
-### 변경 사항
-
-**1. 공통 헬퍼 추가 — `src/components/game/CompassMapWrapper.tsx` (신규)**
-- WorldMap의 150vmax 회전 + accumulatedAngle/smoothedAngle/RAF LERP 로직을 추출
-- `<CompassMapWrapper compassActive heading>{<Map>...}</Map></CompassMapWrapper>` 형태로 재사용
-- 회전 중에는 `draggable={false} zoomable={false}` 자동 적용 (children에 prop 전달)
-
-**2. `src/components/game/UserArrowMarker.tsx` (신규)**
-- WorldMap에서 쓰는 초록 SVG 화살표 마커를 컴포넌트화
-- `compassActive && heading !== null`이면 화살표(heading 회전), 아니면 동그란 점
-- 색상은 prop으로 받음 (술래잡기는 팀 색, 보물은 #3b82f6, 월드는 #22c55e)
-
-**3. `src/components/tag-game/TagGameMap.tsx` 리팩토링**
-- 줌 레벨 `5 → 2`로 변경 (월드맵과 동일한 근접 뷰)
-- 본인 마커를 `UserArrowMarker`로 교체 → 나침반 켤 때 화살표로 표시
-- `<Map>`을 `<CompassMapWrapper>`로 감싸서 지도 자체 회전 적용
-- 기존 `DirectionCone` 제거 (화살표 마커가 대체)
-- 1000m Circle은 유지 (시야 반경 의미)
-
-**4. `src/components/treasure/TreasureGameMap.tsx` 리팩토링**
-- 본인 마커를 `UserArrowMarker`로 교체
-- `<Map>`을 `<CompassMapWrapper>`로 감싸기
-- 30m 탐색 반경 Circle 추가 (보물 근접 표시 — 월드의 20m 채집 원과 동일 스타일)
-- props에 `heading`, `compassActive` 추가 (GameRoom에서 전달)
-- 보물 마커에 월드 SpawnMarker 스타일의 glow pulse 추가 (선택, 시각 통일)
-
-**5. `src/pages/play/GameRoom.tsx` 수정**
-- 보물 모드에도 나침반 토글 버튼 추가 (이미 술래잡기엔 있음)
-- TreasureGameMap에 `heading`, `compassActive` props 전달
-- 나침반/신호/채팅 버튼 스타일을 월드맵과 통일 (h-12 w-12 rounded-full, 색상 톤)
-
-### 영향받지 않는 것
-- 게임 로직 (잡기, 채집, 퀴즈), Realtime 구독, 채팅, 핑, 타이머
-- WaitingRoom, 인벤토리, 점수판
-- /world 페이지 자체
-
-### 결과
-모든 GPS 게임 맵이 동일한 시각 언어를 가짐:
-- 나침반 켜면 지도가 부드럽게 회전 + 내 마커는 항상 위쪽 화살표
-- 동일한 줌 레벨, 동일한 반경 원 스타일, 동일한 하단 버튼 디자인
+| 로비에서 새 방 생성 감지 | 새로고침 필요 | 즉시 표시 |
+| 로비에서 인원 수 변동 | 새로고침 필요 | 즉시 갱신 |
+| 대기실에 다른 유저 입장 | 가끔 누락 | 100% 즉시 반영 |
+| 방장 시작 버튼 → 다른 유저 화면 | 가끔 누락 | 즉시 게임 화면 전환 |
+| 다른 유저 마커 이동 | 5초+ 멈춤 | 1~2초 내 부드러운 이동 |
+| 가만히 서 있는 유저 | 사라진 듯 보임 | 5초 heartbeat로 항상 활성 |
+| 게임 시작 직후 마커 위치 | 부정확 | 5초간 빠른 동기화로 정확 |
 
