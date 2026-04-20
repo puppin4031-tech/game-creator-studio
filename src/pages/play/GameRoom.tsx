@@ -147,6 +147,36 @@ export default function GameRoom() {
   const playerId = myPlayer?.id || null;
   const myTeam = myPlayer?.team || null;
 
+  // Pending state for start/end (immediate UX feedback before realtime echoes back)
+  const [statusPending, setStatusPending] = useState<null | 'starting' | 'ending'>(null);
+
+  // Clear pending state once room status updates via realtime
+  useEffect(() => {
+    if (!room) return;
+    if (statusPending === 'starting' && room.status === 'playing') setStatusPending(null);
+    if (statusPending === 'ending' && room.status === 'ended') setStatusPending(null);
+  }, [room?.status, statusPending]);
+
+  const handleStartGame = useCallback(async () => {
+    if (!room || statusPending) return;
+    setStatusPending('starting');
+    try {
+      await startGame(room.id);
+    } catch {
+      setStatusPending(null);
+    }
+  }, [room?.id, statusPending, startGame]);
+
+  const handleEndGame = useCallback(async () => {
+    if (!room || statusPending) return;
+    setStatusPending('ending');
+    try {
+      await endGame(room.id);
+    } catch {
+      setStatusPending(null);
+    }
+  }, [room?.id, statusPending, endGame]);
+
   // Compass
   const [compassActive, setCompassActive] = useState(false);
   const { heading, requestPermission, permissionGranted } = useDeviceHeading(compassActive);
@@ -248,7 +278,7 @@ export default function GameRoom() {
         onAssignTeam={(pid, team) => assignTeam(pid, team)}
         onUpdateTeamNames={(t1, t2) => updateTeamNames(room.id, t1, t2)}
         onUpdateTimer={(s) => updateTimer(room.id, s)}
-        onStartGame={() => startGame(room.id)}
+        onStartGame={handleStartGame}
         onLeave={() => navigate('/play')}
         onDeleteRoom={isHost ? async () => {
           const ok = await deleteRoom(room.id);
@@ -323,7 +353,7 @@ export default function GameRoom() {
           isHost={isHost}
           heading={heading}
           isCompassActive={compassActive}
-          onEndGame={() => endGame(room.id)}
+          onEndGame={handleEndGame}
           onSendMessage={(msg, channel) => sendMessage(room.id, nickname, msg, channel)}
         />
         {/* Compass toggle — WorldMap-style */}
@@ -373,7 +403,7 @@ export default function GameRoom() {
         </div>
         <div className="flex items-center justify-between px-3 py-2">
           <Team1Score room={room} players={players} />
-          <GameTimer room={room} isHost={isHost} onEndGame={() => endGame(room.id)} />
+          <GameTimer room={room} isHost={isHost} onEndGame={handleEndGame} />
           <Team2Score room={room} players={players} />
         </div>
       </div>
