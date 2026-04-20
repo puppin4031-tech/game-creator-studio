@@ -353,7 +353,7 @@ export default function GameRoom() {
           isHost={isHost}
           heading={heading}
           isCompassActive={compassActive}
-          onEndGame={() => endGame(room.id)}
+          onEndGame={handleEndGame}
           onSendMessage={(msg, channel) => sendMessage(room.id, nickname, msg, channel)}
         />
         {/* Compass toggle — WorldMap-style */}
@@ -403,7 +403,7 @@ export default function GameRoom() {
         </div>
         <div className="flex items-center justify-between px-3 py-2">
           <Team1Score room={room} players={players} />
-          <GameTimer room={room} isHost={isHost} onEndGame={() => endGame(room.id)} />
+          <GameTimer room={room} isHost={isHost} onEndGame={handleEndGame} />
           <Team2Score room={room} players={players} />
         </div>
       </div>
