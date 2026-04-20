@@ -278,7 +278,7 @@ export default function GameRoom() {
         onAssignTeam={(pid, team) => assignTeam(pid, team)}
         onUpdateTeamNames={(t1, t2) => updateTeamNames(room.id, t1, t2)}
         onUpdateTimer={(s) => updateTimer(room.id, s)}
-        onStartGame={() => startGame(room.id)}
+        onStartGame={handleStartGame}
         onLeave={() => navigate('/play')}
         onDeleteRoom={isHost ? async () => {
           const ok = await deleteRoom(room.id);
