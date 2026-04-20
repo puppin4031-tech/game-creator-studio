@@ -147,6 +147,36 @@ export default function GameRoom() {
   const playerId = myPlayer?.id || null;
   const myTeam = myPlayer?.team || null;
 
+  // Pending state for start/end (immediate UX feedback before realtime echoes back)
+  const [statusPending, setStatusPending] = useState<null | 'starting' | 'ending'>(null);
+
+  // Clear pending state once room status updates via realtime
+  useEffect(() => {
+    if (!room) return;
+    if (statusPending === 'starting' && room.status === 'playing') setStatusPending(null);
+    if (statusPending === 'ending' && room.status === 'ended') setStatusPending(null);
+  }, [room?.status, statusPending]);
+
+  const handleStartGame = useCallback(async () => {
+    if (!room || statusPending) return;
+    setStatusPending('starting');
+    try {
+      await startGame(room.id);
+    } catch {
+      setStatusPending(null);
+    }
+  }, [room?.id, statusPending, startGame]);
+
+  const handleEndGame = useCallback(async () => {
+    if (!room || statusPending) return;
+    setStatusPending('ending');
+    try {
+      await endGame(room.id);
+    } catch {
+      setStatusPending(null);
+    }
+  }, [room?.id, statusPending, endGame]);
+
   // Compass
   const [compassActive, setCompassActive] = useState(false);
   const { heading, requestPermission, permissionGranted } = useDeviceHeading(compassActive);

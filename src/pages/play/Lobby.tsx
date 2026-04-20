@@ -75,6 +75,26 @@ export default function Lobby() {
 
   useEffect(() => {
     fetchOpenRooms();
+
+    // Realtime subscriptions: refresh list when rooms or players change
+    const roomsChannel = supabase
+      .channel('lobby_tag_rooms')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tag_rooms' }, () => {
+        fetchOpenRooms();
+      })
+      .subscribe();
+
+    const playersChannel = supabase
+      .channel('lobby_tag_players')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tag_players' }, () => {
+        fetchOpenRooms();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(roomsChannel);
+      supabase.removeChannel(playersChannel);
+    };
   }, []);
 
   const handleCreate = async () => {

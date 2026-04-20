@@ -201,10 +201,17 @@ export function useTagRoom(roomCode?: string, playerId?: string) {
 
     const playerChannel = supabase
       .channel(`tag_players_${room.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tag_players', filter: `room_id=eq.${room.id}` }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tag_players', filter: `room_id=eq.${room.id}` }, (payload) => {
+        console.log('[useTagRoom] tag_players event', payload.eventType);
         fetchPlayers(room.id);
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[useTagRoom] playerChannel status:', status);
+        if (status === 'SUBSCRIBED') {
+          // Re-sync after subscription is confirmed (race condition guard)
+          fetchPlayers(room.id);
+        }
+      });
 
     const messageChannel = supabase
       .channel(`tag_messages_${room.id}`)
@@ -215,14 +222,29 @@ export function useTagRoom(roomCode?: string, playerId?: string) {
           return [...prev, newMsg];
         });
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          fetchMessages(room.id);
+        }
+      });
 
     const roomChannel = supabase
       .channel(`tag_room_${room.id}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tag_rooms', filter: `id=eq.${room.id}` }, (payload) => {
-        setRoom(payload.new as TagRoom);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tag_rooms', filter: `id=eq.${room.id}` }, (payload) => {
+        console.log('[useTagRoom] tag_rooms event', payload.eventType, (payload.new as any)?.status);
+        if (payload.eventType === 'DELETE') {
+          setRoom(null);
+        } else if (payload.new) {
+          setRoom(payload.new as TagRoom);
+        }
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[useTagRoom] roomChannel status:', status);
+        if (status === 'SUBSCRIBED' && room.room_code) {
+          // Re-fetch latest room state after subscription confirmed
+          fetchRoom(room.room_code);
+        }
+      });
 
     return () => {
       supabase.removeChannel(playerChannel);
