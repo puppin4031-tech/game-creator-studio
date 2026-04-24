@@ -1,50 +1,47 @@
 
 
-분석 결과, 사용자가 제시한 방향성은 현재 코드 구조와 100% 호환됩니다. 기존 `useTagRoom.ts`, `Lobby.tsx`, `useLocationShare.ts`, `GameRoom.tsx`를 갈아엎지 않고 누락된 부분만 보강하면 됩니다.
+## 같은 팀만 보이도록 시야 제한
 
-## 구현 계획 (4파일 수정)
+### 변경 파일
+`src/components/tag-game/TagGameMap.tsx`
 
-### 1. `src/pages/play/Lobby.tsx` — 로비 실시간화
-- 기존 `fetchOpenRooms()` 1회 호출 유지
-- `useEffect`에 Supabase 채널 2개 추가:
-  - `tag_rooms` (INSERT/UPDATE/DELETE) → `fetchOpenRooms()` 재호출
-  - `tag_players` (INSERT/DELETE) → `fetchOpenRooms()` 재호출 (인원 수 갱신)
-- 언마운트 시 채널 정리
+### 수정 내용
+`visiblePlayers` useMemo의 필터 로직 단순화:
 
-### 2. `src/hooks/useTagRoom.ts` — 구독 race condition 차단
-- 기존 3개 채널(`tag_players`, `tag_messages`, `tag_rooms`) 구조 유지
-- 각 `.subscribe()` 콜백에서 `status === 'SUBSCRIBED'` 확인 시:
-  - players/messages 채널 → `fetchPlayers(room.id)`, `fetchMessages(room.id)` 재호출
-  - room 채널 → `fetchRoom(room.room_code)` 재호출
-- `console.log` 디버그 (수신 이벤트, 구독 상태) 임시 추가 → 추후 제거 가능
+**현재 (28-37줄):**
+```typescript
+const visiblePlayers = useMemo(() => {
+  return players.filter(p => {
+    if (p.id === currentPlayerId) return false;
+    if (p.team === myTeam) return true;
+    const dist = haversineDistance(...);
+    return dist <= 1000; // ← 다른 팀도 1km 내면 보임
+  });
+}, [players, currentPlayerId, myTeam, position.latitude, position.longitude]);
+```
 
-### 3. `src/hooks/useLocationShare.ts` — 스마트 전송 로직
-- 기존 `setInterval` 5초 + 좌표 동일성 체크 **제거**
-- 새 로직 (haversine 거리 사용 — `src/lib/haversine.ts` 이미 존재):
-  - GPS position 변경 감지 useEffect → 마지막 전송 위치 대비 **2m 이상 이동** 시 즉시 전송
-  - 별도 `setInterval(1000)` heartbeat → **마지막 전송 후 5초 경과** 시 현재 위치 전송 (정지 상태 생존 신고)
-  - `isActive` true 전환 후 첫 5초간은 1초 간격 강제 전송 (Fast Sync)
-- ref 활용: `lastSentAt`, `lastSentPos`, `activatedAt`
+**변경 후:**
+```typescript
+const visiblePlayers = useMemo(() => {
+  return players.filter(p => {
+    if (p.id === currentPlayerId) return false; // 본인 제외
+    return p.team === myTeam; // 같은 팀만
+  });
+}, [players, currentPlayerId, myTeam]);
+```
 
-### 4. `src/pages/play/GameRoom.tsx` — 전환 UX
-- 방장의 "시작"/"종료" 버튼 클릭 시 로컬 `isPending` state로 즉시 비활성화 + Spinner 표시
-- Realtime으로 `room.status` 변경 수신되면 자동 해제 (useEffect로 status 의존성)
-- 중복 클릭 차단
+### 부수 정리
+- `haversineDistance`, `position` import/의존성 더 이상 필요 없음 → 제거
+- 단, `position`은 `center` 계산과 자기 마커 표시에 여전히 필요하므로 **유지**
+- `haversineDistance` import만 제거 (다른 곳에서 안 쓰면)
 
-## 영향 없음
-- DB 스키마 변경 없음 (모든 필요 테이블이 이미 supabase_realtime publication에 등록됨)
-- WaitingRoom, ChatDrawer, TagGameMap, TreasureGameMap, 나침반, 채팅 로직 모두 그대로
-- /world 페이지 영향 없음
+### 영향
+- ✅ 1팀은 1팀원만, 2팀은 2팀원만 지도에서 확인 가능
+- ✅ 미배정(team === null) 플레이어 끼리도 같은 그룹으로만 보임
+- ✅ 본인 마커, 1km 반경 원, 핑(PingOverlay), 나침반 등 다른 기능은 영향 없음
+- ✅ DB/Realtime 변경 없음 — 순수 클라이언트 필터링
 
-## 기대 결과
-
-| 시나리오 | 현재 | 개선 후 |
-|---|---|---|
-| 로비에서 새 방 생성 감지 | 새로고침 필요 | 즉시 표시 |
-| 로비에서 인원 수 변동 | 새로고침 필요 | 즉시 갱신 |
-| 대기실에 다른 유저 입장 | 가끔 누락 | 100% 즉시 반영 |
-| 방장 시작 버튼 → 다른 유저 화면 | 가끔 누락 | 즉시 게임 화면 전환 |
-| 다른 유저 마커 이동 | 5초+ 멈춤 | 1~2초 내 부드러운 이동 |
-| 가만히 서 있는 유저 | 사라진 듯 보임 | 5초 heartbeat로 항상 활성 |
-| 게임 시작 직후 마커 위치 | 부정확 | 5초간 빠른 동기화로 정확 |
+### 참고
+- 채팅(`ChatDrawer`)의 팀 채널은 별개 시스템이므로 그대로 유지
+- 신호(Ping)는 현재 팀원에게만 보내지는 구조라면 그대로 OK (필요 시 별도 검토 가능)
 
