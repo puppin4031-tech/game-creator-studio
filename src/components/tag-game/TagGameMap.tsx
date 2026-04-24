@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { Map, Circle, CustomOverlayMap } from 'react-kakao-maps-sdk';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
-import { haversineDistance } from '@/lib/haversine';
 import { GeoPosition } from '@/hooks/useGeolocation';
 import PingOverlay, { Ping } from './PingOverlay';
 import CompassMapWrapper from '@/components/game/CompassMapWrapper';
@@ -35,15 +34,10 @@ export default function TagGameMap({
 
   const visiblePlayers = useMemo(() => {
     return players.filter(p => {
-      if (p.id === currentPlayerId) return false; // self drawn separately
-      if (p.team === myTeam) return true;
-      const dist = haversineDistance(
-        position.latitude, position.longitude,
-        p.latitude, p.longitude
-      );
-      return dist <= 1000;
+      if (p.id === currentPlayerId) return false; // 본인 제외
+      return p.team === myTeam; // 같은 팀만 표시
     });
-  }, [players, currentPlayerId, myTeam, position.latitude, position.longitude]);
+  }, [players, currentPlayerId, myTeam]);
 
   const myColor = TEAM_COLORS[myTeam || 1];
 
