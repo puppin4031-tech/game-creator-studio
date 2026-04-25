@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
-import { ArrowLeft, Copy, Play, Users, Settings, Crown, Trash2, ArrowRight, Undo2 } from 'lucide-react';
+import { ArrowLeft, Copy, Play, Users, Settings, Crown, Trash2, ArrowRight, Undo2, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import TreasureSetup from '@/components/treasure/TreasureSetup';
 import { useTreasureHunt } from '@/hooks/useTreasureHunt';
@@ -77,6 +77,29 @@ export default function WaitingRoom({
   const copyCode = () => {
     navigator.clipboard.writeText(room.room_code);
     toast.success('방 코드가 복사되었습니다');
+  };
+
+  const shareLink = async () => {
+    const url = `${window.location.origin}/play/${room.room_code}`;
+    const shareData = {
+      title: '함께 플레이하기',
+      text: `${room.title} 방에 참여하세요! (코드: ${room.room_code})`,
+      url,
+    };
+    try {
+      if (navigator.share && typeof navigator.canShare === 'function' && navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+        return;
+      }
+    } catch (e) {
+      // 공유 취소되었거나 실패 → 클립보드 폴백
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('초대 링크가 복사되었습니다');
+    } catch {
+      toast.error('링크 복사에 실패했습니다');
+    }
   };
 
   const saveSettings = () => {
