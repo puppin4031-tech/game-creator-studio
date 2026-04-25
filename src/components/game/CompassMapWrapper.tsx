@@ -78,18 +78,21 @@ export default function CompassMapWrapper({ compassActive, heading, children }: 
     return child;
   });
 
-  return (
-    <div
-      style={{
+  // 나침반 OFF: 일반 100% 컨테이너 (카카오맵 viewport 정상화 → zoom 튐 방지)
+  // 나침반 ON: 150vmax 회전 컨테이너 (지도 회전용)
+  const wrapperStyle: React.CSSProperties = compassActive
+    ? {
         position: 'absolute',
         top: '50%',
         left: '50%',
         width: '150vmax',
         height: '150vmax',
         transform: `translate(-50%, -50%) rotate(${mapRotation}deg)`,
-      }}
-    >
-      {enhancedChildren}
-    </div>
-  );
+      }
+    : {
+        width: '100%',
+        height: '100%',
+      };
+
+  return <div style={wrapperStyle}>{enhancedChildren}</div>;
 }

@@ -1,40 +1,52 @@
-## 문제 원인
+# 카카오맵 Zoom 튐 & 마커/핑 쏠림 수정
 
-현재 `WaitingRoom.tsx`의 공유 링크는 `window.location.origin`을 그대로 사용합니다.
+지도 확대/축소 시 위치가 튀는 문제와, 호출 핑·유저 마커가 실제 GPS 좌표보다 위쪽으로 어긋나는 현상을 한 번에 정리합니다. 사용자가 제시한 코드를 검토한 결과, 3개 파일 외에 **`TreasureGameMap.tsx`도 동일한 이중 정렬 버그**를 가지고 있어 함께 고칩니다.
 
-호스트가 **Lovable 프리뷰 환경**(예: `id-preview--be22ceda...lovable.app`)에서 방을 만들고 링크를 공유하면, 그 도메인은 Lovable 편집자 계정 인증이 걸려 있어서 **외부 참가자가 lovable 로그인 화면을 만나게 됩니다**. 앱 자체의 `/play/:roomCode` 라우트는 이미 비보호(누구나 접근 가능)로 잘 설정돼 있어 코드 로직 문제는 아닙니다.
+## 원인 정리
 
-## 해결 방법
+1. **지도 튐**: `CompassMapWrapper`가 나침반 OFF 상태에서도 항상 `150vmax × 150vmax` 컨테이너로 감싸고 있음 → 카카오맵이 자기 viewport를 화면보다 훨씬 크게 인식 → zoom in/out 시 중심 좌표 재계산 과정에서 시각적 중심이 어긋나며 튐.
+2. **마커·핑 쏠림 (위쪽 편향)**: `CustomOverlayMap`은 기본 anchor가 `xAnchor=0.5, yAnchor=1.0` (좌표 위쪽으로 콘텐츠가 그려짐). 일부 마커는 이를 보정하려고 내부 div에 `transform: translate(-50%, -50%)`를 넣어두었지만, 이는 X축만 보정하고 Y축은 여전히 위쪽으로 쏠림. 또 `PingOverlay`처럼 이미 `yAnchor=0.5`를 명시한 곳과 안 한 곳이 섞여 있어 마커 간 기준점이 다름.
 
-초대 링크 생성 시 **항상 게시된 공개 도메인(`https://gpspinggo.lovable.app`)을 사용**하도록 강제합니다. 사용자가 이미 공개 도메인 또는 추후 연결될 커스텀 도메인에서 접속 중이면 그대로 `window.location.origin`을 씁니다.
+## 수정 대상 파일
 
-### 변경 파일
-`src/components/tag-game/WaitingRoom.tsx`
+### 1. `src/components/game/CompassMapWrapper.tsx`
+- 나침반 OFF: `width:100%, height:100%` 일반 래퍼로 렌더 → 카카오맵 viewport 정상화 → zoom 튐 해소.
+- 나침반 ON: 기존 `150vmax + rotate` 회전 컨테이너 유지.
+- 회전 상태에서 OFF로 전환될 때 RAF/누적 각도가 깨끗이 리셋되는지 재확인.
 
-### 수정 로직
-```ts
-const PUBLIC_HOST = 'https://gpspinggo.lovable.app';
+### 2. `src/components/game/UserArrowMarker.tsx`
+- `CustomOverlayMap`에 `xAnchor={0.5} yAnchor={0.5}` 명시.
+- 점 마커(`div`) 내부의 `transform: translate(-50%, -50%)` 제거 (anchor가 이미 중앙 정렬).
+- 화살표 SVG는 `width:48 height:48` 고정 박스에 회전만 적용, 이중 보정 없음.
 
-function getShareOrigin() {
-  const origin = window.location.origin;
-  // Lovable 편집/프리뷰 도메인이면 공개 도메인으로 치환
-  if (/lovable\.app$/.test(new URL(origin).hostname) && /(^|\.)id-preview--|--lovable\.app$|^preview--/.test(new URL(origin).hostname)) {
-    return PUBLIC_HOST;
-  }
-  // 그 외(공개 도메인, 커스텀 도메인, localhost 등)는 그대로
-  return origin;
-}
+### 3. `src/components/tag-game/TagGameMap.tsx`
+- 같은 팀 다른 플레이어 마커 `CustomOverlayMap`에 `xAnchor=0.5, yAnchor=0.5` 추가.
+- 내부 wrapper div의 `transform: translate(-50%, -50%)` 제거.
+- 마커 + 닉네임이 세로로 쌓이는 구조이므로, 점이 정확히 GPS 좌표 위에 오도록 wrapper에서 `transform: translateY(-50%)`처럼 추가 보정을 해야 닉네임 라벨이 아래로 내려옴 → 가장 깔끔한 방식: 닉네임을 점의 **아래쪽 absolute**로 두고 wrapper는 점 크기(24×24)만 차지하게 변경.
 
-const url = `${getShareOrigin()}/play/${room.room_code}`;
+### 4. `src/components/treasure/TreasureGameMap.tsx` (추가 발견)
+- 동료 플레이어 작은 점 마커: `xAnchor=0.5 yAnchor=0.5` 추가 + `transform: translate(-50%, -50%)` 제거.
+- 보물 아이콘 마커: `xAnchor=0.5 yAnchor=0.5` 명시 (현재 미지정이라 위로 쏠려있음).
+
+## 일관 규칙 (전 마커 공통)
+
+```text
+모든 CustomOverlayMap:
+  xAnchor=0.5, yAnchor=0.5 명시
+내부 children:
+  더 이상 translate(-50%, -50%) 사용 금지
+  중앙 기준 위/아래로 라벨 띄울 때만 absolute + translateX(-50%) 사용
 ```
 
-판별 조건은 안전하게: hostname이 `id-preview--`로 시작하거나 `lovable.dev`/편집기 호스트인 경우 → 공개 도메인 강제. 그 외엔 현 origin 유지(향후 커스텀 도메인 연결 시 자동 호환).
+## 검증 시나리오
 
-### 효과
-- ✅ 프리뷰에서 공유해도 외부 참가자가 lovable 로그인 없이 바로 방에 참여
-- ✅ 게시된 도메인에서 공유하면 그대로 사용
-- ✅ 향후 커스텀 도메인 연결 시에도 자동 적용
+1. `/play/tag-sim` 진입 후 핀치 줌, +/- 줌 반복 → 지도 중심이 시각적으로 안 튐.
+2. 호출(📡) 발사 → 펄스 원의 중심이 본인 마커(점/화살표) 중심과 정확히 겹침.
+3. 나침반 토글 ON/OFF → 회전 컨테이너만 활성/비활성, 일반 모드에선 카카오맵 줌·드래그 자연스러움.
+4. `/play/treasure-sim`에서도 동료 점·보물 아이콘이 GPS 좌표 정중앙에 표시.
 
-### 참고
-- `/play/:roomCode` 라우트는 이미 비보호 상태이므로 추가 변경 불필요
-- 닉네임 입력 카드 흐름도 그대로 유지
+## 영향 범위
+
+- 변경 파일: 4개 (CompassMapWrapper, UserArrowMarker, TagGameMap, TreasureGameMap)
+- 변경 없음: PingOverlay (이미 `yAnchor=0.5` + 중앙 정렬 구조 정상)
+- DB/스키마/네트워크 변경 없음, 순수 클라이언트 렌더링 수정.
