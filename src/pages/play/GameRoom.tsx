@@ -325,6 +325,41 @@ export default function GameRoom() {
     );
   }
 
+  // 닉네임이 없으면 (링크로 직접 진입) 닉네임 입력 카드를 보여준다
+  if (needsNicknameInput) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-xl">{room.title}</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              방 코드 <span className="font-mono">{room.room_code}</span>
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <label className="text-sm font-medium block">닉네임을 입력하고 참여하세요</label>
+            <Input
+              placeholder="닉네임"
+              value={joinNicknameInput}
+              onChange={(e) => setJoinNicknameInput(e.target.value)}
+              maxLength={12}
+              autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter') handleJoinByLink(); }}
+            />
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => navigate('/play')} className="flex-1">
+                <ArrowLeft className="w-4 h-4 mr-1" /> 로비로
+              </Button>
+              <Button onClick={handleJoinByLink} disabled={joining} className="flex-1 gap-2">
+                <LogIn className="w-4 h-4" /> {joining ? '참여 중...' : '참여하기'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // WAITING STATE
   if (room.status === 'waiting') {
     return (
