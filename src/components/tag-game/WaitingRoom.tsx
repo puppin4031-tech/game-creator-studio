@@ -79,8 +79,26 @@ export default function WaitingRoom({
     toast.success('방 코드가 복사되었습니다');
   };
 
+  const getShareOrigin = () => {
+    const origin = window.location.origin;
+    try {
+      const host = new URL(origin).hostname;
+      // Lovable 편집/프리뷰 도메인은 외부인이 lovable 로그인을 요구받으므로
+      // 게시된 공개 도메인으로 강제 치환
+      const isPreview =
+        host.startsWith('id-preview--') ||
+        host.startsWith('preview--') ||
+        host.endsWith('.lovable.dev') ||
+        host.endsWith('.sandbox.lovable.dev');
+      if (isPreview) return 'https://gpspinggo.lovable.app';
+    } catch {
+      // ignore
+    }
+    return origin;
+  };
+
   const shareLink = async () => {
-    const url = `${window.location.origin}/play/${room.room_code}`;
+    const url = `${getShareOrigin()}/play/${room.room_code}`;
     const shareData = {
       title: '함께 플레이하기',
       text: `${room.title} 방에 참여하세요! (코드: ${room.room_code})`,

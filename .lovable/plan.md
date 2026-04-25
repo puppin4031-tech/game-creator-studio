@@ -1,44 +1,40 @@
-## 술래잡기 호출/방 공유 개선
+## 문제 원인
 
-### 진단
+현재 `WaitingRoom.tsx`의 공유 링크는 `window.location.origin`을 그대로 사용합니다.
 
-1. **호출 오버레이가 사용자 중앙에서 어긋남**
-   `PingOverlay`의 외곽 컨테이너는 0×0 div이고, 자식 원에 `transform: translate(-50%, -50%)`만 걸려 있음. 카카오 `CustomOverlayMap`은 자식의 좌상단을 좌표에 배치하므로, 결과적으로 원이 좌표 기준 좌상단 방향으로 살짝 치우쳐 보임. → `xAnchor/yAnchor=0.5`로 컨테이너를 좌표 정중앙에 고정해야 함.
+호스트가 **Lovable 프리뷰 환경**(예: `id-preview--be22ceda...lovable.app`)에서 방을 만들고 링크를 공유하면, 그 도메인은 Lovable 편집자 계정 인증이 걸려 있어서 **외부 참가자가 lovable 로그인 화면을 만나게 됩니다**. 앱 자체의 `/play/:roomCode` 라우트는 이미 비보호(누구나 접근 가능)로 잘 설정돼 있어 코드 로직 문제는 아닙니다.
 
-2. **호출시 팀원에게 좌표가 안 보일 수 있음 / 라이브 구독 누락**
-   `sendPing()`에서 `supabase.channel('pings_'+room.id).send(...)` 로 **새 채널 인스턴스**를 매번 만들어 전송함. 해당 인스턴스는 `subscribe()`되지 않아 broadcast 송출이 누락되는 케이스 발생. 또한 수신 채널은 `useEffect` 의존성에 `myTeam`이 들어 있어 팀이 늦게 할당되면 재구독이 일어나며 그 사이의 ping을 놓칠 수 있음. → **수신/송신 채널을 ref로 공유**, `subscribe` 콜백에서 SUBSCRIBED 확인 후에만 ref 세팅, 의존성을 `room.id`로만 묶고 팀 필터는 ref(`myTeamRef`)로 처리.
+## 해결 방법
 
-3. **방 생성 후 링크 공유로 바로 입장 불가**
-   현재 `WaitingRoom`에는 방 코드만 복사되고, URL 자체를 공유할 수 없음. `/play/:roomCode` 라우트는 이미 존재하나, 닉네임이 없으면 `GameRoom`이 즉시 `/play`로 리다이렉트시킴. → 링크로 들어온 사용자에게 닉네임 입력 후 자동 참여 화면을 보여주고, 입력 시 `rejoinRoom`으로 즉시 참여시켜야 함.
+초대 링크 생성 시 **항상 게시된 공개 도메인(`https://gpspinggo.lovable.app`)을 사용**하도록 강제합니다. 사용자가 이미 공개 도메인 또는 추후 연결될 커스텀 도메인에서 접속 중이면 그대로 `window.location.origin`을 씁니다.
 
-### 구현 변경
+### 변경 파일
+`src/components/tag-game/WaitingRoom.tsx`
 
-#### 1) `src/components/tag-game/PingOverlay.tsx` — 중앙 정렬 수정
-- `<CustomOverlayMap>`에 `xAnchor={0.5} yAnchor={0.5}` 추가.
-- 컨테이너 div를 0×0 anchor 박스로 만들고, 펄스 원은 `position:absolute; left:50%; top:50%; transform:translate(-50%,-50%)`로 항상 중앙에서 확장.
-- 닉네임 라벨도 동일 패턴(중앙 상단 -28px)으로 정확 배치.
+### 수정 로직
+```ts
+const PUBLIC_HOST = 'https://gpspinggo.lovable.app';
 
-#### 2) `src/pages/play/GameRoom.tsx` — 라이브 구독 안정화
-- `pingChannelRef = useRef<RealtimeChannel | null>(null)` 추가.
-- 구독 useEffect 의존성 → `[room?.id, room?.status]`만 (myTeam 제거).
-- `subscribe((status) => { if (status === 'SUBSCRIBED') pingChannelRef.current = channel; })` 패턴.
-- `myTeamRef = useRef<number | null>(null)` 추가, `myTeam` 변경 시 ref 동기화. broadcast 수신 콜백은 `myTeamRef.current`로 팀 필터링.
-- `sendPing`에서 새 채널을 만들지 않고 `pingChannelRef.current?.send(...)` 사용. 발신자 본인에게는 `setPings`로 즉시 표시(기존과 동일).
-- 콘솔 로그(`[Ping] subscribed/sent/received`) 추가.
+function getShareOrigin() {
+  const origin = window.location.origin;
+  // Lovable 편집/프리뷰 도메인이면 공개 도메인으로 치환
+  if (/lovable\.app$/.test(new URL(origin).hostname) && /(^|\.)id-preview--|--lovable\.app$|^preview--/.test(new URL(origin).hostname)) {
+    return PUBLIC_HOST;
+  }
+  // 그 외(공개 도메인, 커스텀 도메인, localhost 등)는 그대로
+  return origin;
+}
 
-#### 3) `src/components/tag-game/WaitingRoom.tsx` — 방 링크 공유 버튼
-- 코드 옆에 `Share2` 아이콘 버튼 추가.
-- 클릭 시 `${window.location.origin}/play/${room.room_code}` URL을:
-  - `navigator.share` 가능하면 네이티브 공유,
-  - 아니면 클립보드 복사 + `toast.success('초대 링크가 복사되었습니다')`.
+const url = `${getShareOrigin()}/play/${room.room_code}`;
+```
 
-#### 4) `src/pages/play/GameRoom.tsx` — 링크 직접 진입 처리
-- `nickname`이 sessionStorage에 없을 때 `/play`로 리다이렉트하던 로직 → **닉네임 입력 카드** 렌더로 변경.
-- 카드: 방 제목/코드 표시 + 닉네임 입력 + "참여하기" 버튼.
-- 참여 시 `useTagRoom`의 `rejoinRoom(roomCode, nickname)` 호출 → 성공하면 sessionStorage에 닉네임/플레이어ID 저장하고 그대로 게임 페이지 진입(같은 화면이 자동으로 WaitingRoom/GameMap으로 전환).
+판별 조건은 안전하게: hostname이 `id-preview--`로 시작하거나 `lovable.dev`/편집기 호스트인 경우 → 공개 도메인 강제. 그 외엔 현 origin 유지(향후 커스텀 도메인 연결 시 자동 호환).
 
-### 영향 범위
-- DB/RLS/Realtime publication 변경 없음 (broadcast 채널만 사용).
-- 같은 팀끼리만 핑이 보이는 정책 유지.
-- 기존 sessionStorage 흐름·로비 동작 그대로.
-- `/play/:roomCode` 직접 링크가 비로그인/세션 없는 신규 사용자에게도 작동.
+### 효과
+- ✅ 프리뷰에서 공유해도 외부 참가자가 lovable 로그인 없이 바로 방에 참여
+- ✅ 게시된 도메인에서 공유하면 그대로 사용
+- ✅ 향후 커스텀 도메인 연결 시에도 자동 적용
+
+### 참고
+- `/play/:roomCode` 라우트는 이미 비보호 상태이므로 추가 변경 불필요
+- 닉네임 입력 카드 흐름도 그대로 유지
