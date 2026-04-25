@@ -132,13 +132,17 @@ function TreasureEndScreen({ roomId, players, room }: { roomId: string; players:
 export default function GameRoom() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
-  const nickname = sessionStorage.getItem('tag_nickname') || '';
+  // 닉네임은 sessionStorage에서 읽되, 없으면 입력 카드를 통해 받는다 (링크 직접 진입 지원)
+  const [nickname, setNickname] = useState<string>(sessionStorage.getItem('tag_nickname') || '');
+  const [joinNicknameInput, setJoinNicknameInput] = useState<string>('');
+  const [joining, setJoining] = useState(false);
   const hostId = sessionStorage.getItem('tag_host_id') || '';
 
   const {
     room, players, messages, loading,
     assignTeam, updateTeamNames, updateTimer,
     startGame, endGame, deleteRoom, sendMessage, updatePosition, setRoom, fetchRoom,
+    rejoinRoom,
   } = useTagRoom(roomCode);
 
   const myPlayer = useMemo(
@@ -148,7 +152,7 @@ export default function GameRoom() {
 
   const isHost = myPlayer?.is_host || false;
   const playerId = myPlayer?.id || null;
-  const myTeam = myPlayer?.team || null;
+  const myTeam = myPlayer?.team ?? null;
 
   // Pending state for start/end (immediate UX feedback before realtime echoes back)
   const [statusPending, setStatusPending] = useState<null | 'starting' | 'ending'>(null);
