@@ -223,20 +223,33 @@ export default function TreasureGameMap({
           )}
 
           {players.filter(p => p.id !== currentPlayerId && p.team === myTeam && p.latitude).map(p => (
-            <CustomOverlayMap key={p.id} position={{ lat: p.latitude, lng: p.longitude }} zIndex={5}>
+            <CustomOverlayMap
+              key={p.id}
+              position={{ lat: p.latitude, lng: p.longitude }}
+              zIndex={5}
+              xAnchor={0.5}
+              yAnchor={0.5}
+            >
               <div style={{
                 width: 14, height: 14, borderRadius: '50%',
                 backgroundColor: '#94a3b8', border: '2px solid white', opacity: 0.8,
-                transform: 'translate(-50%, -50%)',
               }} title={p.nickname} />
             </CustomOverlayMap>
           ))}
 
           {/* Nearby treasure markers with floating animation + glow */}
           {nearbyTreasures.map(t => (
-            <CustomOverlayMap key={t.id} position={{ lat: t.latitude, lng: t.longitude }} zIndex={8}>
+            <CustomOverlayMap
+              key={t.id}
+              position={{ lat: t.latitude, lng: t.longitude }}
+              zIndex={8}
+              xAnchor={0.5}
+              yAnchor={0.5}
+            >
               <div style={{
                 position: 'relative',
+                width: 36,
+                height: 36,
                 animation: 'treasure-float 2s ease-in-out infinite',
                 filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))',
               }}>
