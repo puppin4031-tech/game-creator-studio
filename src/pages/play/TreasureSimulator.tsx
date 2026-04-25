@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Map, CustomOverlayMap } from 'react-kakao-maps-sdk';
-import { MockControls } from '@/components/game/MockControls';
+
 import ProximityGlow from '@/components/treasure/ProximityGlow';
 import TreasureHUD from '@/components/treasure/TreasureHUD';
 import ShovelButton from '@/components/treasure/ShovelButton';

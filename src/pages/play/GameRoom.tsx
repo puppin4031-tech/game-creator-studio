@@ -14,7 +14,7 @@ import { Ping } from '@/components/tag-game/PingOverlay';
 import { playPingSound } from '@/lib/pingSound';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy, Radio, Compass } from 'lucide-react';
-import { MockControls } from '@/components/game/MockControls';
+
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
@@ -199,7 +199,7 @@ export default function GameRoom() {
   }, []);
 
   // Location sharing during game
-  const { position, isSimulated, mockMove, setMockStep } = useLocationShare({
+  const { position, isSimulated } = useLocationShare({
     playerId,
     updatePosition,
     isActive: room?.status === 'playing',

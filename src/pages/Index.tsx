@@ -7,7 +7,7 @@ import { useSpotDetection, DetectedSpot } from '@/hooks/useSpotDetection';
 import { GameMap } from '@/components/game/GameMap';
 import { FloatingBar } from '@/components/game/FloatingBar';
 import { FloorSelector } from '@/components/game/FloorSelector';
-import { MockControls } from '@/components/game/MockControls';
+
 import { ARCameraView } from '@/components/game/ARCameraView';
 import { InventoryDrawer } from '@/components/game/InventoryDrawer';
 import { QuestDrawer } from '@/components/game/QuestDrawer';
@@ -27,7 +27,7 @@ const Index = () => {
   const [hintData, setHintData] = useState({ title: '', hint: '', floor: 1 });
   const [acquiredItem, setAcquiredItem] = useState<string | null>(null);
 
-  const { position, mockMove, isSimulated, setMockStep } = useGeolocation();
+  const { position, isSimulated } = useGeolocation();
 
   // Fetch spots
   const { data: spots } = useQuery({
