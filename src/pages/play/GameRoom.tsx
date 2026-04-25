@@ -14,7 +14,7 @@ import { Ping } from '@/components/tag-game/PingOverlay';
 import { playPingSound } from '@/lib/pingSound';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy, Radio, Compass } from 'lucide-react';
-import { MockControls } from '@/components/game/MockControls';
+
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
@@ -199,7 +199,7 @@ export default function GameRoom() {
   }, []);
 
   // Location sharing during game
-  const { position, isSimulated, mockMove, setMockStep } = useLocationShare({
+  const { position, isSimulated } = useLocationShare({
     playerId,
     updatePosition,
     isActive: room?.status === 'playing',
@@ -371,9 +371,6 @@ export default function GameRoom() {
             <Compass className="w-5 h-5" />
           </Button>
         </div>
-        <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-3 z-[1200]">
-          <MockControls onMove={mockMove} isSimulated={isSimulated} position={position} onStepChange={setMockStep} />
-        </div>
       </div>
     );
   }
@@ -406,11 +403,6 @@ export default function GameRoom() {
           <GameTimer room={room} isHost={isHost} onEndGame={handleEndGame} />
           <Team2Score room={room} players={players} />
         </div>
-      </div>
-
-      {/* Sim controls */}
-      <div className="absolute bottom-32 left-3 z-[1200]">
-        <MockControls onMove={mockMove} isSimulated={isSimulated} position={position} onStepChange={setMockStep} />
       </div>
 
       {/* Bottom bar - signal, compass, chat */}

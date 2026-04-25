@@ -7,7 +7,7 @@ import { useSpotDetection, DetectedSpot } from '@/hooks/useSpotDetection';
 import { GameMap } from '@/components/game/GameMap';
 import { FloatingBar } from '@/components/game/FloatingBar';
 import { FloorSelector } from '@/components/game/FloorSelector';
-import { MockControls } from '@/components/game/MockControls';
+
 import { ARCameraView } from '@/components/game/ARCameraView';
 import { InventoryDrawer } from '@/components/game/InventoryDrawer';
 import { QuestDrawer } from '@/components/game/QuestDrawer';
@@ -27,7 +27,7 @@ const Index = () => {
   const [hintData, setHintData] = useState({ title: '', hint: '', floor: 1 });
   const [acquiredItem, setAcquiredItem] = useState<string | null>(null);
 
-  const { position, mockMove, isSimulated, setMockStep } = useGeolocation();
+  const { position, isSimulated } = useGeolocation();
 
   // Fetch spots
   const { data: spots } = useQuery({
@@ -146,16 +146,6 @@ const Index = () => {
 
       {/* ===== BOTTOM HUD ===== */}
       <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-0 right-0 z-[1000] flex flex-col items-center gap-3 pointer-events-none">
-        {/* Mock controls - right aligned */}
-        <div className="self-end mr-4 pointer-events-auto">
-          <MockControls
-            onMove={mockMove}
-            isSimulated={isSimulated}
-            position={position}
-            onStepChange={setMockStep}
-          />
-        </div>
-
         {/* Floating action bar - centered */}
         <div className="pointer-events-auto">
           <FloatingBar

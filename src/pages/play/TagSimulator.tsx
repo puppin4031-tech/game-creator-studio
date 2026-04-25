@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Map, Circle, CustomOverlayMap } from 'react-kakao-maps-sdk';
-import { MockControls } from '@/components/game/MockControls';
+
 import PingOverlay, { Ping } from '@/components/tag-game/PingOverlay';
 import { haversineDistance } from '@/lib/haversine';
 import { Button } from '@/components/ui/button';
@@ -223,13 +223,6 @@ export default function TagSimulator() {
             <Crosshair className="w-6 h-6 mr-2" /> 잡기!
           </Button>
         )}
-
-        <MockControls
-          onMove={handleMove}
-          isSimulated
-          position={myPos}
-          onStepChange={setStep}
-        />
       </div>
     </div>
   );

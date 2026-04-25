@@ -5,7 +5,7 @@ import { Map, MapMarker, Circle, CustomOverlayMap } from 'react-kakao-maps-sdk';
 import { supabase } from '@/integrations/supabase/client';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useAuth } from '@/contexts/AuthContext';
-import { MockControls } from '@/components/game/MockControls';
+
 import { GameMenu } from '@/components/game/GameMenu';
 import { haversineDistance } from '@/lib/haversine';
 import { Pickaxe, Package, ArrowLeft, Sparkles, Gem, X, Hammer, Compass } from 'lucide-react';
@@ -47,7 +47,7 @@ interface SpawnWithDist {
 export default function WorldMap() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { position, mockMove, isSimulated, setMockStep } = useGeolocation();
+  const { position, isSimulated } = useGeolocation();
   const [selectedSpawn, setSelectedSpawn] = useState<SpawnWithDist | null>(null);
   const [collecting, setCollecting] = useState(false);
   const [showCrafting, setShowCrafting] = useState(false);
@@ -402,12 +402,6 @@ export default function WorldMap() {
               <Compass size={22} />
             </Button>
           </div>
-          <MockControls
-            onMove={mockMove}
-            isSimulated={isSimulated}
-            position={position}
-            onStepChange={setMockStep}
-          />
         </div>
       </div>
 
