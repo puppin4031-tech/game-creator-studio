@@ -212,20 +212,42 @@ export default function GameRoom() {
     isActive: room?.status === 'playing',
   });
 
-  // Broadcast channel for signals
+  // 팀 정보를 ref로 동기화 (broadcast 콜백에서 stale closure 방지)
+  const myTeamRef = useRef<number | null>(null);
+  useEffect(() => { myTeamRef.current = myTeam; }, [myTeam]);
+
+  // Broadcast channel for signals — 송신/수신 채널 공유 (ref)
+  const pingChannelRef = useRef<RealtimeChannel | null>(null);
+
   useEffect(() => {
     if (!room || room.status !== 'playing') return;
 
-    const channel = supabase.channel(`pings_${room.id}`);
-    channel.on('broadcast', { event: 'ping' }, ({ payload }) => {
-      if (payload.team === myTeam) {
-        setPings(prev => [...prev, payload as Ping]);
-        playPingSound();
-      }
-    }).subscribe();
+    const channel = supabase.channel(`pings_${room.id}`, {
+      config: { broadcast: { self: false } },
+    });
 
-    return () => { supabase.removeChannel(channel); };
-  }, [room?.id, room?.status, myTeam]);
+    channel
+      .on('broadcast', { event: 'ping' }, ({ payload }) => {
+        const p = payload as Ping;
+        console.log('[Ping] received', p);
+        // 같은 팀에게만 표시 (정책 유지)
+        if (p.team === myTeamRef.current) {
+          setPings(prev => (prev.some(x => x.id === p.id) ? prev : [...prev, p]));
+          playPingSound();
+        }
+      })
+      .subscribe((status) => {
+        console.log('[Ping] channel status', status);
+        if (status === 'SUBSCRIBED') {
+          pingChannelRef.current = channel;
+        }
+      });
+
+    return () => {
+      pingChannelRef.current = null;
+      supabase.removeChannel(channel);
+    };
+  }, [room?.id, room?.status]);
 
   const PING_COOLDOWN = 10;
 
@@ -239,13 +261,20 @@ export default function GameRoom() {
       nickname,
       timestamp: Date.now(),
     };
+
+    // 발신자 본인에게는 즉시 표시
     setPings(prev => [...prev, ping]);
     playPingSound();
-    supabase.channel(`pings_${room.id}`).send({
-      type: 'broadcast',
-      event: 'ping',
-      payload: ping,
-    });
+
+    // 구독된 채널을 재사용해서 broadcast (새 채널 만들지 않음)
+    const ch = pingChannelRef.current;
+    if (ch) {
+      ch.send({ type: 'broadcast', event: 'ping', payload: ping })
+        .then((r) => console.log('[Ping] sent', r))
+        .catch((e) => console.warn('[Ping] send error', e));
+    } else {
+      console.warn('[Ping] channel not subscribed yet');
+    }
 
     setPingCooldown(PING_COOLDOWN);
     if (cooldownRef.current) clearInterval(cooldownRef.current);
@@ -261,10 +290,32 @@ export default function GameRoom() {
     }, 1000);
   }, [room?.id, myTeam, nickname, position.latitude, position.longitude, pingCooldown]);
 
-  // Redirect if no nickname
-  useEffect(() => {
-    if (!nickname) navigate('/play');
-  }, [nickname]);
+  // 링크로 직접 진입했고 닉네임이 없을 때 → 닉네임 입력 카드 표시
+  const needsNicknameInput = !nickname && !!roomCode && !!room;
+
+  const handleJoinByLink = useCallback(async () => {
+    const nick = joinNicknameInput.trim();
+    if (!nick) {
+      toast.error('닉네임을 입력해주세요');
+      return;
+    }
+    if (!roomCode) return;
+    setJoining(true);
+    const result = await rejoinRoom(roomCode.toUpperCase(), nick);
+    setJoining(false);
+    if (result && result.player) {
+      sessionStorage.setItem('tag_nickname', nick);
+      sessionStorage.setItem('tag_player_id', result.player.id);
+      sessionStorage.setItem('tag_room_code', result.room.room_code);
+      if (result.player.is_host) {
+        sessionStorage.setItem('tag_host_id', result.room.host_id);
+      }
+      setNickname(nick);
+      toast.success('참여했습니다');
+    } else {
+      toast.error('방을 찾을 수 없습니다');
+    }
+  }, [joinNicknameInput, roomCode, rejoinRoom]);
 
   if (loading || !room) {
     return (
