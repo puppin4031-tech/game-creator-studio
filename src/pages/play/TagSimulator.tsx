@@ -223,13 +223,6 @@ export default function TagSimulator() {
             <Crosshair className="w-6 h-6 mr-2" /> 잡기!
           </Button>
         )}
-
-        <MockControls
-          onMove={handleMove}
-          isSimulated
-          position={myPos}
-          onStepChange={setStep}
-        />
       </div>
     </div>
   );

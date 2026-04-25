@@ -402,12 +402,6 @@ export default function WorldMap() {
               <Compass size={22} />
             </Button>
           </div>
-          <MockControls
-            onMove={mockMove}
-            isSimulated={isSimulated}
-            position={position}
-            onStepChange={setMockStep}
-          />
         </div>
       </div>
 

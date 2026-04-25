@@ -457,13 +457,6 @@ export default function TreasureSimulator() {
           onDigSuccess={handleDigSuccess}
           disabled={cooldownLeft > 0}
         />
-
-        <MockControls
-          onMove={handleMove}
-          isSimulated
-          position={myPos}
-          onStepChange={setStep}
-        />
       </div>
 
       {victoryOverlay && (

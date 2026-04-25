@@ -371,9 +371,6 @@ export default function GameRoom() {
             <Compass className="w-5 h-5" />
           </Button>
         </div>
-        <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-3 z-[1200]">
-          <MockControls onMove={mockMove} isSimulated={isSimulated} position={position} onStepChange={setMockStep} />
-        </div>
       </div>
     );
   }
@@ -406,11 +403,6 @@ export default function GameRoom() {
           <GameTimer room={room} isHost={isHost} onEndGame={handleEndGame} />
           <Team2Score room={room} players={players} />
         </div>
-      </div>
-
-      {/* Sim controls */}
-      <div className="absolute bottom-32 left-3 z-[1200]">
-        <MockControls onMove={mockMove} isSimulated={isSimulated} position={position} onStepChange={setMockStep} />
       </div>
 
       {/* Bottom bar - signal, compass, chat */}
