@@ -62,8 +62,15 @@ export default function TagGameMap({
         {visiblePlayers.map(p => {
           const color = TEAM_COLORS[p.team || 1] || '#888';
           return (
-            <CustomOverlayMap key={p.id} position={{ lat: p.latitude, lng: p.longitude }} zIndex={8}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', transform: 'translate(-50%, -50%)' }}>
+            <CustomOverlayMap
+              key={p.id}
+              position={{ lat: p.latitude, lng: p.longitude }}
+              zIndex={8}
+              xAnchor={0.5}
+              yAnchor={0.5}
+            >
+              {/* 24x24 점이 GPS 좌표 정중앙. 닉네임은 점 아래로 absolute 라벨 */}
+              <div style={{ position: 'relative', width: 24, height: 24 }}>
                 <div style={{
                   width: 24,
                   height: 24,
@@ -82,10 +89,16 @@ export default function TagGameMap({
                   {p.nickname.charAt(0)}
                 </div>
                 <span style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  marginTop: 2,
                   fontSize: 10,
                   color: '#fff',
                   textShadow: '0 1px 3px rgba(0,0,0,0.8)',
-                  marginTop: 2,
+                  whiteSpace: 'nowrap',
+                  pointerEvents: 'none',
                 }}>
                   {p.nickname}{p.is_caught ? ' (잡힘)' : ''}
                 </span>
