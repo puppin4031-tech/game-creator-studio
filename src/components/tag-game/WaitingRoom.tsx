@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
-import { ArrowLeft, Copy, Play, Users, Settings, Crown, Trash2, ArrowRight, Undo2 } from 'lucide-react';
+import { ArrowLeft, Copy, Play, Users, Settings, Crown, Trash2, ArrowRight, Undo2, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import TreasureSetup from '@/components/treasure/TreasureSetup';
 import { useTreasureHunt } from '@/hooks/useTreasureHunt';
@@ -79,6 +79,29 @@ export default function WaitingRoom({
     toast.success('방 코드가 복사되었습니다');
   };
 
+  const shareLink = async () => {
+    const url = `${window.location.origin}/play/${room.room_code}`;
+    const shareData = {
+      title: '함께 플레이하기',
+      text: `${room.title} 방에 참여하세요! (코드: ${room.room_code})`,
+      url,
+    };
+    try {
+      if (navigator.share && typeof navigator.canShare === 'function' && navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+        return;
+      }
+    } catch (e) {
+      // 공유 취소되었거나 실패 → 클립보드 폴백
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('초대 링크가 복사되었습니다');
+    } catch {
+      toast.error('링크 복사에 실패했습니다');
+    }
+  };
+
   const saveSettings = () => {
     onUpdateTeamNames(team1Name, team2Name);
     onUpdateTimer(timerMin * 60);
@@ -116,8 +139,11 @@ export default function WaitingRoom({
           <Badge variant="outline" className="text-lg font-mono tracking-widest px-4 py-1">
             {room.room_code}
           </Badge>
-          <Button size="icon" variant="ghost" onClick={copyCode}>
+          <Button size="icon" variant="ghost" onClick={copyCode} title="코드 복사">
             <Copy className="w-4 h-4" />
+          </Button>
+          <Button size="icon" variant="ghost" onClick={shareLink} title="초대 링크 공유">
+            <Share2 className="w-4 h-4" />
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-1">

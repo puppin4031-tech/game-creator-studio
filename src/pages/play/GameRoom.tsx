@@ -13,10 +13,13 @@ import ChatDrawer from '@/components/tag-game/ChatDrawer';
 import { Ping } from '@/components/tag-game/PingOverlay';
 import { playPingSound } from '@/lib/pingSound';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trophy, Radio, Compass } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { ArrowLeft, Trophy, Radio, Compass, LogIn } from 'lucide-react';
+import { toast } from 'sonner';
 
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
 
 import { getTreasureIconSrc } from '@/lib/treasureIcons';
@@ -129,13 +132,17 @@ function TreasureEndScreen({ roomId, players, room }: { roomId: string; players:
 export default function GameRoom() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
-  const nickname = sessionStorage.getItem('tag_nickname') || '';
+  // 닉네임은 sessionStorage에서 읽되, 없으면 입력 카드를 통해 받는다 (링크 직접 진입 지원)
+  const [nickname, setNickname] = useState<string>(sessionStorage.getItem('tag_nickname') || '');
+  const [joinNicknameInput, setJoinNicknameInput] = useState<string>('');
+  const [joining, setJoining] = useState(false);
   const hostId = sessionStorage.getItem('tag_host_id') || '';
 
   const {
     room, players, messages, loading,
     assignTeam, updateTeamNames, updateTimer,
     startGame, endGame, deleteRoom, sendMessage, updatePosition, setRoom, fetchRoom,
+    rejoinRoom,
   } = useTagRoom(roomCode);
 
   const myPlayer = useMemo(
@@ -145,7 +152,7 @@ export default function GameRoom() {
 
   const isHost = myPlayer?.is_host || false;
   const playerId = myPlayer?.id || null;
-  const myTeam = myPlayer?.team || null;
+  const myTeam = myPlayer?.team ?? null;
 
   // Pending state for start/end (immediate UX feedback before realtime echoes back)
   const [statusPending, setStatusPending] = useState<null | 'starting' | 'ending'>(null);
@@ -205,20 +212,42 @@ export default function GameRoom() {
     isActive: room?.status === 'playing',
   });
 
-  // Broadcast channel for signals
+  // 팀 정보를 ref로 동기화 (broadcast 콜백에서 stale closure 방지)
+  const myTeamRef = useRef<number | null>(null);
+  useEffect(() => { myTeamRef.current = myTeam; }, [myTeam]);
+
+  // Broadcast channel for signals — 송신/수신 채널 공유 (ref)
+  const pingChannelRef = useRef<RealtimeChannel | null>(null);
+
   useEffect(() => {
     if (!room || room.status !== 'playing') return;
 
-    const channel = supabase.channel(`pings_${room.id}`);
-    channel.on('broadcast', { event: 'ping' }, ({ payload }) => {
-      if (payload.team === myTeam) {
-        setPings(prev => [...prev, payload as Ping]);
-        playPingSound();
-      }
-    }).subscribe();
+    const channel = supabase.channel(`pings_${room.id}`, {
+      config: { broadcast: { self: false } },
+    });
 
-    return () => { supabase.removeChannel(channel); };
-  }, [room?.id, room?.status, myTeam]);
+    channel
+      .on('broadcast', { event: 'ping' }, ({ payload }) => {
+        const p = payload as Ping;
+        console.log('[Ping] received', p);
+        // 같은 팀에게만 표시 (정책 유지)
+        if (p.team === myTeamRef.current) {
+          setPings(prev => (prev.some(x => x.id === p.id) ? prev : [...prev, p]));
+          playPingSound();
+        }
+      })
+      .subscribe((status) => {
+        console.log('[Ping] channel status', status);
+        if (status === 'SUBSCRIBED') {
+          pingChannelRef.current = channel;
+        }
+      });
+
+    return () => {
+      pingChannelRef.current = null;
+      supabase.removeChannel(channel);
+    };
+  }, [room?.id, room?.status]);
 
   const PING_COOLDOWN = 10;
 
@@ -232,13 +261,20 @@ export default function GameRoom() {
       nickname,
       timestamp: Date.now(),
     };
+
+    // 발신자 본인에게는 즉시 표시
     setPings(prev => [...prev, ping]);
     playPingSound();
-    supabase.channel(`pings_${room.id}`).send({
-      type: 'broadcast',
-      event: 'ping',
-      payload: ping,
-    });
+
+    // 구독된 채널을 재사용해서 broadcast (새 채널 만들지 않음)
+    const ch = pingChannelRef.current;
+    if (ch) {
+      ch.send({ type: 'broadcast', event: 'ping', payload: ping })
+        .then((r) => console.log('[Ping] sent', r))
+        .catch((e) => console.warn('[Ping] send error', e));
+    } else {
+      console.warn('[Ping] channel not subscribed yet');
+    }
 
     setPingCooldown(PING_COOLDOWN);
     if (cooldownRef.current) clearInterval(cooldownRef.current);
@@ -254,15 +290,72 @@ export default function GameRoom() {
     }, 1000);
   }, [room?.id, myTeam, nickname, position.latitude, position.longitude, pingCooldown]);
 
-  // Redirect if no nickname
-  useEffect(() => {
-    if (!nickname) navigate('/play');
-  }, [nickname]);
+  // 링크로 직접 진입했고 닉네임이 없을 때 → 닉네임 입력 카드 표시
+  const needsNicknameInput = !nickname && !!roomCode && !!room;
+
+  const handleJoinByLink = useCallback(async () => {
+    const nick = joinNicknameInput.trim();
+    if (!nick) {
+      toast.error('닉네임을 입력해주세요');
+      return;
+    }
+    if (!roomCode) return;
+    setJoining(true);
+    const result = await rejoinRoom(roomCode.toUpperCase(), nick);
+    setJoining(false);
+    if (result && result.player) {
+      sessionStorage.setItem('tag_nickname', nick);
+      sessionStorage.setItem('tag_player_id', result.player.id);
+      sessionStorage.setItem('tag_room_code', result.room.room_code);
+      if (result.player.is_host) {
+        sessionStorage.setItem('tag_host_id', result.room.host_id);
+      }
+      setNickname(nick);
+      toast.success('참여했습니다');
+    } else {
+      toast.error('방을 찾을 수 없습니다');
+    }
+  }, [joinNicknameInput, roomCode, rejoinRoom]);
 
   if (loading || !room) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // 닉네임이 없으면 (링크로 직접 진입) 닉네임 입력 카드를 보여준다
+  if (needsNicknameInput) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-xl">{room.title}</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              방 코드 <span className="font-mono">{room.room_code}</span>
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <label className="text-sm font-medium block">닉네임을 입력하고 참여하세요</label>
+            <Input
+              placeholder="닉네임"
+              value={joinNicknameInput}
+              onChange={(e) => setJoinNicknameInput(e.target.value)}
+              maxLength={12}
+              autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter') handleJoinByLink(); }}
+            />
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => navigate('/play')} className="flex-1">
+                <ArrowLeft className="w-4 h-4 mr-1" /> 로비로
+              </Button>
+              <Button onClick={handleJoinByLink} disabled={joining} className="flex-1 gap-2">
+                <LogIn className="w-4 h-4" /> {joining ? '참여 중...' : '참여하기'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }

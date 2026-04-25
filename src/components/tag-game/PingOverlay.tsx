@@ -20,7 +20,7 @@ const TEAM_COLORS: Record<number, string> = {
 interface Props {
   pings: Ping[];
   onExpire: (id: string) => void;
-  map?: any; // kept for API compat but unused with kakao
+  map?: any;
 }
 
 function PingCircle({ ping, onExpire }: { ping: Ping; onExpire: () => void }) {
@@ -65,13 +65,22 @@ function PingCircle({ ping, onExpire }: { ping: Ping; onExpire: () => void }) {
 
   const color = TEAM_COLORS[ping.team] || '#EF4444';
 
+  // xAnchor/yAnchor=0.5 → 컨테이너 div의 중앙이 정확한 좌표에 위치
   return (
-    <CustomOverlayMap position={{ lat: ping.lat, lng: ping.lng }} zIndex={100}>
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <CustomOverlayMap
+      position={{ lat: ping.lat, lng: ping.lng }}
+      xAnchor={0.5}
+      yAnchor={0.5}
+      zIndex={100}
+    >
+      <div style={{ position: 'relative', width: 0, height: 0, pointerEvents: 'none' }}>
+        {/* 펄스 원 — 항상 중앙에서 확장 */}
         <div
           ref={outerRef}
           style={{
             position: 'absolute',
+            left: 0,
+            top: 0,
             width: 150,
             height: 150,
             borderRadius: '50%',
@@ -79,19 +88,22 @@ function PingCircle({ ping, onExpire }: { ping: Ping; onExpire: () => void }) {
             backgroundColor: color,
             opacity: 0.3,
             transform: 'translate(-50%, -50%)',
-            pointerEvents: 'none',
           }}
         />
-        <div style={{
-          position: 'absolute',
-          transform: 'translate(-50%, -50%)',
-          whiteSpace: 'nowrap',
-          color,
-          fontSize: 12,
-          fontWeight: 'bold',
-          textShadow: '0 1px 3px rgba(0,0,0,0.5)',
-          top: -20,
-        }}>
+        {/* 닉네임 라벨 — 중앙 상단 */}
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: -28,
+            transform: 'translateX(-50%)',
+            whiteSpace: 'nowrap',
+            color,
+            fontSize: 12,
+            fontWeight: 'bold',
+            textShadow: '0 1px 3px rgba(0,0,0,0.6)',
+          }}
+        >
           📡 {ping.nickname}의 신호
         </div>
       </div>
