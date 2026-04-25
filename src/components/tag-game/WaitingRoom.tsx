@@ -139,8 +139,11 @@ export default function WaitingRoom({
           <Badge variant="outline" className="text-lg font-mono tracking-widest px-4 py-1">
             {room.room_code}
           </Badge>
-          <Button size="icon" variant="ghost" onClick={copyCode}>
+          <Button size="icon" variant="ghost" onClick={copyCode} title="코드 복사">
             <Copy className="w-4 h-4" />
+          </Button>
+          <Button size="icon" variant="ghost" onClick={shareLink} title="초대 링크 공유">
+            <Share2 className="w-4 h-4" />
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
