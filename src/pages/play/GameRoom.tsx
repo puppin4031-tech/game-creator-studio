@@ -13,10 +13,13 @@ import ChatDrawer from '@/components/tag-game/ChatDrawer';
 import { Ping } from '@/components/tag-game/PingOverlay';
 import { playPingSound } from '@/lib/pingSound';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trophy, Radio, Compass } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { ArrowLeft, Trophy, Radio, Compass, LogIn } from 'lucide-react';
+import { toast } from 'sonner';
 
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { TagRoom, TagPlayer } from '@/hooks/useTagRoom';
 
 import { getTreasureIconSrc } from '@/lib/treasureIcons';
