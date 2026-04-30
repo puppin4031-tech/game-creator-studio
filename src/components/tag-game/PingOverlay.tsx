@@ -43,7 +43,7 @@ function PingCircle({ ping, onExpire }: { ping: Ping; onExpire: () => void }) {
 
       const pulsePhase = Math.sin(elapsed * 0.005) * 0.5 + 0.5;
       const fadeOut = Math.max(0, 1 - progress);
-      const outerSize = 150 + pulsePhase * 250 * fadeOut;
+      const outerSize = 100 + pulsePhase * 150 * fadeOut;
 
       if (outerRef.current) {
         outerRef.current.style.width = `${outerSize}px`;
