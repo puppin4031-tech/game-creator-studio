@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { CustomOverlayMap } from 'react-kakao-maps-sdk';
+import { useEffect, useRef } from "react";
+import { CustomOverlayMap } from "react-kakao-maps-sdk";
 
 export interface Ping {
   id: string;
@@ -13,8 +13,8 @@ export interface Ping {
 const PING_DURATION = 4000;
 
 const TEAM_COLORS: Record<number, string> = {
-  1: '#3B82F6',
-  2: '#EF4444',
+  1: "#3B82F6",
+  2: "#EF4444",
 };
 
 interface Props {
@@ -30,7 +30,7 @@ function PingCircle({ ping, onExpire }: { ping: Ping; onExpire: () => void }) {
 
   useEffect(() => {
     startRef.current = Date.now();
-    const color = TEAM_COLORS[ping.team] || '#EF4444';
+    const color = TEAM_COLORS[ping.team] || "#EF4444";
 
     const animate = () => {
       const elapsed = Date.now() - startRef.current;
@@ -63,45 +63,40 @@ function PingCircle({ ping, onExpire }: { ping: Ping; onExpire: () => void }) {
     };
   }, [ping.id]);
 
-  const color = TEAM_COLORS[ping.team] || '#EF4444';
+  const color = TEAM_COLORS[ping.team] || "#EF4444";
 
   // xAnchor/yAnchor=0.5 → 컨테이너 div의 중앙이 정확한 좌표에 위치
   return (
-    <CustomOverlayMap
-      position={{ lat: ping.lat, lng: ping.lng }}
-      xAnchor={0.5}
-      yAnchor={0.5}
-      zIndex={100}
-    >
-      <div style={{ position: 'relative', width: 0, height: 0, pointerEvents: 'none' }}>
+    <CustomOverlayMap position={{ lat: ping.lat, lng: ping.lng }} xAnchor={0.5} yAnchor={0.5} zIndex={100}>
+      <div style={{ position: "relative", width: 0, height: 0, pointerEvents: "none" }}>
         {/* 펄스 원 — 항상 중앙에서 확장 */}
         <div
           ref={outerRef}
           style={{
-            position: 'absolute',
+            position: "absolute",
             left: 0,
             top: 0,
-            width: 150,
-            height: 150,
-            borderRadius: '50%',
+            width: 100,
+            height: 100,
+            borderRadius: "50%",
             border: `2px solid ${color}`,
             backgroundColor: color,
             opacity: 0.3,
-            transform: 'translate(-50%, -50%)',
+            transform: "translate(-50%, -50%)",
           }}
         />
         {/* 닉네임 라벨 — 중앙 상단 */}
         <div
           style={{
-            position: 'absolute',
+            position: "absolute",
             left: 0,
             top: -28,
-            transform: 'translateX(-50%)',
-            whiteSpace: 'nowrap',
+            transform: "translateX(-50%)",
+            whiteSpace: "nowrap",
             color,
             fontSize: 12,
-            fontWeight: 'bold',
-            textShadow: '0 1px 3px rgba(0,0,0,0.6)',
+            fontWeight: "bold",
+            textShadow: "0 1px 3px rgba(0,0,0,0.6)",
           }}
         >
           📡 {ping.nickname}의 신호
@@ -114,7 +109,7 @@ function PingCircle({ ping, onExpire }: { ping: Ping; onExpire: () => void }) {
 export default function PingOverlay({ pings, onExpire }: Props) {
   return (
     <>
-      {pings.map(ping => (
+      {pings.map((ping) => (
         <PingCircle key={ping.id} ping={ping} onExpire={() => onExpire(ping.id)} />
       ))}
     </>
