@@ -470,7 +470,7 @@ export default function GameRoom() {
 
   // PLAYING STATE — Tag mode
   return (
-    <div className="h-screen w-screen relative text-[1.3em]">
+    <div className="h-[100dvh] w-screen relative text-[1.3em]">
       {/* Map */}
       <TagGameMap
         room={room}
@@ -498,13 +498,19 @@ export default function GameRoom() {
         </div>
       </div>
 
-      {/* Bottom bar - signal, compass, chat */}
-      <div className="absolute bottom-6 left-3 right-3 z-10 flex items-end justify-between">
+      {/* Right-side vertical action stack: signal, compass, chat */}
+      <div
+        className="absolute z-[1300] flex flex-col gap-3 text-base items-end"
+        style={{
+          top: 'calc(5.5rem + env(safe-area-inset-top))',
+          right: 'calc(0.75rem + env(safe-area-inset-right))',
+        }}
+      >
         {/* Signal button */}
         <Button
           size="icon"
           variant="secondary"
-          className="h-20 w-20 rounded-full shadow-lg relative"
+          className="h-16 w-16 sm:h-[5.5rem] sm:w-[5.5rem] md:h-24 md:w-24 rounded-full shadow-lg relative"
           onClick={sendPing}
           disabled={pingCooldown > 0}
           title="내 위치 신호 보내기"
@@ -512,7 +518,7 @@ export default function GameRoom() {
           {pingCooldown > 0 ? (
             <span className="text-xl font-bold">{pingCooldown}</span>
           ) : (
-            <Radio className="w-9 h-9" />
+            <Radio className="!w-6 !h-6 sm:!w-9 sm:!h-9 md:!w-10 md:!h-10" />
           )}
         </Button>
 
@@ -520,11 +526,11 @@ export default function GameRoom() {
         <Button
           size="icon"
           variant={compassActive ? 'default' : 'secondary'}
-          className="h-20 w-20 rounded-full shadow-lg"
+          className="h-16 w-16 sm:h-[5.5rem] sm:w-[5.5rem] md:h-24 md:w-24 rounded-full shadow-lg"
           onClick={toggleCompass}
           title="나침반 모드"
         >
-          <Compass className="w-9 h-9" />
+          <Compass className="!w-6 !h-6 sm:!w-9 sm:!h-9 md:!w-10 md:!h-10" />
         </Button>
 
         {/* Chat button */}
