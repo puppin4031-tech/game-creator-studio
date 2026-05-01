@@ -32,6 +32,7 @@ import GameRoom from "./pages/play/GameRoom";
 import PuzzleSimulator from "./pages/play/PuzzleSimulator";
 import TagSimulator from "./pages/play/TagSimulator";
 import TreasureSimulator from "./pages/play/TreasureSimulator";
+import MobileFrame from "./layouts/MobileFrame";
 
 const queryClient = new QueryClient();
 
