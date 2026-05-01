@@ -470,7 +470,7 @@ export default function GameRoom() {
 
   // PLAYING STATE — Tag mode
   return (
-    <div className="h-[100dvh] w-screen relative text-[1.3em]">
+    <div className="h-[100dvh] w-full relative text-[1.3em] overflow-hidden">
       {/* Map */}
       <TagGameMap
         room={room}
