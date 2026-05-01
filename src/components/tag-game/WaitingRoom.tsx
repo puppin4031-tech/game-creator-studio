@@ -79,18 +79,21 @@ export default function WaitingRoom({
     toast.success('방 코드가 복사되었습니다');
   };
 
+  const PUBLISHED_ORIGIN = 'https://gpspinggo.lovable.app';
   const getShareOrigin = () => {
     const origin = window.location.origin;
     try {
       const host = new URL(origin).hostname;
-      // Lovable 편집/프리뷰 도메인은 외부인이 lovable 로그인을 요구받으므로
-      // 게시된 공개 도메인으로 강제 치환
-      const isPreview =
-        host.startsWith('id-preview--') ||
-        host.startsWith('preview--') ||
+      // 게시된 공개 도메인(gpspinggo.lovable.app)이나 사용자 커스텀 도메인이 아니라면
+      // 외부인이 Lovable 로그인 화면을 보지 않도록 published URL로 강제 치환
+      const isPublished = host === 'gpspinggo.lovable.app';
+      const isLovableInternal =
+        host.endsWith('.lovable.app') ||
         host.endsWith('.lovable.dev') ||
-        host.endsWith('.sandbox.lovable.dev');
-      if (isPreview) return 'https://gpspinggo.lovable.app';
+        host.endsWith('.sandbox.lovable.dev') ||
+        host === 'localhost' ||
+        host.startsWith('127.0.0.1');
+      if (!isPublished && isLovableInternal) return PUBLISHED_ORIGIN;
     } catch {
       // ignore
     }
