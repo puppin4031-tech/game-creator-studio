@@ -434,7 +434,7 @@ export default function GameRoom() {
   // PLAYING STATE — Treasure Hunt mode
   if (room.game_mode === 'treasure') {
     return (
-      <div className="relative">
+      <div className="relative h-[100dvh] w-full overflow-hidden">
         <TreasureGameMap
           room={room}
           players={players}
