@@ -68,7 +68,7 @@ export default function ChatDrawer({ room, messages, currentNickname, currentTea
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent side="bottom" className="h-[70vh] flex flex-col">
+      <SheetContent side="bottom" className="h-[70vh] flex flex-col w-full max-w-[480px] mx-auto inset-x-0 rounded-t-lg">
         <SheetHeader>
           <SheetTitle className="text-lg">채팅</SheetTitle>
         </SheetHeader>

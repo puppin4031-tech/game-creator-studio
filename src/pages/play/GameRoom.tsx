@@ -434,7 +434,7 @@ export default function GameRoom() {
   // PLAYING STATE — Treasure Hunt mode
   if (room.game_mode === 'treasure') {
     return (
-      <div className="relative">
+      <div className="relative h-[100dvh] w-full overflow-hidden">
         <TreasureGameMap
           room={room}
           players={players}
@@ -450,7 +450,7 @@ export default function GameRoom() {
           onSendMessage={(msg, channel) => sendMessage(room.id, nickname, msg, channel)}
         />
         {/* Compass toggle — WorldMap-style */}
-        <div className="fixed bottom-[calc(7rem+env(safe-area-inset-bottom))] right-3 z-[1300]">
+        <div className="absolute bottom-[calc(7rem+env(safe-area-inset-bottom))] right-3 z-[1300]">
           <Button
             size="icon"
             onClick={toggleCompass}
@@ -470,7 +470,7 @@ export default function GameRoom() {
 
   // PLAYING STATE — Tag mode
   return (
-    <div className="h-[100dvh] w-screen relative text-[1.3em]">
+    <div className="h-[100dvh] w-full relative text-[1.3em] overflow-hidden">
       {/* Map */}
       <TagGameMap
         room={room}
