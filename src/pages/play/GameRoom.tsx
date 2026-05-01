@@ -450,7 +450,7 @@ export default function GameRoom() {
           onSendMessage={(msg, channel) => sendMessage(room.id, nickname, msg, channel)}
         />
         {/* Compass toggle — WorldMap-style */}
-        <div className="fixed bottom-[calc(7rem+env(safe-area-inset-bottom))] right-3 z-[1300]">
+        <div className="absolute bottom-[calc(7rem+env(safe-area-inset-bottom))] right-3 z-[1300]">
           <Button
             size="icon"
             onClick={toggleCompass}
