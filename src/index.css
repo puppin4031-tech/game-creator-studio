@@ -46,7 +46,20 @@
     --game-glow: 150 80% 45%;
     --game-warning: 35 90% 55%;
     --game-danger: 0 75% 55%;
-    --survival-ground: #b9c48a;
+    --survival-ground: #aabd87;
+    --survival-forest: #648d64;
+    --survival-grass: #93b778;
+    --survival-wetland: #7aa59a;
+    --survival-water: #509ca9;
+    --survival-shore: #c4c19a;
+    --survival-ice: #cde2dd;
+    --survival-path: #b6b5a2;
+    --survival-path-edge: #929b87;
+    --survival-deco-leaf: #507747;
+    --survival-deco-light: #bad18a;
+    --survival-deco-stone: #858d87;
+    --survival-deco-stone-light: #c4ccbc;
+    --survival-deco-shadow: #425e48;
     --survival-fog: rgba(18, 24, 20, 0.92);
 
     --sidebar-background: 220 15% 96%;
