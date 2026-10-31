@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, Backpack, Flame, Lightbulb, LocateFixed, X, Lock, RotateCcw, Route } from 'lucide-react';
@@ -55,7 +55,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [gpsReady, setGpsReady] = useState(false);
   const g = useSurvivalWorld(START, { enabled: !realGps || gpsReady, saveKey: realGps ? 'survival-gps-world-v1' : 'survival-world-v1' });
   const gps = useSurvivalGps(realGps, g.moveTo);
-  if (gpsReady !== gps.ready) setGpsReady(gps.ready);
+  useEffect(() => setGpsReady(gps.ready), [gps.ready]);
   const { state: s } = g;
   const [panel, setPanel] = useState<Panel>('none');
   const [plannerOpen, setPlannerOpen] = useState(false);
