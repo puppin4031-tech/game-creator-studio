@@ -20,6 +20,18 @@ export default function GoogleMapsProvider({ children }: Props) {
   }
 
   if (error) {
+    // Dev-only pages (no map needed) still render when the SDK is blocked,
+    // e.g. on localhost where the Kakao Web domain isn't registered.
+    if (window.location.pathname.startsWith('/dev/')) {
+      return (
+        <>
+          <div className="bg-destructive/10 px-3 py-1.5 text-center text-xs text-destructive">
+            지도 로딩 실패 (현재 도메인 미등록) — 지도 없는 점검 페이지만 표시합니다.
+          </div>
+          {children}
+        </>
+      );
+    }
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
         <div className="text-center space-y-2">
