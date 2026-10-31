@@ -1,0 +1,100 @@
+import { CREATURES, NODES, type CreatureType, type NodeType } from './entities';
+import { biomeAt, distanceM, fromGrid, hash01, pickWeighted, toGrid } from './geo';
+import type { LatLng, WorldCreature, WorldEntity, WorldNode } from './types';
+
+export const NODE_CELL_M = 32;
+export const NODE_DENSITY = 0.5;
+export const CREATURE_CELL_M = 90;
+/** Creatures re-roll their position every epoch, so herds appear to roam. */
+export const CREATURE_EPOCH_MS = 8 * 60_000;
+export const CREATURE_DENSITY_DAY = 0.3;
+export const CREATURE_DENSITY_NIGHT = 0.38;
+/** Creatures never spawn this close to the base edge (safe zone). */
+export const SAFE_MARGIN_M = 15;
+
+export interface WorldQuery {
+  center: LatLng;
+  radiusM: number;
+  now: number;
+  isNight: boolean;
+  depleted: Record<string, number>;
+  safeZone?: { center: LatLng; radiusM: number } | null;
+}
+
+export const creatureEpoch = (now: number) => Math.floor(now / CREATURE_EPOCH_MS);
+
+export function isNodeAvailable(id: string, type: NodeType, depleted: Record<string, number>, now: number) {
+  const at = depleted[id];
+  return !at || now >= at + NODES[type].respawnMin * 60_000;
+}
+
+export function generateNodes(q: WorldQuery): WorldNode[] {
+  const { x, y } = toGrid(q.center);
+  const r = q.radiusM;
+  const cx0 = Math.floor((x - r) / NODE_CELL_M);
+  const cx1 = Math.floor((x + r) / NODE_CELL_M);
+  const cy0 = Math.floor((y - r) / NODE_CELL_M);
+  const cy1 = Math.floor((y + r) / NODE_CELL_M);
+  const out: WorldNode[] = [];
+  const types = Object.keys(NODES) as NodeType[];
+  for (let cx = cx0; cx <= cx1; cx++) {
+    for (let cy = cy0; cy <= cy1; cy++) {
+      if (hash01(cx, cy, 1) > NODE_DENSITY) continue;
+      const gx = (cx + 0.15 + hash01(cx, cy, 2) * 0.7) * NODE_CELL_M;
+      const gy = (cy + 0.15 + hash01(cx, cy, 3) * 0.7) * NODE_CELL_M;
+      const pos = fromGrid(gx, gy);
+      if (distanceM(pos, q.center) > r) continue;
+      const biome = biomeAt(pos);
+      const type = pickWeighted(types.map((t) => [t, NODES[t].biomes[biome as keyof (typeof NODES)[typeof t]['biomes']] ?? 0] as [NodeType, number]), hash01(cx, cy, 4));
+      if (!type) continue;
+      const id = `n:${cx}:${cy}`;
+      if (!isNodeAvailable(id, type, q.depleted, q.now)) continue;
+      out.push({ id, kind: 'node', type, lat: pos.lat, lng: pos.lng });
+    }
+  }
+  return out;
+}
+
+export function generateCreatures(q: WorldQuery): WorldCreature[] {
+  const { x, y } = toGrid(q.center);
+  const r = q.radiusM;
+  const epoch = creatureEpoch(q.now);
+  const density = q.isNight ? CREATURE_DENSITY_NIGHT : CREATURE_DENSITY_DAY;
+  const cx0 = Math.floor((x - r) / CREATURE_CELL_M);
+  const cx1 = Math.floor((x + r) / CREATURE_CELL_M);
+  const cy0 = Math.floor((y - r) / CREATURE_CELL_M);
+  const cy1 = Math.floor((y + r) / CREATURE_CELL_M);
+  const types = Object.keys(CREATURES) as CreatureType[];
+  const out: WorldCreature[] = [];
+  for (let cx = cx0; cx <= cx1; cx++) {
+    for (let cy = cy0; cy <= cy1; cy++) {
+      if (hash01(cx, cy, epoch, 7) > density) continue;
+      const gx = (cx + 0.1 + hash01(cx, cy, epoch, 8) * 0.8) * CREATURE_CELL_M;
+      const gy = (cy + 0.1 + hash01(cx, cy, epoch, 9) * 0.8) * CREATURE_CELL_M;
+      const pos = fromGrid(gx, gy);
+      if (distanceM(pos, q.center) > r) continue;
+      if (q.safeZone && distanceM(pos, q.safeZone.center) < q.safeZone.radiusM + SAFE_MARGIN_M) continue;
+      const biome = biomeAt(pos);
+      const weights = types.map((t) => {
+        const d = CREATURES[t];
+        const bw = (d.biomes as Record<string, number | undefined>)[biome] ?? 0;
+        return [t, bw * (q.isNight ? d.nightWeight : 1)] as [CreatureType, number];
+      });
+      const type = pickWeighted(weights, hash01(cx, cy, epoch, 10));
+      if (!type) continue;
+      const id = `c:${cx}:${cy}:${epoch}`;
+      if (q.depleted[id]) continue;
+      out.push({ id, kind: 'creature', type, lat: pos.lat, lng: pos.lng });
+    }
+  }
+  return out;
+}
+
+/** All entities within the radius, nearest first. */
+export function generateWorld(q: WorldQuery): WorldEntity[] {
+  const all: WorldEntity[] = [...generateNodes(q), ...generateCreatures(q)];
+  return all
+    .map((e) => ({ e, d: distanceM(q.center, e) }))
+    .sort((a, b) => a.d - b.d)
+    .map(({ e }) => e);
+}
