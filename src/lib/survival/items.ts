@@ -24,7 +24,9 @@ export interface ItemDef {
   durability?: number;
 }
 
-const def = <T extends Record<string, ItemDef>>(t: T) => t;
+// Widen values to ItemDef (keeps literal keys for ItemId) so gear fields
+// (tool/weapon/armor/trinket) are readable on any item lookup.
+const def = <T extends Record<string, ItemDef>>(t: T): { [K in keyof T]: ItemDef } => t;
 
 export const ITEMS = def({
   // ── Raw materials
