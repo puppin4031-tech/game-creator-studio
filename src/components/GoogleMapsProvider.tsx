@@ -22,6 +22,7 @@ export default function GoogleMapsProvider({ children }: Props) {
   if (error) {
     // Dev-only pages (no map needed) still render when the SDK is blocked,
     // e.g. on localhost where the Kakao Web domain isn't registered.
+    if (window.location.pathname.startsWith('/play/survival')) return <>{children}</>;
     if (window.location.pathname.startsWith('/dev/')) {
       return (
         <>

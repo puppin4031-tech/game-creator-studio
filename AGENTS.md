@@ -1,0 +1,1 @@
+- Survival map uses MapLibre + OpenFreeMap with all symbol/building layers stripped (TerrainMap.tsx); why: game map must show no real-world brand/place labels. Recipes are locked behind techs in src/lib/survival/tech.ts; why: players learn toolmaking progressively.

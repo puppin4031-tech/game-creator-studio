@@ -40,6 +40,7 @@ export const ITEMS = def({
   hide: { name: '날가죽', desc: '무두질하면 질긴 가죽이 된다.', category: 'material', rarity: 'common', weight: 2, sprite: 'item-hide' },
   tusk: { name: '엄니', desc: '거대한 짐승의 상아. 귀한 건축 재료.', category: 'material', rarity: 'rare', weight: 5, sprite: 'item-tusk' },
   resin: { name: '송진', desc: '끈적한 접착제. 무두질과 활에 쓰인다.', category: 'material', rarity: 'uncommon', weight: 0.5, sprite: 'item-resin' },
+  soil: { name: '흙', desc: '부드러운 흙. 토기와 화덕을 다지는 재료.', category: 'material', rarity: 'common', weight: 2, sprite: 'item-soil' },
   // ── Ores & gems
   obsidian: { name: '흑요석', desc: '유리처럼 깨지는 화산석. 최상급 날.', category: 'ore', rarity: 'rare', weight: 3, sprite: 'item-obsidian' },
   quartz: { name: '석영', desc: '빛을 머금은 투명한 결정.', category: 'ore', rarity: 'uncommon', weight: 2, sprite: 'item-quartz' },
@@ -47,6 +48,8 @@ export const ITEMS = def({
   jade: { name: '옥', desc: '깊은 곳에서만 캐는 신비한 녹색 돌.', category: 'ore', rarity: 'epic', weight: 3, sprite: 'item-jade' },
   // ── Food
   berry: { name: '산딸기', desc: '허기 +8 · 체력 +2', category: 'food', rarity: 'common', weight: 0.5, sprite: 'item-berry', food: { hunger: 8, hp: 2 } },
+  apple: { name: '사과', desc: '허기 +12 · 체력 +4', category: 'food', rarity: 'common', weight: 0.5, sprite: 'item-apple', food: { hunger: 12, hp: 4 } },
+  pear: { name: '돌배', desc: '허기 +10 · 체력 +6', category: 'food', rarity: 'common', weight: 0.5, sprite: 'item-pear', food: { hunger: 10, hp: 6 } },
   raw_meat: { name: '날고기', desc: '허기 +12 · 체력 -5 (배탈 주의)', category: 'food', rarity: 'common', weight: 2, sprite: 'item-raw-meat', food: { hunger: 12, hp: -5 } },
   cooked_meat: { name: '구운 고기', desc: '허기 +35 · 체력 +10', category: 'food', rarity: 'uncommon', weight: 1.5, sprite: 'item-cooked-meat', food: { hunger: 35, hp: 10 } },
   // ── Processed
