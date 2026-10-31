@@ -107,7 +107,7 @@ export function useSurvivalWorld(start: LatLng) {
   }, [inBase, s.backpack]);
 
   const learn = (p: WorldSave, techs: TechDef[]): WorldSave => {
-    techs.forEach((t) => toast.success(`💡 깨달음: ${t.name}`, { description: t.desc }));
+    techs.forEach((t) => toast.success(`깨달음: ${t.name}`, { description: t.desc }));
     return techs.length ? { ...p, techs: [...p.techs, ...techs.map((t) => t.id)] } : p;
   };
 
