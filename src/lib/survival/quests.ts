@@ -2,17 +2,21 @@ import { countOf } from './inventory';
 import type { ItemId } from './items';
 import type { Stack, SurvivalState } from './types';
 
+export type QuestState = Pick<SurvivalState, 'base' | 'gear' | 'storedGear' | 'backpack' | 'storage' | 'questIndex'> & {
+  stats: Pick<SurvivalState['stats'], 'gathered' | 'crafted' | 'kills' | 'deposits'>;
+};
+
 export interface QuestDef {
   id: string;
   title: string;
   hint: string;
-  progress: (s: SurvivalState) => { cur: number; max: number };
+  progress: (s: QuestState) => { cur: number; max: number };
   reward: { xp: number; stacks: Stack[] };
 }
 
-const gathered = (id: ItemId, max: number) => (s: SurvivalState) => ({ cur: Math.min(max, s.stats.gathered[id] ?? 0), max });
-const crafted = (id: ItemId, max: number) => (s: SurvivalState) => ({ cur: Math.min(max, s.stats.crafted[id] ?? 0), max });
-const owned = (id: ItemId, max: number) => (s: SurvivalState) => ({
+const gathered = (id: ItemId, max: number) => (s: QuestState) => ({ cur: Math.min(max, s.stats.gathered[id] ?? 0), max });
+const crafted = (id: ItemId, max: number) => (s: QuestState) => ({ cur: Math.min(max, s.stats.crafted[id] ?? 0), max });
+const owned = (id: ItemId, max: number) => (s: QuestState) => ({
   cur: Math.min(max, s.gear.filter((g) => g.itemId === id).length + s.storedGear.filter((g) => g.itemId === id).length + countOf(s.backpack, id) + countOf(s.storage, id)),
   max,
 });
@@ -35,9 +39,9 @@ export const QUESTS: QuestDef[] = [
   { id: 'jade', title: '옥의 전설', hint: '흑요석 곡괭이로 옥을 캐 목걸이를 만드세요.', progress: owned('jade_amulet', 1), reward: { xp: 300, stacks: [] } },
 ];
 
-export const currentQuest = (s: SurvivalState) => QUESTS[s.questIndex] ?? null;
+export const currentQuest = (s: QuestState) => QUESTS[s.questIndex] ?? null;
 
-export function questReady(s: SurvivalState) {
+export function questReady(s: QuestState) {
   const q = currentQuest(s);
   if (!q) return false;
   const p = q.progress(s);

@@ -21,6 +21,16 @@ export function dayPhase(d: Date): DayPhase {
 
 export const xpToNext = (level: number) => Math.round(40 * Math.pow(level, 1.6));
 
+export function addExperience(progress: { level: number; xp: number }, amount: number) {
+  let { level, xp } = progress;
+  xp += Math.max(0, Math.round(amount));
+  while (xp >= xpToNext(level)) {
+    xp -= xpToNext(level);
+    level += 1;
+  }
+  return { level, xp };
+}
+
 export const maxHp = (s: SurvivalState) => C.baseMaxHp + (s.player.level - 1) * C.hpPerLevel;
 
 export const carryCapacity = (s: SurvivalState) =>
