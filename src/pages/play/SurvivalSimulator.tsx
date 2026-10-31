@@ -14,6 +14,7 @@ import type { PlannerInput } from '@/lib/survival/plannerInput';
 import { toast } from 'sonner';
 import TerrainMap from '@/components/survival/TerrainMap';
 import { useSurvivalWorld } from '@/hooks/useSurvivalWorld';
+import { TERRAIN_ZONE_LABEL, zoneCellKey } from '@/lib/survival/terrainZone';
 import { ITEMS, type ItemId } from '@/lib/survival/items';
 import { nodeDef, creatureDef } from '@/lib/survival/entities';
 import { SPRITE_META, type SpriteKey } from '@/lib/survival/spriteMeta';
@@ -102,11 +103,14 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   useEffect(() => () => window.clearTimeout(actionTimer.current), []);
   const activeAnim = anims?.[action] ?? anims?.idle;
 
+  const zone = s.terrainZones[zoneCellKey(s.pos)] ?? 'plains';
+  const onSurfaceZone = (c: LatLng, z: typeof zone) => g.recordTerrainZone(zoneCellKey(c), z);
+
   const hpPct = (s.hp / C.baseMaxHp) * 100;
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden font-pixel">
-      {(!realGps || gps.fix) && <TerrainMap center={s.pos} visionM={g.vision} explored={s.explored} onTap={onTap}>
+      {(!realGps || gps.fix) && <TerrainMap center={s.pos} visionM={g.vision} explored={s.explored} onTap={onTap} zone={zone} onSurfaceZone={onSurfaceZone}>
         {(project, mpp) => (
           <>
             {s.base && g.baseDef && (() => {
@@ -157,7 +161,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           <div className="flex items-center gap-1">허기<div className="h-2.5 flex-1 border border-foreground bg-muted"><div className="h-full bg-primary" style={{ width: `${s.hunger}%` }} /></div>{s.hunger}</div>
         </div>
         <div className="text-right text-[11px] leading-tight">
-          <div>{g.isNight ? '밤' : '낮'} · 시야 {g.vision}m</div>
+          <div>{g.isNight ? '밤' : '낮'} · {TERRAIN_ZONE_LABEL[zone]} · 시야 {g.vision}m</div>
           <div>배낭 {g.weight}/{g.capacity}kg</div>
           <div aria-label="성장 진행도">Lv.{s.level} · XP {s.xp}/{g.nextLevelXp}</div>
         </div>

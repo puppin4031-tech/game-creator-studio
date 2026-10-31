@@ -105,6 +105,7 @@ export default function TerrainMap({ center, visionM, explored, onTap, zone = 'p
     fogTarget.current = zoneColor(zone, 'fog');
     const map = mapRef.current;
     const bg = map?.getStyle()?.layers.find(l => l.type === 'background');
+    if (map && bg) map.setPaintProperty(bg.id, 'background-color-transition', { duration: 2500, delay: 0 });
     if (map && bg) map.setPaintProperty(bg.id, 'background-color', rgba(zoneColor(zone, 'ground')));
     map?.triggerRepaint();
   }, [zone, mapRef.current]);

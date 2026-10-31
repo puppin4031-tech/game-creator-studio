@@ -39,3 +39,14 @@ describe('real GPS survival', () => {
     expect(terrainOnlyStyle(style, 'green').layers.map(l => l.id)).toEqual(['ground', 'water']);
   });
 });
+import { classifyTerrain, zoneWeight } from '../src/lib/survival/terrainZone';
+import { NODES as ZN } from '../src/lib/survival/entities';
+test('terrain zone: water near player is riverside, rugged cover is highland', () => {
+  expect(classifyTerrain({ water: 0.2, rugged: 0.5 })).toBe('riverside');
+  expect(classifyTerrain({ water: 0, rugged: 0.4 })).toBe('highland');
+  expect(classifyTerrain({ water: 0, rugged: 0.1 })).toBe('plains');
+});
+test('terrain zone: riverside raises clay, highland raises flint on plains biome', () => {
+  expect(zoneWeight(ZN.clay_pit.biomes, 'plains', 'riverside')).toBeGreaterThan(zoneWeight(ZN.clay_pit.biomes, 'plains', undefined));
+  expect(zoneWeight(ZN.flint_rock.biomes, 'plains', 'highland')).toBeGreaterThan(zoneWeight(ZN.flint_rock.biomes, 'plains', 'riverside'));
+});
