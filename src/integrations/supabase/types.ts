@@ -427,6 +427,39 @@ export type Database = {
         }
         Relationships: []
       }
+      survival_sprite_animations: {
+        Row: {
+          action: string
+          character_key: string
+          fps: number
+          frame_count: number
+          id: string
+          image_path: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          action: string
+          character_key?: string
+          fps: number
+          frame_count: number
+          id?: string
+          image_path: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          action?: string
+          character_key?: string
+          fps?: number
+          frame_count?: number
+          id?: string
+          image_path?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       tag_messages: {
         Row: {
           channel: string
