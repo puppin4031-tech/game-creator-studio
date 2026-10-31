@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Backpack, Flame, Lightbulb, LocateFixed, X, Lock, RotateCcw, Route } from 'lucide-react';
+import { ArrowLeft, Backpack, Flame, Lightbulb, LocateFixed, X, Lock, RotateCcw, Route, ListChecks } from 'lucide-react';
 import { useSurvivalGps } from '@/hooks/useSurvivalGps';
 import { Button } from '@/components/ui/button';
 import SurvivalPlanner from '@/components/survival/SurvivalPlanner';
+import SurvivalObjectives from '@/components/survival/SurvivalObjectives';
 import type { PlannerInput } from '@/lib/survival/plannerInput';
 import { toast } from 'sonner';
 import TerrainMap from '@/components/survival/TerrainMap';
@@ -48,7 +49,7 @@ function Stacks({ stacks, onUse, have }: { stacks: Stack[]; onUse?: (id: ItemId)
   );
 }
 
-type Panel = 'none' | 'bag' | 'base' | 'tech';
+type Panel = 'none' | 'bag' | 'base' | 'tech' | 'quests';
 
 export default function SurvivalSimulator({ realGps = false }: { realGps?: boolean }) {
   const navigate = useNavigate();
@@ -139,10 +140,11 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         <div className="text-right text-[11px] leading-tight">
           <div>{g.isNight ? '밤' : '낮'} · 시야 {g.vision}m</div>
           <div>배낭 {g.weight}/{g.capacity}kg</div>
+          <div aria-label="성장 진행도">Lv.{s.level} · XP {s.xp}/{g.nextLevelXp}</div>
         </div>
       </div>
 
-      {realGps && <div className="absolute left-2 right-2 top-16 z-20 flex items-center justify-between gap-2 bg-background/90 px-2 py-1 text-[11px]">
+      {realGps && <div className="absolute left-2 right-2 top-[calc(4.5rem+env(safe-area-inset-top))] z-20 flex items-center justify-between gap-2 bg-background/90 px-2 py-1 text-[11px]">
         <span className="min-w-0 break-words" role="status">{gps.error ?? (gps.fix ? `${s.pos.lat.toFixed(5)}, ${s.pos.lng.toFixed(5)} · ±${Math.round(gps.fix.accuracy)}m` : 'GPS 연결 중')}</span>
         {!gps.ready && <Button variant="outline" className="min-h-11 shrink-0" onClick={gps.retry}>재시도</Button>}
       </div>}
@@ -153,13 +155,14 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           { id: 'bag' as Panel, icon: Backpack, label: '배낭' },
           { id: 'base' as Panel, icon: Flame, label: '거점' },
           { id: 'tech' as Panel, icon: Lightbulb, label: '기술' },
+          { id: 'quests' as Panel, icon: ListChecks, label: '생존 목표' },
         ].map((b) => (
-          <button key={b.id} type="button" onClick={() => setPanel(b.id)} className="pixel-btn flex h-16 w-16 flex-col items-center justify-center bg-card text-xs">
+          <Button key={b.id} type="button" variant="outline" onClick={() => setPanel(b.id)} className="pixel-btn flex h-16 min-h-16 w-16 shrink-0 flex-col items-center justify-center gap-0 bg-card px-0 text-xs">
             <b.icon className="!h-7 !w-7" />{b.label}
-          </button>
+          </Button>
         ))}
         {realGps && <Button type="button" variant="outline" onClick={gps.retry} className="pixel-btn h-16 min-h-16 w-16 flex-col gap-0 bg-card px-0 text-xs"><LocateFixed className="!h-7 !w-7" />GPS 갱신</Button>}
-        <Button type="button" variant="outline" className="pixel-btn h-16 w-16 flex-col gap-0 bg-card px-0 text-xs" onClick={() => setPlannerOpen(true)}><Route className="!h-7 !w-7" />생존 계획</Button>
+        <Button type="button" variant="outline" className="pixel-btn h-16 min-h-16 w-16 shrink-0 flex-col gap-0 bg-card px-0 text-xs" onClick={() => setPlannerOpen(true)}><Route className="!h-7 !w-7" />생존 계획</Button>
       </div>
 
       {!s.base && (
@@ -169,15 +172,21 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         </div>
       )}
 
+      {s.base && <Button variant="outline" onClick={() => setPanel('quests')} className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-3 right-3 z-20 h-auto min-h-11 justify-between gap-2 whitespace-normal bg-card px-3 py-3 text-left text-xs">
+        <span className="min-w-0">{g.quest?.title ?? '모든 생존 목표 완료'}</span>
+        <span className="shrink-0 text-primary">{g.canClaimQuest ? '보상 받기' : g.questProgress ? `${g.questProgress.cur}/${g.questProgress.max}` : '완료'}</span>
+      </Button>}
+
       <AnimatePresence>
         {panel !== 'none' && (
           <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 26, stiffness: 260 }}
             className="absolute inset-x-0 bottom-0 z-30 flex max-h-[75dvh] flex-col border-t-4 border-foreground bg-background">
             <div className="flex items-center justify-between border-b-2 border-foreground px-3 py-2">
-              <b className="text-lg">{panel === 'bag' ? '배낭' : panel === 'base' ? (g.baseDef?.name ?? '거점') : '제작 기술'}</b>
+              <b className="text-lg">{panel === 'bag' ? '배낭' : panel === 'base' ? (g.baseDef?.name ?? '거점') : panel === 'quests' ? '생존 목표' : '제작 기술'}</b>
               <button type="button" aria-label="닫기" onClick={() => setPanel('none')} className="flex h-11 w-11 items-center justify-center"><X className="!h-7 !w-7" /></button>
             </div>
             <div className="flex-1 space-y-4 overflow-y-auto p-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              {panel === 'quests' && <SurvivalObjectives state={{ ...s, storedGear: [], stats: { gathered: s.gathered, crafted: s.crafted, kills: s.kills, deposits: s.deposits } }} canClaim={g.inBase && (!realGps || gps.ready)} onClaim={g.claimQuest} />}
               {panel === 'bag' && (
                 <>
                   <p className="text-xs text-muted-foreground">음식은 눌러서 먹을 수 있어요.</p>
