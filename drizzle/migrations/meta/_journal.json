@@ -22,6 +22,13 @@
       "when": 1793459046445,
       "tag": "0002_survival_sprite_animations",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793459372669,
+      "tag": "0003_migration",
+      "breakpoints": true
     }
   ]
 }
