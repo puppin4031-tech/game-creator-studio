@@ -76,6 +76,21 @@ export const NODES = {
     loot: [{ itemId: 'bone', min: 2, max: 3 }], xp: 4, respawnMin: 30,
     biomes: { plains: 2, rocky: 2, wetland: 1 },
   },
+  apple_tree: {
+    name: '야생 사과나무', sprite: 'node-apple', hp: 3, requires: { kind: 'none', tier: 0 },
+    loot: [{ itemId: 'apple', min: 1, max: 3 }, { itemId: 'branch', min: 0, max: 1 }], xp: 5, respawnMin: 25,
+    biomes: { forest: 2, plains: 2 },
+  },
+  pear_tree: {
+    name: '돌배나무', sprite: 'node-pear', hp: 3, requires: { kind: 'none', tier: 0 },
+    loot: [{ itemId: 'pear', min: 1, max: 3 }, { itemId: 'branch', min: 0, max: 1 }], xp: 5, respawnMin: 25,
+    biomes: { forest: 1.5, plains: 1, wetland: 1.5 },
+  },
+  soil_mound: {
+    name: '흙더미', sprite: 'node-soil', hp: 2, requires: { kind: 'none', tier: 0 },
+    loot: [{ itemId: 'soil', min: 2, max: 3 }, { itemId: 'flint', min: 0, max: 1, chance: 0.3 }], xp: 3, respawnMin: 15,
+    biomes: { plains: 3, wetland: 2, rocky: 1, forest: 1 },
+  },
   oak_tree: {
     name: '참나무', sprite: 'node-oak', hp: 4, requires: { kind: 'chop', tier: 1 },
     loot: [{ itemId: 'log', min: 2, max: 3 }, { itemId: 'branch', min: 1, max: 2 }], xp: 8, respawnMin: 30,
