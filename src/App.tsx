@@ -33,6 +33,7 @@ import PuzzleSimulator from "./pages/play/PuzzleSimulator";
 import TagSimulator from "./pages/play/TagSimulator";
 import TreasureSimulator from "./pages/play/TreasureSimulator";
 import SurvivalSimulator from "./pages/play/SurvivalSimulator";
+import SurvivalCheck from "./pages/dev/SurvivalCheck";
 import MobileFrame from "./layouts/MobileFrame";
 
 const queryClient = new QueryClient();
@@ -92,6 +93,7 @@ const App = () => (
                 <Route path="/play/treasure-sim" element={<TreasureSimulator />} />
                 <Route path="/play/survival-sim" element={<SurvivalSimulator />} />
               </Route>
+              <Route path="/dev/survival-check" element={<SurvivalCheck />} />
               <Route path="/login" element={<Login />} />
               <Route
                 path="/admin/exodus"
