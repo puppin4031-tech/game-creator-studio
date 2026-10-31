@@ -1,5 +1,6 @@
 import { CREATURES, NODES, type CreatureType, type NodeType } from './entities';
 import { biomeAt, distanceM, fromGrid, hash01, pickWeighted, toGrid } from './geo';
+import { zoneCellKey, zoneWeight, type TerrainZone } from './terrainZone';
 import type { LatLng, WorldCreature, WorldEntity, WorldNode } from './types';
 
 export const NODE_CELL_M = 32;
@@ -19,6 +20,8 @@ export interface WorldQuery {
   isNight: boolean;
   depleted: Record<string, number>;
   safeZone?: { center: LatLng; radiusM: number } | null;
+  /** Sampled real-world terrain per zone cell; absent cells use the procedural biome only. */
+  terrainZones?: Record<string, TerrainZone>;
 }
 
 export const creatureEpoch = (now: number) => Math.floor(now / CREATURE_EPOCH_MS);
@@ -45,7 +48,7 @@ export function generateNodes(q: WorldQuery): WorldNode[] {
       const pos = fromGrid(gx, gy);
       if (distanceM(pos, q.center) > r) continue;
       const biome = biomeAt(pos);
-      const type = pickWeighted(types.map((t) => [t, (NODES[t].biomes as Record<string, number | undefined>)[biome] ?? 0] as [NodeType, number]), hash01(cx, cy, 4));
+      const type = pickWeighted(types.map((t) => [t, zoneWeight(NODES[t].biomes, biome, q.terrainZones?.[zoneCellKey(pos)])] as [NodeType, number]), hash01(cx, cy, 4));
       if (!type) continue;
       const id = `n:${cx}:${cy}`;
       if (!isNodeAvailable(id, type, q.depleted, q.now)) continue;
@@ -77,7 +80,7 @@ export function generateCreatures(q: WorldQuery): WorldCreature[] {
       const biome = biomeAt(pos);
       const weights = types.map((t) => {
         const d = CREATURES[t];
-        const bw = (d.biomes as Record<string, number | undefined>)[biome] ?? 0;
+        const bw = zoneWeight(d.biomes, biome, q.terrainZones?.[zoneCellKey(pos)]);
         return [t, bw * (q.isNight ? d.nightWeight : 1)] as [CreatureType, number];
       });
       const type = pickWeighted(weights, hash01(cx, cy, epoch, 10));
