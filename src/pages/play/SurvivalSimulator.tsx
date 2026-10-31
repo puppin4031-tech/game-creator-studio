@@ -1,3 +1,5 @@
+// @refresh reset
+// Custom GPS/world hook changes must remount this screen instead of reusing stale hook queues.
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
