@@ -412,6 +412,21 @@ export type Database = {
         }
         Relationships: []
       }
+      survival_ai_request_throttle: {
+        Row: {
+          client_hash: string
+          last_requested_at: string
+        }
+        Insert: {
+          client_hash: string
+          last_requested_at?: string
+        }
+        Update: {
+          client_hash?: string
+          last_requested_at?: string
+        }
+        Relationships: []
+      }
       tag_messages: {
         Row: {
           channel: string
@@ -761,6 +776,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_survival_ai_request: {
+        Args: { p_client_hash: string }
+        Returns: boolean
+      }
       get_nearby_spawns: {
         Args: { _lat: number; _lng: number; _radius_m?: number }
         Returns: {
