@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { LoaderCircle, RefreshCw, Route, Square, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -75,7 +76,7 @@ export default function SurvivalPlanner({ snapshot, onClose }: { snapshot: Plann
           <Button type="submit" className="min-h-11 flex-1" disabled={ai.loading}>{ai.loading ? <LoaderCircle className="animate-spin" /> : <Route />}{ai.loading ? '계획 생성 중' : '계획 생성'}</Button>
           {ai.loading && <Button type="button" variant="outline" className="min-h-11" onClick={ai.stop}><Square />중단</Button>}
         </div>
-        {ai.plan && <section aria-label="AI 생존 계획 결과" className="border-t-2 border-foreground pt-4"><h3 className="mb-2 font-bold">채집·제작 계획</h3><div className="whitespace-pre-wrap break-words text-sm leading-7">{ai.plan}</div></section>}
+        {ai.plan && <section aria-label="AI 생존 계획 결과" className="border-t-2 border-foreground pt-4"><h3 className="mb-2 font-bold">채집·제작 계획</h3><div className="break-words text-sm leading-7 [&_h2]:mb-2 [&_h2]:mt-5 [&_h2]:font-bold [&_h3]:my-2 [&_h3]:font-bold [&_p]:mb-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mb-2"><ReactMarkdown skipHtml components={{ a: ({ children }) => <span>{children}</span>, img: () => null }}>{ai.plan}</ReactMarkdown></div></section>}
       </form>
     </section>
   );
