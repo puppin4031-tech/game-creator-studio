@@ -6,7 +6,7 @@ import { RECIPES, type Recipe } from '@/lib/survival/recipes';
 import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
 import { SURVIVAL_CONFIG as C } from '@/lib/survival/config';
 import { distanceM } from '@/lib/survival/geo';
-import { generateWorld } from '@/lib/survival/world';
+import { generateWorld, isNodeAvailable } from '@/lib/survival/world';
 import { addStacks, hasAll, removeStacks, splitDeathDrop, stackWeight } from '@/lib/survival/inventory';
 import { dayPhase } from '@/lib/survival/progression';
 import { checkInspiration, isRecipeUnlocked, prerequisitesMet, techById, type TechDef } from '@/lib/survival/tech';
@@ -37,9 +37,9 @@ const fresh = (start: LatLng): WorldSave => ({
   depleted: {}, damage: {}, gathered: {}, techs: [], explored: [start], lastTickAt: Date.now(),
 });
 
-function load(start: LatLng): WorldSave {
+function load(start: LatLng, saveKey: string): WorldSave {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    const raw = localStorage.getItem(saveKey);
     if (raw) return { ...fresh(start), ...(JSON.parse(raw) as Partial<WorldSave>) };
   } catch (e) {
     console.error('[survival] failed to load save', e);
@@ -59,14 +59,26 @@ function roll(loot: LootRoll[]): Stack[] {
 
 const fmt = (st: Stack[]) => st.map((s) => `${ITEMS[s.itemId].name} ×${s.count}`).join(', ');
 
-export function useSurvivalWorld(start: LatLng) {
-  const [s, setS] = useState<WorldSave>(() => load(start));
+export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; saveKey?: string } = {}) {
+  const enabled = options.enabled ?? true;
+  const saveKey = options.saveKey ?? SAVE_KEY;
+  const [s, setState] = useState<WorldSave>(() => load(start, saveKey));
   const ref = useRef(s);
   ref.current = s;
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
+  const setS = useCallback((next: WorldSave | ((previous: WorldSave) => WorldSave)) => {
+    const value = typeof next === 'function' ? next(ref.current) : next;
+    ref.current = value;
+    setState(value);
+  }, []);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(t); }, []);
-  useEffect(() => { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); }, [s]);
+  useEffect(() => {
+    try { localStorage.setItem(saveKey, JSON.stringify(s)); }
+    catch { toast.error('진행 상태를 기기에 저장하지 못했습니다. 저장 공간을 확인해 주세요.'); }
+  }, [s, saveKey]);
 
   const isNight = dayPhase(new Date(now)) === 'night';
   const vision = isNight ? C.visionNightM : C.visionDayM;
@@ -89,7 +101,7 @@ export function useSurvivalWorld(start: LatLng) {
   // Survival tick: hunger drain, starvation, base regen.
   useEffect(() => {
     const ticks = Math.min(C.maxOfflineTicks, Math.floor((now - s.lastTickAt) / C.tickMs));
-    if (ticks <= 0) return;
+    if (!enabled || ticks <= 0) return;
     setS((p) => {
       const hunger = Math.max(0, p.hunger - ticks * C.hungerPerTick);
       let hp = p.hp;
@@ -97,14 +109,14 @@ export function useSurvivalWorld(start: LatLng) {
       if (inBase && baseDef) hp += ticks * baseDef.regenPerTick;
       return { ...p, hunger, hp: Math.max(1, Math.min(C.baseMaxHp, hp)), lastTickAt: p.lastTickAt + ticks * C.tickMs };
     });
-  }, [now, s.lastTickAt, inBase, baseDef]);
+  }, [now, s.lastTickAt, inBase, baseDef, enabled, setS]);
 
   // Auto deposit on entering base.
   useEffect(() => {
-    if (!inBase || s.backpack.length === 0) return;
+    if (!enabled || !inBase || s.backpack.length === 0) return;
     toast.success(`거점 귀환! ${fmt(s.backpack)} 창고에 보관`);
     setS((p) => ({ ...p, storage: addStacks(p.storage, p.backpack), backpack: [] }));
-  }, [inBase, s.backpack]);
+  }, [inBase, s.backpack, enabled, setS]);
 
   const learn = (p: WorldSave, techs: TechDef[]): WorldSave => {
     techs.forEach((t) => toast.success(`깨달음: ${t.name}`, { description: t.desc }));
@@ -117,7 +129,7 @@ export function useSurvivalWorld(start: LatLng) {
       const explored = !last || distanceM(last, pos) >= EXPLORE_STEP_M ? [...p.explored, pos].slice(-MAX_EXPLORED) : p.explored;
       return { ...p, pos, explored };
     });
-  }, []);
+  }, [setS]);
 
   const die = (p: WorldSave): WorldSave => {
     const { kept, dropped } = splitDeathDrop(p.backpack, C.deathDropRatio);
@@ -126,7 +138,9 @@ export function useSurvivalWorld(start: LatLng) {
   };
 
   const interact = useCallback((e: WorldEntity) => {
+    if (!enabledRef.current) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return; }
     const p = ref.current;
+    if (e.kind === 'node' ? !isNodeAvailable(e.id, e.type, p.depleted, Date.now()) : !!p.depleted[e.id]) return;
     if (distanceM(p.pos, e) > C.interactRadiusM) { toast.warning(`${C.interactRadiusM}m 안으로 다가가세요`); return; }
     let next: WorldSave = { ...p, damage: { ...p.damage } };
     let hp = p.hp;
@@ -145,7 +159,8 @@ export function useSurvivalWorld(start: LatLng) {
           toast.error(`${d.name}: ${kind === 'chop' ? '도끼' : '곡괭이'}가 필요합니다`, { description: '제작 기술을 먼저 깨우치세요' });
           return;
         }
-        power = ITEMS[tool!.itemId].tool?.power ?? 1;
+        if (!tool) return;
+        power = ITEMS[tool.itemId].tool?.power ?? 1;
       }
     } else {
       const d = creatureDef(e.type);
@@ -187,6 +202,7 @@ export function useSurvivalWorld(start: LatLng) {
     const it = ITEMS[itemId];
     const p = ref.current;
     const from = p.backpack.some((x) => x.itemId === itemId) ? 'backpack' : 'storage';
+    if (!enabledRef.current || (from === 'storage' && (!p.base || distanceM(p.pos, p.base) > BASE_LEVELS[p.base.level].radiusM))) return;
     const left = removeStacks(p[from], [{ itemId, count: 1 }]);
     if (!left) return;
     const hpGain = it.food?.hp ?? it.heal ?? 0;
@@ -195,6 +211,7 @@ export function useSurvivalWorld(start: LatLng) {
   }, []);
 
   const placeBase = useCallback(() => {
+    if (!enabledRef.current) return;
     const p = ref.current;
     const left = removeStacks(p.backpack, CAMP_COST);
     if (!left) { toast.error(`모닥불 설치에 ${fmt(CAMP_COST)} 필요`); return; }
@@ -204,6 +221,7 @@ export function useSurvivalWorld(start: LatLng) {
 
   const upgradeBase = useCallback(() => {
     const p = ref.current;
+    if (!enabledRef.current || !p.base || distanceM(p.pos, p.base) > BASE_LEVELS[p.base.level].radiusM) return;
     if (!p.base || p.base.level >= 3) return;
     const lv = (p.base.level + 1) as 2 | 3;
     const left = removeStacks(p.storage, BASE_LEVELS[lv].cost);
@@ -214,6 +232,7 @@ export function useSurvivalWorld(start: LatLng) {
 
   const research = useCallback((techId: string) => {
     const p = ref.current;
+    if (!enabledRef.current || !p.base || distanceM(p.pos, p.base) > BASE_LEVELS[p.base.level].radiusM) return;
     const t = techById(techId);
     if (!t?.research || p.techs.includes(t.id) || !prerequisitesMet(t, p.techs)) return;
     const left = removeStacks(p.storage, t.research);
@@ -223,6 +242,7 @@ export function useSurvivalWorld(start: LatLng) {
 
   const craft = useCallback((r: Recipe) => {
     const p = ref.current;
+    if (!enabledRef.current || !p.base || distanceM(p.pos, p.base) > BASE_LEVELS[p.base.level].radiusM) return;
     if (!isRecipeUnlocked(r, p.techs)) { toast.error('아직 제작법을 모릅니다'); return; }
     if (!p.base || p.base.level < r.baseLevel) { toast.error(`거점 ${r.baseLevel}단계 이상 필요`); return; }
     const left = removeStacks(p.storage, r.ingredients);
@@ -237,7 +257,7 @@ export function useSurvivalWorld(start: LatLng) {
     toast.success(`${it.name} 제작 완료!`);
   }, []);
 
-  const reset = useCallback(() => { localStorage.removeItem(SAVE_KEY); setS(fresh(ref.current.pos)); }, []);
+  const reset = useCallback(() => { setS(fresh(ref.current.pos)); }, [setS]);
 
   return {
     state: s, entities, vision, isNight, inBase, baseDef, weight, capacity, weapon,
