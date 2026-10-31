@@ -15,6 +15,10 @@ async function loadTerrainStyle(): Promise<maplibregl.StyleSpecification> {
   if (!res.ok) throw new Error(`style ${res.status}`);
   const style = (await res.json()) as maplibregl.StyleSpecification;
   style.layers = style.layers.filter((l) => l.type !== 'symbol' && !l.id.startsWith('building') && !l.id.includes('aeroway'));
+  // Earthy ground instead of the default near-white background.
+  for (const l of style.layers) {
+    if (l.type === 'background') l.paint = { ...(l.paint ?? {}), 'background-color': '#b9c48a' };
+  }
   return style;
 }
 
