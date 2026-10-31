@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import type { Json } from '@/integrations/supabase/types';
 import { ITEMS, type ItemId } from '@/lib/survival/items';
 import { CREATURES, NODES, creatureDef, nodeDef, isHostileNow, type LootRoll } from '@/lib/survival/entities';
 import { RECIPES, type Recipe } from '@/lib/survival/recipes';
@@ -68,9 +71,11 @@ function roll(loot: LootRoll[]): Stack[] {
 
 const fmt = (st: Stack[]) => st.map((s) => `${ITEMS[s.itemId].name} ×${s.count}`).join(', ');
 
-export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; saveKey?: string } = {}) {
+export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; saveKey?: string; cloudSync?: boolean } = {}) {
   const enabled = options.enabled ?? true;
   const saveKey = options.saveKey ?? SAVE_KEY;
+  const { user } = useAuth();
+  const userId = options.cloudSync ? user?.id ?? null : null;
   const [s, setState] = useState<WorldSave>(() => load(start, saveKey));
   const ref = useRef(s);
   ref.current = s;
