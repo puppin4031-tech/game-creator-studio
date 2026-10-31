@@ -20,7 +20,7 @@ describe('real GPS survival', () => {
   });
   test('apple trees, pear trees and flint retain identical GPS positions between players and reloads', () => {
     const query = { center, radiusM: 1000, now: 2000000, isNight: false, depleted: {} };
-    const a = generateNodes(query);
+    const a = generateNodes(query).filter(n => distanceM(center, n) < 900);
     const b = generateNodes({ ...query, center: offsetM(center, 20, 0), now: 3000000 });
     for (const type of ['apple_tree', 'pear_tree', 'flint_rock']) {
       const node = a.find(n => n.type === type);
