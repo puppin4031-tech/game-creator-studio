@@ -1,1 +1,3 @@
 - Survival map uses MapLibre + OpenFreeMap with all symbol/building layers stripped (TerrainMap.tsx); why: game map must show no real-world brand/place labels. Recipes are locked behind techs in src/lib/survival/tech.ts; why: players learn toolmaking progressively.
+- Survival planning uses a server-only streaming AI Gateway Edge Function; regenerate shared rules with `bun scripts/sync-survival-ai-rules.ts` before deploying it so recommendations use the same recipes and technologies as gameplay.
+- Survival AI remains guest-accessible with a server-side request throttle; provider/credit blocks persist in server-only access state until access is restored and the block is explicitly cleared, preventing reloads from bypassing denials.

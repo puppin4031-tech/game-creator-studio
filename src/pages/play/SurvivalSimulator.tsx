@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Backpack, Flame, Lightbulb, LocateFixed, Footprints, X, Lock, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Backpack, Flame, Lightbulb, LocateFixed, Footprints, X, Lock, RotateCcw, Route } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import SurvivalPlanner from '@/components/survival/SurvivalPlanner';
+import type { PlannerInput } from '@/lib/survival/plannerInput';
 import { toast } from 'sonner';
 import TerrainMap from '@/components/survival/TerrainMap';
 import { useSurvivalWorld } from '@/hooks/useSurvivalWorld';
@@ -52,6 +55,16 @@ export default function SurvivalSimulator() {
   const { state: s } = g;
   const [panel, setPanel] = useState<Panel>('none');
   const [gps, setGps] = useState(false);
+  const [plannerOpen, setPlannerOpen] = useState(false);
+  const nearbyResources: PlannerInput['nearbyResources'] = [];
+  for (const entity of g.entities) {
+    if (entity.kind !== 'node') continue;
+    const existing = nearbyResources.find(r => r.type === entity.type);
+    const distance = Math.round(distanceM(s.pos, entity));
+    if (existing) { existing.count += 1; existing.distanceM = Math.min(existing.distanceM, distance); }
+    else nearbyResources.push({ type: entity.type, distanceM: distance, count: 1 });
+  }
+  const plannerSnapshot: PlannerInput = { health: s.hp, hunger: s.hunger, inventory: s.backpack, storage: s.storage, gear: s.gear.map(x => x.itemId), learnedSkills: s.techs, nearbyResources, gathered: s.gathered, baseLevel: s.base?.level ?? 0, inBase: g.inBase, isNight: g.isNight, goal: '' };
 
   // Real GPS mode.
   useEffect(() => {
@@ -149,6 +162,7 @@ export default function SurvivalSimulator() {
         <button type="button" onClick={() => setGps((v) => !v)} className={`pixel-btn flex h-16 w-16 flex-col items-center justify-center text-xs ${gps ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
           {gps ? <LocateFixed className="!h-7 !w-7" /> : <Footprints className="!h-7 !w-7" />}{gps ? 'GPS' : '탭 이동'}
         </button>
+        <Button type="button" variant="outline" className="pixel-btn h-16 w-16 flex-col gap-0 bg-card px-0 text-xs" onClick={() => setPlannerOpen(true)}><Route className="!h-7 !w-7" />생존 계획</Button>
       </div>
 
       {!s.base && (
@@ -249,6 +263,7 @@ export default function SurvivalSimulator() {
           </motion.div>
         )}
       </AnimatePresence>
+      {plannerOpen && <SurvivalPlanner snapshot={plannerSnapshot} onClose={() => setPlannerOpen(false)} />}
     </div>
   );
 }
