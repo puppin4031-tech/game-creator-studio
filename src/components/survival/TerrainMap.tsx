@@ -6,6 +6,23 @@ import { toast } from 'sonner';
 import type { LatLng } from '@/lib/survival/types';
 import { terrainOnlyStyle, type TerrainPalette } from '@/lib/survival/mapStyle';
 import { terrainDecorations } from '@/lib/survival/terrainScenery';
+import { classifyTerrain, type TerrainZone } from '@/lib/survival/terrainZone';
+
+type Rgba = [number, number, number, number];
+function parseColor(c: string): Rgba {
+  const v = c.trim();
+  if (v.startsWith('#')) {
+    const h = v.length === 4 ? v.slice(1).split('').map(x => x + x).join('') : v.slice(1);
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16), 1];
+  }
+  const n = v.match(/[\d.]+/g)?.map(Number) ?? [0, 0, 0, 1];
+  return [n[0], n[1], n[2], n[3] ?? 1];
+}
+const rgba = (c: Rgba) => `rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${c[3].toFixed(3)})`;
+const zoneColor = (zone: TerrainZone, key: 'ground' | 'fog') =>
+  parseColor(getComputedStyle(document.documentElement).getPropertyValue(`--survival-zone-${zone}-${key}`) || '#000');
+/** Probe offsets (meters) around the player used to sample real surfaces. */
+const PROBE_M = [-60, -30, 0, 30, 60];
 
 maplibregl.setWorkerUrl(workerUrl);
 
@@ -31,10 +48,18 @@ interface Props {
   explored: LatLng[];
   onTap?: (p: LatLng) => void;
   /** Render overlays given a projection function. Re-invoked on every map move. */
+  /** Terrain zone currently shown; drives ground and fog tint transitions. */
+  zone?: TerrainZone;
+  /** Called after the map settles with the zone sampled from real surfaces around `center`. */
+  onSurfaceZone?: (center: LatLng, zone: TerrainZone) => void;
   children: (project: (p: LatLng) => Projected, metersPerPx: number) => ReactNode;
 }
 
-export default function TerrainMap({ center, visionM, explored, onTap, children }: Props) {
+export default function TerrainMap({ center, visionM, explored, onTap, zone = 'plains', onSurfaceZone, children }: Props) {
+  const zoneRef = useRef(onSurfaceZone);
+  zoneRef.current = onSurfaceZone;
+  const fogColor = useRef<Rgba | null>(null);
+  const fogTarget = useRef<Rgba | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const fog = useRef<HTMLCanvasElement>(null);
   const scenery = useRef<HTMLCanvasElement>(null);
@@ -63,7 +88,7 @@ export default function TerrainMap({ center, visionM, explored, onTap, children 
         resize = new ResizeObserver(() => { map.resize(); sceneryDirty.current = true; setFrame(f => f + 1); drawFog(); });
         resize.observe(box.current);
         map.on('move', () => { sceneryDirty.current = true; setFrame((f) => f + 1); });
-        map.on('idle', () => { surfaceCache.current.clear(); drawScenery(true); });
+        map.on('idle', () => { surfaceCache.current.clear(); drawScenery(true); sampleSurface(); });
         map.on('render', () => { if (sceneryDirty.current) { drawScenery(); sceneryDirty.current = false; } drawFog(); });
         map.on('click', (e) => tapRef.current?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }));
       } catch (e) {
@@ -74,6 +99,16 @@ export default function TerrainMap({ center, visionM, explored, onTap, children 
     return () => { cancelled = true; resize?.disconnect(); mapRef.current?.remove(); mapRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Smoothly retint ground (MapLibre paint transition) and fog (lerped per frame) on zone change.
+  useEffect(() => {
+    fogTarget.current = zoneColor(zone, 'fog');
+    const map = mapRef.current;
+    const bg = map?.getStyle()?.layers.find(l => l.type === 'background');
+    if (map && bg) map.setPaintProperty(bg.id, 'background-color-transition', { duration: 2500, delay: 0 });
+    if (map && bg) map.setPaintProperty(bg.id, 'background-color', rgba(zoneColor(zone, 'ground')));
+    map?.triggerRepaint();
+  }, [zone, mapRef.current]);
 
   // Follow player.
   useEffect(() => { mapRef.current?.easeTo({ center: [center.lng, center.lat], duration: 600 }); }, [center.lat, center.lng]);
@@ -127,6 +162,25 @@ export default function TerrainMap({ center, visionM, explored, onTap, children 
     cv.dataset.decorationCount = String(decorations.length);
   }
 
+  function sampleSurface() {
+    const map = mapRef.current;
+    if (!map || !zoneRef.current) return;
+    const layers = map.getStyle().layers.filter(l => l.type === 'fill' || l.type === 'line');
+    const water = layers.filter(l => /water/.test(l.id)).map(l => l.id);
+    const rugged = layers.filter(l => l.type === 'fill' && /wood|forest|rock|scree|cliff/.test(l.id)).map(l => l.id);
+    const c = fogData.current.center;
+    const mLat = 111_320, mLng = 111_320 * Math.cos((c.lat * Math.PI) / 180);
+    let w = 0, r = 0, n = 0;
+    for (const dx of PROBE_M) for (const dy of PROBE_M) {
+      const p = map.project([c.lng + dx / mLng, c.lat + dy / mLat]);
+      const box: [maplibregl.PointLike, maplibregl.PointLike] = [[p.x - 3, p.y - 3], [p.x + 3, p.y + 3]];
+      if (water.length && map.queryRenderedFeatures(box, { layers: water }).length) w++;
+      else if (rugged.length && map.queryRenderedFeatures(box, { layers: rugged }).length) r++;
+      n++;
+    }
+    zoneRef.current(c, classifyTerrain({ water: w / n, rugged: r / n }));
+  }
+
   function drawFog() {
     const map = mapRef.current;
     const cv = fog.current;
@@ -138,7 +192,13 @@ export default function TerrainMap({ center, visionM, explored, onTap, children 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.globalCompositeOperation = 'source-over';
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--survival-fog').trim();
+    const target = fogTarget.current ?? zoneColor(zone, 'fog');
+    const cur = fogColor.current ?? target;
+    const next = cur.map((v, i) => v + (target[i] - v) * 0.06) as Rgba;
+    const settled = next.every((v, i) => Math.abs(v - target[i]) < (i === 3 ? 0.002 : 0.5));
+    fogColor.current = settled ? target : next;
+    if (!settled) map.triggerRepaint();
+    ctx.fillStyle = rgba(fogColor.current);
     ctx.fillRect(0, 0, w, h);
     const mpp = metersPerPx(map);
     const { center: c, visionM: v, explored: ex } = fogData.current;

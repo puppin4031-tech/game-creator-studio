@@ -61,6 +61,12 @@
     --survival-deco-stone-light: #c4ccbc;
     --survival-deco-shadow: #425e48;
     --survival-fog: rgba(18, 24, 20, 0.92);
+    --survival-zone-plains-ground: #aabd87;
+    --survival-zone-plains-fog: rgba(26, 30, 18, 0.92);
+    --survival-zone-riverside-ground: #9fbf98;
+    --survival-zone-riverside-fog: rgba(14, 30, 36, 0.9);
+    --survival-zone-highland-ground: #9a9b7a;
+    --survival-zone-highland-fog: rgba(30, 28, 34, 0.94);
 
     --sidebar-background: 220 15% 96%;
     --sidebar-foreground: 220 20% 25%;
