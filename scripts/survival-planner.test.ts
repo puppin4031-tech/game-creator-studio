@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
-import { plannerInputSchema } from './plannerInput';
-import { unlockedRecipes, TECHS } from './tech';
-import { RECIPES } from './recipes';
+import { plannerInputSchema } from '../src/lib/survival/plannerInput';
+import { unlockedRecipes, TECHS } from '../src/lib/survival/tech';
+import { RECIPES } from '../src/lib/survival/recipes';
 
 const input = { health: 35, hunger: 20, inventory: [{ itemId: 'flint', count: 3 }], storage: [], gear: [], learnedSkills: [], nearbyResources: [{ type: 'apple_tree', distanceM: 12, count: 1 }], gathered: {}, baseLevel: 0, inBase: false, isNight: false, goal: '주먹도끼 만들기' };
 describe('survival planner input and crafting gates', () => {
