@@ -32,6 +32,7 @@ import GameRoom from "./pages/play/GameRoom";
 import PuzzleSimulator from "./pages/play/PuzzleSimulator";
 import TagSimulator from "./pages/play/TagSimulator";
 import TreasureSimulator from "./pages/play/TreasureSimulator";
+import SurvivalSimulator from "./pages/play/SurvivalSimulator";
 import MobileFrame from "./layouts/MobileFrame";
 
 const queryClient = new QueryClient();
@@ -89,6 +90,7 @@ const App = () => (
                 <Route path="/play/puzzle-sim" element={<PuzzleSimulator />} />
                 <Route path="/play/tag-sim" element={<TagSimulator />} />
                 <Route path="/play/treasure-sim" element={<TreasureSimulator />} />
+                <Route path="/play/survival-sim" element={<SurvivalSimulator />} />
               </Route>
               <Route path="/login" element={<Login />} />
               <Route
