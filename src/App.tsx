@@ -26,7 +26,6 @@ import NPCEncyclopedia from "./pages/admin/exodus/NPCEncyclopedia";
 import ItemPresets from "./pages/admin/exodus/ItemPresets";
 import PuzzleQuizMaker from "./pages/admin/exodus/PuzzleQuizMaker";
 import SpotManagement from "./pages/admin/exodus/SpotManagement";
-import WorldMap from "./pages/WorldMap";
 import Lobby from "./pages/play/Lobby";
 import GameRoom from "./pages/play/GameRoom";
 import PuzzleSimulator from "./pages/play/PuzzleSimulator";
@@ -83,7 +82,7 @@ const App = () => (
           <AuthProvider>
             <Routes>
               <Route path="/" element={<LandingPage />} />
-              <Route path="/world" element={<WorldMap />} />
+              <Route path="/world" element={<SurvivalSimulator realGps />} />
               <Route path="/exodus" element={<Index />} />
               <Route element={<MobileFrame />}>
                 <Route path="/play" element={<Lobby />} />
@@ -92,6 +91,7 @@ const App = () => (
                 <Route path="/play/tag-sim" element={<TagSimulator />} />
                 <Route path="/play/treasure-sim" element={<TreasureSimulator />} />
                 <Route path="/play/survival-sim" element={<SurvivalSimulator />} />
+                <Route path="/play/survival" element={<SurvivalSimulator realGps />} />
               </Route>
               <Route path="/dev/survival-check" element={<SurvivalCheck />} />
               <Route path="/login" element={<Login />} />

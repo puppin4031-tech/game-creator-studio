@@ -11,6 +11,9 @@ export default function GoogleMapsProvider({ children }: Props) {
     libraries: ['services'],
   });
 
+  // Terrain survival does not depend on the Kakao SDK or its domain registration.
+  if (window.location.pathname === '/world' || window.location.pathname.startsWith('/play/survival')) return <>{children}</>;
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -22,7 +25,6 @@ export default function GoogleMapsProvider({ children }: Props) {
   if (error) {
     // Dev-only pages (no map needed) still render when the SDK is blocked,
     // e.g. on localhost where the Kakao Web domain isn't registered.
-    if (window.location.pathname.startsWith('/play/survival')) return <>{children}</>;
     if (window.location.pathname.startsWith('/dev/')) {
       return (
         <>

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Backpack, Flame, Lightbulb, LocateFixed, Footprints, X, Lock, RotateCcw, Route } from 'lucide-react';
+import { ArrowLeft, Backpack, Flame, Lightbulb, LocateFixed, X, Lock, RotateCcw, Route } from 'lucide-react';
+import { useSurvivalGps } from '@/hooks/useSurvivalGps';
 import { Button } from '@/components/ui/button';
 import SurvivalPlanner from '@/components/survival/SurvivalPlanner';
 import type { PlannerInput } from '@/lib/survival/plannerInput';
@@ -49,12 +50,14 @@ function Stacks({ stacks, onUse, have }: { stacks: Stack[]; onUse?: (id: ItemId)
 
 type Panel = 'none' | 'bag' | 'base' | 'tech';
 
-export default function SurvivalSimulator() {
+export default function SurvivalSimulator({ realGps = false }: { realGps?: boolean }) {
   const navigate = useNavigate();
-  const g = useSurvivalWorld(START);
+  const [gpsReady, setGpsReady] = useState(false);
+  const g = useSurvivalWorld(START, { enabled: !realGps || gpsReady, saveKey: realGps ? 'survival-gps-world-v1' : 'survival-world-v1' });
+  const gps = useSurvivalGps(realGps, g.moveTo);
+  useEffect(() => setGpsReady(gps.ready), [gps.ready]);
   const { state: s } = g;
   const [panel, setPanel] = useState<Panel>('none');
-  const [gps, setGps] = useState(false);
   const [plannerOpen, setPlannerOpen] = useState(false);
   const nearbyResources: PlannerInput['nearbyResources'] = [];
   for (const entity of g.entities) {
@@ -66,27 +69,16 @@ export default function SurvivalSimulator() {
   }
   const plannerSnapshot: PlannerInput = { health: s.hp, hunger: s.hunger, inventory: s.backpack, storage: s.storage, gear: s.gear.map(x => x.itemId), learnedSkills: s.techs, nearbyResources, gathered: s.gathered, baseLevel: s.base?.level ?? 0, inBase: g.inBase, isNight: g.isNight, goal: '' };
 
-  // Real GPS mode.
-  useEffect(() => {
-    if (!gps) return;
-    if (!navigator.geolocation) { toast.error('이 기기는 위치 기능을 지원하지 않습니다'); setGps(false); return; }
-    const id = navigator.geolocation.watchPosition(
-      (p) => g.moveTo({ lat: p.coords.latitude, lng: p.coords.longitude }),
-      (e) => { toast.error('위치를 가져오지 못했습니다', { description: e.message }); setGps(false); },
-      { enableHighAccuracy: true, maximumAge: 2000 },
-    );
-    return () => navigator.geolocation.clearWatch(id);
-  }, [gps, g.moveTo]);
-
   const onTap = (p: LatLng) => {
-    if (gps) return;
+    if (realGps) return;
     const d = distanceM(s.pos, p);
     if (d > g.vision * 1.2) { toast('안개 속으로는 한 걸음씩 나아가세요'); return; }
     g.moveTo(p);
   };
 
   const tapEntity = (e: WorldEntity) => {
-    if (!gps && distanceM(s.pos, e) > C.interactRadiusM) { g.moveTo({ lat: e.lat, lng: e.lng }); return; }
+    if (realGps && !gps.ready) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return; }
+    if (!realGps && distanceM(s.pos, e) > C.interactRadiusM) { g.moveTo({ lat: e.lat, lng: e.lng }); return; }
     g.interact(e);
   };
 
@@ -94,7 +86,7 @@ export default function SurvivalSimulator() {
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden font-pixel">
-      <TerrainMap center={s.pos} visionM={g.vision} explored={s.explored} onTap={onTap}>
+      {(!realGps || gps.fix) && <TerrainMap center={s.pos} visionM={g.vision} explored={s.explored} onTap={onTap}>
         {(project, mpp) => (
           <>
             {s.base && g.baseDef && (() => {
@@ -113,7 +105,8 @@ export default function SurvivalSimulator() {
               const dmg = s.damage[e.id];
               return (
                 <button key={e.id} type="button" aria-label={name} onClick={(ev) => { ev.stopPropagation(); tapEntity(e); }}
-                  className="pointer-events-auto absolute flex flex-col items-center"
+                  data-resource-id={e.id} data-lat={e.lat} data-lng={e.lng}
+                  className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center"
                   style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}>
                   <motion.div animate={{ y: e.kind === 'creature' ? [0, -3, 0] : 0 }} transition={{ repeat: Infinity, duration: 0.8 }}>
                     <Sprite k={sprite} />
@@ -133,7 +126,8 @@ export default function SurvivalSimulator() {
             })()}
           </>
         )}
-      </TerrainMap>
+      </TerrainMap>}
+      {realGps && !gps.fix && <div className="absolute inset-0 flex items-center justify-center bg-muted px-6 text-center text-sm">{gps.error ?? '현재 GPS 위치를 확인하고 있습니다…'}</div>}
 
       {/* Top HUD */}
       <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-background/80 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur">
@@ -148,8 +142,13 @@ export default function SurvivalSimulator() {
         </div>
       </div>
 
+      {realGps && <div className="absolute left-2 right-2 top-16 z-20 flex items-center justify-between gap-2 bg-background/90 px-2 py-1 text-[11px]">
+        <span className="min-w-0 break-words" role="status">{gps.error ?? (gps.fix ? `${s.pos.lat.toFixed(5)}, ${s.pos.lng.toFixed(5)} · ±${Math.round(gps.fix.accuracy)}m` : 'GPS 연결 중')}</span>
+        {!gps.ready && <Button variant="outline" className="min-h-11 shrink-0" onClick={gps.retry}>재시도</Button>}
+      </div>}
+
       {/* Right action stack */}
-      <div className="absolute right-2 top-24 z-20 flex flex-col gap-2">
+      <div className="absolute bottom-40 right-2 top-32 z-20 flex flex-col gap-2 overflow-y-auto overscroll-contain pb-2 pr-1">
         {[
           { id: 'bag' as Panel, icon: Backpack, label: '배낭' },
           { id: 'base' as Panel, icon: Flame, label: '거점' },
@@ -159,16 +158,14 @@ export default function SurvivalSimulator() {
             <b.icon className="!h-7 !w-7" />{b.label}
           </button>
         ))}
-        <button type="button" onClick={() => setGps((v) => !v)} className={`pixel-btn flex h-16 w-16 flex-col items-center justify-center text-xs ${gps ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
-          {gps ? <LocateFixed className="!h-7 !w-7" /> : <Footprints className="!h-7 !w-7" />}{gps ? 'GPS' : '탭 이동'}
-        </button>
+        {realGps && <Button type="button" variant="outline" onClick={gps.retry} className="pixel-btn h-16 min-h-16 w-16 flex-col gap-0 bg-card px-0 text-xs"><LocateFixed className="!h-7 !w-7" />GPS 갱신</Button>}
         <Button type="button" variant="outline" className="pixel-btn h-16 w-16 flex-col gap-0 bg-card px-0 text-xs" onClick={() => setPlannerOpen(true)}><Route className="!h-7 !w-7" />생존 계획</Button>
       </div>
 
       {!s.base && (
         <div className="absolute inset-x-3 bottom-[max(1rem,env(safe-area-inset-bottom))] z-20 pixel-frame bg-card p-3 text-sm">
           나뭇가지 {countOf(s.backpack, 'branch')}/{CAMP_COST[0].count}개를 모아 모닥불 거점을 세우세요.
-          <button type="button" onClick={g.placeBase} className="pixel-btn mt-2 h-11 w-full bg-primary text-primary-foreground">여기에 모닥불 세우기</button>
+          <Button type="button" disabled={realGps && !gps.ready} onClick={g.placeBase} className="pixel-btn mt-2 h-11 w-full">여기에 모닥불 세우기</Button>
         </div>
       )}
 
@@ -210,7 +207,7 @@ export default function SurvivalSimulator() {
                         if (!known) return (
                           <div key={r.id} className="flex items-center gap-2 text-xs text-muted-foreground"><Lock className="!h-4 !w-4" />??? — 「{techForRecipe(r.id)?.name}」 기술 필요</div>
                         );
-                        const ok = g.inBase && s.base!.level >= r.baseLevel && g.canAfford(r.ingredients);
+                        const ok = g.inBase && (s.base?.level ?? 0) >= r.baseLevel && g.canAfford(r.ingredients);
                         return (
                           <div key={r.id} className="pixel-frame flex items-center gap-2 bg-card p-2">
                             <Sprite k={it.sprite} />
@@ -246,7 +243,7 @@ export default function SurvivalSimulator() {
                         <div className="flex items-center gap-1"><b className="text-sm">{t.name}</b>{known ? <span className="ml-auto text-primary">습득</span> : <Lock className="ml-auto !h-4 !w-4" />}</div>
                         <p>{t.desc}</p>
                         {t.requires.length > 0 && <p className="text-muted-foreground">선행: {t.requires.map((r) => TECHS.find((x) => x.id === r)?.name).join(', ')}</p>}
-                        <p>제작법: {t.recipes.map((r) => ITEMS[g.recipes.find((x) => x.id === r)!.result].name).join(', ')}</p>
+                        <p>제작법: {t.recipes.map(id => { const r = g.recipes.find(x => x.id === id); return r ? ITEMS[r.result].name : ''; }).join(', ')}</p>
                         {!known && t.inspire && <p className="mt-1">깨달음: {ITEMS[t.inspire.itemId].name} {Math.min(s.gathered[t.inspire.itemId] ?? 0, t.inspire.count)}/{t.inspire.count}개 채집</p>}
                         {!known && t.research && (
                           <div className="mt-1">

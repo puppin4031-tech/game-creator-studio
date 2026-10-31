@@ -156,6 +156,7 @@ export default function Lobby() {
       </Button>
 
       {/* Return to my room banner */}
+      <Button size="lg" variant="outline" className="min-h-16 w-full max-w-md gap-2" onClick={() => navigate('/play/survival')}><MapPin className="!h-7 !w-7" />구석기 생존 · 실제 GPS</Button>
       {savedRoomCode && (
         <Card className="w-full max-w-md border-primary/50 bg-primary/5">
           <CardContent className="p-3 flex items-center justify-between">

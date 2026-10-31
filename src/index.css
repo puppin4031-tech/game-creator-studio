@@ -46,6 +46,8 @@
     --game-glow: 150 80% 45%;
     --game-warning: 35 90% 55%;
     --game-danger: 0 75% 55%;
+    --survival-ground: #b9c48a;
+    --survival-fog: rgba(18, 24, 20, 0.92);
 
     --sidebar-background: 220 15% 96%;
     --sidebar-foreground: 220 20% 25%;
