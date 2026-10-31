@@ -12,6 +12,7 @@ import { addExperience, dayPhase, xpToNext } from '@/lib/survival/progression';
 import { claimWorldQuest, freshProgress, type WorldProgress } from '@/lib/survival/worldProgress';
 import { currentQuest, questReady, type QuestState } from '@/lib/survival/quests';
 import { checkInspiration, isRecipeUnlocked, prerequisitesMet, techById, type TechDef } from '@/lib/survival/tech';
+import type { TerrainZone } from '@/lib/survival/terrainZone';
 import type { GearInstance, LatLng, Stack, WorldEntity } from '@/lib/survival/types';
 
 const SAVE_KEY = 'survival-world-v1';
@@ -31,13 +32,15 @@ export interface WorldSave extends WorldProgress {
   gathered: Partial<Record<ItemId, number>>;
   techs: string[];
   explored: LatLng[];
+  /** Real-world terrain zone per coarse cell, sampled once from the map. */
+  terrainZones: Record<string, TerrainZone>;
   lastTickAt: number;
 }
 
 const fresh = (start: LatLng): WorldSave => ({
   ...freshProgress(),
   pos: start, hp: C.baseMaxHp, hunger: 100, backpack: [], storage: [], gear: [], base: null,
-  depleted: {}, damage: {}, gathered: {}, techs: [], explored: [start], lastTickAt: Date.now(),
+  depleted: {}, damage: {}, gathered: {}, techs: [], explored: [start], terrainZones: {}, lastTickAt: Date.now(),
 });
 
 function load(start: LatLng, saveKey: string): WorldSave {
@@ -110,9 +113,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const armor = best((g) => ITEMS[g.itemId].armor?.def ?? 0);
 
   const entities: WorldEntity[] = useMemo(() => generateWorld({
-    center: s.pos, radiusM: vision, now, isNight, depleted: s.depleted,
+    center: s.pos, radiusM: vision, now, isNight, depleted: s.depleted, terrainZones: s.terrainZones,
     safeZone: s.base && baseDef ? { center: s.base, radiusM: baseDef.radiusM } : null,
-  }), [s.pos, vision, now, isNight, s.depleted, s.base, baseDef]);
+  }), [s.pos, vision, now, isNight, s.depleted, s.base, baseDef, s.terrainZones]);
 
   // Survival tick: hunger drain, starvation, base regen.
   useEffect(() => {
@@ -145,6 +148,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const explored = !last || distanceM(last, pos) >= EXPLORE_STEP_M ? [...p.explored, pos].slice(-MAX_EXPLORED) : p.explored;
       return { ...p, pos, explored };
     });
+  }, [setS]);
+
+  /** First sample wins so a cell's resource mix never flips after being seen. */
+  const recordTerrainZone = useCallback((cell: string, zone: TerrainZone) => {
+    setS((p) => (p.terrainZones[cell] ? p : { ...p, terrainZones: { ...p.terrainZones, [cell]: zone } }));
   }, [setS]);
 
   const die = (p: WorldSave): WorldSave => {
@@ -291,6 +299,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const reset = useCallback(() => { setS(fresh(ref.current.pos)); }, [setS]);
 
   return {
+    recordTerrainZone,
     state: s, entities, vision, isNight, inBase, baseDef, weight, capacity, weapon,
     moveTo, interact, eat, placeBase, upgradeBase, research, craft, reset,
     quest, questProgress, canClaimQuest, claimQuest, nextLevelXp: xpToNext(s.level),
