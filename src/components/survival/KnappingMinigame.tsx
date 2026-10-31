@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, useAnimationControls } from 'framer-motion';
-import { Quality, qualityFromCrits, QUALITY_LABEL, Recipe, ITEMS } from '@/lib/survival';
+import { Quality, qualityFromStrikes, StrikeResult, QUALITY_LABEL, Recipe, ITEMS } from '@/lib/survival';
 
 interface Props { recipe: Recipe; onDone: (q: Quality) => void; onCancel: () => void }
 
@@ -8,7 +8,7 @@ const HITS = 3;
 
 export default function KnappingMinigame({ recipe, onDone, onCancel }: Props) {
   const [x, setX] = useState(0); // 0..100 indicator
-  const [hits, setHits] = useState<boolean[]>([]);
+  const [hits, setHits] = useState<StrikeResult[]>([]);
   const [particles, setParticles] = useState<{ id: number; dx: number; dy: number }[]>([]);
   const dir = useRef(1);
   const frozen = useRef(false);
@@ -42,18 +42,16 @@ export default function KnappingMinigame({ recipe, onDone, onCancel }: Props) {
     if (done) return;
     const crit = x >= critStart && x <= critStart + critWidth;
     const normal = x >= normStart && x <= normStart + normWidth;
-    const next = [...hits, crit];
     // Hit-stop 50ms + shake
     frozen.current = true;
     setTimeout(() => { frozen.current = false; }, 50);
     shake.start({ x: [-4, 4, -2, 2, 0], transition: { duration: 0.25 } });
     setParticles(Array.from({ length: 10 }, (_, i) => ({ id: Date.now() + i, dx: (Math.random() - 0.5) * 140, dy: -40 - Math.random() * 60 })));
-    setHits(normal || crit ? next : [...hits, false]);
-    if (!normal && !crit) (next as boolean[]).splice(0); // miss counted as non-crit
+    setHits([...hits, crit ? 'CRIT' : normal ? 'HIT' : 'MISS']);
   };
 
-  const crits = hits.filter(Boolean).length;
-  const quality = qualityFromCrits(crits, hits.length);
+  const crits = hits.filter((h) => h === 'CRIT').length;
+  const quality = qualityFromStrikes(hits);
   const chipped = hits.length; // stone loses a layer per hit
 
   return (
@@ -89,7 +87,7 @@ export default function KnappingMinigame({ recipe, onDone, onCancel }: Props) {
 
         <div className="my-3 flex justify-center gap-2">
           {Array.from({ length: HITS }).map((_, i) => (
-            <span key={i} className={`h-4 w-4 border-2 border-stone-800 ${i < hits.length ? (hits[i] ? 'bg-orange-500' : 'bg-stone-500') : 'bg-stone-100'}`} />
+            <span key={i} className={`h-4 w-4 border-2 border-stone-800 ${i < hits.length ? (hits[i] === 'CRIT' ? 'bg-orange-500' : hits[i] === 'HIT' ? 'bg-yellow-400' : 'bg-red-700') : 'bg-stone-100'}`} />
           ))}
         </div>
 

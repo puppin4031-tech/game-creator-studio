@@ -127,9 +127,10 @@ export function canCraft(storage: Stack[], recipe: Recipe): boolean {
   return recipe.ingredients.every((i) => countOf(storage, i.itemId) >= i.count);
 }
 
-export function qualityFromCrits(crits: number, hits: number): Quality {
-  if (crits >= 3) return 'MASTERWORK';
-  if (hits - crits >= 2 && crits === 0) return 'CRUDE';
+export type StrikeResult = 'CRIT' | 'HIT' | 'MISS';
+export function qualityFromStrikes(r: StrikeResult[]): Quality {
+  if (r.length >= 3 && r.every((x) => x === 'CRIT')) return 'MASTERWORK';
+  if (r.filter((x) => x === 'MISS').length >= 2) return 'CRUDE';
   return 'NORMAL';
 }
 
