@@ -3,7 +3,7 @@
 import { BASE_LEVELS, CAMP_COST, OUTPOST_COST } from './bases';
 import { CLASSES, CLASS_IDS } from './classes';
 import { SURVIVAL_CONFIG as C } from './config';
-import { CREATURES, NODES } from './entities';
+import { CREATURES, NODES, type LootRoll } from './entities';
 import { GEAR_CATEGORIES, ITEMS, ITEM_IDS } from './items';
 import { xpToNext } from './progression';
 import { QUESTS } from './quests';
@@ -85,7 +85,7 @@ export function runSurvivalSelfCheck(): CheckResult[] {
       if (!spriteKeys.has(d.sprite)) problems.push(`노드 ${t}: 스프라이트 없음`);
       if (!(d.hp > 0)) problems.push(`노드 ${t}: 체력 ${d.hp}`);
       if (d.requires.kind !== 'none' && d.requires.tier < 1) problems.push(`노드 ${t}: 도구 등급 이상`);
-      for (const l of d.loot) {
+      for (const l of d.loot as LootRoll[]) {
         if (!itemIds.has(l.itemId)) problems.push(`노드 ${t}: 전리품 '${l.itemId}' 없음`);
         if (l.min > l.max) problems.push(`노드 ${t}: '${l.itemId}' min>max`);
       }
@@ -94,7 +94,7 @@ export function runSurvivalSelfCheck(): CheckResult[] {
     for (const [t, d] of Object.entries(CREATURES)) {
       if (!spriteKeys.has(d.sprite)) problems.push(`동물 ${t}: 스프라이트 없음`);
       if (!(d.hp > 0)) problems.push(`동물 ${t}: 체력 ${d.hp}`);
-      for (const l of d.loot) {
+      for (const l of d.loot as LootRoll[]) {
         if (!itemIds.has(l.itemId)) problems.push(`동물 ${t}: 전리품 '${l.itemId}' 없음`);
         if (l.min > l.max) problems.push(`동물 ${t}: '${l.itemId}' min>max`);
         if (l.chance !== undefined && (l.chance <= 0 || l.chance > 1)) problems.push(`동물 ${t}: '${l.itemId}' 확률 ${l.chance}`);
