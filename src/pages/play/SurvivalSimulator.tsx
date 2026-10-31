@@ -1,218 +1,254 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Map, Circle, CustomOverlayMap } from 'react-kakao-maps-sdk';
-import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
-import { ArrowLeft, Radar, Backpack, Hammer, Flag } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowLeft, Backpack, Flame, Lightbulb, LocateFixed, Footprints, X, Lock, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
-import { useSurvivalGame, WorldEntity } from '@/hooks/useSurvivalGame';
-import { ENTITIES, ITEMS, QUALITY_LABEL, RECIPES, SURVIVAL_CONFIG, Recipe, Stack, canCraft, countOf } from '@/lib/survival';
-import { haversineDistance } from '@/lib/haversine';
-import KnappingMinigame from '@/components/survival/KnappingMinigame';
+import TerrainMap from '@/components/survival/TerrainMap';
+import { useSurvivalWorld } from '@/hooks/useSurvivalWorld';
+import { ITEMS, type ItemId } from '@/lib/survival/items';
+import { nodeDef, creatureDef } from '@/lib/survival/entities';
+import { SPRITE_META, type SpriteKey } from '@/lib/survival/spriteMeta';
+import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
+import { SURVIVAL_CONFIG as C } from '@/lib/survival/config';
+import { distanceM } from '@/lib/survival/geo';
+import { TECHS, isRecipeUnlocked, prerequisitesMet, techForRecipe } from '@/lib/survival/tech';
+import { countOf } from '@/lib/survival/inventory';
+import type { LatLng, Stack, WorldEntity } from '@/lib/survival/types';
 
-const START = { lat: 37.748, lng: 126.7496 };
+const START: LatLng = { lat: 37.748, lng: 126.7496 };
+const spriteUrls = import.meta.glob('../../assets/survival/*.png', { eager: true, import: 'default' }) as Record<string, string>;
+const url = (k: SpriteKey) => spriteUrls[`../../assets/survival/${k}.png`];
 
-function PixelSprite({ color, size = 28, creature = false }: { color: string; size?: number; creature?: boolean }) {
-  return (
-    <motion.div
-      className="pixelated"
-      animate={{ y: [0, -3, 0] }}
-      transition={{ repeat: Infinity, duration: creature ? 0.8 : 2, ease: 'linear' }}
-      style={{ width: size, height: size, background: color, border: '3px solid #1c1917', boxShadow: '3px 3px 0 0 rgba(0,0,0,.6)' }}
-    />
-  );
+function Sprite({ k, scale = 1, className = '' }: { k: SpriteKey; scale?: number; className?: string }) {
+  const m = SPRITE_META[k];
+  return <img src={url(k)} width={m.w * scale} height={m.h * scale} alt="" draggable={false} className={`pixelated select-none ${className}`} />;
 }
 
-function StackList({ stacks }: { stacks: Stack[] }) {
-  if (!stacks.length) return <p className="text-sm text-stone-500">비어 있음</p>;
+function Stacks({ stacks, onUse, have }: { stacks: Stack[]; onUse?: (id: ItemId) => void; have?: Stack[] }) {
+  if (!stacks.length) return <p className="text-sm text-muted-foreground">비어 있음</p>;
   return (
-    <div className="grid grid-cols-4 gap-2">
-      {stacks.map((s) => (
-        <div key={s.itemId} className="pixel-frame flex flex-col items-center bg-stone-100 p-1 text-[11px]">
-          <span className="pixelated mb-1 h-4 w-4" style={{ background: ITEMS[s.itemId].color }} />
-          <span className="truncate">{ITEMS[s.itemId].name}</span>
-          <b>x{s.count}</b>
-        </div>
-      ))}
+    <div className="flex flex-wrap gap-1.5">
+      {stacks.map((s) => {
+        const it = ITEMS[s.itemId];
+        const short = have && countOf(have, s.itemId) < s.count;
+        const usable = onUse && (it.food || it.heal);
+        return (
+          <button key={s.itemId} type="button" disabled={!usable} onClick={() => usable && onUse(s.itemId)}
+            className={`pixel-frame flex min-h-11 items-center gap-1 bg-card px-1.5 py-1 text-xs ${short ? 'text-destructive' : ''} ${usable ? 'active:translate-y-0.5' : ''}`}>
+            <Sprite k={it.sprite} scale={0.75} />
+            <span>{it.name}</span><b>×{s.count}</b>
+          </button>
+        );
+      })}
     </div>
   );
 }
 
+type Panel = 'none' | 'bag' | 'base' | 'tech';
+
 export default function SurvivalSimulator() {
   const navigate = useNavigate();
-  const g = useSurvivalGame(START);
-  const [target, setTarget] = useState<WorldEntity | null>(null);
-  const [lastMsg, setLastMsg] = useState('');
-  const [panel, setPanel] = useState<'none' | 'bag' | 'base'>('none');
-  const [crafting, setCrafting] = useState<Recipe | null>(null);
-  const [now, setNow] = useState(Date.now());
-  const shake = useAnimationControls();
+  const g = useSurvivalWorld(START);
+  const { state: s } = g;
+  const [panel, setPanel] = useState<Panel>('none');
+  const [gps, setGps] = useState(false);
 
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  // Real GPS mode.
+  useEffect(() => {
+    if (!gps) return;
+    if (!navigator.geolocation) { toast.error('이 기기는 위치 기능을 지원하지 않습니다'); setGps(false); return; }
+    const id = navigator.geolocation.watchPosition(
+      (p) => g.moveTo({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      (e) => { toast.error('위치를 가져오지 못했습니다', { description: e.message }); setGps(false); },
+      { enableHighAccuracy: true, maximumAge: 2000 },
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, [gps, g.moveTo]);
 
-  const targetLive = target ? g.entities.find((e) => e.id === target.id) ?? null : null;
-  const secs = Math.max(0, Math.ceil((g.nextScanAt - now) / 1000));
-  const weightPct = Math.min(100, (g.backpackWeight / SURVIVAL_CONFIG.backpackMaxWeight) * 100);
-
-  const hit = () => {
-    if (!target) return;
-    const r = g.interact(target.id);
-    setLastMsg(r.message);
-    if (r.ok) shake.start({ x: [-4, 4, -2, 2, 0], transition: { duration: 0.25 } });
-    else toast.warning(r.message);
-    if (!g.entities.find((e) => e.id === target.id)) setTarget(null);
+  const onTap = (p: LatLng) => {
+    if (gps) return;
+    const d = distanceM(s.pos, p);
+    if (d > g.vision * 1.2) { toast('안개 속으로는 한 걸음씩 나아가세요'); return; }
+    g.moveTo(p);
   };
 
-  return (
-    <div className="relative h-[100dvh] w-full overflow-hidden bg-stone-900 font-pixel text-base">
-      {/* Map (tap = simulated walk) */}
-      <div className="absolute inset-0" style={{ filter: 'sepia(.35) saturate(.8) contrast(1.05)' }}>
-        <Map center={g.pos} isPanto style={{ width: '100%', height: '100%' }} level={3}
-          onClick={(_, e) => g.setPos({ lat: e.latLng.getLat(), lng: e.latLng.getLng() })}>
-          <Circle center={g.base} radius={SURVIVAL_CONFIG.baseRadiusM} strokeWeight={3} strokeColor="#d4a843" strokeStyle="dash" fillColor="#d4a843" fillOpacity={0.12} />
-          <CustomOverlayMap position={g.base} xAnchor={0.5} yAnchor={0.5} zIndex={5}>
-            <motion.div className="pixelated h-6 w-6" animate={{ scale: [1, 1.15, 1] }} transition={{ repeat: Infinity, duration: 0.6 }}
-              style={{ background: '#f97316', border: '3px solid #7c2d12', boxShadow: '0 0 12px 4px #fb923c' }} />
-          </CustomOverlayMap>
-          {g.entities.map((e) => (
-            <CustomOverlayMap key={e.id} position={{ lat: e.lat, lng: e.lng }} xAnchor={0.5} yAnchor={0.5} zIndex={10}>
-              <button onClick={() => { setTarget(e); setLastMsg(''); }} className="flex h-11 w-11 items-center justify-center" aria-label={ENTITIES[e.type].name}>
-                <PixelSprite color={ENTITIES[e.type].color} creature={ENTITIES[e.type].isCreature} size={ENTITIES[e.type].isCreature ? 30 : 24} />
-              </button>
-            </CustomOverlayMap>
-          ))}
-          {g.drops.map((d) => (
-            <CustomOverlayMap key={d.id} position={{ lat: d.lat, lng: d.lng }} xAnchor={0.5} yAnchor={0.5} zIndex={9}>
-              <div className="pixelated h-5 w-5 animate-pulse" style={{ background: '#facc15', border: '3px solid #713f12' }} />
-            </CustomOverlayMap>
-          ))}
-          <CustomOverlayMap position={g.pos} xAnchor={0.5} yAnchor={0.5} zIndex={20}>
-            <div className="pixelated h-5 w-5" style={{ background: '#2563eb', border: '3px solid #fff', boxShadow: '0 0 0 3px #1e3a8a' }} />
-          </CustomOverlayMap>
-        </Map>
-        <div className="pointer-events-none absolute inset-0 opacity-20"
-          style={{ backgroundImage: 'linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px)', backgroundSize: '8px 8px' }} />
-      </div>
+  const tapEntity = (e: WorldEntity) => {
+    if (!gps && distanceM(s.pos, e) > C.interactRadiusM) { g.moveTo({ lat: e.lat, lng: e.lng }); return; }
+    g.interact(e);
+  };
 
-      {/* Top status */}
-      <div className="absolute inset-x-2 z-[1200] space-y-2" style={{ top: 'calc(env(safe-area-inset-top) + 8px)' }}>
-        <div className="flex items-center gap-2">
-          <button onClick={() => navigate('/play')} className="pixel-btn flex h-11 w-11 items-center justify-center bg-stone-200" aria-label="뒤로">
-            <ArrowLeft className="!h-6 !w-6" />
-          </button>
-          <div className={`pixel-frame flex-1 px-2 py-2 text-sm ${g.inBase ? 'bg-yellow-300' : 'bg-green-300'}`}>
-            {g.inBase ? '거점 안전지대 · 제작/창고 활성화' : `야생 필드 · 배낭 모드 (거점 ${Math.round(g.distToBase)}m)`}
-          </div>
+  const hpPct = (s.hp / C.baseMaxHp) * 100;
+
+  return (
+    <div className="relative h-[100dvh] w-full overflow-hidden font-pixel">
+      <TerrainMap center={s.pos} visionM={g.vision} explored={s.explored} onTap={onTap}>
+        {(project, mpp) => (
+          <>
+            {s.base && g.baseDef && (() => {
+              const p = project(s.base); const r = g.baseDef.radiusM / mpp;
+              return (
+                <div className="absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
+                  <div className="rounded-full border-2 border-dashed border-primary/70 bg-primary/10" style={{ width: r * 2, height: r * 2 }} />
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"><Sprite k={g.baseDef.sprite} /></div>
+                </div>
+              );
+            })()}
+            {g.entities.map((e) => {
+              const p = project(e);
+              const sprite = e.kind === 'node' ? nodeDef(e.type).sprite : creatureDef(e.type).sprite;
+              const name = e.kind === 'node' ? nodeDef(e.type).name : creatureDef(e.type).name;
+              const dmg = s.damage[e.id];
+              return (
+                <button key={e.id} type="button" aria-label={name} onClick={(ev) => { ev.stopPropagation(); tapEntity(e); }}
+                  className="pointer-events-auto absolute flex flex-col items-center"
+                  style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}>
+                  <motion.div animate={{ y: e.kind === 'creature' ? [0, -3, 0] : 0 }} transition={{ repeat: Infinity, duration: 0.8 }}>
+                    <Sprite k={sprite} />
+                  </motion.div>
+                  {dmg ? <span className="rounded bg-background/80 px-1 text-[10px]">타격 중</span> : null}
+                </button>
+              );
+            })}
+            {(() => {
+              const p = project(s.pos); const r = C.interactRadiusM / mpp;
+              return (
+                <div className="absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
+                  <div className="rounded-full border border-primary/60" style={{ width: r * 2, height: r * 2 }} />
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[85%]"><Sprite k="char-hunter" /></div>
+                </div>
+              );
+            })()}
+          </>
+        )}
+      </TerrainMap>
+
+      {/* Top HUD */}
+      <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-background/80 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur">
+        <button type="button" aria-label="뒤로" onClick={() => navigate('/play')} className="pixel-btn flex h-11 w-11 items-center justify-center bg-card"><ArrowLeft className="!h-6 !w-6" /></button>
+        <div className="flex-1 space-y-1 text-xs">
+          <div className="flex items-center gap-1">체력<div className="h-2.5 flex-1 border border-foreground bg-muted"><div className="h-full bg-destructive" style={{ width: `${hpPct}%` }} /></div>{s.hp}</div>
+          <div className="flex items-center gap-1">허기<div className="h-2.5 flex-1 border border-foreground bg-muted"><div className="h-full bg-primary" style={{ width: `${s.hunger}%` }} /></div>{s.hunger}</div>
         </div>
-        <div className="pixel-frame bg-stone-200 p-2 text-xs">
-          <div className="mb-1 flex justify-between"><span>HP {g.hp}/100</span><span>배낭 {g.backpackWeight}/{SURVIVAL_CONFIG.backpackMaxWeight}</span></div>
-          <div className="flex gap-2">
-            <div className="h-3 flex-1 border-2 border-stone-800 bg-stone-400"><div className="h-full bg-red-600" style={{ width: `${g.hp}%` }} /></div>
-            <div className="h-3 flex-1 border-2 border-stone-800 bg-stone-400"><div className={`h-full ${weightPct > 85 ? 'bg-orange-500' : 'bg-amber-700'}`} style={{ width: `${weightPct}%` }} /></div>
-          </div>
-          <p className="mt-1 truncate">도구: {g.tool ? `${QUALITY_LABEL[g.tool.quality]} ${ITEMS[g.tool.itemId].name} (${g.tool.durability})` : '맨손'} · 무기: {g.weapon ? `${ITEMS[g.weapon.itemId].name} (${g.weapon.durability})` : '없음'}</p>
+        <div className="text-right text-[11px] leading-tight">
+          <div>{g.isNight ? '밤' : '낮'} · 시야 {g.vision}m</div>
+          <div>배낭 {g.weight}/{g.capacity}kg</div>
         </div>
-        <p className="text-center text-[11px] text-stone-100 drop-shadow">지도를 탭하면 그 위치로 이동(테스트)</p>
       </div>
 
       {/* Right action stack */}
-      <div className="absolute right-3 z-[1200] flex flex-col gap-3" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
-        <button onClick={g.scan} className="pixel-btn flex h-16 w-16 flex-col items-center justify-center bg-cyan-300 text-[10px]"><Radar className="!h-7 !w-7" />{secs}s</button>
-        <button onClick={() => setPanel('bag')} className="pixel-btn flex h-16 w-16 flex-col items-center justify-center bg-amber-300 text-[10px]"><Backpack className="!h-7 !w-7" />배낭</button>
-        <button onClick={() => setPanel('base')} className="pixel-btn flex h-16 w-16 flex-col items-center justify-center bg-yellow-400 text-[10px]"><Hammer className="!h-7 !w-7" />거점</button>
-        <button onClick={() => { g.setBase(g.pos); toast.success('여기에 거점(모닥불)을 설치했습니다'); }} className="pixel-btn flex h-16 w-16 flex-col items-center justify-center bg-orange-300 text-[10px]"><Flag className="!h-7 !w-7" />설치</button>
+      <div className="absolute right-2 top-24 z-20 flex flex-col gap-2">
+        {[
+          { id: 'bag' as Panel, icon: Backpack, label: '배낭' },
+          { id: 'base' as Panel, icon: Flame, label: '거점' },
+          { id: 'tech' as Panel, icon: Lightbulb, label: '기술' },
+        ].map((b) => (
+          <button key={b.id} type="button" onClick={() => setPanel(b.id)} className="pixel-btn flex h-16 w-16 flex-col items-center justify-center bg-card text-xs">
+            <b.icon className="!h-7 !w-7" />{b.label}
+          </button>
+        ))}
+        <button type="button" onClick={() => setGps((v) => !v)} className={`pixel-btn flex h-16 w-16 flex-col items-center justify-center text-xs ${gps ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
+          {gps ? <LocateFixed className="!h-7 !w-7" /> : <Footprints className="!h-7 !w-7" />}{gps ? 'GPS' : '탭 이동'}
+        </button>
       </div>
 
-      {/* Interaction modal */}
-      <AnimatePresence>
-        {targetLive && (
-          <motion.div initial={{ y: 200 }} animate={{ y: 0 }} exit={{ y: 200 }}
-            className="pixel-frame absolute inset-x-2 z-[1300] bg-stone-200 p-3 pr-20" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}>
-            {(() => {
-              const def = ENTITIES[targetLive.type];
-              const dist = Math.round(haversineDistance(g.pos.lat, g.pos.lng, targetLive.lat, targetLive.lng));
-              const lacking = !def.isCreature && (g.tool?.gatherTier ?? 0) < def.requiredToolTier;
-              return (
-                <>
-                  <div className="flex items-center gap-3">
-                    <motion.div animate={shake}><PixelSprite color={def.color} size={40} creature={def.isCreature} /></motion.div>
-                    <div className="flex-1 text-sm">
-                      <b>{def.name}</b> · {dist}m
-                      <div className="mt-1 h-2 border-2 border-stone-800 bg-stone-400"><div className="h-full bg-green-600" style={{ width: `${(targetLive.hp / def.hp) * 100}%` }} /></div>
-                      {lacking && <p className="mt-1 text-xs text-red-700">도구가 부족합니다 (맨손 시 HP -{SURVIVAL_CONFIG.bareHandHpPenalty}, 50% 실패)</p>}
-                      {def.isCreature && <p className="mt-1 text-xs text-red-700">반격 데미지 {def.atk}</p>}
-                      {lastMsg && <p className="mt-1 text-xs">{lastMsg}</p>}
-                    </div>
-                  </div>
-                  <div className="mt-3 flex gap-2">
-                    <button onClick={() => setTarget(null)} className="pixel-btn min-h-[48px] flex-1 bg-stone-400">닫기</button>
-                    <button onClick={hit} className={`pixel-btn min-h-[48px] flex-[2] ${def.isCreature ? 'bg-red-500' : 'bg-green-500'}`}>{def.isCreature ? '공격하기' : '채취하기'}</button>
-                  </div>
-                </>
-              );
-            })()}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {!s.base && (
+        <div className="absolute inset-x-3 bottom-[max(1rem,env(safe-area-inset-bottom))] z-20 pixel-frame bg-card p-3 text-sm">
+          나뭇가지 {countOf(s.backpack, 'branch')}/{CAMP_COST[0].count}개를 모아 모닥불 거점을 세우세요.
+          <button type="button" onClick={g.placeBase} className="pixel-btn mt-2 h-11 w-full bg-primary text-primary-foreground">여기에 모닥불 세우기</button>
+        </div>
+      )}
 
-      {/* Panels */}
       <AnimatePresence>
         {panel !== 'none' && (
-          <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'tween', duration: 0.2 }}
-            className="absolute inset-x-0 bottom-0 z-[1400] flex max-h-[75dvh] flex-col border-t-4 border-stone-800 bg-stone-300 p-3"
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}>
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-lg">{panel === 'bag' ? '배낭' : '거점 제작소'}</h2>
-              <button onClick={() => setPanel('none')} className="pixel-btn min-h-[44px] bg-stone-100 px-3">닫기</button>
+          <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+            className="absolute inset-x-0 bottom-0 z-30 flex max-h-[75dvh] flex-col border-t-4 border-foreground bg-background">
+            <div className="flex items-center justify-between border-b-2 border-foreground px-3 py-2">
+              <b className="text-lg">{panel === 'bag' ? '배낭' : panel === 'base' ? (g.baseDef?.name ?? '거점') : '제작 기술'}</b>
+              <button type="button" aria-label="닫기" onClick={() => setPanel('none')} className="flex h-11 w-11 items-center justify-center"><X className="!h-7 !w-7" /></button>
             </div>
-            <div className="flex-1 space-y-3 overflow-y-auto">
-              {panel === 'bag' ? (
+            <div className="flex-1 space-y-4 overflow-y-auto p-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              {panel === 'bag' && (
                 <>
-                  <StackList stacks={g.backpack} />
-                  <p className="text-xs">거점 반경 {SURVIVAL_CONFIG.baseRadiusM}m 안에 들어가면 자동으로 창고에 보관됩니다.</p>
-                  <h3>장비</h3>
-                  {g.gear.length === 0 && <p className="text-sm text-stone-500">없음</p>}
-                  {g.gear.map((it) => {
-                    const isTool = it.gatherTier > 0;
-                    const equipped = it.instanceId === g.tool?.instanceId || it.instanceId === g.weapon?.instanceId;
-                    return (
-                      <button key={it.instanceId} onClick={() => (isTool ? g.setEquippedToolId(it.instanceId) : g.setEquippedWeaponId(it.instanceId))}
-                        className={`pixel-btn flex min-h-[44px] w-full justify-between px-2 text-sm ${equipped ? 'bg-yellow-300' : 'bg-stone-100'}`}>
-                        <span>[{QUALITY_LABEL[it.quality]}] {ITEMS[it.itemId].name}</span>
-                        <span>공{it.atk} · {it.durability}/{it.maxDurability}</span>
-                      </button>
-                    );
-                  })}
+                  <p className="text-xs text-muted-foreground">음식은 눌러서 먹을 수 있어요.</p>
+                  <Stacks stacks={s.backpack} onUse={g.eat} />
+                  <div>
+                    <b className="text-sm">장비</b>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {s.gear.length ? s.gear.map((x) => (
+                        <div key={x.uid} className="pixel-frame flex items-center gap-1 bg-card px-1.5 py-1 text-xs"><Sprite k={ITEMS[x.itemId].sprite} scale={0.75} />{ITEMS[x.itemId].name}</div>
+                      )) : <p className="text-sm text-muted-foreground">맨손입니다. 기술을 깨우쳐 도구를 만드세요.</p>}
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => { if (confirm('처음부터 다시 시작할까요?')) g.reset(); }} className="flex min-h-11 items-center gap-1 text-xs text-muted-foreground"><RotateCcw className="!h-4 !w-4" />처음부터 다시</button>
                 </>
-              ) : (
+              )}
+
+              {panel === 'base' && (!s.base ? <p className="text-sm">아직 거점이 없습니다.</p> : (
                 <>
-                  <h3>창고</h3>
-                  <StackList stacks={g.storage} />
-                  <h3>제작 (창고 재료 사용 · 어디서나 가능)</h3>
-                  {RECIPES.map((r) => {
-                    const ok = canCraft(g.storage, r);
+                  {!g.inBase && <p className="pixel-frame bg-accent p-2 text-sm">거점 반경 안에서만 제작·연구할 수 있어요.</p>}
+                  <div><b className="text-sm">창고</b><div className="mt-1"><Stacks stacks={s.storage} onUse={g.eat} /></div></div>
+                  <div>
+                    <b className="text-sm">제작</b>
+                    <div className="mt-1 space-y-2">
+                      {g.recipes.map((r) => {
+                        const known = isRecipeUnlocked(r, s.techs);
+                        const it = ITEMS[r.result];
+                        if (!known) return (
+                          <div key={r.id} className="flex items-center gap-2 text-xs text-muted-foreground"><Lock className="!h-4 !w-4" />??? — 「{techForRecipe(r.id)?.name}」 기술 필요</div>
+                        );
+                        const ok = g.inBase && s.base!.level >= r.baseLevel && g.canAfford(r.ingredients);
+                        return (
+                          <div key={r.id} className="pixel-frame flex items-center gap-2 bg-card p-2">
+                            <Sprite k={it.sprite} />
+                            <div className="flex-1 text-xs"><b className="text-sm">{it.name}</b>{r.baseLevel > 1 && ` (거점 ${r.baseLevel}단계)`}<div className="mt-1"><Stacks stacks={r.ingredients} have={s.storage} /></div></div>
+                            <button type="button" disabled={!ok} onClick={() => g.craft(r)} className="pixel-btn h-11 bg-primary px-3 text-primary-foreground disabled:opacity-40">제작</button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {s.base.level < 3 && (() => {
+                    const nx = BASE_LEVELS[(s.base.level + 1) as 2 | 3];
                     return (
-                      <div key={r.resultItemId} className="pixel-frame flex items-center gap-2 bg-stone-100 p-2">
-                        <span className="pixelated h-8 w-8 shrink-0" style={{ background: ITEMS[r.resultItemId].color, border: '3px solid #1c1917' }} />
-                        <div className="flex-1 text-xs">
-                          <b className="text-sm">{ITEMS[r.resultItemId].name}</b>
-                          <p>{r.ingredients.map((i) => `${ITEMS[i.itemId].name} ${countOf(g.storage, i.itemId)}/${i.count}`).join(' · ')}</p>
-                        </div>
-                        <button disabled={!ok} onClick={() => setCrafting(r)} className="pixel-btn min-h-[44px] bg-orange-400 px-3 text-sm">제작</button>
+                      <div className="pixel-frame bg-card p-2 text-xs">
+                        <b className="text-sm">{nx.name}(으)로 발전</b> — {nx.unlocks}
+                        <div className="my-1"><Stacks stacks={nx.cost} have={s.storage} /></div>
+                        <button type="button" disabled={!g.inBase || !g.canAfford(nx.cost)} onClick={g.upgradeBase} className="pixel-btn h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">발전시키기</button>
+                      </div>
+                    );
+                  })()}
+                  <button type="button" onClick={g.placeBase} className="min-h-11 text-xs text-muted-foreground underline">현재 위치로 거점 옮기기 (나뭇가지 3)</button>
+                </>
+              ))}
+
+              {panel === 'tech' && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">처음엔 아무것도 만들 줄 모릅니다. 자원을 모으면 깨달음을 얻고, 일부 기술은 거점에서 재료를 바쳐 연구해야 합니다.</p>
+                  {TECHS.map((t) => {
+                    const known = s.techs.includes(t.id);
+                    const ready = prerequisitesMet(t, s.techs);
+                    return (
+                      <div key={t.id} className={`pixel-frame p-2 text-xs ${known ? 'bg-primary/15' : 'bg-card'} ${!ready && !known ? 'opacity-50' : ''}`}>
+                        <div className="flex items-center gap-1"><b className="text-sm">{t.name}</b>{known ? <span className="ml-auto text-primary">습득</span> : <Lock className="ml-auto !h-4 !w-4" />}</div>
+                        <p>{t.desc}</p>
+                        {t.requires.length > 0 && <p className="text-muted-foreground">선행: {t.requires.map((r) => TECHS.find((x) => x.id === r)?.name).join(', ')}</p>}
+                        <p>제작법: {t.recipes.map((r) => ITEMS[g.recipes.find((x) => x.id === r)!.result].name).join(', ')}</p>
+                        {!known && t.inspire && <p className="mt-1">깨달음: {ITEMS[t.inspire.itemId].name} {Math.min(s.gathered[t.inspire.itemId] ?? 0, t.inspire.count)}/{t.inspire.count}개 채집</p>}
+                        {!known && t.research && (
+                          <div className="mt-1">
+                            <Stacks stacks={t.research} have={s.storage} />
+                            <button type="button" disabled={!ready || !g.inBase || !g.canAfford(t.research)} onClick={() => g.research(t.id)} className="pixel-btn mt-1 h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">거점에서 연구하기</button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
-                </>
+                </div>
               )}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {crafting && (
-        <KnappingMinigame recipe={crafting} onCancel={() => setCrafting(null)}
-          onDone={(q) => { g.craft(crafting, q); setCrafting(null); }} />
-      )}
-
     </div>
   );
 }
