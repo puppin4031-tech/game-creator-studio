@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Map, Circle, CustomOverlayMap } from 'react-kakao-maps-sdk';
 import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
-import { ArrowLeft, Radar, Home, Backpack, Hammer, Flag } from 'lucide-react';
+import { ArrowLeft, Radar, Backpack, Hammer, Flag } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSurvivalGame, WorldEntity } from '@/hooks/useSurvivalGame';
 import { ENTITIES, ITEMS, QUALITY_LABEL, RECIPES, SURVIVAL_CONFIG, Recipe, Stack, canCraft, countOf } from '@/lib/survival';
@@ -213,7 +213,6 @@ export default function SurvivalSimulator() {
           onDone={(q) => { g.craft(crafting, q); setCrafting(null); }} />
       )}
 
-      {!g.inBase && g.distToBase > 0 && false && <Home />}
     </div>
   );
 }
