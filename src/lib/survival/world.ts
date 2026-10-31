@@ -45,7 +45,7 @@ export function generateNodes(q: WorldQuery): WorldNode[] {
       const pos = fromGrid(gx, gy);
       if (distanceM(pos, q.center) > r) continue;
       const biome = biomeAt(pos);
-      const type = pickWeighted(types.map((t) => [t, NODES[t].biomes[biome as keyof (typeof NODES)[typeof t]['biomes']] ?? 0] as [NodeType, number]), hash01(cx, cy, 4));
+      const type = pickWeighted(types.map((t) => [t, (NODES[t].biomes as Record<string, number | undefined>)[biome] ?? 0] as [NodeType, number]), hash01(cx, cy, 4));
       if (!type) continue;
       const id = `n:${cx}:${cy}`;
       if (!isNodeAvailable(id, type, q.depleted, q.now)) continue;
