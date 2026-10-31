@@ -125,3 +125,18 @@
 .animate-treasure-orbit {
   animation: treasure-orbit 3.2s linear infinite;
 }
+
+/* ── Survival pixel-art utilities ── */
+@font-face {
+  font-family: 'DungGeunMo';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_six@1.2/DungGeunMo.woff') format('woff');
+  font-display: swap;
+}
+@layer utilities {
+  .pixelated { image-rendering: pixelated; }
+  .font-pixel { font-family: 'DungGeunMo', monospace; }
+  .pixel-frame { border: 4px solid #292524; box-shadow: 4px 4px 0 0 #000; border-radius: 0; }
+  .pixel-btn { border: 4px solid #292524; box-shadow: 4px 4px 0 0 #000; border-radius: 0; transition: transform 60ms; }
+  .pixel-btn:active { transform: translate(4px, 4px); box-shadow: none; }
+  .pixel-btn:disabled { opacity: .45; }
+}
