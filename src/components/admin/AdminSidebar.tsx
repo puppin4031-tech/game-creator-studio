@@ -13,7 +13,7 @@ import {
   SidebarFooter,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { Map, Users, CheckSquare, LayoutDashboard, PlusCircle, ClipboardList, LogOut, MapPin, Home, Palette, Zap } from 'lucide-react';
+import { Map, Users, CheckSquare, LayoutDashboard, PlusCircle, ClipboardList, LogOut, MapPin, Home, Palette, Zap, Film } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const mainAdminItems = [
@@ -21,6 +21,7 @@ const mainAdminItems = [
   { title: '전체 지도', url: '/admin/map', icon: Map },
   { title: '테마 관리', url: '/admin/themes', icon: Palette },
   { title: '관리자 관리', url: '/admin/users', icon: Users },
+  { title: '캐릭터 애니메이션', url: '/admin/sprites', icon: Film },
   { title: '승인 관리', url: '/admin/approvals', icon: CheckSquare },
 ];
 

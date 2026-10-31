@@ -15,6 +15,13 @@
       "when": 1793434103742,
       "tag": "0001_survival_ai_request_throttle",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793459046445,
+      "tag": "0002_survival_sprite_animations",
+      "breakpoints": true
     }
   ]
 }

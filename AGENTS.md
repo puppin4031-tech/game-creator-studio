@@ -6,3 +6,4 @@
 - Survival GPS progression reuses progression.ts and quests.ts through worldProgress.ts; persist counters and quest index with the world save, and claim rewards only at a GPS-valid base to avoid duplicate rewards or divergent rules.
 - Keep the survival screen's Fast Refresh reset directive: custom world/GPS hook updates can change hook order across modules, so preview refresh must remount from the persisted save rather than reuse stale React hook queues.
 - Survival terrain colors come from global CSS tokens; visual-only scenery uses a separate geographic seed salt and one canvas beneath fog, so map detail never changes resource positions or intercepts interactions.
+- Character animations are horizontal sprite-sheet strips stored in the private survival-sprites bucket and read via signed URLs; why: workspace blocks public buckets, and the game falls back to the bundled sprite when no sheet exists.

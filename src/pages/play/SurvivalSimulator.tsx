@@ -1,6 +1,8 @@
 // @refresh reset
 // Custom GPS/world hook changes must remount this screen instead of reusing stale hook queues.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import SpriteAnimator from '@/components/survival/SpriteAnimator';
+import { useSpriteAnimations, type SpriteAction } from '@/hooks/useSpriteAnimations';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, Backpack, Flame, Lightbulb, LocateFixed, X, Lock, RotateCcw, Route, ListChecks } from 'lucide-react';
@@ -82,8 +84,23 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const tapEntity = (e: WorldEntity) => {
     if (realGps && !gps.ready) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return; }
     if (!realGps && distanceM(s.pos, e) > C.interactRadiusM) { g.moveTo({ lat: e.lat, lng: e.lng }); return; }
+    playAction(e.kind === 'creature' ? 'attack' : 'gather', 900);
     g.interact(e);
   };
+
+  const { data: anims } = useSpriteAnimations('hunter');
+  const [action, setAction] = useState<SpriteAction>('idle');
+  const actionTimer = useRef<number>();
+  const playAction = (a: SpriteAction, ms: number) => {
+    setAction(a); window.clearTimeout(actionTimer.current);
+    actionTimer.current = window.setTimeout(() => setAction('idle'), ms);
+  };
+  const lastPos = useRef(s.pos);
+  useEffect(() => {
+    if (lastPos.current.lat !== s.pos.lat || lastPos.current.lng !== s.pos.lng) { lastPos.current = s.pos; setAction(a => (a === 'idle' ? 'walk' : a)); window.clearTimeout(actionTimer.current); actionTimer.current = window.setTimeout(() => setAction('idle'), 1500); }
+  }, [s.pos]);
+  useEffect(() => () => window.clearTimeout(actionTimer.current), []);
+  const activeAnim = anims?.[action] ?? anims?.idle;
 
   const hpPct = (s.hp / C.baseMaxHp) * 100;
 
@@ -123,7 +140,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               return (
                 <div className="absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
                   <div className="rounded-full border border-primary/60" style={{ width: r * 2, height: r * 2 }} />
-                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[85%]"><Sprite k="char-hunter" /></div>
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[85%]">{activeAnim ? <SpriteAnimator url={activeAnim.url} frames={activeAnim.frame_count} fps={activeAnim.fps} height={SPRITE_META['char-hunter'].h} /> : <Sprite k="char-hunter" />}</div>
                 </div>
               );
             })()}
