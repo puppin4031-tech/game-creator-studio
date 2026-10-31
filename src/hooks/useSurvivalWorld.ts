@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import type { Json } from '@/integrations/supabase/types';
 import { ITEMS, type ItemId } from '@/lib/survival/items';
 import { CREATURES, NODES, creatureDef, nodeDef, isHostileNow, type LootRoll } from '@/lib/survival/entities';
 import { RECIPES, type Recipe } from '@/lib/survival/recipes';
@@ -68,9 +71,11 @@ function roll(loot: LootRoll[]): Stack[] {
 
 const fmt = (st: Stack[]) => st.map((s) => `${ITEMS[s.itemId].name} ×${s.count}`).join(', ');
 
-export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; saveKey?: string } = {}) {
+export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; saveKey?: string; cloudSync?: boolean } = {}) {
   const enabled = options.enabled ?? true;
   const saveKey = options.saveKey ?? SAVE_KEY;
+  const { user } = useAuth();
+  const userId = options.cloudSync ? user?.id ?? null : null;
   const [s, setState] = useState<WorldSave>(() => load(start, saveKey));
   const ref = useRef(s);
   ref.current = s;
@@ -88,6 +93,41 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     try { localStorage.setItem(saveKey, JSON.stringify(s)); }
     catch { toast.error('진행 상태를 기기에 저장하지 못했습니다. 저장 공간을 확인해 주세요.'); }
   }, [s, saveKey]);
+
+  // Cloud sync: on login, restore the newer save (cloud vs this device); then keep uploading changes.
+  const cloudReadyRef = useRef(false);
+  const skipNextUploadRef = useRef(false);
+  useEffect(() => {
+    if (!userId) { cloudReadyRef.current = false; return; }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.from('survival_saves').select('payload').eq('user_id', userId).maybeSingle();
+      if (cancelled) return;
+      if (error) { console.error('[survival] cloud load failed', error); cloudReadyRef.current = true; return; }
+      const remote = data?.payload as Partial<WorldSave> | undefined;
+      const local = ref.current;
+      if (remote && (remote.lastTickAt ?? 0) > local.lastTickAt) {
+        skipNextUploadRef.current = true;
+        setS({ ...fresh(local.pos), ...remote, base: remote.base ? { ...remote.base, placedAt: remote.base.placedAt ?? Date.now() } : null });
+        toast.success('클라우드에 저장된 생존 진행도를 불러왔습니다.');
+      } else {
+        const { error: upErr } = await supabase.from('survival_saves').upsert({ user_id: userId, payload: local as unknown as Json, updated_at: new Date().toISOString() });
+        if (upErr) console.error('[survival] cloud save failed', upErr);
+      }
+      cloudReadyRef.current = true;
+    })();
+    return () => { cancelled = true; };
+  }, [userId, setS]);
+
+  useEffect(() => {
+    if (!userId || !cloudReadyRef.current) return;
+    if (skipNextUploadRef.current) { skipNextUploadRef.current = false; return; }
+    const t = setTimeout(() => {
+      supabase.from('survival_saves').upsert({ user_id: userId, payload: ref.current as unknown as Json, updated_at: new Date().toISOString() })
+        .then(({ error }) => { if (error) console.error('[survival] cloud save failed', error); });
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [s, userId]);
 
   const isNight = dayPhase(new Date(now)) === 'night';
   const vision = isNight ? C.visionNightM : C.visionDayM;
