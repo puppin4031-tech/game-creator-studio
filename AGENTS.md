@@ -7,3 +7,4 @@
 - Keep the survival screen's Fast Refresh reset directive: custom world/GPS hook updates can change hook order across modules, so preview refresh must remount from the persisted save rather than reuse stale React hook queues.
 - Survival terrain colors come from global CSS tokens; visual-only scenery uses a separate geographic seed salt and one canvas beneath fog, so map detail never changes resource positions or intercepts interactions.
 - Character animations are horizontal sprite-sheet strips stored in the private survival-sprites bucket and read via signed URLs; why: workspace blocks public buckets, and the game falls back to the bundled sprite when no sheet exists.
+- Real terrain zones (riverside/highland/plains) are sampled from rendered map surfaces and stored per coarse cell in the world save (first sample wins); why: resource ratios must stay stable for a place while still reflecting real geography.
