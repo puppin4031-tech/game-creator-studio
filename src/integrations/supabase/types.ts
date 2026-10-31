@@ -391,6 +391,27 @@ export type Database = {
           },
         ]
       }
+      survival_ai_access_state: {
+        Row: {
+          blocked_at: string
+          id: string
+          message: string
+          status_code: number
+        }
+        Insert: {
+          blocked_at?: string
+          id: string
+          message: string
+          status_code?: number
+        }
+        Update: {
+          blocked_at?: string
+          id?: string
+          message?: string
+          status_code?: number
+        }
+        Relationships: []
+      }
       tag_messages: {
         Row: {
           channel: string
