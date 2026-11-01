@@ -174,12 +174,25 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     });
   }, [now, s.lastTickAt, inBase, baseDef, enabled, setS]);
 
-  // Auto deposit on entering base.
+  // Auto deposit on entering base. Shell currency stays in the backpack (and is
+  // pulled back out of storage) so it can be spent at traders.
   useEffect(() => {
-    if (!enabled || !inBase || s.backpack.length === 0) return;
-    toast.success(`거점 귀환! ${fmt(s.backpack)} 창고에 보관`);
-    setS((p) => ({ ...p, storage: addStacks(p.storage, p.backpack), backpack: [], deposits: p.deposits + 1 }));
-  }, [inBase, s.backpack, enabled, setS]);
+    if (!enabled || !inBase) return;
+    const deposit = s.backpack.filter((x) => x.itemId !== 'shell');
+    const storedShell = s.storage.find((x) => x.itemId === 'shell');
+    if (!deposit.length && !storedShell) return;
+    if (deposit.length) toast.success(`거점 귀환! ${fmt(deposit)} 창고에 보관`);
+    setS((p) => {
+      const dep = p.backpack.filter((x) => x.itemId !== 'shell');
+      const shells = [...p.backpack, ...p.storage].filter((x) => x.itemId === 'shell').reduce((n, x) => n + x.count, 0);
+      return {
+        ...p,
+        storage: addStacks(p.storage.filter((x) => x.itemId !== 'shell'), dep),
+        backpack: shells ? [{ itemId: 'shell', count: shells }] : [],
+        deposits: p.deposits + (dep.length ? 1 : 0),
+      };
+    });
+  }, [inBase, s.backpack, s.storage, enabled, setS]);
 
   const learn = (p: WorldSave, techs: TechDef[]): WorldSave => {
     techs.forEach((t) => toast.success(`깨달음: ${t.name}`, { description: t.desc }));
