@@ -43,6 +43,8 @@ export interface CreatureDef {
   nightWeight: number;
   /** Becomes aggressive at night. */
   nightAggressive?: boolean;
+  /** Park boss: never spawns by biome weight, only in park cells. */
+  boss?: boolean;
 }
 
 export const NODES = {
@@ -151,7 +153,23 @@ export const CREATURES = {
     loot: [{ itemId: 'raw_meat', min: 6, max: 8 }, { itemId: 'hide', min: 4, max: 5 }, { itemId: 'tusk', min: 2, max: 2 }, { itemId: 'bone', min: 4, max: 5 }], xp: 130,
     biomes: { wetland: 1.2, plains: 0.8, rocky: 0.6 }, nightWeight: 0.6,
   },
+  boss_direwolf: {
+    name: '우두머리 · 거대 늑대', sprite: 'mob-wolf', hp: 90, atk: 14, temper: 'aggressive', boss: true,
+    loot: [{ itemId: 'prime_pelt', min: 1, max: 2 }, { itemId: 'bone', min: 2, max: 3 }, { itemId: 'ancient_fang', min: 1, max: 1, chance: 0.35 },
+      { itemId: 'beast_bait', min: 1, max: 2, chance: 0.4 }, { itemId: 'taming_snare', min: 1, max: 1, chance: 0.25 },
+      { itemId: 'tome_primal_strike', min: 1, max: 1, chance: 0.15 }, { itemId: 'tome_beast_mastery', min: 1, max: 1, chance: 0.15 }], xp: 260,
+    biomes: {}, nightWeight: 1,
+  },
+  boss_mammoth: {
+    name: '우두머리 · 분노한 매머드', sprite: 'mob-mammoth', hp: 220, atk: 22, temper: 'neutral', boss: true,
+    loot: [{ itemId: 'raw_meat', min: 6, max: 9 }, { itemId: 'prime_pelt', min: 2, max: 3 }, { itemId: 'tusk', min: 2, max: 3 }, { itemId: 'alpha_heart', min: 1, max: 1, chance: 0.5 },
+      { itemId: 'ancient_fang', min: 1, max: 2, chance: 0.35 }, { itemId: 'taming_snare', min: 1, max: 1, chance: 0.3 },
+      { itemId: 'tome_iron_skin', min: 1, max: 1, chance: 0.2 }, { itemId: 'tome_beast_mastery', min: 1, max: 1, chance: 0.1 }], xp: 420,
+    biomes: {}, nightWeight: 1,
+  },
 } satisfies Record<string, CreatureDef>;
+
+export const BOSS_TYPES = ['boss_direwolf', 'boss_mammoth'] as const;
 
 export type CreatureType = keyof typeof CREATURES;
 

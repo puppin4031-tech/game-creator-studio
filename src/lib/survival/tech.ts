@@ -16,6 +16,8 @@ export interface TechDef {
   inspire?: { itemId: ItemId; count: number };
   research?: Stack[];
   recipes: string[];
+  /** Learned only by reading a skill book dropped by park bosses. */
+  bookOnly?: boolean;
 }
 
 export const TECHS: TechDef[] = [
@@ -30,7 +32,13 @@ export const TECHS: TechDef[] = [
   { id: 'obsidian', name: '흑요석 가공', desc: '유리 같은 돌을 다루는 비법.', requires: ['hafting'], inspire: { itemId: 'obsidian', count: 1 }, recipes: ['obsidian_spear', 'obsidian_pickaxe'] },
   { id: 'furcraft', name: '털옷 짓기', desc: '두꺼운 털가죽으로 망토를 짓는다.', requires: ['tanning'], research: [{ itemId: 'hide', count: 4 }, { itemId: 'bone', count: 2 }], recipes: ['fur_cloak'] },
   { id: 'jadework', name: '옥 세공', desc: '옥을 갈아 부적을 만든다.', requires: ['obsidian'], inspire: { itemId: 'jade', count: 1 }, recipes: ['jade_amulet'] },
+  { id: 'primal_strike', name: '원시 일격', desc: '짐승을 공격할 때 공격력 +30%.', requires: [], recipes: [], bookOnly: true },
+  { id: 'iron_skin', name: '바위 피부', desc: '받는 피해 -2.', requires: [], recipes: [], bookOnly: true },
+  { id: 'beast_mastery', name: '야수 교감', desc: '짐승 길들이기의 기초. (테이밍은 준비 중)', requires: [], recipes: [], bookOnly: true },
 ];
+
+export const PRIMAL_STRIKE_MULT = 1.3;
+export const IRON_SKIN_DEF = 2;
 
 export const techById = (id: string) => TECHS.find((t) => t.id === id);
 

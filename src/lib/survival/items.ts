@@ -22,6 +22,8 @@ export interface ItemDef {
   trinket?: { lootBonus: number; xpBonus: number };
   /** Base durability for gear (0 = indestructible). */
   durability?: number;
+  /** Reading teaches this tech id (consumed). */
+  book?: { techId: string };
 }
 
 // Widen values to ItemDef (keeps literal keys for ItemId) so gear fields
@@ -61,6 +63,15 @@ export const ITEMS = def({
   leather: { name: '가죽', desc: '무두질한 질긴 가죽.', category: 'processed', rarity: 'uncommon', weight: 1.5, sprite: 'item-leather' },
   clay_pot: { name: '토기', desc: '불에 구운 저장 그릇. 동굴 거처 재료.', category: 'processed', rarity: 'uncommon', weight: 2, sprite: 'item-clay-pot' },
   salve: { name: '약초 연고', desc: '체력 +40', category: 'processed', rarity: 'rare', weight: 0.5, sprite: 'item-salve', heal: 40 },
+  // ── Boss trophies & rare drops
+  ancient_fang: { name: '고대의 송곳니', desc: '우두머리의 송곳니. 최상급 무기 재료.', category: 'material', rarity: 'epic', weight: 1, sprite: 'item-tusk' },
+  prime_pelt: { name: '우두머리 털가죽', desc: '두껍고 윤기 나는 최상급 가죽.', category: 'material', rarity: 'rare', weight: 3, sprite: 'item-hide' },
+  alpha_heart: { name: '야수의 심장', desc: '허기 +30 · 체력 +30', category: 'food', rarity: 'epic', weight: 1, sprite: 'item-raw-meat', food: { hunger: 30, hp: 30 } },
+  taming_snare: { name: '가죽 올가미', desc: '짐승을 길들일 때 쓰는 테이밍 도구.', category: 'processed', rarity: 'rare', weight: 1, sprite: 'item-cordage' },
+  beast_bait: { name: '특제 미끼', desc: '짐승을 유인하는 향긋한 미끼. 테이밍 재료.', category: 'processed', rarity: 'uncommon', weight: 0.5, sprite: 'item-cooked-meat' },
+  tome_primal_strike: { name: '비전서: 원시 일격', desc: '읽으면 공격력 +30% 기술을 배운다.', category: 'processed', rarity: 'epic', weight: 0.5, sprite: 'item-leather', book: { techId: 'primal_strike' } },
+  tome_iron_skin: { name: '비전서: 바위 피부', desc: '읽으면 받는 피해 -2 기술을 배운다.', category: 'processed', rarity: 'epic', weight: 0.5, sprite: 'item-leather', book: { techId: 'iron_skin' } },
+  tome_beast_mastery: { name: '비전서: 야수 교감', desc: '읽으면 짐승 길들이기의 기초를 배운다.', category: 'processed', rarity: 'epic', weight: 0.5, sprite: 'item-leather', book: { techId: 'beast_mastery' } },
   // ── Tools
   hand_axe: { name: '주먹도끼', desc: '나무를 벨 수 있다. 채취력 1', category: 'tool', rarity: 'common', weight: 2, sprite: 'item-hand-axe', tool: { chop: 1, mine: 0, power: 1 }, durability: 40 },
   stone_pickaxe: { name: '돌곡괭이', desc: '광석을 캘 수 있다. 채굴 1단계', category: 'tool', rarity: 'uncommon', weight: 3, sprite: 'item-stone-pickaxe', tool: { chop: 0, mine: 1, power: 1.2 }, durability: 50 },

@@ -1,4 +1,4 @@
-import { CREATURES, NODES, type CreatureType, type NodeType } from './entities';
+import { BOSS_TYPES, CREATURES, NODES, type CreatureType, type NodeType } from './entities';
 import { biomeAt, distanceM, fromGrid, hash01, pickWeighted, toGrid } from './geo';
 import { zoneCellKey, zoneWeight, type TerrainZone } from './terrainZone';
 import { PARK_CREATURE_MULT } from './landmarks';
@@ -13,6 +13,8 @@ export const CREATURE_DENSITY_DAY = 0.3;
 export const CREATURE_DENSITY_NIGHT = 0.38;
 /** Creatures never spawn this close to the base edge (safe zone). */
 export const SAFE_MARGIN_M = 15;
+/** Chance a park creature cell hosts a boss this epoch. */
+export const PARK_BOSS_CHANCE = 0.12;
 
 export interface WorldQuery {
   center: LatLng;
@@ -87,7 +89,10 @@ export function generateCreatures(q: WorldQuery): WorldCreature[] {
         const bw = zoneWeight(d.biomes, biome, q.terrainZones?.[zoneCellKey(pos)]);
         return [t, bw * (q.isNight ? d.nightWeight : 1)] as [CreatureType, number];
       });
-      const type = pickWeighted(weights, hash01(cx, cy, epoch, 10));
+      const bossRoll = hash01(cx, cy, epoch, 11);
+      const type = inPark && bossRoll < PARK_BOSS_CHANCE
+        ? BOSS_TYPES[Math.floor((bossRoll / PARK_BOSS_CHANCE) * BOSS_TYPES.length) % BOSS_TYPES.length]
+        : pickWeighted(weights, hash01(cx, cy, epoch, 10));
       if (!type) continue;
       const id = `c:${cx}:${cy}:${epoch}`;
       if (q.depleted[id]) continue;

@@ -13,6 +13,7 @@ export const TECH_CATEGORIES: { id: TechCategory; label: string }[] = [
 export const TECH_CATEGORY: Record<string, TechCategory> = {
   knapping: 'general', binding: 'general', fire: 'general', herbalism: 'general',
   hafting: 'craft', pottery: 'craft', tanning: 'craft', bonecraft: 'craft', obsidian: 'craft', furcraft: 'craft', jadework: 'craft',
+  primal_strike: 'special', iron_skin: 'special', beast_mastery: 'companion',
 };
 
 /** Planned features shown as locked previews until implemented. */
