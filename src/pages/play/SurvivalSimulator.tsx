@@ -26,6 +26,11 @@ import { ACTOR_IDLE_RETURN_MS, shouldReturnToCenter, type ActorTarget } from '@/
 import { TECHS, isRecipeUnlocked, prerequisitesMet, techForRecipe } from '@/lib/survival/tech';
 import { countOf } from '@/lib/survival/inventory';
 import type { LatLng, Stack, WorldEntity } from '@/lib/survival/types';
+import { DamageVignette, HitFlash, HpBar, useHitPulse } from '@/components/survival/HitFeedback';
+import PeerActionMenu from '@/components/survival/PeerActionMenu';
+import { useSurvivalPresence, type PeerEvent, type PeerPlayer } from '@/hooks/useSurvivalPresence';
+import { EMOTES, PVP_BASE_DAMAGE } from '@/lib/survival/presence';
+import { PLANNED, TECH_CATEGORIES, TECH_CATEGORY, type TechCategory } from '@/lib/survival/techCategories';
 
 const START: LatLng = { lat: 37.748, lng: 126.7496 };
 const spriteUrls = import.meta.glob('../../assets/survival/*.png', { eager: true, import: 'default' }) as Record<string, string>;
@@ -143,7 +148,49 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const zone = s.terrainZones[zoneCellKey(s.pos)] ?? 'plains';
   const onSurfaceZone = (c: LatLng, z: typeof zone) => g.recordTerrainZone(zoneCellKey(c), z);
 
-  const hpPct = (s.hp / C.baseMaxHp) * 100;
+  const hit = useHitPulse(s.hp);
+  const [techTab, setTechTab] = useState<TechCategory>('general');
+  const [selPeerId, setSelPeerId] = useState<string | null>(null);
+  const [bubbles, setBubbles] = useState<Record<string, string>>({});
+  const [allies, setAllies] = useState<{ id: string; name: string }[]>(() => {
+    try { return JSON.parse(localStorage.getItem('survival-allies-v1') ?? '[]'); } catch { return []; }
+  });
+  useEffect(() => { localStorage.setItem('survival-allies-v1', JSON.stringify(allies)); }, [allies]);
+  const showBubble = (id: string, text: string) => {
+    setBubbles(b => ({ ...b, [id]: text }));
+    window.setTimeout(() => setBubbles(b => { const n = { ...b }; if (n[id] === text) delete n[id]; return n; }), 3000);
+  };
+  const peersRef = useRef<PeerPlayer[]>([]);
+  const onPeerEvent = (e: PeerEvent) => {
+    const from = peersRef.current.find(p => p.id === e.from);
+    if (e.type === 'emote') showBubble(e.from, EMOTES.find(x => x.id === e.emote)?.text ?? '');
+    else if (e.type === 'attack') {
+      // Ignore attacks from unknown, allied, or out-of-range players.
+      if (!from || allies.some(a => a.id === e.from) || distanceM(s.pos, from) > C.interactRadiusM * 1.5) return;
+      g.takeDamage(Math.min(30, e.dmg));
+      toast.error(`${from.name}에게 공격받았습니다!`);
+    } else if (e.type === 'ally') {
+      toast(`${e.name}님이 동맹을 제안했습니다`, { action: { label: '수락', onClick: () => {
+        setAllies(a => a.some(x => x.id === e.from) ? a : [...a, { id: e.from, name: e.name }]);
+        presence.send({ type: 'ally', to: e.from, name: presence.name });
+      } } });
+      // Auto-complete if we already proposed to them.
+    }
+  };
+  const presence = useSurvivalPresence(realGps ? gps.ready : true, s.pos, s.level, onPeerEvent);
+  peersRef.current = presence.peers;
+  const selPeer = presence.peers.find(p => p.id === selPeerId) ?? null;
+  const attackPeer = () => {
+    if (!selPeer) return;
+    const dmg = PVP_BASE_DAMAGE + (g.weapon ? ITEMS[g.weapon.itemId].weapon?.atk ?? 0 : 0);
+    presence.send({ type: 'attack', to: selPeer.id, dmg });
+    setActorTarget({ lat: selPeer.lat, lng: selPeer.lng, anchor: s.pos });
+    playAction('attack', 900);
+    window.clearTimeout(returnTimer.current);
+    returnTimer.current = window.setTimeout(returnToCenter, 900 + ACTOR_IDLE_RETURN_MS);
+    toast(`${selPeer.name}을(를) 공격했습니다 (-${dmg})`);
+    setSelPeerId(null);
+  };
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden font-pixel">
@@ -176,6 +223,19 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 </button>
               );
             })}
+            {presence.peers.filter((pr) => distanceM(s.pos, pr) <= g.vision).map((pr) => {
+              const p = project(pr);
+              const ally = allies.some(a => a.id === pr.id);
+              return (
+                <button key={pr.id} type="button" aria-label={`${pr.name} 상호작용`} onClick={(ev) => { ev.stopPropagation(); setSelPeerId(pr.id); }}
+                  className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center transition-[left,top] duration-1000 ease-linear"
+                  style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}>
+                  {bubbles[pr.id] && <span className="whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbles[pr.id]}</span>}
+                  <Sprite k="char-hunter" className="opacity-90 hue-rotate-90" />
+                  <span className={`rounded px-1 text-[10px] ${ally ? 'bg-primary text-primary-foreground' : 'bg-background/80'}`}>{pr.name}</span>
+                </button>
+              );
+            })}
             {(() => {
               const p = project(s.pos); const r = C.interactRadiusM / mpp;
               return (
@@ -187,7 +247,10 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                     const dx = (t.x - p.x) * 0.85, dy = (t.y - p.y) * 0.85;
                     return (
                       <motion.div className="absolute left-1/2 top-1/2" initial={false} animate={{ x: dx, y: dy }} transition={{ duration: actorTarget ? 0.25 : 0.5, ease: 'easeOut' }}>
-                        <div className="-translate-x-1/2 -translate-y-[85%]" style={{ transform: dx < -1 ? 'translate(-50%,-85%) scaleX(-1)' : undefined }}>{activeAnim ? <SpriteAnimator url={activeAnim.url} frames={activeAnim.frame_count} fps={activeAnim.fps} height={SPRITE_META['char-hunter'].h} /> : <Sprite k="char-hunter" />}</div>
+                        <div className="-translate-x-1/2 -translate-y-[85%]">
+                          {bubbles[presence.selfId] && <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbles[presence.selfId]}</span>}
+                          <HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined }}>{activeAnim ? <SpriteAnimator url={activeAnim.url} frames={activeAnim.frame_count} fps={activeAnim.fps} height={SPRITE_META['char-hunter'].h} /> : <Sprite k="char-hunter" />}</div></HitFlash>
+                        </div>
                       </motion.div>
                     );
                   })()}
@@ -203,7 +266,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-background/80 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur">
         <button type="button" aria-label="뒤로" onClick={() => navigate('/play')} className="pixel-btn flex h-11 w-11 items-center justify-center bg-card"><ArrowLeft className="!h-6 !w-6" /></button>
         <div className="flex-1 space-y-1 text-xs">
-          <div className="flex items-center gap-1">체력<div className="h-2.5 flex-1 border border-foreground bg-muted"><div className="h-full bg-destructive" style={{ width: `${hpPct}%` }} /></div>{s.hp}</div>
+          <div className="flex items-center gap-1">체력<HpBar value={s.hp} max={C.baseMaxHp} />{s.hp}</div>
           <div className="flex items-center gap-1">허기<div className="h-2.5 flex-1 border border-foreground bg-muted"><div className="h-full bg-primary" style={{ width: `${s.hunger}%` }} /></div>{s.hunger}</div>
         </div>
         <div className="text-right text-[11px] leading-tight">
