@@ -435,7 +435,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setS]);
 
-  return {
+  return { setSanctuaries, inSanctuary,
     recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, isNight, inBase, baseDef, weight, capacity, weapon,
     moveTo, interact, eat, placeBase, upgradeBase, research, craft, reset,
