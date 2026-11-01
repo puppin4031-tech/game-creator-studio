@@ -338,8 +338,18 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
   const reset = useCallback(() => { setS(fresh(ref.current.pos)); }, [setS]);
 
+  /** Apply external damage (e.g. another player's attack), reduced by worn armor. */
+  const takeDamage = useCallback((amount: number) => {
+    const p = ref.current;
+    const armorGear = p.gear.find((x) => ITEMS[x.itemId].armor);
+    const dmg = Math.max(1, Math.round(amount) - (armorGear ? ITEMS[armorGear.itemId].armor?.def ?? 0 : 0));
+    const hp = p.hp - dmg;
+    setS(hp <= 0 ? die({ ...p, hp }) : { ...p, hp });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setS]);
+
   return {
-    recordTerrainZone,
+    recordTerrainZone, takeDamage,
     state: s, entities, vision, isNight, inBase, baseDef, weight, capacity, weapon,
     moveTo, interact, eat, placeBase, upgradeBase, research, craft, reset,
     quest, questProgress, canClaimQuest, claimQuest, nextLevelXp: xpToNext(s.level),

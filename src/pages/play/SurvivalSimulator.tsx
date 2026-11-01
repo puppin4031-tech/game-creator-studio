@@ -26,6 +26,11 @@ import { ACTOR_IDLE_RETURN_MS, shouldReturnToCenter, type ActorTarget } from '@/
 import { TECHS, isRecipeUnlocked, prerequisitesMet, techForRecipe } from '@/lib/survival/tech';
 import { countOf } from '@/lib/survival/inventory';
 import type { LatLng, Stack, WorldEntity } from '@/lib/survival/types';
+import { DamageVignette, HitFlash, HpBar, useHitPulse } from '@/components/survival/HitFeedback';
+import PeerActionMenu from '@/components/survival/PeerActionMenu';
+import { useSurvivalPresence, type PeerEvent, type PeerPlayer } from '@/hooks/useSurvivalPresence';
+import { EMOTES, PVP_BASE_DAMAGE } from '@/lib/survival/presence';
+import { PLANNED, TECH_CATEGORIES, TECH_CATEGORY, type TechCategory } from '@/lib/survival/techCategories';
 
 const START: LatLng = { lat: 37.748, lng: 126.7496 };
 const spriteUrls = import.meta.glob('../../assets/survival/*.png', { eager: true, import: 'default' }) as Record<string, string>;
@@ -143,7 +148,52 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const zone = s.terrainZones[zoneCellKey(s.pos)] ?? 'plains';
   const onSurfaceZone = (c: LatLng, z: typeof zone) => g.recordTerrainZone(zoneCellKey(c), z);
 
-  const hpPct = (s.hp / C.baseMaxHp) * 100;
+  const hit = useHitPulse(s.hp);
+  const [techTab, setTechTab] = useState<TechCategory>('general');
+  const [selPeerId, setSelPeerId] = useState<string | null>(null);
+  const [bubbles, setBubbles] = useState<Record<string, string>>({});
+  const [allies, setAllies] = useState<{ id: string; name: string }[]>(() => {
+    try { return JSON.parse(localStorage.getItem('survival-allies-v1') ?? '[]'); } catch { return []; }
+  });
+  useEffect(() => { localStorage.setItem('survival-allies-v1', JSON.stringify(allies)); }, [allies]);
+  const showBubble = (id: string, text: string) => {
+    setBubbles(b => ({ ...b, [id]: text }));
+    window.setTimeout(() => setBubbles(b => { const n = { ...b }; if (n[id] === text) delete n[id]; return n; }), 3000);
+  };
+  const peersRef = useRef<PeerPlayer[]>([]);
+  const pendingAlly = useRef(new Set<string>());
+  const onPeerEvent = (e: PeerEvent) => {
+    const from = peersRef.current.find(p => p.id === e.from);
+    if (e.type === 'emote') showBubble(e.from, EMOTES.find(x => x.id === e.emote)?.text ?? '');
+    else if (e.type === 'attack') {
+      // Ignore attacks from unknown, allied, or out-of-range players.
+      if (!from || allies.some(a => a.id === e.from) || distanceM(s.pos, from) > C.interactRadiusM * 1.5) return;
+      g.takeDamage(Math.min(30, e.dmg));
+      toast.error(`${from.name}에게 공격받았습니다!`);
+    } else if (e.type === 'ally') {
+      if (allies.some(x => x.id === e.from)) return;
+      if (pendingAlly.current.has(e.from)) { pendingAlly.current.delete(e.from); setAllies(a => [...a, { id: e.from, name: e.name }]); toast.success(`${e.name}님과 동맹을 맺었습니다`); return; }
+      toast(`${e.name}님이 동맹을 제안했습니다`, { action: { label: '수락', onClick: () => {
+        setAllies(a => a.some(x => x.id === e.from) ? a : [...a, { id: e.from, name: e.name }]);
+        presence.send({ type: 'ally', to: e.from, name: presence.name });
+      } } });
+      // Auto-complete if we already proposed to them.
+    }
+  };
+  const presence = useSurvivalPresence(realGps ? gps.ready : true, s.pos, s.level, onPeerEvent);
+  peersRef.current = presence.peers;
+  const selPeer = presence.peers.find(p => p.id === selPeerId) ?? null;
+  const attackPeer = () => {
+    if (!selPeer) return;
+    const dmg = PVP_BASE_DAMAGE + (g.weapon ? ITEMS[g.weapon.itemId].weapon?.atk ?? 0 : 0);
+    presence.send({ type: 'attack', to: selPeer.id, dmg });
+    setActorTarget({ lat: selPeer.lat, lng: selPeer.lng, anchor: s.pos });
+    playAction('attack', 900);
+    window.clearTimeout(returnTimer.current);
+    returnTimer.current = window.setTimeout(returnToCenter, 900 + ACTOR_IDLE_RETURN_MS);
+    toast(`${selPeer.name}을(를) 공격했습니다 (-${dmg})`);
+    setSelPeerId(null);
+  };
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden font-pixel">
@@ -176,6 +226,19 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 </button>
               );
             })}
+            {presence.peers.filter((pr) => distanceM(s.pos, pr) <= g.vision).map((pr) => {
+              const p = project(pr);
+              const ally = allies.some(a => a.id === pr.id);
+              return (
+                <button key={pr.id} type="button" aria-label={`${pr.name} 상호작용`} onClick={(ev) => { ev.stopPropagation(); setSelPeerId(pr.id); }}
+                  className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center transition-[left,top] duration-1000 ease-linear"
+                  style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}>
+                  {bubbles[pr.id] && <span className="whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbles[pr.id]}</span>}
+                  <Sprite k="char-hunter" className="opacity-90 hue-rotate-90" />
+                  <span className={`rounded px-1 text-[10px] ${ally ? 'bg-primary text-primary-foreground' : 'bg-background/80'}`}>{pr.name}</span>
+                </button>
+              );
+            })}
             {(() => {
               const p = project(s.pos); const r = C.interactRadiusM / mpp;
               return (
@@ -187,7 +250,10 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                     const dx = (t.x - p.x) * 0.85, dy = (t.y - p.y) * 0.85;
                     return (
                       <motion.div className="absolute left-1/2 top-1/2" initial={false} animate={{ x: dx, y: dy }} transition={{ duration: actorTarget ? 0.25 : 0.5, ease: 'easeOut' }}>
-                        <div className="-translate-x-1/2 -translate-y-[85%]" style={{ transform: dx < -1 ? 'translate(-50%,-85%) scaleX(-1)' : undefined }}>{activeAnim ? <SpriteAnimator url={activeAnim.url} frames={activeAnim.frame_count} fps={activeAnim.fps} height={SPRITE_META['char-hunter'].h} /> : <Sprite k="char-hunter" />}</div>
+                        <div className="-translate-x-1/2 -translate-y-[85%]">
+                          {bubbles[presence.selfId] && <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbles[presence.selfId]}</span>}
+                          <HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined }}>{activeAnim ? <SpriteAnimator url={activeAnim.url} frames={activeAnim.frame_count} fps={activeAnim.fps} height={SPRITE_META['char-hunter'].h} /> : <Sprite k="char-hunter" />}</div></HitFlash>
+                        </div>
                       </motion.div>
                     );
                   })()}
@@ -203,7 +269,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-background/80 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur">
         <button type="button" aria-label="뒤로" onClick={() => navigate('/play')} className="pixel-btn flex h-11 w-11 items-center justify-center bg-card"><ArrowLeft className="!h-6 !w-6" /></button>
         <div className="flex-1 space-y-1 text-xs">
-          <div className="flex items-center gap-1">체력<div className="h-2.5 flex-1 border border-foreground bg-muted"><div className="h-full bg-destructive" style={{ width: `${hpPct}%` }} /></div>{s.hp}</div>
+          <div className="flex items-center gap-1">체력<HpBar value={s.hp} max={C.baseMaxHp} />{s.hp}</div>
           <div className="flex items-center gap-1">허기<div className="h-2.5 flex-1 border border-foreground bg-muted"><div className="h-full bg-primary" style={{ width: `${s.hunger}%` }} /></div>{s.hunger}</div>
         </div>
         <div className="text-right text-[11px] leading-tight">
@@ -318,8 +384,14 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
               {panel === 'tech' && (
                 <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground">처음엔 아무것도 만들 줄 모릅니다. 자원을 모으면 깨달음을 얻고, 일부 기술은 거점에서 재료를 바쳐 연구해야 합니다.</p>
-                  {TECHS.map((t) => {
+                  <div className="sticky top-0 z-10 -mx-3 -mt-3 flex gap-1 overflow-x-auto bg-background px-3 py-2" role="tablist">
+                    {TECH_CATEGORIES.map((c) => (
+                      <button key={c.id} type="button" role="tab" aria-selected={techTab === c.id} onClick={() => setTechTab(c.id)}
+                        className={`pixel-btn min-h-11 shrink-0 px-3 text-xs ${techTab === c.id ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>{c.label}</button>
+                    ))}
+                  </div>
+                  {(techTab === 'general' || techTab === 'craft') && <p className="text-xs text-muted-foreground">처음엔 아무것도 만들 줄 모릅니다. 자원을 모으면 깨달음을 얻고, 일부 기술은 거점에서 재료를 바쳐 연구해야 합니다.</p>}
+                  {TECHS.filter((t) => (TECH_CATEGORY[t.id] ?? 'general') === techTab).map((t) => {
                     const known = s.techs.includes(t.id);
                     const ready = prerequisitesMet(t, s.techs);
                     return (
@@ -338,12 +410,36 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       </div>
                     );
                   })}
+                  {techTab === 'talk' && (
+                    <div className="space-y-2 text-xs">
+                      <p className="text-muted-foreground">주변 25m 안의 다른 생존자를 누르면 표현을 보내거나 동맹을 제안할 수 있습니다.</p>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {EMOTES.map((e) => <div key={e.id} className="pixel-frame bg-primary/15 p-2"><b>{e.label}</b><p>"{e.text}"</p></div>)}
+                        <div className="pixel-frame bg-primary/15 p-2"><b>동맹 제안</b><p>친구로 추가하고 서로 공격하지 않음</p></div>
+                      </div>
+                      <p>동맹 {allies.length}명{allies.length ? `: ${allies.map(a => a.name).join(', ')}` : ''}</p>
+                    </div>
+                  )}
+                  {(PLANNED[techTab] ?? []).map((p) => (
+                    <div key={p.name} className="pixel-frame bg-card p-2 text-xs opacity-60">
+                      <div className="flex items-center gap-1"><b className="text-sm">{p.name}</b><span className="ml-auto flex items-center gap-1"><Lock className="!h-4 !w-4" />준비 중</span></div>
+                      <p>{p.desc}</p>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+      <AnimatePresence>
+        {selPeer && <PeerActionMenu peer={selPeer} distance={distanceM(s.pos, selPeer)} inRange={distanceM(s.pos, selPeer) <= C.interactRadiusM}
+          isAlly={allies.some(a => a.id === selPeer.id)} onClose={() => setSelPeerId(null)}
+          onEmote={(e) => { presence.send({ type: 'emote', to: selPeer.id, emote: e }); showBubble(presence.selfId, EMOTES.find(x => x.id === e)!.text); playAction('talk', 900); setSelPeerId(null); }}
+          onAlly={() => { pendingAlly.current.add(selPeer.id); presence.send({ type: 'ally', to: selPeer.id, name: presence.name }); toast('동맹을 제안했습니다'); setSelPeerId(null); }}
+          onAttack={attackPeer} />}
+      </AnimatePresence>
+      <DamageVignette hitKey={hit.n} />
       {plannerOpen && <SurvivalPlanner snapshot={plannerSnapshot} onClose={() => setPlannerOpen(false)} />}
     </div>
   );
