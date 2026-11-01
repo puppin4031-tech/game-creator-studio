@@ -446,6 +446,16 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       <p>동맹 {allies.length}명{allies.length ? `: ${allies.map(a => a.name).join(', ')}` : ''}</p>
                     </div>
                   )}
+                  {techTab === 'build' && (
+                    <div className="pixel-frame bg-primary/15 p-2 text-xs space-y-1.5">
+                      <div className="flex items-center gap-1"><b className="text-sm">거점 건설</b>
+                        <span className="ml-auto">{s.base ? `${s.base.level}단계 · 반경 ${BASE_LEVELS[s.base.level].radiusM}m` : '미건설'}</span></div>
+                      <p>현재 위치에 모닥불 거점을 세웁니다. 거점 안에서는 짐승이 나타나지 않습니다.</p>
+                      <p>필요: 나뭇가지 {countOf(s.backpack, 'branch')}/{CAMP_COST[0].count}</p>
+                      <button type="button" disabled={(realGps && !gps.ready) || countOf(s.backpack, 'branch') < CAMP_COST[0].count} onClick={g.placeBase}
+                        className="pixel-btn h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">{s.base ? '현재 위치로 거점 옮기기' : '여기에 거점 건설'}</button>
+                    </div>
+                  )}
                   {(PLANNED[techTab] ?? []).map((p) => (
                     <div key={p.name} className="pixel-frame bg-card p-2 text-xs opacity-60">
                       <div className="flex items-center gap-1"><b className="text-sm">{p.name}</b><span className="ml-auto flex items-center gap-1"><Lock className="!h-4 !w-4" />준비 중</span></div>
