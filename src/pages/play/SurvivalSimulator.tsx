@@ -21,6 +21,7 @@ import { SPRITE_META, type SpriteKey } from '@/lib/survival/spriteMeta';
 import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
 import { SURVIVAL_CONFIG as C } from '@/lib/survival/config';
 import { distanceM } from '@/lib/survival/geo';
+import { ACTOR_IDLE_RETURN_MS, shouldReturnToCenter, type ActorTarget } from '@/lib/survival/actorPos';
 import { TECHS, isRecipeUnlocked, prerequisitesMet, techForRecipe } from '@/lib/survival/tech';
 import { countOf } from '@/lib/survival/inventory';
 import type { LatLng, Stack, WorldEntity } from '@/lib/survival/types';
@@ -85,22 +86,44 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const tapEntity = (e: WorldEntity) => {
     if (realGps && !gps.ready) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return; }
     if (!realGps && distanceM(s.pos, e) > C.interactRadiusM) { g.moveTo({ lat: e.lat, lng: e.lng }); return; }
-    playAction(e.kind === 'creature' ? 'attack' : 'gather', 900);
+    const inRange = distanceM(s.pos, e) <= C.interactRadiusM;
+    const act: SpriteAction = e.kind === 'creature' ? 'attack' : 'gather';
+    if (inRange) {
+      // Walk to the object (250ms), act, then wait 3s before walking back.
+      setActorTarget({ lat: e.lat, lng: e.lng, anchor: s.pos });
+      setAction('walk'); window.clearTimeout(actionTimer.current); window.clearTimeout(returnTimer.current);
+      actionTimer.current = window.setTimeout(() => {
+        playAction(act, 900);
+        returnTimer.current = window.setTimeout(returnToCenter, 900 + ACTOR_IDLE_RETURN_MS);
+      }, 250);
+    } else playAction(act, 900);
     g.interact(e);
   };
 
   const { data: anims } = useSpriteAnimations('hunter');
   const [action, setAction] = useState<SpriteAction>('idle');
   const actionTimer = useRef<number>();
+  const returnTimer = useRef<number>();
+  const [actorTarget, setActorTarget] = useState<ActorTarget | null>(null);
   const playAction = (a: SpriteAction, ms: number) => {
     setAction(a); window.clearTimeout(actionTimer.current);
     actionTimer.current = window.setTimeout(() => setAction('idle'), ms);
+  };
+  const returnToCenter = () => {
+    window.clearTimeout(returnTimer.current);
+    setActorTarget(null);
+    playAction('walk', 500);
   };
   const lastPos = useRef(s.pos);
   useEffect(() => {
     if (lastPos.current.lat !== s.pos.lat || lastPos.current.lng !== s.pos.lng) { lastPos.current = s.pos; setAction(a => (a === 'idle' ? 'walk' : a)); window.clearTimeout(actionTimer.current); actionTimer.current = window.setTimeout(() => setAction('idle'), 1500); }
   }, [s.pos]);
-  useEffect(() => () => window.clearTimeout(actionTimer.current), []);
+  useEffect(() => () => { window.clearTimeout(actionTimer.current); window.clearTimeout(returnTimer.current); }, []);
+  // Return sprite to GPS center when the player really walks or the object leaves the radius.
+  useEffect(() => {
+    if (actorTarget && shouldReturnToCenter(s.pos, actorTarget, C.interactRadiusM)) returnToCenter();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.pos, actorTarget]);
   const activeAnim = anims?.[action] ?? anims?.idle;
 
   const zone = s.terrainZones[zoneCellKey(s.pos)] ?? 'plains';
@@ -144,7 +167,16 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               return (
                 <div className="absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
                   <div className="rounded-full border border-primary/60" style={{ width: r * 2, height: r * 2 }} />
-                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[85%]">{activeAnim ? <SpriteAnimator url={activeAnim.url} frames={activeAnim.frame_count} fps={activeAnim.fps} height={SPRITE_META['char-hunter'].h} /> : <Sprite k="char-hunter" />}</div>
+                  {(() => {
+                    // Visual-only offset: stop slightly short of the object so the sprite stands beside it.
+                    const t = actorTarget ? project(actorTarget) : p;
+                    const dx = (t.x - p.x) * 0.85, dy = (t.y - p.y) * 0.85;
+                    return (
+                      <motion.div className="absolute left-1/2 top-1/2" initial={false} animate={{ x: dx, y: dy }} transition={{ duration: actorTarget ? 0.25 : 0.5, ease: 'easeOut' }}>
+                        <div className="-translate-x-1/2 -translate-y-[85%]" style={{ transform: dx < -1 ? 'translate(-50%,-85%) scaleX(-1)' : undefined }}>{activeAnim ? <SpriteAnimator url={activeAnim.url} frames={activeAnim.frame_count} fps={activeAnim.fps} height={SPRITE_META['char-hunter'].h} /> : <Sprite k="char-hunter" />}</div>
+                      </motion.div>
+                    );
+                  })()}
                 </div>
               );
             })()}
