@@ -5,7 +5,8 @@ import SpriteAnimator from '@/components/survival/SpriteAnimator';
 import { useSpriteAnimations, type SpriteAction } from '@/hooks/useSpriteAnimations';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Backpack, Flame, Lightbulb, LocateFixed, X, Lock, RotateCcw, Route, ListChecks } from 'lucide-react';
+import { ArrowLeft, Backpack, Flame, Lightbulb, LocateFixed, X, Lock, RotateCcw, Route, ListChecks, Compass } from 'lucide-react';
+import { useDeviceHeading } from '@/hooks/useDeviceHeading';
 import { useSurvivalGps } from '@/hooks/useSurvivalGps';
 import { Button } from '@/components/ui/button';
 import SurvivalPlanner from '@/components/survival/SurvivalPlanner';
@@ -58,6 +59,19 @@ function Stacks({ stacks, onUse, have }: { stacks: Stack[]; onUse?: (id: ItemId)
 type Panel = 'none' | 'bag' | 'base' | 'tech' | 'quests';
 
 export default function SurvivalSimulator({ realGps = false }: { realGps?: boolean }) {
+  const [compassOn, setCompassOn] = useState(false);
+  const { heading, requestPermission } = useDeviceHeading(compassOn);
+  const toggleCompass = async () => {
+    if (compassOn) { setCompassOn(false); return; }
+    try {
+      const ok = await requestPermission();
+      if (!ok) { toast.error('방향 센서 권한이 필요합니다', { description: '브라우저 설정에서 동작 및 방향 접근을 허용해 주세요.' }); return; }
+      setCompassOn(true);
+      toast.success('방향 따라가기를 켰습니다');
+    } catch {
+      toast.error('방향 센서를 사용할 수 없습니다');
+    }
+  };
   const navigate = useNavigate();
   const [gpsReady, setGpsReady] = useState(false);
   const g = useSurvivalWorld(START, { enabled: !realGps || gpsReady, saveKey: realGps ? 'survival-gps-world-v1' : 'survival-world-v1', cloudSync: realGps });
@@ -133,7 +147,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden font-pixel">
-      {(!realGps || gps.fix) && <TerrainMap center={s.pos} visionM={g.vision} explored={s.explored} onTap={onTap} zone={zone} onSurfaceZone={onSurfaceZone}>
+      {(!realGps || gps.fix) && <TerrainMap center={s.pos} visionM={g.vision} explored={s.explored} onTap={onTap} zone={zone} onSurfaceZone={onSurfaceZone} bearing={compassOn && heading !== null ? heading : 0}>
         {(project, mpp) => (
           <>
             {s.base && g.baseDef && (() => {
@@ -198,6 +212,12 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           <div aria-label="성장 진행도">Lv.{s.level} · XP {s.xp}/{g.nextLevelXp}</div>
         </div>
       </div>
+
+      {/* Compass toggle: north-up vs heading-up */}
+      <button type="button" aria-label={compassOn ? '북쪽 고정으로 전환' : '방향 따라가기 켜기'} aria-pressed={compassOn} onClick={toggleCompass}
+        className={`pixel-btn absolute right-2 top-[calc(max(0.5rem,env(safe-area-inset-top))+4.25rem)] z-20 flex h-11 w-11 items-center justify-center ${compassOn ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
+        <Compass className="!h-6 !w-6" style={{ transform: `rotate(${compassOn && heading !== null ? -heading : 0}deg)` }} />
+      </button>
 
       {realGps && <div className="absolute left-2 right-2 top-[calc(4.5rem+env(safe-area-inset-top))] z-20 flex items-center justify-between gap-2 bg-background/90 px-2 py-1 text-[11px]">
         <span className="min-w-0 break-words" role="status">{gps.error ?? (gps.fix ? `${s.pos.lat.toFixed(5)}, ${s.pos.lng.toFixed(5)} · ±${Math.round(gps.fix.accuracy)}m` : 'GPS 연결 중')}</span>

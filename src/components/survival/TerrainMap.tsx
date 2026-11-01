@@ -52,10 +52,12 @@ interface Props {
   zone?: TerrainZone;
   /** Called after the map settles with the zone sampled from real surfaces around `center`. */
   onSurfaceZone?: (center: LatLng, zone: TerrainZone) => void;
+  /** Map bearing in degrees (0 = north up). */
+  bearing?: number;
   children: (project: (p: LatLng) => Projected, metersPerPx: number) => ReactNode;
 }
 
-export default function TerrainMap({ center, visionM, explored, onTap, zone = 'plains', onSurfaceZone, children }: Props) {
+export default function TerrainMap({ center, visionM, explored, onTap, zone = 'plains', onSurfaceZone, bearing = 0, children }: Props) {
   const zoneRef = useRef(onSurfaceZone);
   zoneRef.current = onSurfaceZone;
   const fogColor = useRef<Rgba | null>(null);
@@ -112,6 +114,11 @@ export default function TerrainMap({ center, visionM, explored, onTap, zone = 'p
 
   // Follow player.
   useEffect(() => { mapRef.current?.easeTo({ center: [center.lng, center.lat], duration: 600 }); }, [center.lat, center.lng]);
+  // Heading-up rotation: bearing is already smoothed by the heading hook, so jump without easing.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map && Math.abs(map.getBearing() - bearing) > 0.2) map.setBearing(bearing);
+  }, [bearing, mapRef.current]);
   useEffect(() => { drawFog(); }, [explored.length, visionM]);
 
   function metersPerPx(map: maplibregl.Map) {
