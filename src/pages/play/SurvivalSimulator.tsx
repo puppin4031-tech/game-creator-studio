@@ -318,8 +318,14 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
               {panel === 'tech' && (
                 <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground">처음엔 아무것도 만들 줄 모릅니다. 자원을 모으면 깨달음을 얻고, 일부 기술은 거점에서 재료를 바쳐 연구해야 합니다.</p>
-                  {TECHS.map((t) => {
+                  <div className="sticky top-0 z-10 -mx-3 -mt-3 flex gap-1 overflow-x-auto bg-background px-3 py-2" role="tablist">
+                    {TECH_CATEGORIES.map((c) => (
+                      <button key={c.id} type="button" role="tab" aria-selected={techTab === c.id} onClick={() => setTechTab(c.id)}
+                        className={`pixel-btn min-h-11 shrink-0 px-3 text-xs ${techTab === c.id ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>{c.label}</button>
+                    ))}
+                  </div>
+                  {(techTab === 'general' || techTab === 'craft') && <p className="text-xs text-muted-foreground">처음엔 아무것도 만들 줄 모릅니다. 자원을 모으면 깨달음을 얻고, 일부 기술은 거점에서 재료를 바쳐 연구해야 합니다.</p>}
+                  {TECHS.filter((t) => (TECH_CATEGORY[t.id] ?? 'general') === techTab).map((t) => {
                     const known = s.techs.includes(t.id);
                     const ready = prerequisitesMet(t, s.techs);
                     return (
@@ -338,12 +344,36 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       </div>
                     );
                   })}
+                  {techTab === 'talk' && (
+                    <div className="space-y-2 text-xs">
+                      <p className="text-muted-foreground">주변 25m 안의 다른 생존자를 누르면 표현을 보내거나 동맹을 제안할 수 있습니다.</p>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {EMOTES.map((e) => <div key={e.id} className="pixel-frame bg-primary/15 p-2"><b>{e.label}</b><p>"{e.text}"</p></div>)}
+                        <div className="pixel-frame bg-primary/15 p-2"><b>동맹 제안</b><p>친구로 추가하고 서로 공격하지 않음</p></div>
+                      </div>
+                      <p>동맹 {allies.length}명{allies.length ? `: ${allies.map(a => a.name).join(', ')}` : ''}</p>
+                    </div>
+                  )}
+                  {(PLANNED[techTab] ?? []).map((p) => (
+                    <div key={p.name} className="pixel-frame bg-card p-2 text-xs opacity-60">
+                      <div className="flex items-center gap-1"><b className="text-sm">{p.name}</b><span className="ml-auto flex items-center gap-1"><Lock className="!h-4 !w-4" />준비 중</span></div>
+                      <p>{p.desc}</p>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+      <AnimatePresence>
+        {selPeer && <PeerActionMenu peer={selPeer} distance={distanceM(s.pos, selPeer)} inRange={distanceM(s.pos, selPeer) <= C.interactRadiusM}
+          isAlly={allies.some(a => a.id === selPeer.id)} onClose={() => setSelPeerId(null)}
+          onEmote={(e) => { presence.send({ type: 'emote', to: selPeer.id, emote: e }); showBubble(presence.selfId, EMOTES.find(x => x.id === e)!.text); playAction('talk', 900); setSelPeerId(null); }}
+          onAlly={() => { presence.send({ type: 'ally', to: selPeer.id, name: presence.name }); toast('동맹을 제안했습니다'); setSelPeerId(null); }}
+          onAttack={attackPeer} />}
+      </AnimatePresence>
+      <DamageVignette hitKey={hit.n} />
       {plannerOpen && <SurvivalPlanner snapshot={plannerSnapshot} onClose={() => setPlannerOpen(false)} />}
     </div>
   );
