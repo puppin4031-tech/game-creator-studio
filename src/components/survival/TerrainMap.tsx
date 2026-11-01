@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import type { LatLng } from '@/lib/survival/types';
 import { terrainOnlyStyle, type TerrainPalette } from '@/lib/survival/mapStyle';
 import { terrainDecorations } from '@/lib/survival/terrainScenery';
-import { classifyPoi, type Landmark } from '@/lib/survival/landmarks';
+import { classifyPoi, clusterLandmarks, type Landmark } from '@/lib/survival/landmarks';
 import { classifyTerrain, type TerrainZone } from '@/lib/survival/terrainZone';
 
 type Rgba = [number, number, number, number];
@@ -218,6 +218,7 @@ export default function TerrainMap({ center, visionM, explored, onTap, zone = 'p
           if (f.geometry.type !== 'Point') continue;
           const pr = f.properties as { name?: string; 'name:ko'?: string; class?: string; subclass?: string };
           const name = pr['name:ko'] ?? pr.name;
+          if (pr.subclass === 'subway_entrance' || pr.subclass === 'entrance' || /출구|exit|entrance/i.test(name ?? '')) continue;
           const kind = classifyPoi({ name, class: pr.class, subclass: pr.subclass });
           if (!kind) continue;
           const [lng, lat] = f.geometry.coordinates as [number, number];
@@ -225,7 +226,7 @@ export default function TerrainMap({ center, visionM, explored, onTap, zone = 'p
           seen.set(id, { id, kind, lat, lng, origin: name });
         }
       } catch (e) { console.error('[TerrainMap] poi query failed', e); }
-      lmRef.current([...seen.values()]);
+      lmRef.current(clusterLandmarks([...seen.values()]));
     }
   }
 
