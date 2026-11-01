@@ -30,5 +30,7 @@ export function terrainOnlyStyle(style: StyleSpecification, groundColor: string,
         if (color) return { ...layer, paint: { ...layer.paint, 'line-color': color } };
       }
       return layer;
-    }) };
+    })
+    // Invisible probe keeps POI tiles queryable for landmarks without drawing any label or brand.
+    .concat([{ id: 'game-poi-probe', type: 'circle', source: 'openmaptiles', 'source-layer': 'poi', minzoom: 14, paint: { 'circle-radius': 1, 'circle-opacity': 0 } } as StyleSpecification['layers'][number]]) };
 }

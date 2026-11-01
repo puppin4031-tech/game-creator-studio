@@ -204,7 +204,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS]);
 
   /** Use a landmark within the interaction radius. Returns the shaman's words, if any. */
-  const useLandmark = useCallback((l: Landmark): string | null => {
+  const visitLandmark = useCallback((l: Landmark): string | null => {
     const p = ref.current;
     if (!enabledRef.current) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return null; }
     if (distanceM(p.pos, l) > C.interactRadiusM) { toast.warning(`${C.interactRadiusM}m 안으로 다가가세요`); return null; }
@@ -406,7 +406,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS]);
 
   return {
-    recordTerrainZone, takeDamage,
+    recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, isNight, inBase, baseDef, weight, capacity, weapon,
     moveTo, interact, eat, placeBase, upgradeBase, research, craft, reset,
     quest, questProgress, canClaimQuest, claimQuest, nextLevelXp: xpToNext(s.level),
