@@ -15,7 +15,7 @@ import { addExperience, dayPhase, xpToNext } from '@/lib/survival/progression';
 import { claimWorldQuest, freshProgress, type WorldProgress } from '@/lib/survival/worldProgress';
 import { currentQuest, questReady, type QuestState } from '@/lib/survival/quests';
 import { IRON_SKIN_DEF, PRIMAL_STRIKE_MULT, checkInspiration, isRecipeUnlocked, prerequisitesMet, techById, type TechDef } from '@/lib/survival/tech';
-import { LANDMARK_INFO, SHAMAN_BLESS_XP, SHAMAN_RUMORS, SHAMAN_TIPS, TRADER_STOCK, canClaimLandmark, landmarkReward, recordLandmarkClaim, sellPrice, type Landmark, type LandmarkClaims } from '@/lib/survival/landmarks';
+import { NATURAL_REGEN_MIN_HUNGER, NATURAL_REGEN_PER_TICK, SANCTUARY_RADIUS_M, SANCTUARY_REGEN_PER_TICK, LANDMARK_INFO, SHAMAN_BLESS_XP, SHAMAN_RUMORS, SHAMAN_TIPS, TRADER_STOCK, canClaimLandmark, landmarkReward, recordLandmarkClaim, sellPrice, type Landmark, type LandmarkClaims } from '@/lib/survival/landmarks';
 import type { TerrainZone } from '@/lib/survival/terrainZone';
 import type { GearInstance, LatLng, Stack, WorldEntity } from '@/lib/survival/types';
 
@@ -136,6 +136,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const isNight = dayPhase(new Date(now)) === 'night';
   const vision = isNight ? C.visionNightM : C.visionDayM;
   const baseDef = s.base ? BASE_LEVELS[s.base.level] : null;
+  const [sanctuaries, setSanctuaries] = useState<LatLng[]>([]);
+  const inSanctuary = sanctuaries.some((c) => distanceM(s.pos, c) <= SANCTUARY_RADIUS_M);
   const inBase = !!s.base && !!baseDef && distanceM(s.pos, s.base) <= baseDef.radiusM;
   const weight = stackWeight(s.backpack);
   const capacity = C.baseCarryKg + (s.level - 1) * C.carryPerLevelKg;
@@ -157,9 +159,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const armor = best((g) => ITEMS[g.itemId].armor?.def ?? 0);
 
   const entities: WorldEntity[] = useMemo(() => generateWorld({
-    center: s.pos, radiusM: vision, now, isNight, depleted: s.depleted, terrainZones: s.terrainZones, parkCells: s.parkCells,
+    center: s.pos, radiusM: vision, now, isNight, depleted: s.depleted, terrainZones: s.terrainZones, parkCells: s.parkCells, sanctuaries,
     safeZone: s.base && baseDef ? { center: s.base, radiusM: baseDef.radiusM } : null,
-  }), [s.pos, vision, now, isNight, s.depleted, s.base, baseDef, s.terrainZones, s.parkCells]);
+  }), [s.pos, vision, now, isNight, s.depleted, s.base, baseDef, s.terrainZones, s.parkCells, sanctuaries]);
 
   // Survival tick: hunger drain, starvation, base regen.
   useEffect(() => {
@@ -170,9 +172,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       let hp = p.hp;
       if (hunger === 0) hp -= ticks * C.starveHpPerTick;
       if (inBase && baseDef) hp += ticks * baseDef.regenPerTick;
+      else if (inSanctuary) hp += ticks * SANCTUARY_REGEN_PER_TICK;
+      if (hunger >= NATURAL_REGEN_MIN_HUNGER) hp += ticks * NATURAL_REGEN_PER_TICK;
       return { ...p, hunger, hp: Math.max(1, Math.min(C.baseMaxHp, hp)), lastTickAt: p.lastTickAt + ticks * C.tickMs };
     });
-  }, [now, s.lastTickAt, inBase, baseDef, enabled, setS]);
+  }, [now, s.lastTickAt, inBase, inSanctuary, baseDef, enabled, setS]);
 
   // Auto deposit on entering base. Shell currency stays in the backpack (and is
   // pulled back out of storage) so it can be spent at traders.
@@ -431,7 +435,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setS]);
 
-  return {
+  return { setSanctuaries, inSanctuary,
     recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, isNight, inBase, baseDef, weight, capacity, weapon,
     moveTo, interact, eat, placeBase, upgradeBase, research, craft, reset,

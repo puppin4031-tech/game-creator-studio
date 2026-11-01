@@ -28,7 +28,7 @@ import { countOf } from '@/lib/survival/inventory';
 import type { LatLng, Stack, WorldEntity } from '@/lib/survival/types';
 import { DamageVignette, HitFlash, HpBar, useHitPulse } from '@/components/survival/HitFeedback';
 import LandmarkSheet from '@/components/survival/LandmarkSheet';
-import { LANDMARK_INFO, type Landmark } from '@/lib/survival/landmarks';
+import { LANDMARK_INFO, SANCTUARY_RADIUS_M, type Landmark } from '@/lib/survival/landmarks';
 import PeerActionMenu from '@/components/survival/PeerActionMenu';
 import { useSurvivalPresence, type PeerEvent, type PeerPlayer } from '@/hooks/useSurvivalPresence';
 import { EMOTES, PVP_BASE_DAMAGE } from '@/lib/survival/presence';
@@ -152,6 +152,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const onSurfacePark = (c: LatLng, park: boolean) => g.recordPark(zoneCellKey(c), park);
   const inPark = !!s.parkCells?.[zoneCellKey(s.pos)];
   const [landmarks, setLandmarks] = useState<Landmark[]>([]);
+  const { setSanctuaries } = g;
+  useEffect(() => { setSanctuaries(landmarks.filter((l) => l.kind === 'shaman').map((l) => ({ lat: l.lat, lng: l.lng }))); }, [landmarks, setSanctuaries]);
   const [selLandmark, setSelLandmark] = useState<Landmark | null>(null);
   const [shamanWords, setShamanWords] = useState<string | null>(null);
 
@@ -216,6 +218,10 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 </div>
               );
             })()}
+            {landmarks.filter((l) => l.kind === 'shaman' && distanceM(s.pos, l) <= g.vision + SANCTUARY_RADIUS_M).map((l) => {
+              const p = project(l); const r = SANCTUARY_RADIUS_M / mpp;
+              return <div key={`sanct-${l.id}`} aria-hidden className="pointer-events-none absolute rounded-full border-2 border-primary/60 bg-primary/5 shadow-[0_0_18px_hsl(var(--primary)/0.5)]" style={{ left: p.x, top: p.y, width: r * 2, height: r * 2, transform: 'translate(-50%,-50%)' }} />;
+            })}
             {landmarks.filter((l) => distanceM(s.pos, l) <= g.vision).map((l) => {
               const p = project(l); const info = LANDMARK_INFO[l.kind];
               return (
@@ -293,7 +299,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           <div className="flex items-center gap-1">허기<div className="h-2.5 flex-1 border border-foreground bg-muted"><div className="h-full bg-primary" style={{ width: `${s.hunger}%` }} /></div>{s.hunger}</div>
         </div>
         <div className="text-right text-[11px] leading-tight">
-          <div>{g.isNight ? '밤' : '낮'} · {TERRAIN_ZONE_LABEL[zone]}{inPark ? ' · 공원(짐승 多)' : ''} · 시야 {g.vision}m</div>
+          <div>{g.isNight ? '밤' : '낮'} · {TERRAIN_ZONE_LABEL[zone]}{inPark ? ' · 공원(짐승 多)' : ''}{g.inSanctuary ? ' · 성소(안전)' : ''} · 시야 {g.vision}m</div>
           <div>배낭 {g.weight}/{g.capacity}kg</div>
           <div aria-label="성장 진행도">Lv.{s.level} · XP {s.xp}/{g.nextLevelXp}</div>
         </div>

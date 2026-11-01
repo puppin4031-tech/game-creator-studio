@@ -19,6 +19,13 @@ export const LANDMARK_INFO: Record<LandmarkKind, { name: string; desc: string; s
   trader: { name: '떠돌이 만물상', desc: '물건을 조개 화폐로 사고팝니다.', sprite: 'char-gatherer' },
 };
 
+/** Shaman sanctuary: creatures never spawn inside, and HP regenerates faster. */
+export const SANCTUARY_RADIUS_M = 100;
+export const SANCTUARY_REGEN_PER_TICK = 3;
+/** Natural regen per tick while fed (hunger at or above the threshold). */
+export const NATURAL_REGEN_PER_TICK = 1;
+export const NATURAL_REGEN_MIN_HUNGER = 30;
+
 /** Abuse limits per landmark. */
 export const LANDMARK_COOLDOWN_MS = 30 * 60_000;
 export const LANDMARK_DAILY_MAX = 3;
