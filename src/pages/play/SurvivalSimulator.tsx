@@ -161,6 +161,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     window.setTimeout(() => setBubbles(b => { const n = { ...b }; if (n[id] === text) delete n[id]; return n; }), 3000);
   };
   const peersRef = useRef<PeerPlayer[]>([]);
+  const pendingAlly = useRef(new Set<string>());
   const onPeerEvent = (e: PeerEvent) => {
     const from = peersRef.current.find(p => p.id === e.from);
     if (e.type === 'emote') showBubble(e.from, EMOTES.find(x => x.id === e.emote)?.text ?? '');
@@ -170,6 +171,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       g.takeDamage(Math.min(30, e.dmg));
       toast.error(`${from.name}에게 공격받았습니다!`);
     } else if (e.type === 'ally') {
+      if (allies.some(x => x.id === e.from)) return;
+      if (pendingAlly.current.has(e.from)) { pendingAlly.current.delete(e.from); setAllies(a => [...a, { id: e.from, name: e.name }]); toast.success(`${e.name}님과 동맹을 맺었습니다`); return; }
       toast(`${e.name}님이 동맹을 제안했습니다`, { action: { label: '수락', onClick: () => {
         setAllies(a => a.some(x => x.id === e.from) ? a : [...a, { id: e.from, name: e.name }]);
         presence.send({ type: 'ally', to: e.from, name: presence.name });
@@ -433,7 +436,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         {selPeer && <PeerActionMenu peer={selPeer} distance={distanceM(s.pos, selPeer)} inRange={distanceM(s.pos, selPeer) <= C.interactRadiusM}
           isAlly={allies.some(a => a.id === selPeer.id)} onClose={() => setSelPeerId(null)}
           onEmote={(e) => { presence.send({ type: 'emote', to: selPeer.id, emote: e }); showBubble(presence.selfId, EMOTES.find(x => x.id === e)!.text); playAction('talk', 900); setSelPeerId(null); }}
-          onAlly={() => { presence.send({ type: 'ally', to: selPeer.id, name: presence.name }); toast('동맹을 제안했습니다'); setSelPeerId(null); }}
+          onAlly={() => { pendingAlly.current.add(selPeer.id); presence.send({ type: 'ally', to: selPeer.id, name: presence.name }); toast('동맹을 제안했습니다'); setSelPeerId(null); }}
           onAttack={attackPeer} />}
       </AnimatePresence>
       <DamageVignette hitKey={hit.n} />
