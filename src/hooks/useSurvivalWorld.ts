@@ -14,7 +14,7 @@ import { addStacks, hasAll, removeStacks, splitDeathDrop, stackWeight } from '@/
 import { addExperience, dayPhase, xpToNext } from '@/lib/survival/progression';
 import { claimWorldQuest, freshProgress, type WorldProgress } from '@/lib/survival/worldProgress';
 import { currentQuest, questReady, type QuestState } from '@/lib/survival/quests';
-import { checkInspiration, isRecipeUnlocked, prerequisitesMet, techById, type TechDef } from '@/lib/survival/tech';
+import { IRON_SKIN_DEF, PRIMAL_STRIKE_MULT, checkInspiration, isRecipeUnlocked, prerequisitesMet, techById, type TechDef } from '@/lib/survival/tech';
 import { LANDMARK_INFO, SHAMAN_BLESS_XP, SHAMAN_RUMORS, SHAMAN_TIPS, TRADER_STOCK, canClaimLandmark, landmarkReward, recordLandmarkClaim, sellPrice, type Landmark, type LandmarkClaims } from '@/lib/survival/landmarks';
 import type { TerrainZone } from '@/lib/survival/terrainZone';
 import type { GearInstance, LatLng, Stack, WorldEntity } from '@/lib/survival/types';
@@ -252,6 +252,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     toast.success(`${ITEMS[itemId].name} 구매`);
   }, [capacity]);
 
+  const d0Name = (t: Parameters<typeof creatureDef>[0]) => creatureDef(t).name;
+
   const die = (p: WorldSave): WorldSave => {
     const { kept, dropped } = splitDeathDrop(p.backpack, C.deathDropRatio);
     toast.error('쓰러졌습니다…', { description: dropped.length ? `잃어버림: ${fmt(dropped)}` : undefined });
@@ -287,9 +289,10 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const d = creatureDef(e.type);
       label = d.name; need = d.hp; loot = d.loot;
       power = weapon ? ITEMS[weapon.itemId].weapon?.atk ?? C.fistAtk : C.fistAtk;
+      if (p.techs.includes('primal_strike')) power *= PRIMAL_STRIKE_MULT;
       const ranged = !!(weapon && ITEMS[weapon.itemId].weapon?.ranged) && !p.damage[e.id];
       const fightsBack = d.temper !== 'passive' || isHostileNow(e.type, isNight);
-      if (fightsBack && !ranged) hp -= Math.max(1, d.atk - (armor ? ITEMS[armor.itemId].armor?.def ?? 0 : 0));
+      if (fightsBack && !ranged) hp -= Math.max(1, d.atk - (armor ? ITEMS[armor.itemId].armor?.def ?? 0 : 0) - (p.techs.includes('iron_skin') ? IRON_SKIN_DEF : 0));
       if (d.temper === 'passive' && Math.random() < (d.escapeChance ?? 0)) {
         toast(`${d.name}이(가) 달아났습니다`);
         setS({ ...next, depleted: { ...p.depleted, [e.id]: Date.now() } });
@@ -316,7 +319,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     next.gathered = gathered;
     next.kills = p.kills + (e.kind === 'creature' ? 1 : 0);
     next = gainXp(next, e.kind === 'node' ? nodeDef(e.type).xp : creatureDef(e.type).xp);
-    if (fits) toast.success(`획득: ${fmt(got) || '없음'}`); else toast.warning('배낭이 너무 무겁습니다! 거점에 다녀오세요');
+    if (e.kind === 'creature' && creatureDef(e.type).boss && fits) toast.success(`우두머리 처치! ${d0Name(e.type)}`, { description: `획득: ${fmt(got)}` });
+    else if (fits) toast.success(`획득: ${fmt(got) || '없음'}`); else toast.warning('배낭이 너무 무겁습니다! 거점에 다녀오세요');
     next = learn(next, checkInspiration(gathered, next.techs));
     setS(next);
   }, [best, weapon, armor, isNight, capacity]);
@@ -324,6 +328,14 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const eat = useCallback((itemId: ItemId) => {
     const it = ITEMS[itemId];
     const p = ref.current;
+    if (it.book) {
+      const t = techById(it.book.techId);
+      const left = removeStacks(p.backpack, [{ itemId, count: 1 }]) ?? null;
+      if (!t || !left) return;
+      if (p.techs.includes(t.id)) { toast('이미 아는 기술입니다'); return; }
+      setS(learn({ ...p, backpack: left }, [t]));
+      return;
+    }
     const from = p.backpack.some((x) => x.itemId === itemId) ? 'backpack' : 'storage';
     if (!enabledRef.current || (from === 'storage' && (!p.base || distanceM(p.pos, p.base) > BASE_LEVELS[p.base.level].radiusM))) return;
     const left = removeStacks(p[from], [{ itemId, count: 1 }]);
@@ -399,7 +411,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const takeDamage = useCallback((amount: number) => {
     const p = ref.current;
     const armorGear = p.gear.find((x) => ITEMS[x.itemId].armor);
-    const dmg = Math.max(1, Math.round(amount) - (armorGear ? ITEMS[armorGear.itemId].armor?.def ?? 0 : 0));
+    const dmg = Math.max(1, Math.round(amount) - (armorGear ? ITEMS[armorGear.itemId].armor?.def ?? 0 : 0) - (p.techs.includes('iron_skin') ? IRON_SKIN_DEF : 0));
     const hp = p.hp - dmg;
     setS(hp <= 0 ? die({ ...p, hp }) : { ...p, hp });
     // eslint-disable-next-line react-hooks/exhaustive-deps
