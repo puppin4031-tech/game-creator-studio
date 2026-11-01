@@ -1,7 +1,7 @@
 import { BOSS_TYPES, CREATURES, NODES, type CreatureType, type NodeType } from './entities';
 import { biomeAt, distanceM, fromGrid, hash01, pickWeighted, toGrid } from './geo';
 import { zoneCellKey, zoneWeight, type TerrainZone } from './terrainZone';
-import { PARK_CREATURE_MULT } from './landmarks';
+import { PARK_CREATURE_MULT, SANCTUARY_RADIUS_M } from './landmarks';
 import type { LatLng, WorldCreature, WorldEntity, WorldNode } from './types';
 
 export const NODE_CELL_M = 32;
@@ -27,6 +27,8 @@ export interface WorldQuery {
   terrainZones?: Record<string, TerrainZone>;
   /** Zone cells sampled as parks; creatures crowd there. */
   parkCells?: Record<string, boolean>;
+  /** Shaman sanctuary centers; creatures never spawn within SANCTUARY_RADIUS_M. */
+  sanctuaries?: LatLng[];
 }
 
 export const creatureEpoch = (now: number) => Math.floor(now / CREATURE_EPOCH_MS);
@@ -83,6 +85,7 @@ export function generateCreatures(q: WorldQuery): WorldCreature[] {
       if (hash01(cx, cy, epoch, 7) > (inPark ? Math.min(0.95, density * PARK_CREATURE_MULT) : density)) continue;
       if (distanceM(pos, q.center) > r) continue;
       if (q.safeZone && distanceM(pos, q.safeZone.center) < q.safeZone.radiusM + SAFE_MARGIN_M) continue;
+      if (q.sanctuaries?.some((c) => distanceM(pos, c) < SANCTUARY_RADIUS_M)) continue;
       const biome = biomeAt(pos);
       const weights = types.map((t) => {
         const d = CREATURES[t];
