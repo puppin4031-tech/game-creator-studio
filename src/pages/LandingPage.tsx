@@ -3,6 +3,7 @@ import { useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Globe, Users, Gamepad2, Church, Building2, GraduationCap, Gem, Swords, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { EXPLORATION_LOGIN_URL } from "@/lib/authNavigation";
 
 function AnimatedSection({
   children,
@@ -120,7 +121,7 @@ export default function LandingPage() {
             transition={{ duration: 0.6, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
           >
             <Button
-              onClick={() => navigate("/world")}
+              onClick={() => navigate(EXPLORATION_LOGIN_URL)}
               size="lg"
               className="h-14 px-10 text-lg font-bold rounded-2xl bg-gradient-to-r from-[hsl(150,80%,40%)] to-[hsl(150,70%,45%)] hover:from-[hsl(150,80%,45%)] hover:to-[hsl(150,70%,50%)] text-white shadow-[0_0_40px_hsl(150,80%,35%,0.3)] hover:shadow-[0_0_60px_hsl(150,80%,35%,0.5)] transition-all duration-300"
             >

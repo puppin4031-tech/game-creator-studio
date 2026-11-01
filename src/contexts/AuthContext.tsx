@@ -49,15 +49,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
+    // Restore persisted sign-in only after validating it with the auth server.
+    let active = true;
+    supabase.auth.getUser().then(({ data: { user: restoredUser }, error }) => {
+      if (!active) return;
+      if (!error) {
+        setUser(restoredUser);
+        if (restoredUser) void fetchProfile(restoredUser.id);
       }
-      setIsLoading(false);
+    }).catch(() => {
+      // A temporary network failure must not delete the persisted session.
+    }).finally(() => {
+      if (active) setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => { active = false; subscription.unsubscribe(); };
   }, []);
 
   const signIn = async (email: string, password: string) => {

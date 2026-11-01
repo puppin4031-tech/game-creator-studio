@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,60 +7,74 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MapPin, Shield } from 'lucide-react';
+import { loginDestination } from '@/lib/authNavigation';
 
 export default function Login() {
   const { user, signIn, signUp, isLoading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const destination = loginDestination(searchParams.get('returnTo'));
+  const isExploration = destination === '/world';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [confirmationSent, setConfirmationSent] = useState(false);
 
   // Redirect if already logged in
   useEffect(() => {
     if (!isLoading && user) {
-      navigate('/admin', { replace: true });
+      navigate(destination, { replace: true });
     }
-  }, [user, isLoading, navigate]);
+  }, [user, isLoading, navigate, destination]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const { error } = await signIn(email, password);
-    if (error) setError(error);
-    setLoading(false);
+    try {
+      const { error } = await signIn(email.trim(), password);
+      if (error) setError(error);
+    } catch {
+      setError('로그인할 수 없습니다. 연결을 확인하고 다시 시도해 주세요.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const { error } = await signUp(email, password, displayName);
-    if (error) setError(error);
-    // If auto-confirm is on, onAuthStateChange will fire and user state will update,
-    // triggering the useEffect redirect above.
-    setLoading(false);
+    try {
+      const { error } = await signUp(email.trim(), password, displayName);
+      if (error) setError(error);
+      else setConfirmationSent(true);
+    } catch {
+      setError('회원가입할 수 없습니다. 연결을 확인하고 다시 시도해 주세요.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!isLoading && user) return null;
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div className="flex min-h-[100dvh] items-center justify-center px-4 py-8 pb-[max(2rem,env(safe-area-inset-bottom))]">
       <Card className="w-full max-w-md border-border bg-card">
         <CardHeader className="text-center space-y-2">
           <div className="mx-auto w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
             <MapPin className="h-7 w-7 text-primary" />
           </div>
-          <CardTitle className="text-2xl font-bold">AR 방탈출 관리자</CardTitle>
+          <CardTitle className="text-2xl font-bold">{isExploration ? '탐험가 로그인' : 'AR 방탈출 관리자'}</CardTitle>
           <CardDescription className="flex items-center justify-center gap-1">
-            <Shield className="h-3.5 w-3.5" />
-            관리자 전용 포털
+            {isExploration ? <MapPin className="h-3.5 w-3.5" /> : <Shield className="h-3.5 w-3.5" />}
+            {isExploration ? 'GPS 생존 탐험' : '관리자 전용 포털'}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="signin">
+          <Tabs defaultValue="signin" onValueChange={() => { setError(null); setConfirmationSent(false); }}>
             <TabsList className="w-full">
               <TabsTrigger value="signin" className="flex-1">로그인</TabsTrigger>
               <TabsTrigger value="signup" className="flex-1">회원가입</TabsTrigger>
@@ -70,14 +84,14 @@ export default function Login() {
               <form onSubmit={handleSignIn} className="space-y-4 mt-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">이메일</Label>
-                  <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+                  <Input id="email" type="email" autoComplete="username" className="min-h-11 text-base" value={email} onChange={e => setEmail(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password">비밀번호</Label>
-                  <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+                  <Input id="password" type="password" autoComplete="current-password" className="min-h-11 text-base" value={password} onChange={e => setPassword(e.target.value)} required />
                 </div>
                 {error && <p className="text-sm text-destructive">{error}</p>}
-                <Button type="submit" className="w-full" disabled={loading}>
+                <Button type="submit" className="w-full min-h-11" disabled={loading || isLoading}>
                   {loading ? '로그인 중...' : '로그인'}
                 </Button>
               </form>
@@ -95,10 +109,11 @@ export default function Login() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="pw2">비밀번호</Label>
-                  <Input id="pw2" type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
+                  <Input id="pw2" type="password" autoComplete="new-password" className="min-h-11 text-base" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
                 </div>
                 {error && <p className="text-sm text-destructive">{error}</p>}
-                <Button type="submit" className="w-full" disabled={loading}>
+                {confirmationSent && <p role="status" className="text-sm text-primary">가입 확인 이메일을 보냈습니다. 이메일의 확인 링크를 눌러 주세요.</p>}
+                <Button type="submit" className="w-full min-h-11" disabled={loading || isLoading || confirmationSent}>
                   {loading ? '가입 중...' : '회원가입'}
                 </Button>
               </form>
