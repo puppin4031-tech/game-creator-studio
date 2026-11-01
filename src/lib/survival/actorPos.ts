@@ -1,4 +1,5 @@
-import { distanceM, type LatLng } from './world';
+import { distanceM } from './geo';
+import type { LatLng } from './types';
 
 /** Visual-only actor offset: the sprite walks to a tapped object while GPS position stays put. */
 export interface ActorTarget { lat: number; lng: number; anchor: LatLng }
