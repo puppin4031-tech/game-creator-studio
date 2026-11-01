@@ -9,7 +9,7 @@ export interface TerrainPalette {
 export function terrainOnlyStyle(style: StyleSpecification, groundColor: string, palette?: TerrainPalette): StyleSpecification {
   return { ...style, layers: style.layers
     .filter(layer => layer.type !== 'symbol' && !/building|aeroway|poi/i.test(layer.id))
-    .map(layer => {
+    .map((layer): StyleSpecification['layers'][number] => {
       if (layer.type === 'background') return { ...layer, paint: { ...layer.paint, 'background-color': groundColor } };
       if (!palette) return layer;
       if (layer.type === 'fill') {
