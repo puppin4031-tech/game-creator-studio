@@ -11,8 +11,8 @@ export default function GoogleMapsProvider({ children }: Props) {
     libraries: ['services'],
   });
 
-  // Terrain survival does not depend on the Kakao SDK or its domain registration.
-  if (window.location.pathname === '/world' || window.location.pathname.startsWith('/play/survival')) return <>{children}</>;
+  // Entry, authentication and terrain survival must not wait for the Kakao SDK.
+  if (['/', '/login', '/world'].includes(window.location.pathname) || window.location.pathname.startsWith('/play/survival')) return <>{children}</>;
 
   if (loading) {
     return (
