@@ -71,7 +71,7 @@ export function useSurvivalPresence(enabled: boolean, pos: LatLng, level: number
     return () => window.clearInterval(t);
   }, [enabled, track]);
 
-  const send = useCallback((e: Omit<PeerEvent, 'from'>) => {
+  const send = useCallback((e: PeerEvent extends infer T ? T extends PeerEvent ? Omit<T, 'from'> : never : never) => {
     const c = chan.current;
     if (!c) return false;
     void c.send({ type: 'broadcast', event: 'peer', payload: { ...e, from: selfId } });

@@ -214,7 +214,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const tip = SHAMAN_TIPS[Math.floor(Math.random() * SHAMAN_TIPS.length)];
     const rumor = Math.random() < 0.5 ? SHAMAN_RUMORS[Math.floor(Math.random() * SHAMAN_RUMORS.length)] : null;
     if (!check.ok) {
-      const msg = check.reason === 'cooldown' ? `${Math.ceil((check.waitMs ?? 0) / 60_000)}분 뒤에 다시 오세요` : check.reason === 'daily' ? '이곳은 오늘 더 내어줄 것이 없습니다 (하루 3회)' : '오늘의 랜드마크 보상을 모두 받았습니다';
+      const fail = check as Extract<typeof check, { ok: false }>;
+      const msg = fail.reason === 'cooldown' ? `${Math.ceil((fail.waitMs ?? 0) / 60_000)}분 뒤에 다시 오세요` : fail.reason === 'daily' ? '이곳은 오늘 더 내어줄 것이 없습니다 (하루 3회)' : '오늘의 랜드마크 보상을 모두 받았습니다';
       if (l.kind === 'shaman') return `${tip}\n(${msg})`;
       toast(`${info.name}: ${msg}`);
       return null;
