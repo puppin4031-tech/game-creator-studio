@@ -77,6 +77,29 @@ export function classifyPoi(p: PoiProps): LandmarkKind | null {
   return null;
 }
 
+/** Merge radius per kind: a station's exits/platforms collapse into one shaman. */
+export const LANDMARK_MERGE_M: Record<LandmarkKind, number> = { shaman: 150, spring: 25, smokehouse: 25, trader: 25 };
+
+/** Collapse same-kind landmarks within merge radius into one, placed at the group's centroid with a stable id. */
+export function clusterLandmarks(list: Landmark[]): Landmark[] {
+  const sorted = [...list].sort((a, b) => a.id.localeCompare(b.id));
+  const groups: Landmark[][] = [];
+  for (const l of sorted) {
+    const r = LANDMARK_MERGE_M[l.kind];
+    const g = groups.find(g => g[0].kind === l.kind && g.some(m => {
+      const dy = (m.lat - l.lat) * 111320, dx = (m.lng - l.lng) * 111320 * Math.cos(l.lat * Math.PI / 180);
+      return Math.hypot(dx, dy) <= r;
+    }));
+    if (g) g.push(l); else groups.push([l]);
+  }
+  return groups.map(g => {
+    const named = g.find(m => m.origin && /역$/.test(m.origin)) ?? g[0];
+    if (g.length === 1) return g[0];
+    const lat = g.reduce((s, m) => s + m.lat, 0) / g.length, lng = g.reduce((s, m) => s + m.lng, 0) / g.length;
+    return { ...named, id: g[0].id, lat, lng };
+  });
+}
+
 /** Reward rolled when a landmark is used (shaman blesses with XP instead). */
 export function landmarkReward(kind: LandmarkKind, r: number): Stack[] {
   if (kind === 'spring') return r < 0.3 ? [{ itemId: 'spring_water', count: 2 }, { itemId: 'coconut', count: 1 }] : [{ itemId: 'spring_water', count: 2 }];

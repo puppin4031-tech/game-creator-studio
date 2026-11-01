@@ -45,3 +45,11 @@ test('parks spawn about three times more creatures', () => {
   const park = generateCreatures({ ...q, parkCells }).length;
   expect(park).toBeGreaterThan(normal * 2.5);
 });
+
+import { clusterLandmarks as _cl } from '../src/lib/survival/landmarks';
+import { test as _t, expect as _e } from 'bun:test';
+_t('station exits within 150m merge into one shaman', () => {
+  const mk = (i: number, dLat: number) => ({ id: `lm:shaman:${i}`, kind: 'shaman' as const, lat: 37.5 + dLat, lng: 127, origin: '역삼역' });
+  _e(_cl([mk(1, 0), mk(2, 0.0004), mk(3, 0.0009)]).length).toBe(1);
+  _e(_cl([mk(1, 0), mk(2, 0.005)]).length).toBe(2);
+});
