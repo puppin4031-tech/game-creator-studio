@@ -15,6 +15,7 @@ import { addExperience, dayPhase, xpToNext } from '@/lib/survival/progression';
 import { claimWorldQuest, freshProgress, type WorldProgress } from '@/lib/survival/worldProgress';
 import { currentQuest, questReady, type QuestState } from '@/lib/survival/quests';
 import { checkInspiration, isRecipeUnlocked, prerequisitesMet, techById, type TechDef } from '@/lib/survival/tech';
+import { LANDMARK_INFO, SHAMAN_BLESS_XP, SHAMAN_RUMORS, SHAMAN_TIPS, TRADER_STOCK, canClaimLandmark, landmarkReward, recordLandmarkClaim, sellPrice, type Landmark, type LandmarkClaims } from '@/lib/survival/landmarks';
 import type { TerrainZone } from '@/lib/survival/terrainZone';
 import type { GearInstance, LatLng, Stack, WorldEntity } from '@/lib/survival/types';
 
@@ -37,13 +38,16 @@ export interface WorldSave extends WorldProgress {
   explored: LatLng[];
   /** Real-world terrain zone per coarse cell, sampled once from the map. */
   terrainZones: Record<string, TerrainZone>;
+  /** Zone cells sampled inside real parks (first sample wins). */
+  parkCells: Record<string, boolean>;
+  landmarkClaims?: LandmarkClaims;
   lastTickAt: number;
 }
 
 const fresh = (start: LatLng): WorldSave => ({
   ...freshProgress(),
   pos: start, hp: C.baseMaxHp, hunger: 100, backpack: [], storage: [], gear: [], base: null,
-  depleted: {}, damage: {}, gathered: {}, techs: [], explored: [start], terrainZones: {}, lastTickAt: Date.now(),
+  depleted: {}, damage: {}, gathered: {}, techs: [], explored: [start], terrainZones: {}, parkCells: {}, lastTickAt: Date.now(),
 });
 
 function load(start: LatLng, saveKey: string): WorldSave {
@@ -153,9 +157,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const armor = best((g) => ITEMS[g.itemId].armor?.def ?? 0);
 
   const entities: WorldEntity[] = useMemo(() => generateWorld({
-    center: s.pos, radiusM: vision, now, isNight, depleted: s.depleted, terrainZones: s.terrainZones,
+    center: s.pos, radiusM: vision, now, isNight, depleted: s.depleted, terrainZones: s.terrainZones, parkCells: s.parkCells,
     safeZone: s.base && baseDef ? { center: s.base, radiusM: baseDef.radiusM } : null,
-  }), [s.pos, vision, now, isNight, s.depleted, s.base, baseDef, s.terrainZones]);
+  }), [s.pos, vision, now, isNight, s.depleted, s.base, baseDef, s.terrainZones, s.parkCells]);
 
   // Survival tick: hunger drain, starvation, base regen.
   useEffect(() => {
@@ -194,6 +198,59 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const recordTerrainZone = useCallback((cell: string, zone: TerrainZone) => {
     setS((p) => (p.terrainZones[cell] ? p : { ...p, terrainZones: { ...p.terrainZones, [cell]: zone } }));
   }, [setS]);
+
+  const recordPark = useCallback((cell: string, park: boolean) => {
+    setS((p) => (cell in (p.parkCells ?? {}) ? p : { ...p, parkCells: { ...(p.parkCells ?? {}), [cell]: park } }));
+  }, [setS]);
+
+  /** Use a landmark within the interaction radius. Returns the shaman's words, if any. */
+  const visitLandmark = useCallback((l: Landmark): string | null => {
+    const p = ref.current;
+    if (!enabledRef.current) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return null; }
+    if (distanceM(p.pos, l) > C.interactRadiusM) { toast.warning(`${C.interactRadiusM}m 안으로 다가가세요`); return null; }
+    const now = Date.now();
+    const check = canClaimLandmark(p.landmarkClaims, l.id, now);
+    const info = LANDMARK_INFO[l.kind];
+    const tip = SHAMAN_TIPS[Math.floor(Math.random() * SHAMAN_TIPS.length)];
+    const rumor = Math.random() < 0.5 ? SHAMAN_RUMORS[Math.floor(Math.random() * SHAMAN_RUMORS.length)] : null;
+    if (!check.ok) {
+      const msg = check.reason === 'cooldown' ? `${Math.ceil((check.waitMs ?? 0) / 60_000)}분 뒤에 다시 오세요` : check.reason === 'daily' ? '이곳은 오늘 더 내어줄 것이 없습니다 (하루 3회)' : '오늘의 랜드마크 보상을 모두 받았습니다';
+      if (l.kind === 'shaman') return `${tip}\n(${msg})`;
+      toast(`${info.name}: ${msg}`);
+      return null;
+    }
+    let next: WorldSave = { ...p, landmarkClaims: recordLandmarkClaim(p.landmarkClaims, l.id, now) };
+    if (l.kind === 'shaman') {
+      next = gainXp(next, SHAMAN_BLESS_XP);
+      setS(next);
+      toast.success(`샤먼의 축복 · 경험치 +${SHAMAN_BLESS_XP}`);
+      return rumor ? `${tip}\n\n풍문: ${rumor}` : tip;
+    }
+    const got = landmarkReward(l.kind, Math.random());
+    if (stackWeight(got) > capacity - stackWeight(p.backpack)) { toast.warning('배낭이 너무 무겁습니다'); return null; }
+    setS({ ...next, backpack: addStacks(p.backpack, got) });
+    toast.success(`${info.name}: ${fmt(got)}`);
+    return null;
+  }, [capacity]);
+
+  const sellItem = useCallback((itemId: ItemId) => {
+    const p = ref.current;
+    const price = sellPrice(itemId);
+    const left = price ? removeStacks(p.backpack, [{ itemId, count: 1 }]) : null;
+    if (!left) return;
+    setS({ ...p, backpack: addStacks(left, [{ itemId: 'shell', count: price }]) });
+  }, []);
+
+  const buyItem = useCallback((itemId: ItemId) => {
+    const p = ref.current;
+    const offer = TRADER_STOCK.find((x) => x.itemId === itemId);
+    if (!offer) return;
+    const left = removeStacks(p.backpack, [{ itemId: 'shell', count: offer.price }]);
+    if (!left) { toast.error('조개 화폐가 부족합니다'); return; }
+    if (ITEMS[itemId].weight > capacity - stackWeight(p.backpack)) { toast.warning('배낭이 너무 무겁습니다'); return; }
+    setS({ ...p, backpack: addStacks(left, [{ itemId, count: 1 }]) });
+    toast.success(`${ITEMS[itemId].name} 구매`);
+  }, [capacity]);
 
   const die = (p: WorldSave): WorldSave => {
     const { kept, dropped } = splitDeathDrop(p.backpack, C.deathDropRatio);
@@ -349,7 +406,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS]);
 
   return {
-    recordTerrainZone, takeDamage,
+    recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, isNight, inBase, baseDef, weight, capacity, weapon,
     moveTo, interact, eat, placeBase, upgradeBase, research, craft, reset,
     quest, questProgress, canClaimQuest, claimQuest, nextLevelXp: xpToNext(s.level),

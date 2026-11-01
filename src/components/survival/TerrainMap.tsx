@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import type { LatLng } from '@/lib/survival/types';
 import { terrainOnlyStyle, type TerrainPalette } from '@/lib/survival/mapStyle';
 import { terrainDecorations } from '@/lib/survival/terrainScenery';
+import { classifyPoi, type Landmark } from '@/lib/survival/landmarks';
 import { classifyTerrain, type TerrainZone } from '@/lib/survival/terrainZone';
 
 type Rgba = [number, number, number, number];
@@ -52,14 +53,22 @@ interface Props {
   zone?: TerrainZone;
   /** Called after the map settles with the zone sampled from real surfaces around `center`. */
   onSurfaceZone?: (center: LatLng, zone: TerrainZone) => void;
+  /** Called after the map settles with whether `center` sits inside a real park. */
+  onSurfacePark?: (center: LatLng, park: boolean) => void;
+  /** Called after the map settles with landmarks derived from real POIs in view. */
+  onLandmarks?: (list: Landmark[]) => void;
   /** Map bearing in degrees (0 = north up). */
   bearing?: number;
   children: (project: (p: LatLng) => Projected, metersPerPx: number) => ReactNode;
 }
 
-export default function TerrainMap({ center, visionM, explored, onTap, zone = 'plains', onSurfaceZone, bearing = 0, children }: Props) {
+export default function TerrainMap({ center, visionM, explored, onTap, zone = 'plains', onSurfaceZone, onSurfacePark, onLandmarks, bearing = 0, children }: Props) {
   const zoneRef = useRef(onSurfaceZone);
   zoneRef.current = onSurfaceZone;
+  const parkRef = useRef(onSurfacePark);
+  parkRef.current = onSurfacePark;
+  const lmRef = useRef(onLandmarks);
+  lmRef.current = onLandmarks;
   const fogColor = useRef<Rgba | null>(null);
   const fogTarget = useRef<Rgba | null>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -90,7 +99,7 @@ export default function TerrainMap({ center, visionM, explored, onTap, zone = 'p
         resize = new ResizeObserver(() => { map.resize(); sceneryDirty.current = true; setFrame(f => f + 1); drawFog(); });
         resize.observe(box.current);
         map.on('move', () => { sceneryDirty.current = true; setFrame((f) => f + 1); });
-        map.on('idle', () => { surfaceCache.current.clear(); drawScenery(true); sampleSurface(); });
+        map.on('idle', () => { surfaceCache.current.clear(); drawScenery(true); sampleSurface(); samplePlaces(); });
         map.on('render', () => { if (sceneryDirty.current) { drawScenery(); sceneryDirty.current = false; } drawFog(); });
         map.on('click', (e) => tapRef.current?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }));
       } catch (e) {
@@ -186,6 +195,38 @@ export default function TerrainMap({ center, visionM, explored, onTap, zone = 'p
       n++;
     }
     zoneRef.current(c, classifyTerrain({ water: w / n, rugged: r / n }));
+  }
+
+  function samplePlaces() {
+    const map = mapRef.current;
+    if (!map) return;
+    const c = fogData.current.center;
+    if (parkRef.current) {
+      const parkLayers = map.getStyle().layers.filter(l => l.type === 'fill' && /park|grass|landuse|landcover|wood/.test(l.id)).map(l => l.id);
+      const p = map.project([c.lng, c.lat]);
+      const hits = parkLayers.length ? map.queryRenderedFeatures([[p.x - 4, p.y - 4], [p.x + 4, p.y + 4]], { layers: parkLayers }) : [];
+      const park = hits.some(f => {
+        const pr = f.properties as Record<string, unknown>;
+        return /park|garden|nature_reserve|protected_area|recreation_ground/.test(`${pr.class ?? ''} ${pr.subclass ?? ''}`) || /공원|숲|수목원/.test(String(pr.name ?? ''));
+      });
+      parkRef.current(c, park);
+    }
+    if (lmRef.current) {
+      const seen = new Map<string, Landmark>();
+      try {
+        for (const f of map.querySourceFeatures('openmaptiles', { sourceLayer: 'poi' })) {
+          if (f.geometry.type !== 'Point') continue;
+          const pr = f.properties as { name?: string; 'name:ko'?: string; class?: string; subclass?: string };
+          const name = pr['name:ko'] ?? pr.name;
+          const kind = classifyPoi({ name, class: pr.class, subclass: pr.subclass });
+          if (!kind) continue;
+          const [lng, lat] = f.geometry.coordinates as [number, number];
+          const id = `lm:${kind}:${lat.toFixed(5)}:${lng.toFixed(5)}`;
+          seen.set(id, { id, kind, lat, lng, origin: name });
+        }
+      } catch (e) { console.error('[TerrainMap] poi query failed', e); }
+      lmRef.current([...seen.values()]);
+    }
   }
 
   function drawFog() {

@@ -52,6 +52,10 @@ export const ITEMS = def({
   pear: { name: '돌배', desc: '허기 +10 · 체력 +6', category: 'food', rarity: 'common', weight: 0.5, sprite: 'item-pear', food: { hunger: 10, hp: 6 } },
   raw_meat: { name: '날고기', desc: '허기 +12 · 체력 -5 (배탈 주의)', category: 'food', rarity: 'common', weight: 2, sprite: 'item-raw-meat', food: { hunger: 12, hp: -5 } },
   cooked_meat: { name: '구운 고기', desc: '허기 +35 · 체력 +10', category: 'food', rarity: 'uncommon', weight: 1.5, sprite: 'item-cooked-meat', food: { hunger: 35, hp: 10 } },
+  spring_water: { name: '샘물', desc: '허기 +4 · 체력 +8', category: 'food', rarity: 'common', weight: 1, sprite: 'item-clay-pot', food: { hunger: 4, hp: 8 } },
+  coconut: { name: '야자 열매', desc: '허기 +14 · 체력 +6', category: 'food', rarity: 'uncommon', weight: 1, sprite: 'item-apple', food: { hunger: 14, hp: 6 } },
+  jerky: { name: '말린 고기', desc: '허기 +28 · 체력 +5', category: 'food', rarity: 'uncommon', weight: 0.5, sprite: 'item-cooked-meat', food: { hunger: 28, hp: 5 } },
+  shell: { name: '조개 화폐', desc: '만물상에서 물건을 사고팔 때 쓰는 화폐.', category: 'material', rarity: 'common', weight: 0, sprite: 'item-quartz' },
   // ── Processed
   cordage: { name: '노끈', desc: '섬유를 꼬아 만든 튼튼한 끈.', category: 'processed', rarity: 'common', weight: 0.5, sprite: 'item-cordage' },
   leather: { name: '가죽', desc: '무두질한 질긴 가죽.', category: 'processed', rarity: 'uncommon', weight: 1.5, sprite: 'item-leather' },
