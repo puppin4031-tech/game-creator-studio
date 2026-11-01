@@ -27,6 +27,8 @@ import { TECHS, isRecipeUnlocked, prerequisitesMet, techForRecipe } from '@/lib/
 import { countOf } from '@/lib/survival/inventory';
 import type { LatLng, Stack, WorldEntity } from '@/lib/survival/types';
 import { DamageVignette, HitFlash, HpBar, useHitPulse } from '@/components/survival/HitFeedback';
+import LandmarkSheet from '@/components/survival/LandmarkSheet';
+import { LANDMARK_INFO, type Landmark } from '@/lib/survival/landmarks';
 import PeerActionMenu from '@/components/survival/PeerActionMenu';
 import { useSurvivalPresence, type PeerEvent, type PeerPlayer } from '@/hooks/useSurvivalPresence';
 import { EMOTES, PVP_BASE_DAMAGE } from '@/lib/survival/presence';
@@ -147,6 +149,11 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
   const zone = s.terrainZones[zoneCellKey(s.pos)] ?? 'plains';
   const onSurfaceZone = (c: LatLng, z: typeof zone) => g.recordTerrainZone(zoneCellKey(c), z);
+  const onSurfacePark = (c: LatLng, park: boolean) => g.recordPark(zoneCellKey(c), park);
+  const inPark = !!s.parkCells?.[zoneCellKey(s.pos)];
+  const [landmarks, setLandmarks] = useState<Landmark[]>([]);
+  const [selLandmark, setSelLandmark] = useState<Landmark | null>(null);
+  const [shamanWords, setShamanWords] = useState<string | null>(null);
 
   const hit = useHitPulse(s.hp);
   const [techTab, setTechTab] = useState<TechCategory>('general');
@@ -197,7 +204,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden font-pixel">
-      {(!realGps || gps.fix) && <TerrainMap center={s.pos} visionM={g.vision} explored={s.explored} onTap={onTap} zone={zone} onSurfaceZone={onSurfaceZone} bearing={compassOn && heading !== null ? heading : 0}>
+      {(!realGps || gps.fix) && <TerrainMap center={s.pos} visionM={g.vision} explored={s.explored} onTap={onTap} zone={zone} onSurfaceZone={onSurfaceZone} onSurfacePark={onSurfacePark} onLandmarks={setLandmarks} bearing={compassOn && heading !== null ? heading : 0}>
         {(project, mpp) => (
           <>
             {s.base && g.baseDef && (() => {
@@ -209,6 +216,17 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 </div>
               );
             })()}
+            {landmarks.filter((l) => distanceM(s.pos, l) <= g.vision).map((l) => {
+              const p = project(l); const info = LANDMARK_INFO[l.kind];
+              return (
+                <button key={l.id} type="button" aria-label={info.name} data-landmark={l.kind} onClick={(ev) => { ev.stopPropagation(); setShamanWords(null); setSelLandmark(l); }}
+                  className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center"
+                  style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}>
+                  <div className="rounded-full bg-primary/30 p-0.5 shadow-[0_0_12px_hsl(var(--primary))]"><Sprite k={info.sprite} /></div>
+                  <span className="whitespace-nowrap rounded bg-primary px-1 text-[10px] text-primary-foreground">{info.name}</span>
+                </button>
+              );
+            })}
             {g.entities.map((e) => {
               const p = project(e);
               const sprite = e.kind === 'node' ? nodeDef(e.type).sprite : creatureDef(e.type).sprite;
@@ -273,7 +291,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           <div className="flex items-center gap-1">허기<div className="h-2.5 flex-1 border border-foreground bg-muted"><div className="h-full bg-primary" style={{ width: `${s.hunger}%` }} /></div>{s.hunger}</div>
         </div>
         <div className="text-right text-[11px] leading-tight">
-          <div>{g.isNight ? '밤' : '낮'} · {TERRAIN_ZONE_LABEL[zone]} · 시야 {g.vision}m</div>
+          <div>{g.isNight ? '밤' : '낮'} · {TERRAIN_ZONE_LABEL[zone]}{inPark ? ' · 공원(짐승 多)' : ''} · 시야 {g.vision}m</div>
           <div>배낭 {g.weight}/{g.capacity}kg</div>
           <div aria-label="성장 진행도">Lv.{s.level} · XP {s.xp}/{g.nextLevelXp}</div>
         </div>
@@ -438,6 +456,12 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           onEmote={(e) => { presence.send({ type: 'emote', to: selPeer.id, emote: e }); showBubble(presence.selfId, EMOTES.find(x => x.id === e)!.text); playAction('talk', 900); setSelPeerId(null); }}
           onAlly={() => { pendingAlly.current.add(selPeer.id); presence.send({ type: 'ally', to: selPeer.id, name: presence.name }); toast('동맹을 제안했습니다'); setSelPeerId(null); }}
           onAttack={attackPeer} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {selLandmark && <LandmarkSheet landmark={selLandmark} inRange={distanceM(s.pos, selLandmark) <= C.interactRadiusM && (!realGps || gps.ready)}
+          claims={s.landmarkClaims} backpack={s.backpack} words={shamanWords}
+          onVisit={() => { const w = g.visitLandmark(selLandmark); if (w) { setShamanWords(w); playAction('talk', 900); } }}
+          onSell={g.sellItem} onBuy={g.buyItem} onClose={() => setSelLandmark(null)} />}
       </AnimatePresence>
       <DamageVignette hitKey={hit.n} />
       {plannerOpen && <SurvivalPlanner snapshot={plannerSnapshot} onClose={() => setPlannerOpen(false)} />}
