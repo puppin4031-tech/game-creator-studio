@@ -50,7 +50,7 @@ function Stacks({ stacks, onUse, have }: { stacks: Stack[]; onUse?: (id: ItemId)
       {stacks.map((s) => {
         const it = ITEMS[s.itemId];
         const short = have && countOf(have, s.itemId) < s.count;
-        const usable = onUse && (it.food || it.heal);
+        const usable = onUse && (it.food || it.heal || it.book);
         return (
           <button key={s.itemId} type="button" disabled={!usable} onClick={() => usable && onUse(s.itemId)}
             className={`pixel-frame flex min-h-11 items-center gap-1 bg-card px-1.5 py-1 text-xs ${short ? 'text-destructive' : ''} ${usable ? 'active:translate-y-0.5' : ''}`}>
@@ -232,14 +232,16 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               const sprite = e.kind === 'node' ? nodeDef(e.type).sprite : creatureDef(e.type).sprite;
               const name = e.kind === 'node' ? nodeDef(e.type).name : creatureDef(e.type).name;
               const dmg = s.damage[e.id];
+              const boss = e.kind === 'creature' && !!creatureDef(e.type).boss;
               return (
                 <button key={e.id} type="button" aria-label={name} onClick={(ev) => { ev.stopPropagation(); tapEntity(e); }}
                   data-resource-id={e.id} data-lat={e.lat} data-lng={e.lng}
                   className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center"
                   style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}>
                   <motion.div animate={{ y: e.kind === 'creature' ? [0, -3, 0] : 0 }} transition={{ repeat: Infinity, duration: 0.8 }}>
-                    <Sprite k={sprite} />
+                    <div className={boss ? 'scale-150 rounded-full ring-2 ring-destructive shadow-[0_0_18px_hsl(var(--destructive))]' : ''}><Sprite k={sprite} /></div>
                   </motion.div>
+                  {boss ? <span className="mt-2 rounded bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">우두머리</span> : null}
                   {dmg ? <span className="rounded bg-background/80 px-1 text-[10px]">타격 중</span> : null}
                 </button>
               );
