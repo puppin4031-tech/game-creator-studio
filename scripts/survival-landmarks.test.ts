@@ -53,3 +53,14 @@ _t('station exits within 150m merge into one shaman', () => {
   _e(_cl([mk(1, 0), mk(2, 0.0004), mk(3, 0.0009)]).length).toBe(1);
   _e(_cl([mk(1, 0), mk(2, 0.005)]).length).toBe(2);
 });
+
+import { generateCreatures as genC } from '../src/lib/survival/world';
+import { distanceM as dist } from '../src/lib/survival/geo';
+test('no creatures spawn within 100m of a shaman sanctuary', () => {
+  const center = { lat: 37.5446, lng: 127.0374 };
+  for (let i = 0; i < 20; i++) {
+    const now = i * 8 * 60_000;
+    const cs = genC({ center, radiusM: 300, now, isNight: true, depleted: {}, sanctuaries: [center] });
+    for (const c of cs) expect(dist(c, center)).toBeGreaterThanOrEqual(100);
+  }
+});
