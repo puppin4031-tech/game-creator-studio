@@ -1,6 +1,7 @@
 import { CREATURES, NODES, type CreatureType, type NodeType } from './entities';
 import { biomeAt, distanceM, fromGrid, hash01, pickWeighted, toGrid } from './geo';
 import { zoneCellKey, zoneWeight, type TerrainZone } from './terrainZone';
+import { PARK_CREATURE_MULT } from './landmarks';
 import type { LatLng, WorldCreature, WorldEntity, WorldNode } from './types';
 
 export const NODE_CELL_M = 32;
@@ -22,6 +23,8 @@ export interface WorldQuery {
   safeZone?: { center: LatLng; radiusM: number } | null;
   /** Sampled real-world terrain per zone cell; absent cells use the procedural biome only. */
   terrainZones?: Record<string, TerrainZone>;
+  /** Zone cells sampled as parks; creatures crowd there. */
+  parkCells?: Record<string, boolean>;
 }
 
 export const creatureEpoch = (now: number) => Math.floor(now / CREATURE_EPOCH_MS);
@@ -71,10 +74,11 @@ export function generateCreatures(q: WorldQuery): WorldCreature[] {
   const out: WorldCreature[] = [];
   for (let cx = cx0; cx <= cx1; cx++) {
     for (let cy = cy0; cy <= cy1; cy++) {
-      if (hash01(cx, cy, epoch, 7) > density) continue;
       const gx = (cx + 0.1 + hash01(cx, cy, epoch, 8) * 0.8) * CREATURE_CELL_M;
       const gy = (cy + 0.1 + hash01(cx, cy, epoch, 9) * 0.8) * CREATURE_CELL_M;
       const pos = fromGrid(gx, gy);
+      const inPark = !!q.parkCells?.[zoneCellKey(pos)];
+      if (hash01(cx, cy, epoch, 7) > (inPark ? Math.min(0.95, density * PARK_CREATURE_MULT) : density)) continue;
       if (distanceM(pos, q.center) > r) continue;
       if (q.safeZone && distanceM(pos, q.safeZone.center) < q.safeZone.radiusM + SAFE_MARGIN_M) continue;
       const biome = biomeAt(pos);

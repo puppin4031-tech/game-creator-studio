@@ -1,5 +1,6 @@
 import { ITEMS, type ItemId } from './items';
 import type { LatLng, Stack } from './types';
+import type { SpriteKey } from './spriteMeta';
 
 /** Real-world places reinterpreted as Paleolithic landmarks. */
 export type LandmarkKind = 'shaman' | 'spring' | 'smokehouse' | 'trader';
@@ -11,11 +12,11 @@ export interface Landmark extends LatLng {
   origin?: string;
 }
 
-export const LANDMARK_INFO: Record<LandmarkKind, { name: string; desc: string; sprite: 'base-totem' | 'node-spring' | 'item-cooked-meat' | 'item-clay-pot' }> = {
-  shaman: { name: '샤먼의 지하 성소', desc: '제사장이 풍문과 생존 지혜를 들려줍니다.', sprite: 'base-totem' },
-  spring: { name: '신성한 샘터', desc: '맑은 물과 열매를 길어 올릴 수 있습니다.', sprite: 'node-spring' },
+export const LANDMARK_INFO: Record<LandmarkKind, { name: string; desc: string; sprite: SpriteKey }> = {
+  shaman: { name: '샤먼의 지하 성소', desc: '제사장이 풍문과 생존 지혜를 들려줍니다.', sprite: 'char-shaman' },
+  spring: { name: '신성한 샘터', desc: '맑은 물과 열매를 길어 올릴 수 있습니다.', sprite: 'item-clay-pot' },
   smokehouse: { name: '훈제 보관소', desc: '말린 고기를 얻을 수 있습니다.', sprite: 'item-cooked-meat' },
-  trader: { name: '떠돌이 만물상', desc: '물건을 조개 화폐로 사고팝니다.', sprite: 'item-clay-pot' },
+  trader: { name: '떠돌이 만물상', desc: '물건을 조개 화폐로 사고팝니다.', sprite: 'char-gatherer' },
 };
 
 /** Abuse limits per landmark. */
