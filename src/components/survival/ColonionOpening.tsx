@@ -33,7 +33,7 @@ export function ColonionOpening({ onEnter }: { onEnter: (name: string) => void }
         <motion.img
           src={titleArt.url}
           alt="콜로니온: 문명의 시작 — 구석기 모닥불과 미래 도시를 잇는 GPS 신호"
-          className="absolute inset-0 h-full w-full object-cover [image-rendering:pixelated]"
+          className="absolute inset-0 h-full w-full object-contain [image-rendering:pixelated]"
           initial={{ scale: 1.12 }}
           animate={{ scale: 1 }}
           transition={{ duration: 2.4, ease: "easeOut" }}
