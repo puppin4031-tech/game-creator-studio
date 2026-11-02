@@ -36,6 +36,13 @@
       "when": 1793655848862,
       "tag": "0004_security_stage1",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793656725139,
+      "tag": "0005_security_stage2_teleport",
+      "breakpoints": true
     }
   ]
 }
