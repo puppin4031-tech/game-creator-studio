@@ -18,6 +18,24 @@ export const presenceCell = (p: LatLng) =>
 /** Round to ~1m so we never leak sub-meter precision. */
 export const roundCoord = (v: number) => Math.round(v * 1e5) / 1e5;
 
+/** Grid snap (meters) applied to every position shared with other players. */
+export const PUBLIC_GRID_M = 10;
+/** Coarser grid used near the player's own base (often their home). */
+export const HOME_GRID_M = 50;
+/** Radius around the base where the coarse grid applies. */
+export const HOME_PRIVACY_RADIUS_M = 200;
+
+const snap = (v: number, step: number) => Math.round(Math.round(v / step) * step * 1e6) / 1e6;
+
+/** Position other players may see: snapped to a grid, coarser near the base so a home cannot be pinpointed. */
+export function publicPosition(pos: LatLng, base: LatLng | null): LatLng {
+  const nearHome = !!base && distanceM(pos, base) <= HOME_PRIVACY_RADIUS_M;
+  const gridM = nearHome ? HOME_GRID_M : PUBLIC_GRID_M;
+  const latStep = gridM / 111320;
+  const lngStep = gridM / (111320 * Math.max(0.1, Math.cos((pos.lat * Math.PI) / 180)));
+  return { lat: snap(pos.lat, latStep), lng: snap(pos.lng, lngStep) };
+}
+
 export function shouldBroadcast(last: { pos: LatLng; at: number } | null, pos: LatLng, now: number): boolean {
   if (!last) return true;
   const elapsed = now - last.at;

@@ -3,7 +3,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { LatLng } from '@/lib/survival/types';
-import { presenceCell, roundCoord, shouldBroadcast, PRESENCE_MIN_INTERVAL_MS, type EmoteId } from '@/lib/survival/presence';
+import { presenceCell, publicPosition, shouldBroadcast, PRESENCE_MIN_INTERVAL_MS, type EmoteId } from '@/lib/survival/presence';
 
 export interface PeerPlayer { id: string; name: string; lat: number; lng: number; level: number; at: number }
 export type PeerEvent =
@@ -21,7 +21,8 @@ function guestId() {
  * Low-traffic multiplayer presence: one realtime room per ~1km cell, position re-sent only after
  * 5m movement (min 3s apart) or a 20s heartbeat. Events (emote/attack/ally) are tiny broadcasts.
  */
-export function useSurvivalPresence(enabled: boolean, pos: LatLng, level: number, onEvent: (e: PeerEvent) => void, chiefName?: string) {
+export function useSurvivalPresence(enabled: boolean, pos: LatLng, level: number, onEvent: (e: PeerEvent) => void, chiefName?: string, base?: LatLng | null) {
+  const baseRef = useRef(base); baseRef.current = base;
   const { user, profile } = useAuth();
   const selfId = user?.id ?? guestId();
   const name = chiefName?.trim() || profile?.display_name || user?.email?.split('@')[0] || `원시인${selfId.slice(-3)}`;
@@ -37,7 +38,8 @@ export function useSurvivalPresence(enabled: boolean, pos: LatLng, level: number
     const now = Date.now(); const p = posRef.current;
     if (!force && !shouldBroadcast(last.current, p, now)) return;
     last.current = { pos: p, at: now };
-    try { await c.track({ id: selfId, name, lat: roundCoord(p.lat), lng: roundCoord(p.lng), level, at: now }); }
+    const shared = publicPosition(p, baseRef.current ?? null);
+    try { await c.track({ id: selfId, name, lat: shared.lat, lng: shared.lng, level, at: now }); }
     catch (e) { console.warn('[survivalPresence] track failed', e); }
   }, [selfId, name, level]);
 
