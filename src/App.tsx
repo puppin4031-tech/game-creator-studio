@@ -86,7 +86,7 @@ const App = () => (
           <AuthProvider>
             <Routes>
               <Route path="/" element={<LandingPage />} />
-              <Route path="/world" element={<SurvivalSimulator realGps />} />
+              <Route path="/world" element={<ProtectedRoute><SurvivalSimulator realGps /></ProtectedRoute>} />
               <Route path="/exodus" element={<Index />} />
               <Route element={<MobileFrame />}>
                 <Route path="/play" element={<Lobby />} />

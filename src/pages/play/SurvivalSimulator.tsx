@@ -39,6 +39,11 @@ const START: LatLng = { lat: 37.748, lng: 126.7496 };
 const spriteUrls = import.meta.glob('../../assets/survival/*.png', { eager: true, import: 'default' }) as Record<string, string>;
 const url = (k: SpriteKey) => spriteUrls[`../../assets/survival/${k}.png`];
 
+const PLAYER_SCALE = 1.2;
+const LANDMARK_FEATURE_SCALE = 1.15;
+// Hard materials (stone, wood, ore) use the strike animation; soft ones use gather.
+const STRIKE_NODES = new Set<string>(['flint_rock', 'branch_pile', 'oak_tree', 'pine_tree', 'hematite_rock', 'quartz_vein', 'obsidian_rock', 'jade_rock']);
+
 function Sprite({ k, scale = 1, className = '' }: { k: SpriteKey; scale?: number; className?: string }) {
   const m = SPRITE_META[k];
   return <img src={url(k)} width={m.w * scale} height={m.h * scale} alt="" draggable={false} className={`pixelated select-none ${className}`} />;
@@ -115,7 +120,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     if (realGps && !gps.ready) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return; }
     if (!realGps && distanceM(s.pos, e) > C.interactRadiusM) { g.moveTo({ lat: e.lat, lng: e.lng }); return; }
     const inRange = distanceM(s.pos, e) <= C.interactRadiusM;
-    const act: SpriteAction = e.kind === 'creature' ? 'attack' : 'gather';
+    const act: SpriteAction = e.kind === 'creature' || STRIKE_NODES.has(e.type) ? 'attack' : 'gather';
     if (inRange) {
       // Walk to the object (250ms), act, then wait 3s before walking back.
       setActorTarget({ lat: e.lat, lng: e.lng, anchor: s.pos });
@@ -243,7 +248,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 <button key={l.id} type="button" aria-label={info.name} data-landmark={l.kind} onClick={(ev) => { ev.stopPropagation(); setShamanWords(null); setSelLandmark(l); }}
                   className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center"
                   style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}>
-                  <div className="rounded-full bg-primary/30 p-0.5 shadow-[0_0_12px_hsl(var(--primary))]"><Sprite k={info.sprite} /></div>
+                  <div className="rounded-full bg-primary/30 p-0.5 shadow-[0_0_12px_hsl(var(--primary))]"><Sprite k={info.sprite} scale={l.kind === 'shaman' || l.kind === 'trader' ? LANDMARK_FEATURE_SCALE : 1} /></div>
                   <span className="whitespace-nowrap rounded bg-primary px-1 text-[10px] text-primary-foreground">{info.name}</span>
                 </button>
               );
@@ -301,7 +306,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       <motion.div className="absolute left-1/2 top-1/2" initial={false} animate={{ x: dx, y: dy }} transition={{ duration: actorTarget ? 0.25 : 0.5, ease: 'easeOut' }}>
                         <div className="-translate-x-1/2 -translate-y-[85%]">
                           {bubbles[presence.selfId] && <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbles[presence.selfId]}</span>}
-                          <HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined }}>{activeAnim ? <SpriteAnimator url={activeAnim.url} frames={activeAnim.frame_count} fps={activeAnim.fps} height={SPRITE_META['char-hunter'].h} once={action === 'gather' || action === 'attack'} /> : <Sprite k="char-hunter" />}</div></HitFlash>
+                          <HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined }}>{activeAnim ? <SpriteAnimator url={activeAnim.url} frames={activeAnim.frame_count} fps={activeAnim.fps} height={Math.round(SPRITE_META['char-hunter'].h * PLAYER_SCALE)} once={action === 'gather' || action === 'attack'} /> : <Sprite k="char-hunter" scale={PLAYER_SCALE} />}</div></HitFlash>
                         </div>
                       </motion.div>
                     );
