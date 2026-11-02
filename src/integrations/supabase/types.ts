@@ -412,6 +412,24 @@ export type Database = {
         }
         Relationships: []
       }
+      survival_ai_daily_usage: {
+        Row: {
+          client_hash: string
+          request_count: number
+          usage_date: string
+        }
+        Insert: {
+          client_hash: string
+          request_count?: number
+          usage_date?: string
+        }
+        Update: {
+          client_hash?: string
+          request_count?: number
+          usage_date?: string
+        }
+        Relationships: []
+      }
       survival_ai_request_throttle: {
         Row: {
           client_hash: string
@@ -827,6 +845,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_survival_ai_daily: {
+        Args: { p_client_hash: string; p_limit: number }
+        Returns: boolean
+      }
       claim_survival_ai_request: {
         Args: { p_client_hash: string }
         Returns: boolean
