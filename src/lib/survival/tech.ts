@@ -35,7 +35,16 @@ export const TECHS: TechDef[] = [
   { id: 'jadework', name: '옥 세공', desc: '옥을 갈아 부적을 만든다.', requires: ['obsidian'], inspire: { itemId: 'jade', count: 1 }, recipes: ['jade_amulet'] },
   { id: 'primal_strike', name: '원시 일격', desc: '짐승을 공격할 때 공격력 +30%.', requires: [], recipes: [], bookOnly: true },
   { id: 'iron_skin', name: '바위 피부', desc: '받는 피해 -2.', requires: [], recipes: [], bookOnly: true },
-  { id: 'beast_mastery', name: '야수 교감', desc: '짐승 길들이기의 기초. (테이밍은 준비 중)', requires: [], recipes: [], bookOnly: true },
+  { id: 'beast_mastery', name: '야수 교감', desc: '늑대 테이밍 연구와 올가미·미끼 제작을 해금한다.', requires: [], recipes: ['taming_snare', 'beast_bait'], bookOnly: true },
+  { id: 'stone_barrage', name: '돌팔매 연타', desc: '25m 안 가까운 짐승 1마리에 18 피해. 부싯돌 1 · 대기 12초.', requires: ['knapping', 'binding'], research: [{ itemId: 'flint', count: 4 }, { itemId: 'cordage', count: 2 }], recipes: [] },
+  { id: 'roar', name: '포효', desc: '25m 안 일반 짐승을 20초간 진정. 우두머리 제외. 허기 1 · 대기 30초.', requires: ['primal_strike'], research: [{ itemId: 'bone', count: 4 }, { itemId: 'ancient_fang', count: 1 }], recipes: [] },
+  { id: 'ember_scatter', name: '불씨 뿌리기', desc: '거점 25m 안에서 주변 짐승에 12 피해. 송진 1·나뭇가지 1 · 대기 20초.', requires: ['fire', 'pottery'], research: [{ itemId: 'resin', count: 3 }, { itemId: 'clay_pot', count: 1 }], recipes: [] },
+  { id: 'hut_building', name: '움집', desc: '2단계 거점 발전 해금. 발전 후 배낭 용량 +10kg.', requires: ['binding', 'fire'], research: [{ itemId: 'log', count: 4 }, { itemId: 'cordage', count: 2 }], recipes: [] },
+  { id: 'palisade', name: '목책', desc: '설치 후 거점 반경 +15m, 거점 안 짐승 반격 피해 -3.', requires: ['hut_building'], research: [{ itemId: 'log', count: 4 }, { itemId: 'flint', count: 2 }], recipes: [] },
+  { id: 'outpost', name: '전진기지', desc: '본거지에서 150m 이상 떨어진 곳에 1개. 반경 30m 안에서 공용 창고·제작·연구.', requires: ['hut_building'], research: [{ itemId: 'hide', count: 2 }, { itemId: 'cordage', count: 2 }], recipes: [] },
+  { id: 'wolf_taming', name: '늑대 길들이기', desc: '체력 절반 이하 일반 늑대: 미끼 1·올가미 1·날고기 2. 성공률 70%, 실패에도 재료 소비. 펫 1마리, 공격 +3.', requires: ['beast_mastery', 'binding'], research: [{ itemId: 'hide', count: 2 }, { itemId: 'bone', count: 2 }], recipes: [] },
+  { id: 'recruitment', name: '부족원 모집', desc: '샤먼 곁 NPC 모집: 조개 10·구운 고기 2. 거점 작업 5분마다 나뭇가지 2·섬유 1.', requires: ['hut_building'], research: [{ itemId: 'cooked_meat', count: 2 }, { itemId: 'hide', count: 2 }], recipes: [] },
+  { id: 'rescue', name: '포로 구출', desc: '우두머리 처치 후 NPC 구조: 연고 1·말린 고기 2. 거점 작업 5분마다 뼈 1·흙 1. 동료 총 2명.', requires: ['recruitment', 'herbalism'], research: [{ itemId: 'salve', count: 1 }, { itemId: 'cordage', count: 2 }], recipes: [] },
 ];
 
 export const PRIMAL_STRIKE_MULT = 1.3;

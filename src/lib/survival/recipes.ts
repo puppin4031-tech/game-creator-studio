@@ -29,6 +29,8 @@ export const RECIPES: Recipe[] = [
   { id: 'flint_spear', result: 'flint_spear', count: 1, ingredients: [{ itemId: 'flint', count: 2 }, { itemId: 'branch', count: 3 }, { itemId: 'cordage', count: 1 }], minigame: 'knap', difficulty: 2, baseLevel: 1, processSec: 0 },
   { id: 'cooked_meat', result: 'cooked_meat', count: 1, ingredients: [{ itemId: 'raw_meat', count: 1 }, { itemId: 'branch', count: 1 }], minigame: 'fire', difficulty: 1, baseLevel: 1, processSec: 30 },
   { id: 'clay_pot', result: 'clay_pot', count: 1, ingredients: [{ itemId: 'clay', count: 3 }, { itemId: 'branch', count: 2 }], minigame: 'fire', difficulty: 2, baseLevel: 1, processSec: 120 },
+  { id: 'beast_bait', result: 'beast_bait', count: 2, ingredients: [{ itemId: 'raw_meat', count: 1 }, { itemId: 'berry', count: 2 }], minigame: 'fire', difficulty: 1, baseLevel: 1, processSec: 0 },
+  { id: 'taming_snare', result: 'taming_snare', count: 1, ingredients: [{ itemId: 'hide', count: 1 }, { itemId: 'cordage', count: 2 }], minigame: 'bind', difficulty: 2, baseLevel: 1, processSec: 0 },
   // Level 2 — hut
   { id: 'leather', result: 'leather', count: 1, ingredients: [{ itemId: 'hide', count: 2 }, { itemId: 'resin', count: 1 }], minigame: 'fire', difficulty: 2, baseLevel: 2, processSec: 90 },
   { id: 'salve', result: 'salve', count: 1, ingredients: [{ itemId: 'herb', count: 3 }, { itemId: 'resin', count: 1 }], minigame: 'fire', difficulty: 2, baseLevel: 2, processSec: 60 },
