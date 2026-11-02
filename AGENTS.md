@@ -20,3 +20,5 @@
 - Survival vital ticks use the pure metabolism.ts helper with capped catch-up and full elapsed-time settlement; why: returning saves must not repeatedly drain an offline backlog or apply starvation to ticks before hunger runs out.
 - Survival abilities, research costs, structures and NPC/pet limits use pure abilities.ts rules with hook-level GPS checks; why: local effects and persisted cooldowns need deterministic validation without additional realtime traffic or control over other users.
 - Withdrawn inventory types remain packed until manually stored; why: field skills, taming and outpost construction must not lose supplies to the automatic deposit effect.
+- Positions shared with other players go through publicPosition in src/lib/survival/presence.ts (fixed grid, coarser near the base); why: realtime peers must never pinpoint a player's home.
+- survival_saves rows are validated by a DB trigger (size, vitals, item counts, future timestamps) and AI planning has a per-client daily cap in survival_ai_daily_usage; why: client-side state can be tampered with, so the server rejects impossible saves and bounds AI spend.

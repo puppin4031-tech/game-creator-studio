@@ -202,7 +202,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       // Auto-complete if we already proposed to them.
     }
   };
-  const presence = useSurvivalPresence(realGps ? gps.ready : true, s.pos, s.level, onPeerEvent, chiefName);
+  const presence = useSurvivalPresence(realGps ? gps.ready : true, s.pos, s.level, onPeerEvent, chiefName, s.base);
   peersRef.current = presence.peers;
   const selPeer = presence.peers.find(p => p.id === selPeerId) ?? null;
   const attackPeer = () => {
