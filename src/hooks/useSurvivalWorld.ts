@@ -15,7 +15,7 @@ import { addStacks, hasAll, removeStacks, splitDeathDrop, stackWeight } from '@/
 import { addExperience, dayPhase, xpToNext } from '@/lib/survival/progression';
 import { claimWorldQuest, freshProgress, type WorldProgress } from '@/lib/survival/worldProgress';
 import { currentQuest, questReady, type QuestState } from '@/lib/survival/quests';
-import { IRON_SKIN_DEF, PRIMAL_STRIKE_MULT, checkInspiration, isRecipeUnlocked, prerequisitesMet, techById, type TechDef } from '@/lib/survival/tech';
+import { IRON_SKIN_DEF, PRIMAL_STRIKE_MULT, checkInspiration, isRecipeUnlocked, prerequisitesMet, readSkillBook, techById, type TechDef } from '@/lib/survival/tech';
 import { NATURAL_REGEN_MIN_HUNGER, NATURAL_REGEN_PER_TICK, SANCTUARY_RADIUS_M, SANCTUARY_REGEN_PER_TICK, LANDMARK_INFO, SHAMAN_BLESS_XP, SHAMAN_RUMORS, SHAMAN_TIPS, TRADER_STOCK, canClaimLandmark, landmarkReward, recordLandmarkClaim, sellPrice, type Landmark, type LandmarkClaims } from '@/lib/survival/landmarks';
 import type { TerrainZone } from '@/lib/survival/terrainZone';
 import type { GearInstance, LatLng, Stack, WorldEntity } from '@/lib/survival/types';
@@ -348,16 +348,15 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const eat = useCallback((itemId: ItemId) => {
     const it = ITEMS[itemId];
     const p = ref.current;
-    if (it.book) {
-      const t = techById(it.book.techId);
-      const left = removeStacks(p.backpack, [{ itemId, count: 1 }]) ?? null;
-      if (!t || !left) return;
-      if (p.techs.includes(t.id)) { toast('이미 아는 기술입니다'); return; }
-      setS(learn({ ...p, backpack: left }, [t]));
-      return;
-    }
     const from = p.backpack.some((x) => x.itemId === itemId) ? 'backpack' : 'storage';
     if (!enabledRef.current || (from === 'storage' && (!p.base || distanceM(p.pos, p.base) > BASE_LEVELS[p.base.level].radiusM))) return;
+    if (it.book) {
+      if (p.techs.includes(it.book.techId)) { toast('이미 아는 기술입니다'); return; }
+      const read = readSkillBook(p[from], itemId, p.techs);
+      if (!read) return;
+      setS(learn({ ...p, [from]: read.remaining }, [read.tech]));
+      return;
+    }
     const left = removeStacks(p[from], [{ itemId, count: 1 }]);
     if (!left) return;
     const hpGain = it.food?.hp ?? it.heal ?? 0;
