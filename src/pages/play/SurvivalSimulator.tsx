@@ -10,7 +10,7 @@ import { useDeviceHeading } from '@/hooks/useDeviceHeading';
 import { useSurvivalGps } from '@/hooks/useSurvivalGps';
 import { Button } from '@/components/ui/button';
 import SurvivalPlanner from '@/components/survival/SurvivalPlanner';
-import { ColonionOpening } from '@/components/survival/ColonionOpening';
+import { ColonionOpening, PIONEER_NAME_KEY } from '@/components/survival/ColonionOpening';
 import SurvivalObjectives from '@/components/survival/SurvivalObjectives';
 import type { PlannerInput } from '@/lib/survival/plannerInput';
 import { toast } from 'sonner';
@@ -68,7 +68,12 @@ type Panel = 'none' | 'bag' | 'base' | 'tech' | 'quests';
 
 export default function SurvivalSimulator({ realGps = false }: { realGps?: boolean }) {
   const [showOpening, setShowOpening] = useState(() => realGps && sessionStorage.getItem('colonion.openingSeen') !== '1');
-  const enterWorld = () => { sessionStorage.setItem('colonion.openingSeen', '1'); setShowOpening(false); };
+  const [chiefName, setChiefName] = useState(() => localStorage.getItem(PIONEER_NAME_KEY) ?? '');
+  const enterWorld = (name: string) => {
+    sessionStorage.setItem('colonion.openingSeen', '1');
+    if (name) { setChiefName(name); toast.success(`${name} 족장님, 구석기 시대에 오신 것을 환영합니다`); }
+    setShowOpening(false);
+  };
   const [compassOn, setCompassOn] = useState(false);
   const { heading, requestPermission } = useDeviceHeading(compassOn);
   const toggleCompass = async () => {
