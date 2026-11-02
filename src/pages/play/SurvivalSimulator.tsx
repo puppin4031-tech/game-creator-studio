@@ -209,6 +209,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden font-pixel">
+      <AnimatePresence>{showOpening && <ColonionOpening onEnter={enterWorld} />}</AnimatePresence>
       {(!realGps || gps.fix) && <TerrainMap center={s.pos} visionM={g.vision} explored={s.explored} onTap={onTap} zone={zone} onSurfaceZone={onSurfaceZone} onSurfacePark={onSurfacePark} onLandmarks={setLandmarks} bearing={compassOn && heading !== null ? heading : 0}>
         {(project, mpp) => (
           <>
