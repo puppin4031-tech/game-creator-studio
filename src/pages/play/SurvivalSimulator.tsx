@@ -197,7 +197,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       // Auto-complete if we already proposed to them.
     }
   };
-  const presence = useSurvivalPresence(realGps ? gps.ready : true, s.pos, s.level, onPeerEvent);
+  const presence = useSurvivalPresence(realGps ? gps.ready : true, s.pos, s.level, onPeerEvent, chiefName);
   peersRef.current = presence.peers;
   const selPeer = presence.peers.find(p => p.id === selPeerId) ?? null;
   const attackPeer = () => {
@@ -315,7 +315,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         <div className="text-right text-[11px] leading-tight">
           <div>{g.isNight ? '밤' : '낮'} · {TERRAIN_ZONE_LABEL[zone]}{inPark ? ' · 공원(짐승 多)' : ''}{g.inSanctuary ? ' · 성소(안전)' : ''} · 시야 {g.vision}m</div>
           <div>배낭 {g.weight}/{g.capacity}kg</div>
-          <div aria-label="성장 진행도">Lv.{s.level} · XP {s.xp}/{g.nextLevelXp}</div>
+          <div aria-label="성장 진행도">족장 {presence.name} · Lv.{s.level} · XP {s.xp}/{g.nextLevelXp}</div>
         </div>
       </div>
 
