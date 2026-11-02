@@ -283,7 +283,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       <motion.div className="absolute left-1/2 top-1/2" initial={false} animate={{ x: dx, y: dy }} transition={{ duration: actorTarget ? 0.25 : 0.5, ease: 'easeOut' }}>
                         <div className="-translate-x-1/2 -translate-y-[85%]">
                           {bubbles[presence.selfId] && <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbles[presence.selfId]}</span>}
-                          <HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined }}>{activeAnim ? <SpriteAnimator url={activeAnim.url} frames={activeAnim.frame_count} fps={activeAnim.fps} height={SPRITE_META['char-hunter'].h} /> : <Sprite k="char-hunter" />}</div></HitFlash>
+                          <HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined }}>{activeAnim ? <SpriteAnimator url={activeAnim.url} frames={activeAnim.frame_count} fps={activeAnim.fps} height={SPRITE_META['char-hunter'].h} once={action === 'gather' || action === 'attack'} /> : <Sprite k="char-hunter" />}</div></HitFlash>
                         </div>
                       </motion.div>
                     );
