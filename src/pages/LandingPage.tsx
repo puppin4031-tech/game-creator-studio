@@ -1,9 +1,13 @@
-import { motion, useInView } from "framer-motion";
-import { useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { Globe, Users, Gamepad2, Church, Building2, GraduationCap, Gem, Swords, MapPin } from "lucide-react";
+import { AnimatePresence, motion, useInView } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { Globe, Users, Gamepad2, Church, Building2, GraduationCap, Gem, Swords, MapPin, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { EXPLORATION_LOGIN_URL } from "@/lib/authNavigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { ColonionOpening } from "@/components/survival/ColonionOpening";
+import titleArt from "@/assets/colonion_title.jpg.asset.json";
 
 function AnimatedSection({
   children,
@@ -62,88 +66,61 @@ const audiences = [
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const { user, isLoading } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const [showSetup, setShowSetup] = useState(false);
+
+  // Step 2 opens automatically after login returns to "/?start=1".
+  useEffect(() => {
+    if (params.get("start") === "1" && !isLoading && user) {
+      setShowSetup(true);
+      params.delete("start");
+      setParams(params, { replace: true });
+    }
+  }, [params, setParams, user, isLoading]);
+
+  const startExploration = () => {
+    if (isLoading) return;
+    if (!user) { navigate(EXPLORATION_LOGIN_URL); return; } // step 1
+    setShowSetup(true); // step 2
+  };
+
+  const enterWorld = (name: string) => {
+    if (name) toast.success(`${name} 족장님, 구석기 시대에 오신 것을 환영합니다`);
+    navigate("/world"); // step 3; browser back returns to "/"
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[hsl(220,25%,8%)] via-[hsl(150,30%,12%)] to-[hsl(220,25%,8%)]" />
-        <div
-          className="absolute inset-0 opacity-[0.07]"
-          style={{
-            backgroundImage: `radial-gradient(circle at 1px 1px, hsl(var(--primary)) 1px, transparent 0)`,
-            backgroundSize: "40px 40px",
-          }}
-        />
-        {/* Glow orbs */}
-        <div className="absolute top-1/4 left-1/4 w-[400px] h-[400px] rounded-full bg-[hsl(150,80%,35%)] opacity-[0.08] blur-[120px]" />
-        <div className="absolute bottom-1/4 right-1/4 w-[300px] h-[300px] rounded-full bg-[hsl(35,90%,50%)] opacity-[0.06] blur-[100px]" />
+      <AnimatePresence>{showSetup && <ColonionOpening onEnter={enterWorld} />}</AnimatePresence>
 
-        <div className="relative z-10 text-center px-6 max-w-2xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[hsl(150,80%,35%,0.3)] bg-[hsl(150,80%,35%,0.1)] text-[hsl(150,80%,70%)] text-sm font-medium mb-8">
-              <Globe className="w-4 h-4" />
-              GPS 기반 리얼타임 게임 플랫폼
-            </div>
-          </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.9, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
-            className="text-4xl sm:text-5xl md:text-6xl font-extrabold leading-tight tracking-tight text-white mb-6"
-          >
-            일상이 모험이 되는 순간,
-            <br />
-            <span className="bg-gradient-to-r from-[hsl(150,80%,55%)] to-[hsl(35,90%,60%)] bg-clip-text text-transparent">
-              GPS 리얼타임 액션
-            </span>
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="text-lg sm:text-xl text-[hsl(220,10%,65%)] mb-10 leading-relaxed"
-          >
-            야외에서 직접 걷고 뛰며 즐기는
-            <br className="sm:hidden" /> 거대한 오픈 월드 탐험
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <Button
-              onClick={() => navigate(EXPLORATION_LOGIN_URL)}
-              size="lg"
-              className="h-14 px-10 text-lg font-bold rounded-2xl bg-gradient-to-r from-[hsl(150,80%,40%)] to-[hsl(150,70%,45%)] hover:from-[hsl(150,80%,45%)] hover:to-[hsl(150,70%,50%)] text-white shadow-[0_0_40px_hsl(150,80%,35%,0.3)] hover:shadow-[0_0_60px_hsl(150,80%,35%,0.5)] transition-all duration-300"
-            >
-              🗺️ 지금 바로 탐험 시작하기
-            </Button>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1.2, duration: 1 }}
-            className="mt-16 flex justify-center"
-          >
-            <div className="w-6 h-10 rounded-full border-2 border-[hsl(220,10%,40%)] flex items-start justify-center p-1.5">
-              <motion.div
-                animate={{ y: [0, 12, 0] }}
-                transition={{ repeat: Infinity, duration: 1.8, ease: "easeInOut" }}
-                className="w-1.5 h-1.5 rounded-full bg-[hsl(150,80%,55%)]"
-              />
-            </div>
-          </motion.div>
+      {/* Colonion opening hero */}
+      <section className="relative flex min-h-[100dvh] flex-col overflow-hidden bg-colonion-night font-pixel">
+        <div className="relative flex-1">
+          <motion.img
+            src={titleArt.url}
+            alt="콜로니온: 문명의 시작 — 구석기 모닥불과 미래 도시를 잇는 GPS 신호"
+            className="absolute inset-0 h-full w-full object-contain [image-rendering:pixelated]"
+            initial={{ scale: 1.12, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 2.4, ease: "easeOut" }}
+          />
+          <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-colonion-night to-transparent" />
         </div>
+        <motion.div
+          className="relative z-10 mx-auto w-full max-w-md px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] text-center"
+          initial={{ y: 40, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.6, duration: 0.6 }}
+        >
+          <p className="mb-4 text-sm text-colonion-parchment">GPS기반 문명개척 무료게임</p>
+          <button
+            onClick={startExploration}
+            className="flex h-14 w-full items-center justify-center gap-2 rounded border-2 border-colonion-wood-edge bg-gradient-to-b from-primary to-colonion-ember text-base font-bold text-colonion-night shadow-lg active:translate-y-0.5"
+          >
+            {user ? "문명 개척 시작하기" : "로그인하고 탐험 시작하기"} <Play className="!h-5 !w-5 fill-current" />
+          </button>
+        </motion.div>
       </section>
 
       {/* Features Section */}
