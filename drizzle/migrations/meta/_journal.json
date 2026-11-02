@@ -43,6 +43,13 @@
       "when": 1793656725139,
       "tag": "0005_security_stage2_teleport",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793660083860,
+      "tag": "0006_tighten_spawns_and_puzzle_storage",
+      "breakpoints": true
     }
   ]
 }
