@@ -67,7 +67,8 @@ function Stacks({ stacks, onUse, have }: { stacks: Stack[]; onUse?: (id: ItemId)
 type Panel = 'none' | 'bag' | 'base' | 'tech' | 'quests';
 
 export default function SurvivalSimulator({ realGps = false }: { realGps?: boolean }) {
-  const [showOpening, setShowOpening] = useState(() => realGps && sessionStorage.getItem('colonion.openingSeen') !== '1');
+  // Opening now lives on the main page ("/"); the world starts immediately.
+  const [showOpening, setShowOpening] = useState(false);
   const [chiefName, setChiefName] = useState(() => localStorage.getItem(PIONEER_NAME_KEY) ?? '');
   const enterWorld = (name: string) => {
     sessionStorage.setItem('colonion.openingSeen', '1');
@@ -307,7 +308,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
       {/* Top HUD */}
       <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-background/80 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur">
-        <button type="button" aria-label="뒤로" onClick={() => navigate('/play')} className="pixel-btn flex h-11 w-11 items-center justify-center bg-card"><ArrowLeft className="!h-6 !w-6" /></button>
+        <button type="button" aria-label="뒤로" onClick={() => navigate(realGps ? '/' : '/play')} className="pixel-btn flex h-11 w-11 items-center justify-center bg-card"><ArrowLeft className="!h-6 !w-6" /></button>
         <div className="flex-1 space-y-1 text-xs">
           <div className="flex items-center gap-1">체력<HpBar value={s.hp} max={C.baseMaxHp} />{s.hp}</div>
           <div className="flex items-center gap-1">허기<div className="h-2.5 flex-1 border border-foreground bg-muted"><div className="h-full bg-primary" style={{ width: `${s.hunger}%` }} /></div>{s.hunger}</div>
