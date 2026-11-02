@@ -1,35 +1,36 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Lock, Play } from "lucide-react";
+import { Lock, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { normalizePioneerName, PIONEER_ERAS, PIONEER_NAME_KEY } from "@/lib/pioneer";
 import titleArt from "@/assets/colonion_title.jpg.asset.json";
+import hunter from "@/assets/survival/char-hunter.png";
 
-const ERAS = [
-  { id: "stone", label: "구석기", open: true },
-  { id: "bronze", label: "청동기", open: false },
-  { id: "industry", label: "산업화", open: false },
-  { id: "modern", label: "현대문명", open: false },
-] as const;
-
-export const PIONEER_NAME_KEY = "colonion.pioneerName";
+export { PIONEER_NAME_KEY } from "@/lib/pioneer";
 
 /** Full-screen opening shown before entering the survival world. */
-export function ColonionOpening({ onEnter }: { onEnter: (name: string) => void }) {
+export function ColonionOpening({ onEnter, onClose }: { onEnter: (name: string) => void; onClose?: () => void }) {
   const [name, setName] = useState(() => localStorage.getItem(PIONEER_NAME_KEY) ?? "");
 
   const enter = () => {
-    const trimmed = name.trim().slice(0, 16);
-    if (trimmed) localStorage.setItem(PIONEER_NAME_KEY, trimmed);
+    const trimmed = normalizePioneerName(name);
+    if (!trimmed) return;
+    localStorage.setItem(PIONEER_NAME_KEY, trimmed);
     onEnter(trimmed);
   };
 
   return (
     <motion.div
-      className="fixed inset-0 z-[100] flex flex-col bg-colonion-night font-pixel"
+      role="dialog"
+      aria-modal="true"
+      aria-label="개척자 선택"
+      className="fixed inset-0 z-[100] flex h-[100dvh] flex-col overflow-y-auto bg-colonion-night font-pixel"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
-      <div className="relative flex-1 overflow-hidden">
+      {onClose && <Button variant="ghost" size="icon" aria-label="선택창 닫기" onClick={onClose} className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-10 h-11 w-11 text-colonion-parchment"><X /></Button>}
+      <div className="relative min-h-32 flex-1 overflow-hidden">
         <motion.img
           src={titleArt.url}
           alt="콜로니온: 문명의 시작 — 구석기 모닥불과 미래 도시를 잇는 GPS 신호"
@@ -48,33 +49,44 @@ export function ColonionOpening({ onEnter }: { onEnter: (name: string) => void }
         transition={{ delay: 0.6, duration: 0.6 }}
       >
         <div className="flex gap-1">
-          {ERAS.map((era) => (
-            <div
+          {PIONEER_ERAS.map((era) => (
+            <Button
               key={era.id}
-              className={`flex flex-1 items-center justify-center gap-1 rounded-t-md border-2 border-b-0 border-colonion-wood-edge px-1 py-2 text-xs ${
-                era.open ? "bg-colonion-wood text-colonion-parchment" : "bg-colonion-wood-dark text-colonion-parchment/50"
+              variant="ghost"
+              disabled={!era.available}
+              aria-pressed={era.available}
+              title={era.available ? era.label : `${era.label} — 준비 중`}
+              className={`h-11 min-w-0 flex-1 gap-1 rounded-b-none border-2 border-b-0 border-colonion-wood-edge px-1 text-xs ${
+                era.available ? "bg-colonion-wood text-colonion-parchment" : "bg-colonion-wood-dark text-colonion-parchment/50"
               }`}
             >
-              {!era.open && <Lock className="!h-3 !w-3" />}
+              {!era.available && <Lock className="!h-3 !w-3" />}
               {era.label}
-            </div>
+            </Button>
           ))}
         </div>
         <div className="rounded-b-md border-2 border-colonion-wood-edge bg-colonion-wood p-4 shadow-2xl">
-          <p className="mb-3 text-center text-sm text-colonion-parchment">개척자 등록</p>
+          <h2 className="mb-2 text-center text-base text-colonion-parchment">개척자</h2>
+          <Button
+            onClick={enter}
+            disabled={!normalizePioneerName(name)}
+            aria-label={`${normalizePioneerName(name) || '개척자'} 캐릭터로 접속`}
+            variant="ghost"
+            className="mb-3 flex h-32 w-full flex-col gap-2 border border-colonion-wood-edge bg-colonion-wood-dark text-colonion-parchment hover:bg-colonion-wood-dark hover:ring-2 hover:ring-primary"
+          >
+            <img src={hunter} alt="구석기 개척자 캐릭터" className="h-20 w-20 object-contain [image-rendering:pixelated]" draggable={false} />
+            <span className="max-w-full truncate text-base">{normalizePioneerName(name) || '개척자'}</span>
+          </Button>
+          <label htmlFor="pioneer-name" className="mb-1 block text-xs text-colonion-parchment">닉네임</label>
           <input
+            id="pioneer-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={16}
             placeholder="족장 닉네임 입력"
-            className="mb-3 h-12 w-full rounded border-2 border-colonion-wood-edge bg-colonion-wood-dark px-3 text-base text-colonion-parchment placeholder:text-colonion-parchment/40 focus:outline-none focus:ring-2 focus:ring-primary"
+            onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) enter(); }}
+            className="h-12 w-full rounded border-2 border-colonion-wood-edge bg-colonion-wood-dark px-3 text-base text-colonion-parchment placeholder:text-colonion-parchment/40 focus:outline-none focus:ring-2 focus:ring-primary"
           />
-          <button
-            onClick={enter}
-            className="flex h-14 w-full items-center justify-center gap-2 rounded border-2 border-colonion-wood-edge bg-gradient-to-b from-primary to-colonion-ember text-base font-bold text-colonion-night shadow-lg active:translate-y-0.5"
-          >
-            GPS 연결 및 구석기 시대로 진입 <Play className="!h-5 !w-5 fill-current" />
-          </button>
         </div>
       </motion.div>
     </motion.div>

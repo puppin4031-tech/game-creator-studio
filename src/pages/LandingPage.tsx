@@ -92,7 +92,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      <AnimatePresence>{showSetup && <ColonionOpening onEnter={enterWorld} />}</AnimatePresence>
+      <AnimatePresence>{showSetup && <ColonionOpening onEnter={enterWorld} onClose={() => setShowSetup(false)} />}</AnimatePresence>
 
       {/* Colonion opening hero */}
       <section className="relative flex min-h-[100dvh] flex-col overflow-hidden bg-colonion-night font-pixel">
