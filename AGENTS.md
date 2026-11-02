@@ -22,3 +22,4 @@
 - Withdrawn inventory types remain packed until manually stored; why: field skills, taming and outpost construction must not lose supplies to the automatic deposit effect.
 - Positions shared with other players go through publicPosition in src/lib/survival/presence.ts (fixed grid, coarser near the base); why: realtime peers must never pinpoint a player's home.
 - survival_saves rows are validated by a DB trigger (size, vitals, item counts, future timestamps) and AI planning has a per-client daily cap in survival_ai_daily_usage; why: client-side state can be tampered with, so the server rejects impossible saves and bounds AI spend.
+- GPS jumps re-anchor only after repeated accurate fixes and then lock interactions for a cooldown (gps.ts); the survival_saves trigger also rejects implied travel over 100 m/s since the last save; why: spoofed teleports must never yield instant rewards or sync.
