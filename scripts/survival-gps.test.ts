@@ -50,3 +50,11 @@ test('terrain zone: riverside raises clay, highland raises flint on plains biome
   expect(zoneWeight(ZN.clay_pit.biomes, 'plains', 'riverside')).toBeGreaterThan(zoneWeight(ZN.clay_pit.biomes, 'plains', undefined));
   expect(zoneWeight(ZN.flint_rock.biomes, 'plains', 'highland')).toBeGreaterThan(zoneWeight(ZN.flint_rock.biomes, 'plains', 'riverside'));
 });
+
+import { shouldReanchor as reanchor } from '../src/lib/survival/gps';
+test('re-anchors only after 3 accurate rejected jumps', () => {
+  const f = { lat: 37.5, lng: 127, accuracy: 10, timestamp: 1 };
+  expect(reanchor(2, f)).toBe(false);
+  expect(reanchor(3, f)).toBe(true);
+  expect(reanchor(3, { ...f, accuracy: 80 })).toBe(false);
+});

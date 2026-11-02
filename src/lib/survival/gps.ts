@@ -20,3 +20,12 @@ export function smoothGpsFix(fix: GpsFix, previous: GpsFix | null, variance = 10
   const gain = predictedVariance / (predictedVariance + Math.max(1, fix.accuracy ** 2));
   return { fix: { ...fix, lat: previous.lat + gain * (fix.lat - previous.lat), lng: previous.lng + gain * (fix.lng - previous.lng) }, variance: (1 - gain) * predictedVariance };
 }
+/** After a rejected jump, interactions stay locked this long once the new position is re-anchored. */
+export const GPS_JUMP_LOCK_MS = 60000;
+/** Consecutive rejected fixes needed before re-anchoring at a new location. */
+export const GPS_REANCHOR_REJECTS = 3;
+
+/** Decide whether repeated rejected fixes should become the new anchor (e.g. after a car ride). */
+export function shouldReanchor(rejects: number, fix: GpsFix): boolean {
+  return rejects >= GPS_REANCHOR_REJECTS && fix.accuracy <= GPS_MAX_ACCURACY_M;
+}
