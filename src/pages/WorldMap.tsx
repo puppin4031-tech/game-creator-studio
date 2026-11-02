@@ -174,25 +174,13 @@ export default function WorldMap() {
     if (!selectedSpawn || !user || collecting) return;
     setCollecting(true);
     try {
-      await supabase.from('global_spawns').update({
-        last_collected_by: user.id,
-        last_collected_at: new Date().toISOString(),
-      }).eq('id', selectedSpawn.id);
-
-      await supabase.from('user_inventory').insert({
-        user_id: user.id,
-        item_name: selectedSpawn.item_type,
-        item_icon: selectedSpawn.item_icon,
-        item_type: 'material',
-        quantity: 1,
+      if (!position) throw new Error('no position');
+      const { error } = await supabase.rpc('collect_global_spawn', {
+        _spawn_id: selectedSpawn.id,
+        _lat: position.latitude,
+        _lng: position.longitude,
       });
-
-      if (userStats) {
-        const xpGain = selectedSpawn.rarity === 'legendary' ? 25 : selectedSpawn.rarity === 'epic' ? 15 : selectedSpawn.rarity === 'rare' ? 10 : selectedSpawn.rarity === 'uncommon' ? 5 : 3;
-        await supabase.from('user_stats').update({
-          current_xp: (userStats.current_xp || 0) + xpGain,
-        }).eq('user_id', user.id);
-      }
+      if (error) throw error;
 
       toast.success(`${selectedSpawn.item_type} 획득!`, {
         duration: 2000,
