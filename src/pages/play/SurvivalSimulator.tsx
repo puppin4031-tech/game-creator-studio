@@ -102,14 +102,6 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   useEffect(() => setGpsReady(gps.ready), [gps.ready]);
   const { state: s } = g;
   const [panel, setPanel] = useState<Panel>('none');
-  const nearbyResources: PlannerInput['nearbyResources'] = [];
-  for (const entity of g.entities) {
-    if (entity.kind !== 'node') continue;
-    const existing = nearbyResources.find(r => r.type === entity.type);
-    const distance = Math.round(distanceM(s.pos, entity));
-    if (existing) { existing.count += 1; existing.distanceM = Math.min(existing.distanceM, distance); }
-    else nearbyResources.push({ type: entity.type, distanceM: distance, count: 1 });
-  }
 
   const onTap = (p: LatLng) => {
     if (realGps) return;
