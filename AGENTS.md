@@ -13,3 +13,5 @@
 - Survival multiplayer uses one realtime presence room per ~1km cell with throttled position tracking (5m/3s, 20s heartbeat) and tiny broadcast events; why: dozens of nearby players must not flood realtime traffic as in the 35-player tag game.
 - Survival landmarks come from an invisible POI probe layer (no labels drawn) and are classified in src/lib/survival/landmarks.ts; claim limits (cooldown, per-place and global daily caps) live in the world save so cloud sync carries them. Park cells are sampled once per zone cell and multiply creature density.
 - Survival beast hit exchanges and loot probability boundaries use the shared combat.ts helpers; resolve player damage before retaliation and gate rapid beast attacks locally to keep combat deterministic without extra realtime traffic.
+
+- Invention rules (material physics, plausibility, hard caps, recipe hash) live in src/lib/survival/invention.ts as pure functions; why: client pre-check and server evaluator must share identical rules.
