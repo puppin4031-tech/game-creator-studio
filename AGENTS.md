@@ -16,3 +16,4 @@
 - Survival beast hit exchanges and loot probability boundaries use the shared combat.ts helpers; resolve player damage before retaliation and gate rapid beast attacks locally to keep combat deterministic without extra realtime traffic.
 
 - Invention rules (material physics, plausibility, hard caps, recipe hash) live in src/lib/survival/invention.ts as pure functions; why: client pre-check and server evaluator must share identical rules.
+- Skill-book consumption uses the pure readSkillBook helper in tech.ts after the shared inventory access gate; why: backpack and base storage must learn skills consistently without consuming already-known books.

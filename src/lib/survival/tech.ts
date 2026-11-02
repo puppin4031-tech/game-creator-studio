@@ -1,4 +1,5 @@
-import type { ItemId } from './items';
+import { ITEMS, type ItemId } from './items';
+import { removeStacks } from './inventory';
 import type { Stack } from './types';
 import { RECIPES, type Recipe } from './recipes';
 
@@ -41,6 +42,15 @@ export const PRIMAL_STRIKE_MULT = 1.3;
 export const IRON_SKIN_DEF = 2;
 
 export const techById = (id: string) => TECHS.find((t) => t.id === id);
+
+/** Read one book from the accessible inventory without consuming known skills. */
+export function readSkillBook(stacks: Stack[], itemId: ItemId, known: string[]): { remaining: Stack[]; tech: TechDef } | null {
+  const book = ITEMS[itemId].book;
+  const tech = book ? techById(book.techId) : undefined;
+  if (!tech || known.includes(tech.id)) return null;
+  const remaining = removeStacks(stacks, [{ itemId, count: 1 }]);
+  return remaining ? { remaining, tech } : null;
+}
 
 export const prerequisitesMet = (t: TechDef, known: string[]) => t.requires.every((r) => known.includes(r));
 
