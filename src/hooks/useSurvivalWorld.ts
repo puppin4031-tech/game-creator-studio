@@ -44,6 +44,7 @@ export interface WorldSave extends WorldProgress {
   /** Zone cells sampled inside real parks (first sample wins). */
   parkCells: Record<string, boolean>;
   landmarkClaims?: LandmarkClaims;
+  packedItems?: ItemId[];
   outpost?: LatLng | null;
   palisade?: boolean;
   cooldowns?: Record<string, number>;
@@ -174,16 +175,16 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   // pulled back out of storage) so it can be spent at traders.
   useEffect(() => {
     if (!enabled || !inBase) return;
-    const deposit = s.backpack.filter((x) => !['shell', 'flint', 'branch', 'fiber', 'hide', 'resin', 'raw_meat', 'cooked_meat', 'beast_bait', 'taming_snare'].includes(x.itemId));
+    const deposit = s.backpack.filter((x) => x.itemId !== 'shell' && !(s.packedItems ?? []).includes(x.itemId));
     const storedShell = s.storage.find((x) => x.itemId === 'shell');
     if (!deposit.length && !storedShell) return;
     if (deposit.length) toast.success(`거점 귀환! ${fmt(deposit)} 창고에 보관`);
     setS((p) => {
-      const dep = p.backpack.filter((x) => !['shell', 'flint', 'branch', 'fiber', 'hide', 'resin', 'raw_meat', 'cooked_meat', 'beast_bait', 'taming_snare'].includes(x.itemId));
+      const dep = p.backpack.filter((x) => x.itemId !== 'shell' && !(p.packedItems ?? []).includes(x.itemId));
       const shells = [...p.backpack, ...p.storage].filter((x) => x.itemId === 'shell').reduce((n, x) => n + x.count, 0);
       return {
         ...p,
-        storage: addStacks(p.storage.filter((x) => !['shell', 'flint', 'branch', 'fiber', 'hide', 'resin', 'raw_meat', 'cooked_meat', 'beast_bait', 'taming_snare'].includes(x.itemId)), dep),
+        storage: addStacks(p.storage.filter((x) => x.itemId !== 'shell'), dep),
         backpack: addStacks(p.backpack.filter(x => x.itemId !== 'shell' && !dep.some(d => d.itemId === x.itemId)), shells ? [{ itemId: 'shell', count: shells }] : []),
         deposits: p.deposits + (dep.length ? 1 : 0),
       };
@@ -308,7 +309,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const ranged = !!(weapon && ITEMS[weapon.itemId].weapon?.ranged) && !p.damage[e.id];
       power += (p.companions ?? []).some(c => c.kind === 'wolf') ? 3 : 0;
       const defense = (atMainBase(p) && p.palisade ? 3 : 0) + (armor ? ITEMS[armor.itemId].armor?.def ?? 0 : 0) + (p.techs.includes('iron_skin') ? IRON_SKIN_DEF : 0);
-      const exchange = resolveCreatureHit(e.type, p.damage[e.id] ?? 0, power, defense, ranged || (p.calmUntil?.[e.id] ?? 0) > at);
+      const exchange = resolveCreatureHit(e.type, p.damage[e.id] ?? 0, power, defense, ranged || (p.calmUntil?.[e.id] ?? 0) > Date.now());
       power = exchange.dealt - (p.damage[e.id] ?? 0);
       hp -= exchange.counterDamage;
       if (exchange.counterDamage) toast.error(`${d.name} 반격! 체력 -${exchange.counterDamage}`);
@@ -389,7 +390,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
   const research = useCallback((techId: string) => {
     const result = researchTechnology(ref.current, techId, enabledRef.current);
-    if (!result.ok) { toast.warning(result.reason); return; }
+    if (result.ok === false) { toast.warning(result.reason); return; }
     setS(result.state);
     toast.success(`${techById(techId)?.name} 습득`);
   }, [setS]);
@@ -431,7 +432,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const targets = generateWorld({ center: p.pos, radiusM: C.interactRadiusM, now: at, isNight, depleted: p.depleted, terrainZones: p.terrainZones, parkCells: p.parkCells })
       .filter((e): e is Extract<WorldEntity, { kind: 'creature' }> => e.kind === 'creature');
     const result = prepareSkill(p, id, targets, at, enabledRef.current);
-    if (!result.ok) { toast.warning(result.reason); return false; }
+    if (result.ok === false) { toast.warning(result.reason); return false; }
     let next = { ...result.state, damage: { ...p.damage }, depleted: { ...p.depleted } };
     if (id !== 'roar') for (const e of result.targets ?? []) {
       const def = creatureDef(e.type);
@@ -458,7 +459,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [capacity, isNight, setS]);
   const construct = useCallback((kind: 'palisade' | 'outpost') => {
     const result = buildStructure(ref.current, kind, enabledRef.current);
-    if (!result.ok) { toast.warning(result.reason); return; }
+    if (result.ok === false) { toast.warning(result.reason); return; }
     setS(result.state); toast.success(kind === 'palisade' ? '목책을 세웠습니다' : '전진기지를 세웠습니다');
   }, [setS]);
   const tame = useCallback((id: string) => {
@@ -466,18 +467,18 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const e = entities.find(e => e.id === id && e.kind === 'creature');
     if (!e || e.kind !== 'creature' || p.depleted[id]) { toast.warning('늑대가 더 이상 이곳에 없습니다'); return; }
     const result = tameWolf(p, e, p.damage[id] ?? 0, Date.now(), enabledRef.current, Math.random());
-    if (!result.ok) { toast.warning(result.reason); return; }
+    if (result.ok === false) { toast.warning(result.reason); return; }
     setS(result.tamed ? { ...result.state, depleted: { ...p.depleted, [id]: Date.now() } } : result.state);
     toast(result.tamed ? '늑대가 동료가 되었습니다' : '늑대가 거부했습니다. 재료가 소모되었습니다');
   }, [entities, setS]);
   const recruit = useCallback((kind: 'gatherer' | 'rescued', shaman?: Landmark) => {
     const result = recruitCompanion(ref.current, kind, Date.now(), enabledRef.current, shaman?.kind === 'shaman' ? shaman : undefined);
-    if (!result.ok) { toast.warning(result.reason); return; }
+    if (result.ok === false) { toast.warning(result.reason); return; }
     setS(result.state); toast.success('새로운 NPC 동료를 맞았습니다');
   }, [setS]);
   const collectWork = useCallback(() => {
     const result = collectCompanionWork(ref.current, Date.now(), enabledRef.current);
-    if (!result.ok) { toast.warning(result.reason); return; }
+    if (result.ok === false) { toast.warning(result.reason); return; }
     setS(result.state); toast.success('동료가 모은 재료를 창고에 보관했습니다');
   }, [setS]);
   const withdraw = useCallback((itemId: ItemId) => {
@@ -485,7 +486,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (!enabledRef.current || !atWorkshop(p)) { toast.warning('거점 안에서만 꺼낼 수 있습니다'); return; }
     const storage = removeStacks(p.storage, [{ itemId, count: 1 }]);
     if (!storage || stackWeight(p.backpack) + ITEMS[itemId].weight > capacity) return;
-    setS({ ...p, storage, backpack: addStacks(p.backpack, [{ itemId, count: 1 }]) });
+    setS({ ...p, storage, backpack: addStacks(p.backpack, [{ itemId, count: 1 }]), packedItems: [...new Set([...(p.packedItems ?? []), itemId])] });
   }, [capacity, setS]);
 
   const reset = useCallback(() => { setS(fresh(ref.current.pos)); }, [setS]);
