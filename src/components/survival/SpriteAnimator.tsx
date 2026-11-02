@@ -24,9 +24,13 @@ export default function SpriteAnimator({ url, frames, fps, height = 64, playing 
   useEffect(() => {
     setFrame(0);
     if (!playing || frames < 2) return;
-    const id = window.setInterval(() => setFrame(f => (f + 1) % frames), 1000 / fps);
+    const id = window.setInterval(() => setFrame(f => {
+      const next = f + 1;
+      if (once && next >= frames) { window.clearInterval(id); return frames - 1; }
+      return next % frames;
+    }), 1000 / fps);
     return () => window.clearInterval(id);
-  }, [frames, fps, playing, url]);
+  }, [frames, fps, playing, url, once]);
 
   const width = height * ratio;
   return (
