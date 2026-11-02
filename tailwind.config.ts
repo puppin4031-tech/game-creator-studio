@@ -14,6 +14,14 @@ export default {
     },
     extend: {
       colors: {
+        colonion: {
+          night: "hsl(var(--colonion-night))",
+          wood: "hsl(var(--colonion-wood))",
+          "wood-dark": "hsl(var(--colonion-wood-dark))",
+          "wood-edge": "hsl(var(--colonion-wood-edge))",
+          parchment: "hsl(var(--colonion-parchment))",
+          ember: "hsl(var(--colonion-ember))",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

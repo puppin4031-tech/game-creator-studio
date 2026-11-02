@@ -10,6 +10,7 @@ import { useDeviceHeading } from '@/hooks/useDeviceHeading';
 import { useSurvivalGps } from '@/hooks/useSurvivalGps';
 import { Button } from '@/components/ui/button';
 import SurvivalPlanner from '@/components/survival/SurvivalPlanner';
+import { ColonionOpening } from '@/components/survival/ColonionOpening';
 import SurvivalObjectives from '@/components/survival/SurvivalObjectives';
 import type { PlannerInput } from '@/lib/survival/plannerInput';
 import { toast } from 'sonner';
@@ -66,6 +67,8 @@ function Stacks({ stacks, onUse, have }: { stacks: Stack[]; onUse?: (id: ItemId)
 type Panel = 'none' | 'bag' | 'base' | 'tech' | 'quests';
 
 export default function SurvivalSimulator({ realGps = false }: { realGps?: boolean }) {
+  const [showOpening, setShowOpening] = useState(() => realGps && sessionStorage.getItem('colonion.openingSeen') !== '1');
+  const enterWorld = () => { sessionStorage.setItem('colonion.openingSeen', '1'); setShowOpening(false); };
   const [compassOn, setCompassOn] = useState(false);
   const { heading, requestPermission } = useDeviceHeading(compassOn);
   const toggleCompass = async () => {
@@ -206,6 +209,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden font-pixel">
+      <AnimatePresence>{showOpening && <ColonionOpening onEnter={enterWorld} />}</AnimatePresence>
       {(!realGps || gps.fix) && <TerrainMap center={s.pos} visionM={g.vision} explored={s.explored} onTap={onTap} zone={zone} onSurfaceZone={onSurfaceZone} onSurfacePark={onSurfacePark} onLandmarks={setLandmarks} bearing={compassOn && heading !== null ? heading : 0}>
         {(project, mpp) => (
           <>
