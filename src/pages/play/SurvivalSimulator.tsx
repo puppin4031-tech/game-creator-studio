@@ -273,7 +273,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
             {(() => {
               const p = project(s.pos); const r = C.interactRadiusM / mpp;
               return (
-                <div className="absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
+                <div className="pointer-events-none absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
                   <div className="rounded-full border border-primary/60" style={{ width: r * 2, height: r * 2 }} />
                   {(() => {
                     // Visual-only offset: stop slightly short of the object so the sprite stands beside it.
