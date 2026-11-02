@@ -21,10 +21,10 @@ function guestId() {
  * Low-traffic multiplayer presence: one realtime room per ~1km cell, position re-sent only after
  * 5m movement (min 3s apart) or a 20s heartbeat. Events (emote/attack/ally) are tiny broadcasts.
  */
-export function useSurvivalPresence(enabled: boolean, pos: LatLng, level: number, onEvent: (e: PeerEvent) => void) {
+export function useSurvivalPresence(enabled: boolean, pos: LatLng, level: number, onEvent: (e: PeerEvent) => void, chiefName?: string) {
   const { user, profile } = useAuth();
   const selfId = user?.id ?? guestId();
-  const name = profile?.display_name || user?.email?.split('@')[0] || `원시인${selfId.slice(-3)}`;
+  const name = chiefName?.trim() || profile?.display_name || user?.email?.split('@')[0] || `원시인${selfId.slice(-3)}`;
   const [peers, setPeers] = useState<PeerPlayer[]>([]);
   const chan = useRef<RealtimeChannel | null>(null);
   const last = useRef<{ pos: LatLng; at: number } | null>(null);
