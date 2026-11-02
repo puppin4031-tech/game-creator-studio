@@ -117,44 +117,9 @@ export default function CraftingDrawer({ open, onOpenChange }: CraftingDrawerPro
     if (!user || crafting || !canCraft(recipe)) return;
     setCrafting(true);
     try {
-      // Consume materials: delete inventory rows (quantity-based)
-      for (const mat of recipe.required_materials) {
-        let remaining = mat.quantity;
-        const matItems = inventory
-          .filter(i => i.item_name === mat.item_type && i.item_type === 'material')
-          .sort((a, b) => (a.quantity || 1) - (b.quantity || 1));
-        
-        for (const item of matItems) {
-          if (remaining <= 0) break;
-          const itemQty = item.quantity || 1;
-          if (itemQty <= remaining) {
-            await supabase.from('user_inventory').delete().eq('id', item.id);
-            remaining -= itemQty;
-          } else {
-            await supabase.from('user_inventory').update({ quantity: itemQty - remaining }).eq('id', item.id);
-            remaining = 0;
-          }
-        }
-      }
-
-      // Add crafted item to inventory
-      await supabase.from('user_inventory').insert({
-        user_id: user.id,
-        item_name: recipe.result_item_name,
-        item_icon: recipe.result_item_icon,
-        item_type: 'jewelry',
-        quantity: 1,
-      });
-
-      // Award XP
-      if (userStats) {
-        const newXp = (userStats.current_xp || 0) + recipe.xp_reward;
-        const newLevel = Math.floor(newXp / 100) + 1;
-        await supabase.from('user_stats').update({
-          current_xp: newXp,
-          level: Math.max(userStats.level || 1, newLevel),
-        }).eq('user_id', user.id);
-      }
+      // Server validates materials/level, consumes them and awards item + XP atomically
+      const { error } = await supabase.rpc('craft_recipe', { _recipe_id: recipe.id });
+      if (error) throw error;
 
       setCraftedItem(recipe.result_item_name);
       setTimeout(() => setCraftedItem(null), 2500);

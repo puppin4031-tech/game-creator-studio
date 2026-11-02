@@ -853,6 +853,11 @@ export type Database = {
         Args: { p_client_hash: string }
         Returns: boolean
       }
+      collect_global_spawn: {
+        Args: { _lat: number; _lng: number; _spawn_id: string }
+        Returns: Json
+      }
+      craft_recipe: { Args: { _recipe_id: string }; Returns: Json }
       get_nearby_spawns: {
         Args: { _lat: number; _lng: number; _radius_m?: number }
         Returns: {
