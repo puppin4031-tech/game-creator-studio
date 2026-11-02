@@ -16,7 +16,7 @@ test('shared position near base is snapped to 50m grid', () => {
   const shared = publicPosition(near, base);
   expect(distanceM(shared, near)).toBeLessThanOrEqual(36);
   // Points inside the same 50m cell collapse to one coordinate.
-  expect(publicPosition({ lat: near.lat + 0.00005, lng: near.lng }, base)).toEqual(shared);
+  expect(publicPosition({ lat: shared.lat + 0.0001, lng: shared.lng - 0.0001 }, base)).toEqual(shared);
 });
 test('shared position away from base uses 10m grid', () => {
   const far = { lat: 37.76, lng: 126.77 };
