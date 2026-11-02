@@ -10,10 +10,8 @@ import { bearingDeg, useSurvivalFavorites } from '@/hooks/useSurvivalFavorites';
 import { useDeviceHeading } from '@/hooks/useDeviceHeading';
 import { useSurvivalGps } from '@/hooks/useSurvivalGps';
 import { Button } from '@/components/ui/button';
-import SurvivalPlanner from '@/components/survival/SurvivalPlanner';
 import { ColonionOpening, PIONEER_NAME_KEY } from '@/components/survival/ColonionOpening';
 import SurvivalObjectives from '@/components/survival/SurvivalObjectives';
-import type { PlannerInput } from '@/lib/survival/plannerInput';
 import { toast } from 'sonner';
 import TerrainMap from '@/components/survival/TerrainMap';
 import { useSurvivalWorld } from '@/hooks/useSurvivalWorld';
@@ -104,7 +102,6 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   useEffect(() => setGpsReady(gps.ready), [gps.ready]);
   const { state: s } = g;
   const [panel, setPanel] = useState<Panel>('none');
-  const [plannerOpen, setPlannerOpen] = useState(false);
   const nearbyResources: PlannerInput['nearbyResources'] = [];
   for (const entity of g.entities) {
     if (entity.kind !== 'node') continue;
@@ -113,7 +110,6 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     if (existing) { existing.count += 1; existing.distanceM = Math.min(existing.distanceM, distance); }
     else nearbyResources.push({ type: entity.type, distanceM: distance, count: 1 });
   }
-  const plannerSnapshot: PlannerInput = { health: s.hp, hunger: s.hunger, inventory: s.backpack, storage: s.storage, gear: s.gear.map(x => x.itemId), learnedSkills: s.techs, nearbyResources, gathered: s.gathered, baseLevel: s.base?.level ?? 0, inBase: g.inBase, isNight: g.isNight, goal: '' };
 
   const onTap = (p: LatLng) => {
     if (realGps) return;
