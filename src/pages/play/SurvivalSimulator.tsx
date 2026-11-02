@@ -114,11 +114,11 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       setActorTarget({ lat: e.lat, lng: e.lng, anchor: s.pos });
       setAction('walk'); window.clearTimeout(actionTimer.current); window.clearTimeout(returnTimer.current);
       actionTimer.current = window.setTimeout(() => {
+        g.interact(e);
         playAction(act, 900);
         returnTimer.current = window.setTimeout(returnToCenter, 900 + ACTOR_IDLE_RETURN_MS);
       }, 250);
-    } else playAction(act, 900);
-    g.interact(e);
+    } else g.interact(e);
   };
 
   const { data: anims } = useSpriteAnimations('hunter');
@@ -238,6 +238,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               const sprite = e.kind === 'node' ? nodeDef(e.type).sprite : creatureDef(e.type).sprite;
               const name = e.kind === 'node' ? nodeDef(e.type).name : creatureDef(e.type).name;
               const dmg = s.damage[e.id];
+              const creature = e.kind === 'creature' ? creatureDef(e.type) : null;
+              const remainingHp = creature ? Math.max(0, creature.hp - (dmg ?? 0)) : 0;
               const boss = e.kind === 'creature' && !!creatureDef(e.type).boss;
               return (
                 <button key={e.id} type="button" aria-label={name} onClick={(ev) => { ev.stopPropagation(); tapEntity(e); }}
@@ -248,7 +250,10 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                     <div className={boss ? 'scale-150 rounded-full ring-2 ring-destructive shadow-[0_0_18px_hsl(var(--destructive))]' : ''}><Sprite k={sprite} /></div>
                   </motion.div>
                   {boss ? <span className="mt-2 rounded bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">우두머리</span> : null}
-                  {dmg ? <span className="rounded bg-background/80 px-1 text-[10px]">타격 중</span> : null}
+                  {creature ? <div className="mt-1 w-20 rounded bg-background/90 px-1 text-center text-[10px]" aria-label={`${name} 체력 ${remainingHp}/${creature.hp}, 공격력 ${creature.atk}`}>
+                    <div className="flex items-center gap-1"><HpBar value={remainingHp} max={creature.hp} /></div>
+                    <span>{remainingHp}/{creature.hp} · 공격 {creature.atk}</span>
+                  </div> : dmg ? <span className="rounded bg-background/80 px-1 text-[10px]">타격 중</span> : null}
                 </button>
               );
             })}

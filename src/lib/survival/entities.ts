@@ -129,42 +129,42 @@ export type NodeType = keyof typeof NODES;
 
 export const CREATURES = {
   rabbit: {
-    name: '산토끼', sprite: 'mob-rabbit', hp: 6, atk: 0, temper: 'passive', escapeChance: 0.3,
-    loot: [{ itemId: 'raw_meat', min: 1, max: 1 }, { itemId: 'hide', min: 0, max: 1, chance: 0.6 }], xp: 6,
+    name: '산토끼', sprite: 'mob-rabbit', hp: 6, atk: 1, temper: 'passive', escapeChance: 0.3,
+    loot: [{ itemId: 'raw_meat', min: 1, max: 1 }, { itemId: 'hide', min: 1, max: 1, chance: 0.6 }], xp: 6,
     biomes: { plains: 5, forest: 3, wetland: 3 }, nightWeight: 0.2,
   },
   boar: {
-    name: '멧돼지', sprite: 'mob-boar', hp: 30, atk: 6, temper: 'neutral',
+    name: '멧돼지', sprite: 'mob-boar', hp: 24, atk: 4, temper: 'neutral',
     loot: [{ itemId: 'raw_meat', min: 2, max: 3 }, { itemId: 'hide', min: 1, max: 2 }, { itemId: 'bone', min: 1, max: 1 }, { itemId: 'tusk', min: 1, max: 1, chance: 0.25 }], xp: 22,
     biomes: { forest: 4, plains: 3, wetland: 4, rocky: 2 }, nightWeight: 0.8,
   },
   wolf: {
-    name: '회색 늑대', sprite: 'mob-wolf', hp: 24, atk: 8, temper: 'neutral', nightAggressive: true,
+    name: '회색 늑대', sprite: 'mob-wolf', hp: 24, atk: 5, temper: 'neutral', nightAggressive: true,
     loot: [{ itemId: 'hide', min: 2, max: 2 }, { itemId: 'bone', min: 1, max: 2 }, { itemId: 'raw_meat', min: 1, max: 1 }], xp: 26,
     biomes: { forest: 3, rocky: 3, plains: 1 }, nightWeight: 2.5,
   },
   raptor: {
-    name: '랩터', sprite: 'mob-raptor', hp: 40, atk: 12, temper: 'aggressive',
+    name: '랩터', sprite: 'mob-raptor', hp: 36, atk: 7, temper: 'aggressive',
     loot: [{ itemId: 'hide', min: 2, max: 3 }, { itemId: 'bone', min: 2, max: 3 }, { itemId: 'raw_meat', min: 2, max: 2 }], xp: 45,
     biomes: { rocky: 3, forest: 1, plains: 1 }, nightWeight: 1.4,
   },
   mammoth: {
-    name: '매머드', sprite: 'mob-mammoth', hp: 120, atk: 18, temper: 'neutral',
+    name: '매머드', sprite: 'mob-mammoth', hp: 90, atk: 10, temper: 'neutral',
     loot: [{ itemId: 'raw_meat', min: 6, max: 8 }, { itemId: 'hide', min: 4, max: 5 }, { itemId: 'tusk', min: 2, max: 2 }, { itemId: 'bone', min: 4, max: 5 }], xp: 130,
     biomes: { wetland: 1.2, plains: 0.8, rocky: 0.6 }, nightWeight: 0.6,
   },
   boss_direwolf: {
-    name: '우두머리 · 거대 늑대', sprite: 'mob-wolf', hp: 90, atk: 14, temper: 'aggressive', boss: true,
+    name: '우두머리 · 거대 늑대', sprite: 'mob-wolf', hp: 72, atk: 9, temper: 'aggressive', boss: true,
     loot: [{ itemId: 'prime_pelt', min: 1, max: 2 }, { itemId: 'bone', min: 2, max: 3 }, { itemId: 'ancient_fang', min: 1, max: 1, chance: 0.35 },
       { itemId: 'beast_bait', min: 1, max: 2, chance: 0.4 }, { itemId: 'taming_snare', min: 1, max: 1, chance: 0.25 },
-      { itemId: 'tome_primal_strike', min: 1, max: 1, chance: 0.15 }, { itemId: 'tome_beast_mastery', min: 1, max: 1, chance: 0.15 }], xp: 260,
+      { itemId: 'tome_primal_strike', min: 1, max: 1, chance: 0.2 }, { itemId: 'tome_beast_mastery', min: 1, max: 1, chance: 0.15 }], xp: 260,
     biomes: {}, nightWeight: 1,
   },
   boss_mammoth: {
-    name: '우두머리 · 분노한 매머드', sprite: 'mob-mammoth', hp: 220, atk: 22, temper: 'neutral', boss: true,
+    name: '우두머리 · 분노한 매머드', sprite: 'mob-mammoth', hp: 160, atk: 12, temper: 'neutral', boss: true,
     loot: [{ itemId: 'raw_meat', min: 6, max: 9 }, { itemId: 'prime_pelt', min: 2, max: 3 }, { itemId: 'tusk', min: 2, max: 3 }, { itemId: 'alpha_heart', min: 1, max: 1, chance: 0.5 },
       { itemId: 'ancient_fang', min: 1, max: 2, chance: 0.35 }, { itemId: 'taming_snare', min: 1, max: 1, chance: 0.3 },
-      { itemId: 'tome_iron_skin', min: 1, max: 1, chance: 0.2 }, { itemId: 'tome_beast_mastery', min: 1, max: 1, chance: 0.1 }], xp: 420,
+      { itemId: 'tome_iron_skin', min: 1, max: 1, chance: 0.25 }, { itemId: 'tome_beast_mastery', min: 1, max: 1, chance: 0.15 }], xp: 420,
     biomes: {}, nightWeight: 1,
   },
 } satisfies Record<string, CreatureDef>;
