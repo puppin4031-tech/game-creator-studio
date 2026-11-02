@@ -5,14 +5,13 @@ import SpriteAnimator from '@/components/survival/SpriteAnimator';
 import { useSpriteAnimations, type SpriteAction } from '@/hooks/useSpriteAnimations';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Backpack, Flame, Lightbulb, LocateFixed, X, Lock, RotateCcw, Route, ListChecks, Compass } from 'lucide-react';
+import { ArrowLeft, Backpack, Flame, Lightbulb, LocateFixed, X, Lock, RotateCcw, ListChecks, Compass, ChevronUp, Star, MapPin, Navigation } from 'lucide-react';
+import { bearingDeg, useSurvivalFavorites } from '@/hooks/useSurvivalFavorites';
 import { useDeviceHeading } from '@/hooks/useDeviceHeading';
 import { useSurvivalGps } from '@/hooks/useSurvivalGps';
 import { Button } from '@/components/ui/button';
-import SurvivalPlanner from '@/components/survival/SurvivalPlanner';
 import { ColonionOpening, PIONEER_NAME_KEY } from '@/components/survival/ColonionOpening';
 import SurvivalObjectives from '@/components/survival/SurvivalObjectives';
-import type { PlannerInput } from '@/lib/survival/plannerInput';
 import { toast } from 'sonner';
 import TerrainMap from '@/components/survival/TerrainMap';
 import { useSurvivalWorld } from '@/hooks/useSurvivalWorld';
@@ -64,7 +63,15 @@ function Stacks({ stacks, onUse, have }: { stacks: Stack[]; onUse?: (id: ItemId)
   );
 }
 
-type Panel = 'none' | 'bag' | 'base' | 'tech' | 'quests';
+type Panel = 'none' | 'bag' | 'base' | 'tech' | 'quests' | 'favs';
+
+function MenuBtn({ icon: Icon, label, onClick }: { icon: typeof Backpack; label: string; onClick: () => void }) {
+  return (
+    <Button type="button" variant="outline" onClick={onClick} className="pixel-btn flex h-14 min-h-14 w-14 flex-col items-center justify-center gap-0 bg-card px-0 text-[10px]">
+      <Icon className="!h-6 !w-6" />{label}
+    </Button>
+  );
+}
 
 export default function SurvivalSimulator({ realGps = false }: { realGps?: boolean }) {
   // Opening now lives on the main page ("/"); the world starts immediately.
@@ -95,16 +102,6 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   useEffect(() => setGpsReady(gps.ready), [gps.ready]);
   const { state: s } = g;
   const [panel, setPanel] = useState<Panel>('none');
-  const [plannerOpen, setPlannerOpen] = useState(false);
-  const nearbyResources: PlannerInput['nearbyResources'] = [];
-  for (const entity of g.entities) {
-    if (entity.kind !== 'node') continue;
-    const existing = nearbyResources.find(r => r.type === entity.type);
-    const distance = Math.round(distanceM(s.pos, entity));
-    if (existing) { existing.count += 1; existing.distanceM = Math.min(existing.distanceM, distance); }
-    else nearbyResources.push({ type: entity.type, distanceM: distance, count: 1 });
-  }
-  const plannerSnapshot: PlannerInput = { health: s.hp, hunger: s.hunger, inventory: s.backpack, storage: s.storage, gear: s.gear.map(x => x.itemId), learnedSkills: s.techs, nearbyResources, gathered: s.gathered, baseLevel: s.base?.level ?? 0, inBase: g.inBase, isNight: g.isNight, goal: '' };
 
   const onTap = (p: LatLng) => {
     if (realGps) return;
@@ -164,6 +161,10 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const { setSanctuaries } = g;
   useEffect(() => { setSanctuaries(landmarks.filter((l) => l.kind === 'shaman').map((l) => ({ lat: l.lat, lng: l.lng }))); }, [landmarks, setSanctuaries]);
   const [selLandmark, setSelLandmark] = useState<Landmark | null>(null);
+  const favs = useSurvivalFavorites();
+  const [leftOpen, setLeftOpen] = useState(false);
+  const [rightOpen, setRightOpen] = useState(false);
+  const mapBearing = compassOn && heading !== null ? heading : 0;
   const [shamanWords, setShamanWords] = useState<string | null>(null);
 
   const hit = useHitPulse(s.hp);
@@ -326,25 +327,51 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         <Compass className="!h-6 !w-6" style={{ transform: `rotate(${compassOn && heading !== null ? -heading : 0}deg)` }} />
       </button>
 
-      {realGps && <div className="absolute left-2 right-2 top-[calc(4.5rem+env(safe-area-inset-top))] z-20 flex items-center justify-between gap-2 bg-background/90 px-2 py-1 text-[11px]">
-        <span className="min-w-0 break-words" role="status">{gps.error ?? (gps.fix ? `${s.pos.lat.toFixed(5)}, ${s.pos.lng.toFixed(5)} · ±${Math.round(gps.fix.accuracy)}m` : 'GPS 연결 중')}</span>
-        {!gps.ready && <Button variant="outline" className="min-h-11 shrink-0" onClick={gps.retry}>재시도</Button>}
+      {realGps && <div className="absolute left-2 right-16 top-[calc(4.5rem+env(safe-area-inset-top))] z-20 flex items-center gap-1.5">
+        <span className="min-w-0 truncate rounded bg-background/80 px-2 py-1 text-[10px]" role="status">{gps.error ? `GPS ±${gps.fix ? Math.round(gps.fix.accuracy) : '?'}m · 신호 대기` : gps.fix ? `GPS ±${Math.round(gps.fix.accuracy)}m` : 'GPS 연결 중'}</span>
+        {!gps.ready && <Button variant="outline" size="sm" className="h-9 shrink-0 px-2 text-xs" onClick={gps.retry}>재시도</Button>}
       </div>}
 
-      {/* Right action stack */}
-      <div className="absolute bottom-40 right-2 top-32 z-20 flex flex-col gap-2 overflow-y-auto overscroll-contain pb-2 pr-1">
-        {[
-          { id: 'bag' as Panel, icon: Backpack, label: '배낭' },
-          { id: 'base' as Panel, icon: Flame, label: '거점' },
-          { id: 'tech' as Panel, icon: Lightbulb, label: '기술' },
-          { id: 'quests' as Panel, icon: ListChecks, label: '생존 목표' },
-        ].map((b) => (
-          <Button key={b.id} type="button" variant="outline" onClick={() => setPanel(b.id)} className="pixel-btn flex h-16 min-h-16 w-16 shrink-0 flex-col items-center justify-center gap-0 bg-card px-0 text-xs">
-            <b.icon className="!h-7 !w-7" />{b.label}
-          </Button>
-        ))}
-        {realGps && <Button type="button" variant="outline" onClick={gps.retry} className="pixel-btn h-16 min-h-16 w-16 flex-col gap-0 bg-card px-0 text-xs"><LocateFixed className="!h-7 !w-7" />GPS 갱신</Button>}
-        <Button type="button" variant="outline" className="pixel-btn h-16 min-h-16 w-16 shrink-0 flex-col gap-0 bg-card px-0 text-xs" onClick={() => setPlannerOpen(true)}><Route className="!h-7 !w-7" />생존 계획</Button>
+      {favs.tracked && (() => {
+        const d = distanceM(s.pos, favs.tracked);
+        return (
+          <button type="button" onClick={() => setPanel('favs')} className="pixel-frame absolute left-1/2 top-[calc(6.75rem+env(safe-area-inset-top))] z-20 flex max-w-[60%] -translate-x-1/2 items-center gap-1.5 bg-card px-2 py-1 text-xs">
+            <Navigation className="!h-5 !w-5 shrink-0 text-primary" style={{ transform: `rotate(${bearingDeg(s.pos, favs.tracked) - mapBearing}deg)` }} />
+            <span className="truncate">{favs.tracked.name}</span><b className="shrink-0">{d >= 1000 ? `${(d / 1000).toFixed(1)}km` : `${Math.round(d)}m`}</b>
+          </button>
+        );
+      })()}
+
+      {/* Right drawer: survival actions */}
+      <div className="absolute right-2 top-[calc(7.5rem+env(safe-area-inset-top))] z-20 flex flex-col items-end gap-2">
+        <Button type="button" variant="outline" aria-expanded={rightOpen} aria-label={rightOpen ? '생존 메뉴 접기' : '생존 메뉴 펼치기'} onClick={() => setRightOpen((v) => !v)} className={`pixel-btn h-11 w-11 p-0 ${rightOpen ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
+          {rightOpen ? <ChevronUp className="!h-6 !w-6" /> : <Backpack className="!h-6 !w-6" />}
+        </Button>
+        <AnimatePresence>
+          {rightOpen && (
+            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex flex-col gap-2">
+              <MenuBtn icon={Backpack} label="배낭" onClick={() => setPanel('bag')} />
+              <MenuBtn icon={Flame} label="거점" onClick={() => setPanel('base')} />
+              {realGps && <MenuBtn icon={LocateFixed} label="GPS 갱신" onClick={gps.retry} />}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Left drawer: skills & exploration */}
+      <div className="absolute left-2 top-[calc(7.5rem+env(safe-area-inset-top))] z-20 flex flex-col items-start gap-2">
+        <Button type="button" variant="outline" aria-expanded={leftOpen} aria-label={leftOpen ? '기술 메뉴 접기' : '기술 메뉴 펼치기'} onClick={() => setLeftOpen((v) => !v)} className={`pixel-btn h-11 w-11 p-0 ${leftOpen ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
+          {leftOpen ? <ChevronUp className="!h-6 !w-6" /> : <Lightbulb className="!h-6 !w-6" />}
+        </Button>
+        <AnimatePresence>
+          {leftOpen && (
+            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex flex-col gap-2">
+              <MenuBtn icon={Lightbulb} label="기술" onClick={() => setPanel('tech')} />
+              <MenuBtn icon={ListChecks} label="생존 목표" onClick={() => setPanel('quests')} />
+              <MenuBtn icon={Star} label="즐겨찾기" onClick={() => setPanel('favs')} />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {!s.base && (
@@ -354,17 +381,18 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         </div>
       )}
 
-      {s.base && <Button variant="outline" onClick={() => setPanel('quests')} className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-3 right-3 z-20 h-auto min-h-11 justify-between gap-2 whitespace-normal bg-card px-3 py-3 text-left text-xs">
-        <span className="min-w-0">{g.quest?.title ?? '모든 생존 목표 완료'}</span>
-        <span className="shrink-0 text-primary">{g.canClaimQuest ? '보상 받기' : g.questProgress ? `${g.questProgress.cur}/${g.questProgress.max}` : '완료'}</span>
-      </Button>}
+      {s.base && <button type="button" onClick={() => setPanel('quests')} className="pixel-frame absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-2 z-20 flex min-h-11 max-w-[60%] items-center gap-2 bg-card px-2.5 py-1.5 text-left text-xs">
+        <ListChecks className="!h-4 !w-4 shrink-0" />
+        <span className="min-w-0 truncate">{g.quest?.title ?? '모든 목표 완료'}</span>
+        <span className="shrink-0 text-primary">{g.canClaimQuest ? '보상!' : g.questProgress ? `${g.questProgress.cur}/${g.questProgress.max}` : '완료'}</span>
+      </button>}
 
       <AnimatePresence>
         {panel !== 'none' && (
           <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 26, stiffness: 260 }}
             className="absolute inset-x-0 bottom-0 z-30 flex max-h-[75dvh] flex-col border-t-4 border-foreground bg-background">
             <div className="flex items-center justify-between border-b-2 border-foreground px-3 py-2">
-              <b className="text-lg">{panel === 'bag' ? '배낭' : panel === 'base' ? (g.baseDef?.name ?? '거점') : panel === 'quests' ? '생존 목표' : '제작 기술'}</b>
+              <b className="text-lg">{panel === 'bag' ? '배낭' : panel === 'base' ? (g.baseDef?.name ?? '거점') : panel === 'quests' ? '생존 목표' : panel === 'favs' ? '즐겨찾기' : '제작 기술'}</b>
               <button type="button" aria-label="닫기" onClick={() => setPanel('none')} className="flex h-11 w-11 items-center justify-center"><X className="!h-7 !w-7" /></button>
             </div>
             <div className="flex-1 space-y-4 overflow-y-auto p-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
@@ -423,6 +451,28 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 </>
               ))}
 
+              {panel === 'favs' && (
+                <>
+                  <Button type="button" variant="outline" className="pixel-btn h-11 w-full" disabled={realGps && !gps.ready}
+                    onClick={() => { favs.toggle({ id: `pin-${Date.now()}`, name: `내 표시 ${favs.favorites.filter((f) => f.id.startsWith('pin-')).length + 1}`, lat: s.pos.lat, lng: s.pos.lng }); toast('지금 위치를 즐겨찾기에 등록했어요'); }}>
+                    <MapPin className="!h-5 !w-5" />지금 위치 등록
+                  </Button>
+                  <p className="text-xs text-muted-foreground">샤먼·샘터 같은 장소는 장소 창의 별을 눌러 등록하세요. '안내'를 누르면 화면 위에 방향과 거리가 계속 보여요.</p>
+                  {!favs.favorites.length && <p className="text-sm text-muted-foreground">등록된 곳이 없어요.</p>}
+                  {favs.favorites.map((f) => {
+                    const d = distanceM(s.pos, f);
+                    const on = favs.tracked?.id === f.id;
+                    return (
+                      <div key={f.id} className="pixel-frame flex items-center gap-2 bg-card p-2 text-xs">
+                        <Navigation className="!h-5 !w-5 shrink-0 text-primary" style={{ transform: `rotate(${bearingDeg(s.pos, f) - mapBearing}deg)` }} />
+                        <div className="min-w-0 flex-1"><b className="block truncate">{f.name}</b>{d >= 1000 ? `${(d / 1000).toFixed(1)}km` : `${Math.round(d)}m`}</div>
+                        <Button type="button" size="sm" variant={on ? 'default' : 'outline'} className="min-h-11" onClick={() => favs.setTrackedId(on ? null : f.id)}>{on ? '안내 끄기' : '안내'}</Button>
+                        <Button type="button" size="icon" variant="ghost" className="h-11 w-11" aria-label="삭제" onClick={() => favs.remove(f.id)}><X /></Button>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
               {panel === 'tech' && (
                 <div className="space-y-2">
                   <div className="sticky top-0 z-10 -mx-3 -mt-3 flex gap-1 overflow-x-auto bg-background px-3 py-2" role="tablist">
@@ -494,10 +544,11 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         {selLandmark && <LandmarkSheet landmark={selLandmark} inRange={distanceM(s.pos, selLandmark) <= C.interactRadiusM && (!realGps || gps.ready)}
           claims={s.landmarkClaims} backpack={s.backpack} words={shamanWords}
           onVisit={() => { const w = g.visitLandmark(selLandmark); if (w) { setShamanWords(w); playAction('talk', 900); } }}
-          onSell={g.sellItem} onBuy={g.buyItem} onClose={() => setSelLandmark(null)} />}
+          onSell={g.sellItem} onBuy={g.buyItem} onClose={() => setSelLandmark(null)}
+          isFav={favs.isFav(selLandmark.id)}
+          onToggleFav={() => { const was = favs.isFav(selLandmark.id); favs.toggle({ id: selLandmark.id, name: LANDMARK_INFO[selLandmark.kind].name, lat: selLandmark.lat, lng: selLandmark.lng }); toast(was ? '즐겨찾기에서 뺐어요' : '즐겨찾기에 등록했어요'); }} />}
       </AnimatePresence>
       <DamageVignette hitKey={hit.n} />
-      {plannerOpen && <SurvivalPlanner snapshot={plannerSnapshot} onClose={() => setPlannerOpen(false)} />}
     </div>
   );
 }
