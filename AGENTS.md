@@ -17,3 +17,4 @@
 
 - Invention rules (material physics, plausibility, hard caps, recipe hash) live in src/lib/survival/invention.ts as pure functions; why: client pre-check and server evaluator must share identical rules.
 - Skill-book consumption uses the pure readSkillBook helper in tech.ts after the shared inventory access gate; why: backpack and base storage must learn skills consistently without consuming already-known books.
+- Survival vital ticks use the pure metabolism.ts helper with capped catch-up and full elapsed-time settlement; why: returning saves must not repeatedly drain an offline backlog or apply starvation to ticks before hunger runs out.

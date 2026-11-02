@@ -40,10 +40,10 @@ export const SURVIVAL_CONFIG = {
   dodgeChance: 0.1,
   /** Survival tick length (ms): hunger drain, regen, starvation. */
   tickMs: 60_000,
-  hungerPerTick: 1,
-  starveHpPerTick: 2,
+  hungerPerTick: 0.25,
+  starveHpPerTick: 0.5,
   /** Max ticks applied after the app was closed (prevents offline starvation). */
-  maxOfflineTicks: 30,
+  maxOfflineTicks: 5,
   /** Field outpost rules. */
   outpostMinDistFromBaseM: 150,
   outpostRadiusM: 30,

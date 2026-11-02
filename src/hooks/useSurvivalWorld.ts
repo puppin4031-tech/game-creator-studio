@@ -9,6 +9,7 @@ import { CREATURE_ATTACK_INTERVAL_MS, resolveCreatureHit, rollLoot } from '@/lib
 import { RECIPES, type Recipe } from '@/lib/survival/recipes';
 import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
 import { SURVIVAL_CONFIG as C } from '@/lib/survival/config';
+import { advanceSurvivalVitals } from '@/lib/survival/metabolism';
 import { distanceM } from '@/lib/survival/geo';
 import { generateWorld, isNodeAvailable } from '@/lib/survival/world';
 import { addStacks, hasAll, removeStacks, splitDeathDrop, stackWeight } from '@/lib/survival/inventory';
@@ -16,7 +17,7 @@ import { addExperience, dayPhase, xpToNext } from '@/lib/survival/progression';
 import { claimWorldQuest, freshProgress, type WorldProgress } from '@/lib/survival/worldProgress';
 import { currentQuest, questReady, type QuestState } from '@/lib/survival/quests';
 import { IRON_SKIN_DEF, PRIMAL_STRIKE_MULT, checkInspiration, isRecipeUnlocked, prerequisitesMet, readSkillBook, techById, type TechDef } from '@/lib/survival/tech';
-import { NATURAL_REGEN_MIN_HUNGER, NATURAL_REGEN_PER_TICK, SANCTUARY_RADIUS_M, SANCTUARY_REGEN_PER_TICK, LANDMARK_INFO, SHAMAN_BLESS_XP, SHAMAN_RUMORS, SHAMAN_TIPS, TRADER_STOCK, canClaimLandmark, landmarkReward, recordLandmarkClaim, sellPrice, type Landmark, type LandmarkClaims } from '@/lib/survival/landmarks';
+import { SANCTUARY_RADIUS_M, SANCTUARY_REGEN_PER_TICK, LANDMARK_INFO, SHAMAN_BLESS_XP, SHAMAN_RUMORS, SHAMAN_TIPS, TRADER_STOCK, canClaimLandmark, landmarkReward, recordLandmarkClaim, sellPrice, type Landmark, type LandmarkClaims } from '@/lib/survival/landmarks';
 import type { TerrainZone } from '@/lib/survival/terrainZone';
 import type { GearInstance, LatLng, Stack, WorldEntity } from '@/lib/survival/types';
 
@@ -157,17 +158,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
   // Survival tick: hunger drain, starvation, base regen.
   useEffect(() => {
-    const ticks = Math.min(C.maxOfflineTicks, Math.floor((now - s.lastTickAt) / C.tickMs));
-    if (!enabled || ticks <= 0) return;
-    setS((p) => {
-      const hunger = Math.max(0, p.hunger - ticks * C.hungerPerTick);
-      let hp = p.hp;
-      if (hunger === 0) hp -= ticks * C.starveHpPerTick;
-      if (inBase && baseDef) hp += ticks * baseDef.regenPerTick;
-      else if (inSanctuary) hp += ticks * SANCTUARY_REGEN_PER_TICK;
-      if (hunger >= NATURAL_REGEN_MIN_HUNGER) hp += ticks * NATURAL_REGEN_PER_TICK;
-      return { ...p, hunger, hp: Math.max(1, Math.min(C.baseMaxHp, hp)), lastTickAt: p.lastTickAt + ticks * C.tickMs };
-    });
+    if (!enabled || now - s.lastTickAt < C.tickMs) return;
+    const locationRegen = inBase && baseDef ? baseDef.regenPerTick : inSanctuary ? SANCTUARY_REGEN_PER_TICK : 0;
+    setS((p) => advanceSurvivalVitals(p, now, locationRegen));
   }, [now, s.lastTickAt, inBase, inSanctuary, baseDef, enabled, setS]);
 
   // Auto deposit on entering base. Shell currency stays in the backpack (and is
