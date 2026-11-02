@@ -73,7 +73,7 @@ export function prepareSkill<T extends AbilitySave>(p: T, id: ActiveSkill, targe
   if (!gpsReady) return { ok: false, reason: '정확한 GPS 신호가 필요합니다' };
   if (!p.techs.includes(id)) return { ok: false, reason: '기술을 먼저 연구하세요' };
   if ((p.cooldowns?.[id] ?? 0) > now) return { ok: false, reason: '기술이 아직 회복 중입니다' };
-  if (id === 'ember_scatter' && (!p.base || distanceM(p.pos, p.base) > C.interactRadiusM) && (!p.outpost || distanceM(p.pos, p.outpost) > C.interactRadiusM)) return { ok: false, reason: '모닥불 25m 안에서 사용하세요' };
+  if (id === 'ember_scatter' && !atWorkshop(p)) return { ok: false, reason: '거점 안에서 사용하세요' };
   let nearby = targets.filter(e => distanceM(p.pos, e) <= C.interactRadiusM && (id !== 'roar' || !creatureDef(e.type).boss)).sort((a, b) => distanceM(p.pos, a) - distanceM(p.pos, b));
   if (id === 'stone_barrage') nearby = nearby.slice(0, 1);
   if (!nearby.length) return { ok: false, reason: '25m 안에 대상 짐승이 없습니다' };

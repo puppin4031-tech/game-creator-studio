@@ -408,6 +408,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 <>
                   <p className="text-xs text-muted-foreground">음식은 눌러서 먹을 수 있어요.</p>
                   <Stacks stacks={s.backpack} onUse={g.eat} />
+                  {!!s.packedItems?.length && <Button variant="outline" disabled={!g.inBase || !actionReady} className="h-11 w-full" onClick={g.storePacked}>휴대 재료 모두 창고에 보관</Button>}
                   <div>
                     <b className="text-sm">장비</b>
                     <div className="mt-1 flex flex-wrap gap-1.5">

@@ -1,4 +1,5 @@
-import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Flame, Volume2, Zap, Hammer, Tent, PawPrint, Users, PackageCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ACTIVE_SKILLS, PALISADE_COST, RECRUIT_COST, RESCUE_COST, TAME_COST, WORK_MS, type ActiveSkill, type Companion } from '@/lib/survival/abilities';
@@ -9,9 +10,11 @@ import type { Stack } from '@/lib/survival/types';
 const materials = (cost: Stack[]) => cost.map(s => `${ITEMS[s.itemId].name} ${s.count}`).join(' · ');
 const icons = { stone_barrage: Zap, roar: Volume2, ember_scatter: Flame };
 export function SkillControls({ known, cooldowns, ready, onUse }: { known: string[]; cooldowns?: Record<string, number>; ready: boolean; onUse: (id: ActiveSkill) => void }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
   return <div className="grid grid-cols-1 gap-2">{(Object.keys(ACTIVE_SKILLS) as ActiveSkill[]).filter(id => known.includes(id)).map(id => {
     const def = ACTIVE_SKILLS[id]; const Icon = icons[id];
-    const wait = Math.max(0, Math.ceil(((cooldowns?.[id] ?? 0) - Date.now()) / 1000));
+    const wait = Math.max(0, Math.ceil(((cooldowns?.[id] ?? 0) - now) / 1000));
     return <Button key={id} variant="outline" disabled={!ready || wait > 0} className="pixel-btn h-11 justify-start" onClick={() => onUse(id)}><Icon className="!h-5 !w-5" />{def.name}{wait > 0 && <span className="ml-auto">{wait}초</span>}</Button>;
   })}</div>;
 }
@@ -32,5 +35,6 @@ export function CompanionControls({ known, companions, ready, rescueTokens, onRe
 }
 export function SkillEffect({ id, stamp, radius }: { id: ActiveSkill; stamp: number; radius: number }) {
   const Icon = icons[id];
-  return <motion.div key={stamp} aria-hidden initial={{ opacity: 1, scale: 0.2 }} animate={{ opacity: 0, scale: 1 }} transition={{ duration: 0.9 }} className={`pointer-events-none absolute flex items-center justify-center rounded-full border-4 ${id === 'ember_scatter' ? 'border-destructive bg-destructive/20 text-destructive' : 'border-primary bg-primary/20 text-primary'}`} style={{ width: radius * 2, height: radius * 2, left: -radius, top: -radius }}><Icon className="!h-10 !w-10" /></motion.div>;
+  const reduced = useReducedMotion();
+  return <motion.div key={stamp} aria-hidden initial={{ opacity: 1, scale: reduced ? 1 : 0.2 }} animate={{ opacity: 0, scale: 1 }} transition={{ duration: 0.9 }} className={`pointer-events-none absolute flex items-center justify-center rounded-full border-4 ${id === 'ember_scatter' ? 'border-destructive bg-destructive/20 text-destructive' : 'border-primary bg-primary/20 text-primary'}`} style={{ width: radius * 2, height: radius * 2, left: -radius, top: -radius }}><Icon className="!h-10 !w-10" /></motion.div>;
 }

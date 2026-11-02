@@ -24,7 +24,7 @@ export interface TechDef {
 export const TECHS: TechDef[] = [
   { id: 'knapping', name: '돌 떼기', desc: '부싯돌을 쳐서 날을 세우는 법을 깨우친다.', requires: [], inspire: { itemId: 'flint', count: 2 }, recipes: ['hand_axe'] },
   { id: 'binding', name: '끈 꼬기', desc: '섬유를 꼬아 묶는 법을 깨우친다.', requires: [], inspire: { itemId: 'fiber', count: 3 }, recipes: ['cordage', 'wooden_club'] },
-  { id: 'fire', name: '불 다루기', desc: '나뭇가지를 모아 불씨를 지키는 법.', requires: [], inspire: { itemId: 'branch', count: 6 }, recipes: ['cooked_meat'] },
+  { id: 'fire', name: '불 다루기', desc: '나뭇가지를 모아 불씨를 지키는 법.', requires: [], inspire: { itemId: 'branch', count: 6 }, recipes: ['cooked_meat', 'jerky'] },
   { id: 'hafting', name: '자루 끼우기', desc: '돌날을 나무 자루에 묶어 창과 곡괭이를 만든다.', requires: ['knapping', 'binding'], research: [{ itemId: 'branch', count: 3 }, { itemId: 'flint', count: 2 }, { itemId: 'cordage', count: 1 }], recipes: ['flint_spear', 'stone_pickaxe'] },
   { id: 'pottery', name: '토기 굽기', desc: '흙과 점토를 반죽해 불에 굽는다.', requires: ['fire'], research: [{ itemId: 'soil', count: 3 }, { itemId: 'clay', count: 2 }], recipes: ['clay_pot'] },
   { id: 'herbalism', name: '약초학', desc: '약초를 짓이겨 상처에 바르는 법.', requires: [], inspire: { itemId: 'herb', count: 3 }, recipes: ['salve'] },
@@ -38,7 +38,7 @@ export const TECHS: TechDef[] = [
   { id: 'beast_mastery', name: '야수 교감', desc: '늑대 테이밍 연구와 올가미·미끼 제작을 해금한다.', requires: [], recipes: ['taming_snare', 'beast_bait'], bookOnly: true },
   { id: 'stone_barrage', name: '돌팔매 연타', desc: '25m 안 가까운 짐승 1마리에 18 피해. 부싯돌 1 · 대기 12초.', requires: ['knapping', 'binding'], research: [{ itemId: 'flint', count: 4 }, { itemId: 'cordage', count: 2 }], recipes: [] },
   { id: 'roar', name: '포효', desc: '25m 안 일반 짐승을 20초간 진정. 우두머리 제외. 허기 1 · 대기 30초.', requires: ['primal_strike'], research: [{ itemId: 'bone', count: 4 }, { itemId: 'ancient_fang', count: 1 }], recipes: [] },
-  { id: 'ember_scatter', name: '불씨 뿌리기', desc: '거점 25m 안에서 주변 짐승에 12 피해. 송진 1·나뭇가지 1 · 대기 20초.', requires: ['fire', 'pottery'], research: [{ itemId: 'resin', count: 3 }, { itemId: 'clay_pot', count: 1 }], recipes: [] },
+  { id: 'ember_scatter', name: '불씨 뿌리기', desc: '거점 안에서 사용. 내 주변 25m 짐승에 12 피해. 송진 1·나뭇가지 1 · 대기 20초.', requires: ['fire', 'pottery'], research: [{ itemId: 'resin', count: 3 }, { itemId: 'clay_pot', count: 1 }], recipes: [] },
   { id: 'hut_building', name: '움집', desc: '2단계 거점 발전 해금. 발전 후 배낭 용량 +10kg.', requires: ['binding', 'fire'], research: [{ itemId: 'log', count: 4 }, { itemId: 'cordage', count: 2 }], recipes: [] },
   { id: 'palisade', name: '목책', desc: '설치 후 거점 반경 +15m, 거점 안 짐승 반격 피해 -3.', requires: ['hut_building'], research: [{ itemId: 'log', count: 4 }, { itemId: 'flint', count: 2 }], recipes: [] },
   { id: 'outpost', name: '전진기지', desc: '본거지에서 150m 이상 떨어진 곳에 1개. 반경 30m 안에서 공용 창고·제작·연구.', requires: ['hut_building'], research: [{ itemId: 'hide', count: 2 }, { itemId: 'cordage', count: 2 }], recipes: [] },

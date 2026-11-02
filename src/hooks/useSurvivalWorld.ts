@@ -429,8 +429,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const useSkill = useCallback((id: ActiveSkill) => {
     const p = ref.current;
     const at = Date.now();
-    const targets = generateWorld({ center: p.pos, radiusM: C.interactRadiusM, now: at, isNight, depleted: p.depleted, terrainZones: p.terrainZones, parkCells: p.parkCells })
-      .filter((e): e is Extract<WorldEntity, { kind: 'creature' }> => e.kind === 'creature');
+    const targets = entities.filter((e): e is Extract<WorldEntity, { kind: 'creature' }> => e.kind === 'creature' && !p.depleted[e.id]);
     const result = prepareSkill(p, id, targets, at, enabledRef.current);
     if (result.ok === false) { toast.warning(result.reason); return false; }
     let next = { ...result.state, damage: { ...p.damage }, depleted: { ...p.depleted } };
@@ -456,7 +455,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     setSkillEffect({ id, at });
     toast.success(`${ACTIVE_SKILLS[id].name} 사용`);
     return true;
-  }, [capacity, isNight, setS]);
+  }, [capacity, entities, setS]);
   const construct = useCallback((kind: 'palisade' | 'outpost') => {
     const result = buildStructure(ref.current, kind, enabledRef.current);
     if (result.ok === false) { toast.warning(result.reason); return; }
@@ -489,6 +488,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     setS({ ...p, storage, backpack: addStacks(p.backpack, [{ itemId, count: 1 }]), packedItems: [...new Set([...(p.packedItems ?? []), itemId])] });
   }, [capacity, setS]);
 
+  const storePacked = useCallback(() => {
+    if (!enabledRef.current || !atWorkshop(ref.current)) return;
+    setS(p => ({ ...p, packedItems: [] }));
+  }, [setS]);
+
   const reset = useCallback(() => { setS(fresh(ref.current.pos)); }, [setS]);
 
   /** Apply external damage (e.g. another player's attack), reduced by worn armor. */
@@ -501,7 +505,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setS]);
 
-  return { setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw,
+  return { setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked,
     recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, isNight, inBase, baseDef, weight, capacity, weapon,
     moveTo, interact, eat, placeBase, upgradeBase, research, craft, reset,

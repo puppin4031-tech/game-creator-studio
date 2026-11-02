@@ -58,7 +58,7 @@ describe('active skill rules', () => {
     expect(result.state.storage).toEqual([]);
     expect(ACTIVE_SKILLS.ember_scatter.damage).toBe(12);
     expect(result.state.cooldowns?.ember_scatter).toBe(at + 20000);
-    expect(prepareSkill({ ...p, pos: offset(40) }, 'ember_scatter', [{ ...wolf, ...offset(40) }], at, true).ok).toBe(false);
+    expect(prepareSkill({ ...p, pos: offset(51) }, 'ember_scatter', [{ ...wolf, ...offset(51) }], at, true).ok).toBe(false);
   });
   for (const id of Object.keys(ACTIVE_SKILLS) as (keyof typeof ACTIVE_SKILLS)[]) test(`${id} blocks missing skill, GPS and distant/absent targets`, () => {
     const p = { ...fresh(), storage: ACTIVE_SKILLS[id].cost };
