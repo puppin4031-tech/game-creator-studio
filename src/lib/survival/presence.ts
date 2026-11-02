@@ -1,5 +1,5 @@
 import type { LatLng } from './types';
-import { distanceM } from './geo';
+import { distanceM, M_PER_DEG_LAT, M_PER_DEG_LNG } from './geo';
 
 /** ~1.1km presence cells: players only join the room for their own cell to cap realtime traffic. */
 export const PRESENCE_CELL_DEG = 0.01;
@@ -31,8 +31,8 @@ const snap = (v: number, step: number) => Math.round(Math.round(v / step) * step
 export function publicPosition(pos: LatLng, base: LatLng | null): LatLng {
   const nearHome = !!base && distanceM(pos, base) <= HOME_PRIVACY_RADIUS_M;
   const gridM = nearHome ? HOME_GRID_M : PUBLIC_GRID_M;
-  const latStep = gridM / 111320;
-  const lngStep = gridM / (111320 * Math.max(0.1, Math.cos((pos.lat * Math.PI) / 180)));
+  const latStep = gridM / M_PER_DEG_LAT;
+  const lngStep = gridM / M_PER_DEG_LNG;
   return { lat: snap(pos.lat, latStep), lng: snap(pos.lng, lngStep) };
 }
 
