@@ -6,7 +6,8 @@ export function useHitPulse(hp: number) {
   const prev = useRef(hp);
   const [hit, setHit] = useState<{ n: number; dmg: number }>({ n: 0, dmg: 0 });
   useEffect(() => {
-    if (hp < prev.current) setHit((h) => ({ n: h.n + 1, dmg: prev.current - hp }));
+    const damage = prev.current - hp;
+    if (damage > 0) setHit((h) => ({ n: h.n + 1, dmg: damage }));
     prev.current = hp;
   }, [hp]);
   return hit;

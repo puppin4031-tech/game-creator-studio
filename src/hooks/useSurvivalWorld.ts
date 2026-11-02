@@ -4,7 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Json } from '@/integrations/supabase/types';
 import { ITEMS, type ItemId } from '@/lib/survival/items';
-import { CREATURES, NODES, creatureDef, nodeDef, isHostileNow, type LootRoll } from '@/lib/survival/entities';
+import { CREATURES, NODES, creatureDef, nodeDef, type LootRoll } from '@/lib/survival/entities';
+import { CREATURE_ATTACK_INTERVAL_MS, resolveCreatureHit, rollLoot } from '@/lib/survival/combat';
 import { RECIPES, type Recipe } from '@/lib/survival/recipes';
 import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
 import { SURVIVAL_CONFIG as C } from '@/lib/survival/config';
@@ -63,16 +64,6 @@ function load(start: LatLng, saveKey: string): WorldSave {
   return fresh(start);
 }
 
-function roll(loot: LootRoll[]): Stack[] {
-  const out: Stack[] = [];
-  for (const l of loot) {
-    if (l.chance !== undefined && Math.random() > l.chance) continue;
-    const n = l.min + Math.floor(Math.random() * (l.max - l.min + 1));
-    if (n > 0) out.push({ itemId: l.itemId, count: n });
-  }
-  return out;
-}
-
 const fmt = (st: Stack[]) => st.map((s) => `${ITEMS[s.itemId].name} ×${s.count}`).join(', ');
 
 export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; saveKey?: string; cloudSync?: boolean } = {}) {
@@ -91,6 +82,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     setState(value);
   }, []);
   const [now, setNow] = useState(Date.now());
+  const lastCreatureAttack = useRef(0);
 
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(t); }, []);
   useEffect(() => {
@@ -283,6 +275,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const p = ref.current;
     if (e.kind === 'node' ? !isNodeAvailable(e.id, e.type, p.depleted, Date.now()) : !!p.depleted[e.id]) return;
     if (distanceM(p.pos, e) > C.interactRadiusM) { toast.warning(`${C.interactRadiusM}m 안으로 다가가세요`); return; }
+    if (e.kind === 'creature') {
+      const at = Date.now();
+      if (at - lastCreatureAttack.current < CREATURE_ATTACK_INTERVAL_MS) return;
+      lastCreatureAttack.current = at;
+    }
     let next: WorldSave = { ...p, damage: { ...p.damage } };
     let hp = p.hp;
     let power = 1;
@@ -309,11 +306,16 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       power = weapon ? ITEMS[weapon.itemId].weapon?.atk ?? C.fistAtk : C.fistAtk;
       if (p.techs.includes('primal_strike')) power *= PRIMAL_STRIKE_MULT;
       const ranged = !!(weapon && ITEMS[weapon.itemId].weapon?.ranged) && !p.damage[e.id];
-      const fightsBack = d.temper !== 'passive' || isHostileNow(e.type, isNight);
-      if (fightsBack && !ranged) hp -= Math.max(1, d.atk - (armor ? ITEMS[armor.itemId].armor?.def ?? 0 : 0) - (p.techs.includes('iron_skin') ? IRON_SKIN_DEF : 0));
-      if (d.temper === 'passive' && Math.random() < (d.escapeChance ?? 0)) {
+      const defense = (armor ? ITEMS[armor.itemId].armor?.def ?? 0 : 0) + (p.techs.includes('iron_skin') ? IRON_SKIN_DEF : 0);
+      const exchange = resolveCreatureHit(e.type, p.damage[e.id] ?? 0, power, defense, ranged);
+      power = exchange.dealt - (p.damage[e.id] ?? 0);
+      hp -= exchange.counterDamage;
+      if (exchange.counterDamage) toast.error(`${d.name} 반격! 체력 -${exchange.counterDamage}`);
+      if (hp <= 0) { setS(die({ ...next, hp })); return; }
+      if (!exchange.defeated && d.temper === 'passive' && Math.random() < (d.escapeChance ?? 0)) {
         toast(`${d.name}이(가) 달아났습니다`);
-        setS({ ...next, depleted: { ...p.depleted, [e.id]: Date.now() } });
+        delete next.damage[e.id];
+        setS({ ...next, hp, depleted: { ...p.depleted, [e.id]: Date.now() } });
         return;
       }
     }
@@ -327,7 +329,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       return;
     }
     delete next.damage[e.id];
-    const got = roll(loot);
+    const got = rollLoot(loot);
     const free = capacity - stackWeight(p.backpack);
     const fits = stackWeight(got) <= free;
     next.backpack = fits ? addStacks(p.backpack, got) : p.backpack;
@@ -341,7 +343,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     else if (fits) toast.success(`획득: ${fmt(got) || '없음'}`); else toast.warning('배낭이 너무 무겁습니다! 거점에 다녀오세요');
     next = learn(next, checkInspiration(gathered, next.techs));
     setS(next);
-  }, [best, weapon, armor, isNight, capacity]);
+  }, [best, weapon, armor, capacity]);
 
   const eat = useCallback((itemId: ItemId) => {
     const it = ITEMS[itemId];
