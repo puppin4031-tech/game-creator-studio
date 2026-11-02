@@ -42,7 +42,7 @@ const url = (k: SpriteKey) => spriteUrls[`../../assets/survival/${k}.png`];
 const PLAYER_SCALE = 1.2;
 const LANDMARK_FEATURE_SCALE = 1.15;
 // Hard materials (stone, wood, ore) use the strike animation; soft ones use gather.
-const STRIKE_NODES = new Set<string>(['flint', 'branch', 'oak', 'pine', 'hematite', 'quartz', 'obsidian', 'jade']);
+const STRIKE_NODES = new Set<string>(['flint_rock', 'branch_pile', 'oak_tree', 'pine_tree', 'hematite_rock', 'quartz_vein', 'obsidian_rock', 'jade_rock']);
 
 function Sprite({ k, scale = 1, className = '' }: { k: SpriteKey; scale?: number; className?: string }) {
   const m = SPRITE_META[k];
