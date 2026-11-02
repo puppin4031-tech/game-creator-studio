@@ -9,6 +9,7 @@ import { CREATURE_ATTACK_INTERVAL_MS, resolveCreatureHit, rollLoot } from '@/lib
 import { RECIPES, type Recipe } from '@/lib/survival/recipes';
 import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
 import { SURVIVAL_CONFIG as C } from '@/lib/survival/config';
+import { ACTIVE_SKILLS, atMainBase, atWorkshop, buildStructure, collectCompanionWork, prepareSkill, recruitCompanion, researchTechnology, tameWolf, type ActiveSkill, type Companion } from '@/lib/survival/abilities';
 import { advanceSurvivalVitals } from '@/lib/survival/metabolism';
 import { distanceM } from '@/lib/survival/geo';
 import { generateWorld, isNodeAvailable } from '@/lib/survival/world';
@@ -43,6 +44,13 @@ export interface WorldSave extends WorldProgress {
   /** Zone cells sampled inside real parks (first sample wins). */
   parkCells: Record<string, boolean>;
   landmarkClaims?: LandmarkClaims;
+  packedItems?: ItemId[];
+  outpost?: LatLng | null;
+  palisade?: boolean;
+  cooldowns?: Record<string, number>;
+  calmUntil?: Record<string, number>;
+  companions?: Companion[];
+  rescueTokens?: number;
   lastTickAt: number;
 }
 
@@ -131,9 +139,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const baseDef = s.base ? BASE_LEVELS[s.base.level] : null;
   const [sanctuaries, setSanctuaries] = useState<LatLng[]>([]);
   const inSanctuary = sanctuaries.some((c) => distanceM(s.pos, c) <= SANCTUARY_RADIUS_M);
-  const inBase = !!s.base && !!baseDef && distanceM(s.pos, s.base) <= baseDef.radiusM;
+  const inBase = atWorkshop(s);
   const weight = stackWeight(s.backpack);
-  const capacity = C.baseCarryKg + (s.level - 1) * C.carryPerLevelKg;
+  const capacity = C.baseCarryKg + (s.level - 1) * C.carryPerLevelKg + ((s.base?.level ?? 0) >= 2 ? 10 : 0);
   const questState: QuestState = { ...s, storedGear: [], stats: { gathered: s.gathered, crafted: s.crafted, kills: s.kills, deposits: s.deposits } };
   const quest = currentQuest(questState);
   const questProgress = quest?.progress(questState) ?? null;
@@ -153,8 +161,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
   const entities: WorldEntity[] = useMemo(() => generateWorld({
     center: s.pos, radiusM: vision, now, isNight, depleted: s.depleted, terrainZones: s.terrainZones, parkCells: s.parkCells, sanctuaries,
-    safeZone: s.base && baseDef ? { center: s.base, radiusM: baseDef.radiusM } : null,
-  }), [s.pos, vision, now, isNight, s.depleted, s.base, baseDef, s.terrainZones, s.parkCells, sanctuaries]);
+    safeZone: s.base && baseDef ? { center: s.base, radiusM: baseDef.radiusM + (s.palisade ? 15 : 0) } : null,
+  }).filter(e => !(e.kind === 'creature' && s.outpost && distanceM(e, s.outpost) < C.outpostRadiusM + 15)), [s.pos, vision, now, isNight, s.depleted, s.base, baseDef, s.terrainZones, s.parkCells, sanctuaries, s.palisade, s.outpost]);
 
   // Survival tick: hunger drain, starvation, base regen.
   useEffect(() => {
@@ -167,17 +175,17 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   // pulled back out of storage) so it can be spent at traders.
   useEffect(() => {
     if (!enabled || !inBase) return;
-    const deposit = s.backpack.filter((x) => x.itemId !== 'shell');
+    const deposit = s.backpack.filter((x) => x.itemId !== 'shell' && !(s.packedItems ?? []).includes(x.itemId));
     const storedShell = s.storage.find((x) => x.itemId === 'shell');
     if (!deposit.length && !storedShell) return;
     if (deposit.length) toast.success(`거점 귀환! ${fmt(deposit)} 창고에 보관`);
     setS((p) => {
-      const dep = p.backpack.filter((x) => x.itemId !== 'shell');
+      const dep = p.backpack.filter((x) => x.itemId !== 'shell' && !(p.packedItems ?? []).includes(x.itemId));
       const shells = [...p.backpack, ...p.storage].filter((x) => x.itemId === 'shell').reduce((n, x) => n + x.count, 0);
       return {
         ...p,
         storage: addStacks(p.storage.filter((x) => x.itemId !== 'shell'), dep),
-        backpack: shells ? [{ itemId: 'shell', count: shells }] : [],
+        backpack: addStacks(p.backpack.filter(x => x.itemId !== 'shell' && !dep.some(d => d.itemId === x.itemId)), shells ? [{ itemId: 'shell', count: shells }] : []),
         deposits: p.deposits + (dep.length ? 1 : 0),
       };
     });
@@ -299,8 +307,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       power = weapon ? ITEMS[weapon.itemId].weapon?.atk ?? C.fistAtk : C.fistAtk;
       if (p.techs.includes('primal_strike')) power *= PRIMAL_STRIKE_MULT;
       const ranged = !!(weapon && ITEMS[weapon.itemId].weapon?.ranged) && !p.damage[e.id];
-      const defense = (armor ? ITEMS[armor.itemId].armor?.def ?? 0 : 0) + (p.techs.includes('iron_skin') ? IRON_SKIN_DEF : 0);
-      const exchange = resolveCreatureHit(e.type, p.damage[e.id] ?? 0, power, defense, ranged);
+      power += (p.companions ?? []).some(c => c.kind === 'wolf') ? 3 : 0;
+      const defense = (atMainBase(p) && p.palisade ? 3 : 0) + (armor ? ITEMS[armor.itemId].armor?.def ?? 0 : 0) + (p.techs.includes('iron_skin') ? IRON_SKIN_DEF : 0);
+      const exchange = resolveCreatureHit(e.type, p.damage[e.id] ?? 0, power, defense, ranged || (p.calmUntil?.[e.id] ?? 0) > Date.now());
       power = exchange.dealt - (p.damage[e.id] ?? 0);
       hp -= exchange.counterDamage;
       if (exchange.counterDamage) toast.error(`${d.name} 반격! 체력 -${exchange.counterDamage}`);
@@ -331,6 +340,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (fits) got.forEach((g) => { gathered[g.itemId] = (gathered[g.itemId] ?? 0) + g.count; });
     next.gathered = gathered;
     next.kills = p.kills + (e.kind === 'creature' ? 1 : 0);
+    if (e.kind === 'creature' && creatureDef(e.type).boss) next.rescueTokens = Math.min(2, (p.rescueTokens ?? 0) + 1);
     next = gainXp(next, e.kind === 'node' ? nodeDef(e.type).xp : creatureDef(e.type).xp);
     if (e.kind === 'creature' && creatureDef(e.type).boss && fits) toast.success(`우두머리 처치! ${d0Name(e.type)}`, { description: `획득: ${fmt(got)}` });
     else if (fits) toast.success(`획득: ${fmt(got) || '없음'}`); else toast.warning('배낭이 너무 무겁습니다! 거점에 다녀오세요');
@@ -342,7 +352,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const it = ITEMS[itemId];
     const p = ref.current;
     const from = p.backpack.some((x) => x.itemId === itemId) ? 'backpack' : 'storage';
-    if (!enabledRef.current || (from === 'storage' && (!p.base || distanceM(p.pos, p.base) > BASE_LEVELS[p.base.level].radiusM))) return;
+    if (!enabledRef.current || (from === 'storage' && !atWorkshop(p))) return;
     if (it.book) {
       if (p.techs.includes(it.book.techId)) { toast('이미 아는 기술입니다'); return; }
       const read = readSkillBook(p[from], itemId, p.techs);
@@ -370,6 +380,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const p = ref.current;
     if (!enabledRef.current || !p.base || distanceM(p.pos, p.base) > BASE_LEVELS[p.base.level].radiusM) return;
     if (!p.base || p.base.level >= 3) return;
+    if (p.base.level === 1 && !p.techs.includes('hut_building')) { toast.error('움집 기술을 먼저 연구하세요'); return; }
     const lv = (p.base.level + 1) as 2 | 3;
     const left = removeStacks(p.storage, BASE_LEVELS[lv].cost);
     if (!left) { toast.error('창고 재료가 부족합니다'); return; }
@@ -378,18 +389,15 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, []);
 
   const research = useCallback((techId: string) => {
-    const p = ref.current;
-    if (!enabledRef.current || !p.base || distanceM(p.pos, p.base) > BASE_LEVELS[p.base.level].radiusM) return;
-    const t = techById(techId);
-    if (!t?.research || p.techs.includes(t.id) || !prerequisitesMet(t, p.techs)) return;
-    const left = removeStacks(p.storage, t.research);
-    if (!left) { toast.error('연구 재료가 창고에 부족합니다'); return; }
-    setS(learn({ ...p, storage: left }, [t]));
-  }, []);
+    const result = researchTechnology(ref.current, techId, enabledRef.current);
+    if (result.ok === false) { toast.warning(result.reason); return; }
+    setS(result.state);
+    toast.success(`${techById(techId)?.name} 습득`);
+  }, [setS]);
 
   const craft = useCallback((r: Recipe) => {
     const p = ref.current;
-    if (!enabledRef.current || !p.base || distanceM(p.pos, p.base) > BASE_LEVELS[p.base.level].radiusM) return;
+    if (!enabledRef.current || !atWorkshop(p)) return;
     if (!isRecipeUnlocked(r, p.techs)) { toast.error('아직 제작법을 모릅니다'); return; }
     if (!p.base || p.base.level < r.baseLevel) { toast.error(`거점 ${r.baseLevel}단계 이상 필요`); return; }
     const left = removeStacks(p.storage, r.ingredients);
@@ -417,6 +425,74 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     toast.success('생존 목표 달성! 보상을 받았습니다.');
   }, [setS]);
 
+  const [skillEffect, setSkillEffect] = useState<{ id: ActiveSkill; at: number } | null>(null);
+  const useSkill = useCallback((id: ActiveSkill) => {
+    const p = ref.current;
+    const at = Date.now();
+    const targets = entities.filter((e): e is Extract<WorldEntity, { kind: 'creature' }> => e.kind === 'creature' && !p.depleted[e.id]);
+    const result = prepareSkill(p, id, targets, at, enabledRef.current);
+    if (result.ok === false) { toast.warning(result.reason); return false; }
+    let next = { ...result.state, damage: { ...p.damage }, depleted: { ...p.depleted } };
+    if (id !== 'roar') for (const e of result.targets ?? []) {
+      const def = creatureDef(e.type);
+      const damage = (next.damage[e.id] ?? 0) + ACTIVE_SKILLS[id].damage;
+      if (damage < def.hp) { next.damage[e.id] = damage; continue; }
+      delete next.damage[e.id];
+      next.depleted[e.id] = at;
+      const got = rollLoot(def.loot);
+      if (stackWeight(got) <= capacity - stackWeight(next.backpack)) {
+        next.backpack = addStacks(next.backpack, got);
+        next.gathered = { ...next.gathered };
+        for (const item of got) next.gathered[item.itemId] = (next.gathered[item.itemId] ?? 0) + item.count;
+        toast.success(`획득: ${fmt(got)}`);
+      } else toast.warning('배낭이 가득 차 전리품을 담지 못했습니다');
+      next.kills += 1;
+      if (def.boss) next.rescueTokens = Math.min(2, (next.rescueTokens ?? 0) + 1);
+      next = gainXp(next, def.xp);
+    }
+    next = learn(next, checkInspiration(next.gathered, next.techs));
+    setS(next);
+    setSkillEffect({ id, at });
+    toast.success(`${ACTIVE_SKILLS[id].name} 사용`);
+    return true;
+  }, [capacity, entities, setS]);
+  const construct = useCallback((kind: 'palisade' | 'outpost') => {
+    const result = buildStructure(ref.current, kind, enabledRef.current);
+    if (result.ok === false) { toast.warning(result.reason); return; }
+    setS(result.state); toast.success(kind === 'palisade' ? '목책을 세웠습니다' : '전진기지를 세웠습니다');
+  }, [setS]);
+  const tame = useCallback((id: string) => {
+    const p = ref.current;
+    const e = entities.find(e => e.id === id && e.kind === 'creature');
+    if (!e || e.kind !== 'creature' || p.depleted[id]) { toast.warning('늑대가 더 이상 이곳에 없습니다'); return; }
+    const result = tameWolf(p, e, p.damage[id] ?? 0, Date.now(), enabledRef.current, Math.random());
+    if (result.ok === false) { toast.warning(result.reason); return; }
+    setS(result.tamed ? { ...result.state, depleted: { ...p.depleted, [id]: Date.now() } } : result.state);
+    toast(result.tamed ? '늑대가 동료가 되었습니다' : '늑대가 거부했습니다. 재료가 소모되었습니다');
+  }, [entities, setS]);
+  const recruit = useCallback((kind: 'gatherer' | 'rescued', shaman?: Landmark) => {
+    const result = recruitCompanion(ref.current, kind, Date.now(), enabledRef.current, shaman?.kind === 'shaman' ? shaman : undefined);
+    if (result.ok === false) { toast.warning(result.reason); return; }
+    setS(result.state); toast.success('새로운 NPC 동료를 맞았습니다');
+  }, [setS]);
+  const collectWork = useCallback(() => {
+    const result = collectCompanionWork(ref.current, Date.now(), enabledRef.current);
+    if (result.ok === false) { toast.warning(result.reason); return; }
+    setS(result.state); toast.success('동료가 모은 재료를 창고에 보관했습니다');
+  }, [setS]);
+  const withdraw = useCallback((itemId: ItemId) => {
+    const p = ref.current;
+    if (!enabledRef.current || !atWorkshop(p)) { toast.warning('거점 안에서만 꺼낼 수 있습니다'); return; }
+    const storage = removeStacks(p.storage, [{ itemId, count: 1 }]);
+    if (!storage || stackWeight(p.backpack) + ITEMS[itemId].weight > capacity) return;
+    setS({ ...p, storage, backpack: addStacks(p.backpack, [{ itemId, count: 1 }]), packedItems: [...new Set([...(p.packedItems ?? []), itemId])] });
+  }, [capacity, setS]);
+
+  const storePacked = useCallback(() => {
+    if (!enabledRef.current || !atWorkshop(ref.current)) return;
+    setS(p => ({ ...p, packedItems: [] }));
+  }, [setS]);
+
   const reset = useCallback(() => { setS(fresh(ref.current.pos)); }, [setS]);
 
   /** Apply external damage (e.g. another player's attack), reduced by worn armor. */
@@ -429,7 +505,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setS]);
 
-  return { setSanctuaries, inSanctuary,
+  return { setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked,
     recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, isNight, inBase, baseDef, weight, capacity, weapon,
     moveTo, interact, eat, placeBase, upgradeBase, research, craft, reset,

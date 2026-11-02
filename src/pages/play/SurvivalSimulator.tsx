@@ -1,6 +1,7 @@
 // @refresh reset
 // Custom GPS/world hook changes must remount this screen instead of reusing stale hook queues.
 import { useEffect, useRef, useState } from 'react';
+import { SkillControls, ConstructionControls, CompanionControls, SkillEffect } from '@/components/survival/SurvivalAbilities';
 import SpriteAnimator from '@/components/survival/SpriteAnimator';
 import { useSpriteAnimations, type SpriteAction } from '@/hooks/useSpriteAnimations';
 import { useNavigate } from 'react-router-dom';
@@ -32,7 +33,7 @@ import { LANDMARK_INFO, SANCTUARY_RADIUS_M, type Landmark } from '@/lib/survival
 import PeerActionMenu from '@/components/survival/PeerActionMenu';
 import { useSurvivalPresence, type PeerEvent, type PeerPlayer } from '@/hooks/useSurvivalPresence';
 import { EMOTES, PVP_BASE_DAMAGE } from '@/lib/survival/presence';
-import { PLANNED, TECH_CATEGORIES, TECH_CATEGORY, type TechCategory } from '@/lib/survival/techCategories';
+import { TECH_CATEGORIES, TECH_CATEGORY, type TechCategory } from '@/lib/survival/techCategories';
 
 const START: LatLng = { lat: 37.748, lng: 126.7496 };
 const spriteUrls = import.meta.glob('../../assets/survival/*.png', { eager: true, import: 'default' }) as Record<string, string>;
@@ -156,6 +157,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const zone = s.terrainZones[zoneCellKey(s.pos)] ?? 'plains';
   const onSurfaceZone = (c: LatLng, z: typeof zone) => g.recordTerrainZone(zoneCellKey(c), z);
   const onSurfacePark = (c: LatLng, park: boolean) => g.recordPark(zoneCellKey(c), park);
+  const actionReady = !realGps || gps.ready;
+  const activateSkill = (id: Parameters<typeof g.useSkill>[0]) => { if (g.useSkill(id)) playAction('attack', 900); };
   const inPark = !!s.parkCells?.[zoneCellKey(s.pos)];
   const [landmarks, setLandmarks] = useState<Landmark[]>([]);
   const { setSanctuaries } = g;
@@ -221,7 +224,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         {(project, mpp) => (
           <>
             {s.base && g.baseDef && (() => {
-              const p = project(s.base); const r = g.baseDef.radiusM / mpp;
+              const p = project(s.base); const r = (g.baseDef.radiusM + (s.palisade ? 15 : 0)) / mpp;
               return (
                 <div className="absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
                   <div className="rounded-full border-2 border-dashed border-primary/70 bg-primary/10" style={{ width: r * 2, height: r * 2 }} />
@@ -229,6 +232,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 </div>
               );
             })()}
+            {s.outpost && (() => { const p = project(s.outpost); return <div className="pointer-events-none absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}><Sprite k="base-campfire" /><span className="bg-background text-[10px]">전진기지</span></div>; })()}
             {landmarks.filter((l) => l.kind === 'shaman' && distanceM(s.pos, l) <= g.vision + SANCTUARY_RADIUS_M).map((l) => {
               const p = project(l); const r = SANCTUARY_RADIUS_M / mpp;
               return <div key={`sanct-${l.id}`} aria-hidden className="pointer-events-none absolute rounded-full border-2 border-primary/60 bg-primary/5 shadow-[0_0_18px_hsl(var(--primary)/0.5)]" style={{ left: p.x, top: p.y, width: r * 2, height: r * 2, transform: 'translate(-50%,-50%)' }} />;
@@ -260,6 +264,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   <motion.div animate={{ y: e.kind === 'creature' ? [0, -3, 0] : 0 }} transition={{ repeat: Infinity, duration: 0.8 }}>
                     <div className={boss ? 'scale-150 rounded-full ring-2 ring-destructive shadow-[0_0_18px_hsl(var(--destructive))]' : ''}><Sprite k={sprite} /></div>
                   </motion.div>
+                  {(s.calmUntil?.[e.id] ?? 0) > Date.now() && <span className="bg-primary text-[10px] text-primary-foreground">진정됨</span>}
                   {boss ? <span className="mt-2 rounded bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">우두머리</span> : null}
                   {creature ? <div className="mt-1 w-20 rounded bg-background/90 px-1 text-center text-[10px]" aria-label={`${name} 체력 ${remainingHp}/${creature.hp}, 공격력 ${creature.atk}`}>
                     <div className="flex items-center gap-1"><HpBar value={remainingHp} max={creature.hp} /></div>
@@ -285,6 +290,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               const p = project(s.pos); const r = C.interactRadiusM / mpp;
               return (
                 <div className="pointer-events-none absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
+                  {g.skillEffect && Date.now() - g.skillEffect.at < 1200 && <div className="absolute left-1/2 top-1/2"><SkillEffect id={g.skillEffect.id} stamp={g.skillEffect.at} radius={r} /></div>}
+                  {(s.companions ?? []).some(c => c.kind === 'wolf') && <div className="absolute left-1/2 top-1/2 translate-x-5"><Sprite k="mob-wolf" scale={0.7} /></div>}
                   <div className="rounded-full border border-primary/60" style={{ width: r * 2, height: r * 2 }} />
                   {(() => {
                     // Visual-only offset: stop slightly short of the object so the sprite stands beside it.
@@ -401,6 +408,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 <>
                   <p className="text-xs text-muted-foreground">음식은 눌러서 먹을 수 있어요.</p>
                   <Stacks stacks={s.backpack} onUse={g.eat} />
+                  {!!s.packedItems?.length && <Button variant="outline" disabled={!g.inBase || !actionReady} className="h-11 w-full" onClick={g.storePacked}>휴대 재료 모두 창고에 보관</Button>}
                   <div>
                     <b className="text-sm">장비</b>
                     <div className="mt-1 flex flex-wrap gap-1.5">
@@ -416,7 +424,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               {panel === 'base' && (!s.base ? <p className="text-sm">아직 거점이 없습니다.</p> : (
                 <>
                   {!g.inBase && <p className="pixel-frame bg-accent p-2 text-sm">거점 반경 안에서만 제작·연구할 수 있어요.</p>}
-                  <div><b className="text-sm">창고</b><div className="mt-1"><Stacks stacks={s.storage} onUse={g.eat} /></div></div>
+                  <div><b className="text-sm">창고</b><div className="mt-1"><Stacks stacks={s.storage} onUse={g.eat} /></div><div className="mt-2 flex flex-wrap gap-1">{s.storage.map(st => <Button key={st.itemId} variant="outline" size="sm" className="min-h-11 text-xs" disabled={!g.inBase || !actionReady} onClick={() => g.withdraw(st.itemId)}>{ITEMS[st.itemId].name} 1개 꺼내기</Button>)}</div></div>
                   <div>
                     <b className="text-sm">제작</b>
                     <div className="mt-1 space-y-2">
@@ -443,7 +451,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       <div className="pixel-frame bg-card p-2 text-xs">
                         <b className="text-sm">{nx.name}(으)로 발전</b> — {nx.unlocks}
                         <div className="my-1"><Stacks stacks={nx.cost} have={s.storage} /></div>
-                        <button type="button" disabled={!g.inBase || !g.canAfford(nx.cost)} onClick={g.upgradeBase} className="pixel-btn h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">발전시키기</button>
+                        <button type="button" disabled={!g.inBase || !g.canAfford(nx.cost) || !actionReady || (s.base?.level === 1 && !s.techs.includes('hut_building'))} onClick={g.upgradeBase} className="pixel-btn h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">발전시키기</button>
                       </div>
                     );
                   })()}
@@ -490,12 +498,13 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                         <div className="flex items-center gap-1"><b className="text-sm">{t.name}</b>{known ? <span className="ml-auto text-primary">습득</span> : <Lock className="ml-auto !h-4 !w-4" />}</div>
                         <p>{t.desc}</p>
                         {t.requires.length > 0 && <p className="text-muted-foreground">선행: {t.requires.map((r) => TECHS.find((x) => x.id === r)?.name).join(', ')}</p>}
+                        {t.bookOnly && !known && <p className="text-primary">공원 우두머리 전리품 스킬북을 읽어 습득</p>}
                         <p>제작법: {t.recipes.map(id => { const r = g.recipes.find(x => x.id === id); return r ? ITEMS[r.result].name : ''; }).join(', ')}</p>
                         {!known && t.inspire && <p className="mt-1">깨달음: {ITEMS[t.inspire.itemId].name} {Math.min(s.gathered[t.inspire.itemId] ?? 0, t.inspire.count)}/{t.inspire.count}개 채집</p>}
                         {!known && t.research && (
                           <div className="mt-1">
                             <Stacks stacks={t.research} have={s.storage} />
-                            <button type="button" disabled={!ready || !g.inBase || !g.canAfford(t.research)} onClick={() => g.research(t.id)} className="pixel-btn mt-1 h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">거점에서 연구하기</button>
+                            <button type="button" disabled={!ready || !g.inBase || !g.canAfford(t.research) || !actionReady} onClick={() => g.research(t.id)} className="pixel-btn mt-1 h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">거점에서 연구하기</button>
                           </div>
                         )}
                       </div>
@@ -521,12 +530,12 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                         className="pixel-btn h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">{s.base ? '현재 위치로 거점 옮기기' : '여기에 거점 건설'}</button>
                     </div>
                   )}
-                  {(PLANNED[techTab] ?? []).map((p) => (
-                    <div key={p.name} className="pixel-frame bg-card p-2 text-xs opacity-60">
-                      <div className="flex items-center gap-1"><b className="text-sm">{p.name}</b><span className="ml-auto flex items-center gap-1"><Lock className="!h-4 !w-4" />준비 중</span></div>
-                      <p>{p.desc}</p>
-                    </div>
-                  ))}
+                  {techTab === 'special' && <SkillControls known={s.techs} cooldowns={s.cooldowns} ready={actionReady} onUse={activateSkill} />}
+                  {techTab === 'build' && <ConstructionControls known={s.techs} palisade={s.palisade} outpost={!!s.outpost} ready={actionReady} onBuild={g.construct} />}
+                  {techTab === 'companion' && <CompanionControls known={s.techs} companions={s.companions ?? []} ready={actionReady} rescueTokens={s.rescueTokens ?? 0} onCollect={g.collectWork}
+                    onRecruit={kind => g.recruit(kind, landmarks.find(l => l.kind === 'shaman' && distanceM(s.pos, l) <= 25))} onTame={g.tame}
+                    wolves={g.entities.filter((e): e is Extract<WorldEntity, { kind: 'creature' }> => e.kind === 'creature' && e.type === 'wolf' && distanceM(s.pos, e) <= 25).map(e => ({ id: e.id, name: creatureDef(e.type).name, hp: creatureDef(e.type).hp - (s.damage[e.id] ?? 0) }))} />}
+
                 </div>
               )}
             </div>
@@ -536,7 +545,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       <AnimatePresence>
         {selPeer && <PeerActionMenu peer={selPeer} distance={distanceM(s.pos, selPeer)} inRange={distanceM(s.pos, selPeer) <= C.interactRadiusM}
           isAlly={allies.some(a => a.id === selPeer.id)} onClose={() => setSelPeerId(null)}
-          onEmote={(e) => { presence.send({ type: 'emote', to: selPeer.id, emote: e }); showBubble(presence.selfId, EMOTES.find(x => x.id === e)!.text); playAction('talk', 900); setSelPeerId(null); }}
+          onEmote={(e) => { presence.send({ type: 'emote', to: selPeer.id, emote: e }); showBubble(presence.selfId, EMOTES.find(x => x.id === e)?.text ?? ''); playAction('talk', 900); setSelPeerId(null); }}
           onAlly={() => { pendingAlly.current.add(selPeer.id); presence.send({ type: 'ally', to: selPeer.id, name: presence.name }); toast('동맹을 제안했습니다'); setSelPeerId(null); }}
           onAttack={attackPeer} />}
       </AnimatePresence>
