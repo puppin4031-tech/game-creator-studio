@@ -78,6 +78,14 @@ export default function TerrainMap({ center, visionM, explored, onTap, zone = 'p
   const sceneryDirty = useRef(true);
   const surfaceCache = useRef(new Map<string, boolean>());
   const mapRef = useRef<maplibregl.Map | null>(null);
+  // Accumulated zoom target so rapid taps stack instead of restarting from a mid-animation zoom.
+  const zoomTarget = useRef<number | null>(null);
+  const zoomTo = (map: maplibregl.Map, z: number, duration: number) => {
+    const next = Math.max(15, Math.min(19.5, z));
+    zoomTarget.current = next;
+    map.easeTo({ zoom: next, duration });
+    map.once('moveend', () => { if (zoomTarget.current === next) zoomTarget.current = null; });
+  };
   const [, setFrame] = useState(0);
   const tapRef = useRef(onTap);
   tapRef.current = onTap;
