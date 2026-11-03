@@ -71,6 +71,13 @@
       "when": 1793711236504,
       "tag": "0009_sprite_action_chop",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793720930619,
+      "tag": "0010_survival_item_catalog",
+      "breakpoints": true
     }
   ]
 }
