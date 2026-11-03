@@ -74,7 +74,7 @@ function ItemEditor({ draft, onClose }: { draft: Draft; onClose: () => void }) {
         <div className="flex h-20 w-20 items-center justify-center rounded border bg-muted">
           {d.preview ? <img src={d.preview} alt="" className="pixelated h-16 w-16 object-contain" /> : <span className="text-xs text-muted-foreground">이미지 없음</span>}
         </div>
-        <Input type="file" accept="image/png,image/webp,image/gif" onChange={(e) => { const f = e.target.files?.[0] ?? null; set('file', f); set('preview', f ? URL.createObjectURL(f) : draft.imageUrl ?? null); }} />
+        <Input type="file" accept="image/png,image/webp,image/gif" onChange={(e) => { const f = e.target.files?.[0] ?? null; set('file', f); set('preview', f ? URL.createObjectURL(f) : draft.preview); }} />
       </div>
       <div><Label>아이템 ID</Label><Input value={d.itemId} disabled={!d.isNew} onChange={(e) => set('itemId', e.target.value.toLowerCase())} placeholder="예: stone_hammer" /></div>
       <div><Label>이름</Label><Input value={d.name} maxLength={40} onChange={(e) => set('name', e.target.value)} /></div>
