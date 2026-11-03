@@ -654,7 +654,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   })}
                   {techTab === 'talk' && (
                     <div className="space-y-2 text-xs">
-                      <p className="text-muted-foreground">주변 25m 안의 다른 생존자를 누르면 표현을 보내거나 동맹을 제안할 수 있습니다.</p>
+                      <p className="text-muted-foreground">주변 25m 안의 다른 생존자를 누르면 우우·호감 표현, 전투 신청, 동료 초대·부하 임명을 할 수 있습니다.</p>
                       <div className="grid grid-cols-2 gap-1.5">
                         {EMOTES.map((e) => <div key={e.id} className="pixel-frame bg-primary/15 p-2"><b>{e.label}</b><p>"{e.text}"</p></div>)}
                         <div className="pixel-frame bg-primary/15 p-2"><b>동맹 제안</b><p>친구로 추가하고 서로 공격하지 않음</p></div>
@@ -705,7 +705,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           onToggleFav={() => { const was = favs.isFav(selLandmark.id); favs.toggle({ id: selLandmark.id, name: LANDMARK_INFO[selLandmark.kind].name, lat: selLandmark.lat, lng: selLandmark.lng }); toast(was ? '즐겨찾기에서 뺐어요' : '즐겨찾기에 등록했어요'); }} />}
       </AnimatePresence>
       <DamageVignette hitKey={hit.n} />
-      <AlertDialog open={!!vassalOffer} onOpenChange={(o) => { if (!o && vassalOffer) void acceptVassal(false); }}>
+      <AlertDialog open={!!vassalOffer}>
         <AlertDialogContent className="font-pixel">
           <AlertDialogHeader>
             <AlertDialogTitle>{vassalOffer?.name}님이 당신을 부하로 임명하려 합니다</AlertDialogTitle>
