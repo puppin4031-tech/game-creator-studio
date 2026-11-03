@@ -178,6 +178,22 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const onSurfaceZone = (c: LatLng, z: typeof zone) => g.recordTerrainZone(zoneCellKey(c), z);
   const onSurfacePark = (c: LatLng, park: boolean) => g.recordPark(zoneCellKey(c), park);
   const actionReady = !realGps || gps.ready;
+  // Auto pickup tech: gather one hand-gatherable node within 10m every few seconds.
+  const autoRef = useRef({ g, ready: actionReady });
+  autoRef.current = { g, ready: actionReady };
+  const autoOn = hasAutoPickup(s.techs);
+  useEffect(() => {
+    if (!autoOn) return;
+    const id = window.setInterval(() => {
+      const { g: w, ready } = autoRef.current;
+      if (!ready || w.weight >= w.capacity) return;
+      const p = w.state;
+      const target = w.entities.find(e => e.kind === 'node' && !STRIKE_NODES.has(e.type)
+        && isNodeAvailable(e.id, e.type, p.depleted, Date.now()) && distanceM(p.pos, e) <= AUTO_PICKUP_RADIUS_M);
+      if (target) w.interact(target);
+    }, AUTO_PICKUP_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [autoOn]);
   const activateSkill = (id: Parameters<typeof g.useSkill>[0]) => { if (g.useSkill(id)) playAction('attack', 900); };
   const inPark = !!s.parkCells?.[zoneCellKey(s.pos)];
   const [landmarks, setLandmarks] = useState<Landmark[]>([]);
