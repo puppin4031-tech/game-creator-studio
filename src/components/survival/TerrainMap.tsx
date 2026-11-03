@@ -99,7 +99,12 @@ export default function TerrainMap({ center, visionM, explored, onTap, zone = 'p
         setFrame(f => f + 1);
         resize = new ResizeObserver(() => { map.resize(); sceneryDirty.current = true; setFrame(f => f + 1); drawFog(); });
         resize.observe(box.current);
-        map.on('move', () => { sceneryDirty.current = true; setFrame((f) => f + 1); });
+        // Coalesce overlay re-renders to one per animation frame during zoom/pan.
+        let raf = 0;
+        map.on('move', () => {
+          sceneryDirty.current = true;
+          if (!raf) raf = requestAnimationFrame(() => { raf = 0; setFrame((f) => f + 1); });
+        });
         map.on('idle', () => { surfaceCache.current.clear(); drawScenery(true); sampleSurface(); samplePlaces(); });
         map.on('render', () => { if (sceneryDirty.current) { drawScenery(); sceneryDirty.current = false; } drawFog(); });
         map.on('click', (e) => tapRef.current?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }));
@@ -123,7 +128,13 @@ export default function TerrainMap({ center, visionM, explored, onTap, zone = 'p
   }, [zone, mapRef.current]);
 
   // Follow player.
-  useEffect(() => { mapRef.current?.easeTo({ center: [center.lng, center.lat], duration: 600 }); }, [center.lat, center.lng]);
+  // Follow player; pan only (keeps any in-progress zoom target so animations don't fight).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const zoom = zoomTarget.current ?? map.getZoom();
+    map.easeTo({ center: [center.lng, center.lat], zoom, duration: 600 });
+  }, [center.lat, center.lng]);
   // Heading-up rotation: bearing is already smoothed by the heading hook, so jump without easing.
   useEffect(() => {
     const map = mapRef.current;
@@ -280,7 +291,7 @@ export default function TerrainMap({ center, visionM, explored, onTap, zone = 'p
       <canvas ref={scenery} aria-hidden="true" data-terrain-scenery className="pointer-events-none absolute inset-0 h-full w-full" />
       <canvas ref={fog} className="pointer-events-none absolute inset-0 h-full w-full" />
       <div className="pointer-events-none absolute inset-0">{map && children(project, metersPerPx(map))}</div>
-      {map && <MapZoomControl onZoomBy={(d) => map.easeTo({ zoom: map.getZoom() + d, duration: 300 })} onReset={() => map.easeTo({ zoom: DEFAULT_ZOOM, duration: 400 })} />}
+      {map && <MapZoomControl onZoomBy={(d) => zoomTo(map, (zoomTarget.current ?? map.getZoom()) + d, 250)} onReset={() => zoomTo(map, DEFAULT_ZOOM, 350)} />}
     </div>
   );
 }
