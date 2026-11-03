@@ -16,6 +16,7 @@ import MainDashboard from "./pages/admin/MainDashboard";
 import GlobalMapView from "./pages/admin/GlobalMapView";
 import UserManagement from "./pages/admin/UserManagement";
 import SpriteAssets from "./pages/admin/SpriteAssets";
+import ItemCatalog from "./pages/admin/ItemCatalog";
 import ApprovalManagement from "./pages/admin/ApprovalManagement";
 import SubRegionMap from "./pages/admin/SubRegionMap";
 import CreateMission from "./pages/admin/CreateMission";
@@ -59,6 +60,7 @@ function AdminRoutes() {
           <Route path="map" element={<GlobalMapView />} />
           <Route path="users" element={<UserManagement />} />
           <Route path="sprites" element={<SpriteAssets />} />
+          <Route path="items" element={<ItemCatalog />} />
           <Route path="approvals" element={<ApprovalManagement />} />
           <Route path="themes" element={<ThemeManagement />} />
           <Route path="themes/:themeId" element={<ThemeDetail />} />

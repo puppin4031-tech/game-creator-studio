@@ -92,7 +92,7 @@ function ItemEditor({ draft, onClose }: { draft: Draft; onClose: () => void }) {
       </div>
       <div className="flex gap-2">
         <Button onClick={save} disabled={saving} className="flex-1">{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}저장</Button>
-        {!d.isNew && (draft.isCustom || draft.imagePath !== null || draft.name !== undefined) && (
+        {!d.isNew && (
           <Button variant="outline" onClick={resetOverride}>{d.isCustom ? '삭제' : '기본값 복원'}</Button>
         )}
       </div>
