@@ -495,6 +495,19 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
   const reset = useCallback(() => { setS(fresh(ref.current.pos)); }, [setS]);
 
+  /** Discard selected backpack stacks; counts are clamped to what is held. */
+  const dropItems = useCallback((drops: Stack[]) => {
+    const p = ref.current;
+    const valid = drops
+      .map(d => ({ itemId: d.itemId, count: Math.min(Math.floor(d.count), p.backpack.find(b => b.itemId === d.itemId)?.count ?? 0) }))
+      .filter(d => d.count > 0);
+    if (!valid.length) return;
+    const left = removeStacks(p.backpack, valid);
+    if (!left) { toast.error('버릴 수량을 다시 확인하세요'); return; }
+    setS({ ...p, backpack: left });
+    toast.success(`${valid.reduce((n, d) => n + d.count, 0)}개를 버렸습니다`);
+  }, [setS]);
+
   /** Apply external damage (e.g. another player's attack), reduced by worn armor. */
   const takeDamage = useCallback((amount: number) => {
     const p = ref.current;
@@ -508,7 +521,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   return { setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked,
     recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, isNight, inBase, baseDef, weight, capacity, weapon,
-    moveTo, interact, eat, placeBase, upgradeBase, research, craft, reset,
+    moveTo, interact, eat, placeBase, upgradeBase, research, craft, reset, dropItems,
     quest, questProgress, canClaimQuest, claimQuest, nextLevelXp: xpToNext(s.level),
     canAfford: (st: Stack[]) => hasAll(s.storage, st),
     recipes: RECIPES, NODES, CREATURES,
