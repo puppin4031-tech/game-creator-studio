@@ -535,6 +535,66 @@ export type Database = {
         }
         Relationships: []
       }
+      survival_tributes: {
+        Row: {
+          claimed_at: string | null
+          count: number
+          created_at: string
+          id: string
+          item_id: string
+          lord_id: string
+          vassal_id: string
+          vassal_name: string
+        }
+        Insert: {
+          claimed_at?: string | null
+          count?: number
+          created_at?: string
+          id?: string
+          item_id: string
+          lord_id: string
+          vassal_id: string
+          vassal_name?: string
+        }
+        Update: {
+          claimed_at?: string | null
+          count?: number
+          created_at?: string
+          id?: string
+          item_id?: string
+          lord_id?: string
+          vassal_id?: string
+          vassal_name?: string
+        }
+        Relationships: []
+      }
+      survival_vassals: {
+        Row: {
+          created_at: string
+          last_tribute_on: string | null
+          lord_id: string
+          lord_name: string
+          vassal_id: string
+          vassal_name: string
+        }
+        Insert: {
+          created_at?: string
+          last_tribute_on?: string | null
+          lord_id: string
+          lord_name?: string
+          vassal_id: string
+          vassal_name?: string
+        }
+        Update: {
+          created_at?: string
+          last_tribute_on?: string | null
+          lord_id?: string
+          lord_name?: string
+          vassal_id?: string
+          vassal_name?: string
+        }
+        Relationships: []
+      }
       tag_messages: {
         Row: {
           channel: string
@@ -884,6 +944,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      become_survival_vassal: {
+        Args: { _lord: string; _lord_name: string; _vassal_name: string }
+        Returns: boolean
+      }
       claim_survival_ai_daily: {
         Args: { p_client_hash: string; p_limit: number }
         Returns: boolean
@@ -891,6 +955,14 @@ export type Database = {
       claim_survival_ai_request: {
         Args: { p_client_hash: string }
         Returns: boolean
+      }
+      claim_survival_tributes: {
+        Args: never
+        Returns: {
+          count: number
+          item_id: string
+          vassal_name: string
+        }[]
       }
       collect_global_spawn: {
         Args: { _lat: number; _lng: number; _spawn_id: string }
@@ -926,6 +998,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      pay_survival_tribute: { Args: never; Returns: Json }
     }
     Enums: {
       app_role: "main_admin" | "sub_admin"
