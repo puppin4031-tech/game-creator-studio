@@ -17,5 +17,7 @@ export const TECH_CATEGORY: Record<string, TechCategory> = {
   hut_building: 'build', palisade: 'build', outpost: 'build',
   wolf_taming: 'companion', recruitment: 'companion', rescue: 'companion',
   primal_strike: 'special', iron_skin: 'special', beast_mastery: 'companion',
+  keen_eye: 'special', long_reach: 'special', auto_pickup: 'special',
+  pocket_1: 'special', pocket_2: 'special', pocket_3: 'special',
 };
 
