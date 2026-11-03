@@ -24,6 +24,8 @@ import { SPRITE_META, type SpriteKey } from '@/lib/survival/spriteMeta';
 import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
 import { SURVIVAL_CONFIG as C } from '@/lib/survival/config';
 import { distanceM } from '@/lib/survival/geo';
+import { isNodeAvailable } from '@/lib/survival/world';
+import { AUTO_PICKUP_INTERVAL_MS, AUTO_PICKUP_RADIUS_M, hasAutoPickup } from '@/lib/survival/utilitySkills';
 import { ACTOR_IDLE_RETURN_MS, shouldReturnToCenter, type ActorTarget } from '@/lib/survival/actorPos';
 import { TECHS, isRecipeUnlocked, prerequisitesMet, techForRecipe } from '@/lib/survival/tech';
 import { countOf } from '@/lib/survival/inventory';
@@ -133,8 +135,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
   const tapEntity = (e: WorldEntity) => {
     if (realGps && !gps.ready) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return; }
-    if (!realGps && distanceM(s.pos, e) > C.interactRadiusM) { g.moveTo({ lat: e.lat, lng: e.lng }); return; }
-    const inRange = distanceM(s.pos, e) <= C.interactRadiusM;
+    if (!realGps && distanceM(s.pos, e) > g.reach) { g.moveTo({ lat: e.lat, lng: e.lng }); return; }
+    const inRange = distanceM(s.pos, e) <= g.reach;
     const act: SpriteAction = e.kind === 'creature' ? 'attack' : STRIKE_NODES.has(e.type) ? 'chop' : 'gather';
     if (inRange) {
       // Walk to the object (250ms), act, then wait 3s before walking back.
@@ -169,7 +171,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   useEffect(() => () => { window.clearTimeout(actionTimer.current); window.clearTimeout(returnTimer.current); }, []);
   // Return sprite to GPS center when the player really walks or the object leaves the radius.
   useEffect(() => {
-    if (actorTarget && shouldReturnToCenter(s.pos, actorTarget, C.interactRadiusM)) returnToCenter();
+    if (actorTarget && shouldReturnToCenter(s.pos, actorTarget, g.reach)) returnToCenter();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.pos, actorTarget]);
   const activeAnim = anims?.[action] ?? (action === 'chop' ? anims?.attack : undefined) ?? anims?.idle;
@@ -178,6 +180,22 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const onSurfaceZone = (c: LatLng, z: typeof zone) => g.recordTerrainZone(zoneCellKey(c), z);
   const onSurfacePark = (c: LatLng, park: boolean) => g.recordPark(zoneCellKey(c), park);
   const actionReady = !realGps || gps.ready;
+  // Auto pickup tech: gather one hand-gatherable node within 10m every few seconds.
+  const autoRef = useRef({ g, ready: actionReady });
+  autoRef.current = { g, ready: actionReady };
+  const autoOn = hasAutoPickup(s.techs);
+  useEffect(() => {
+    if (!autoOn) return;
+    const id = window.setInterval(() => {
+      const { g: w, ready } = autoRef.current;
+      if (!ready || w.weight >= w.capacity) return;
+      const p = w.state;
+      const target = w.entities.find(e => e.kind === 'node' && !STRIKE_NODES.has(e.type)
+        && isNodeAvailable(e.id, e.type, p.depleted, Date.now()) && distanceM(p.pos, e) <= AUTO_PICKUP_RADIUS_M);
+      if (target) w.interact(target);
+    }, AUTO_PICKUP_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [autoOn]);
   const activateSkill = (id: Parameters<typeof g.useSkill>[0]) => { if (g.useSkill(id)) playAction('attack', 900); };
   const inPark = !!s.parkCells?.[zoneCellKey(s.pos)];
   const [landmarks, setLandmarks] = useState<Landmark[]>([]);
@@ -209,7 +227,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     if (e.type === 'emote') showBubble(e.from, EMOTES.find(x => x.id === e.emote)?.text ?? '');
     else if (e.type === 'attack') {
       // Ignore attacks from unknown, allied, or out-of-range players.
-      if (!from || allies.some(a => a.id === e.from) || distanceM(s.pos, from) > C.interactRadiusM * 1.5) return;
+      if (!from || allies.some(a => a.id === e.from) || distanceM(s.pos, from) > g.reach * 1.5) return;
       g.takeDamage(Math.min(30, e.dmg));
       toast.error(`${from.name}에게 공격받았습니다!`);
     } else if (e.type === 'ally') {
@@ -308,7 +326,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               );
             })}
             {(() => {
-              const p = project(s.pos); const r = C.interactRadiusM / mpp;
+              const p = project(s.pos); const r = g.reach / mpp;
               return (
                 <div className="pointer-events-none absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
                   {g.skillEffect && Date.now() - g.skillEffect.at < 1200 && <div className="absolute left-1/2 top-1/2"><SkillEffect id={g.skillEffect.id} stamp={g.skillEffect.at} radius={r} /></div>}
@@ -546,6 +564,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       <div className="flex items-center gap-1"><b className="text-sm">거점 건설</b>
                         <span className="ml-auto">{s.base ? `${s.base.level}단계 · 반경 ${BASE_LEVELS[s.base.level].radiusM}m` : '미건설'}</span></div>
                       <p>현재 위치에 모닥불 거점을 세웁니다. 거점 안에서는 짐승이 나타나지 않습니다.</p>
+                      {s.base?.level === 1 && s.techs.includes('hut_building') && <p className="font-bold text-primary">움집 기술 습득 완료! 거점 안에서 [거점] 메뉴 → '뼈 움막으로 발전'을 눌러야 모닥불이 움막으로 바뀝니다. (창고: 통나무 12·날가죽 4·노끈 4·뼈 6)</p>}
                       <p>필요: 나뭇가지 {countOf(s.backpack, 'branch')}/{CAMP_COST[0].count}</p>
                       <button type="button" disabled={(realGps && !gps.ready) || countOf(s.backpack, 'branch') < CAMP_COST[0].count} onClick={g.placeBase}
                         className="pixel-btn h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">{s.base ? '현재 위치로 거점 옮기기' : '여기에 거점 건설'}</button>
@@ -564,14 +583,14 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         )}
       </AnimatePresence>
       <AnimatePresence>
-        {selPeer && <PeerActionMenu peer={selPeer} distance={distanceM(s.pos, selPeer)} inRange={distanceM(s.pos, selPeer) <= C.interactRadiusM}
+        {selPeer && <PeerActionMenu peer={selPeer} distance={distanceM(s.pos, selPeer)} inRange={distanceM(s.pos, selPeer) <= g.reach}
           isAlly={allies.some(a => a.id === selPeer.id)} onClose={() => setSelPeerId(null)}
           onEmote={(e) => { presence.send({ type: 'emote', to: selPeer.id, emote: e }); showBubble(presence.selfId, EMOTES.find(x => x.id === e)?.text ?? ''); playAction('talk', 900); setSelPeerId(null); }}
           onAlly={() => { pendingAlly.current.add(selPeer.id); presence.send({ type: 'ally', to: selPeer.id, name: presence.name }); toast('동맹을 제안했습니다'); setSelPeerId(null); }}
           onAttack={attackPeer} />}
       </AnimatePresence>
       <AnimatePresence>
-        {selLandmark && <LandmarkSheet landmark={selLandmark} inRange={distanceM(s.pos, selLandmark) <= C.interactRadiusM && (!realGps || gps.ready)}
+        {selLandmark && <LandmarkSheet landmark={selLandmark} inRange={distanceM(s.pos, selLandmark) <= g.reach && (!realGps || gps.ready)}
           claims={s.landmarkClaims} backpack={s.backpack} words={shamanWords}
           onVisit={() => { const w = g.visitLandmark(selLandmark); if (w) { setShamanWords(w); playAction('talk', 900); } }}
           onSell={g.sellItem} onBuy={g.buyItem} onClose={() => setSelLandmark(null)}

@@ -445,6 +445,45 @@ export type Database = {
         }
         Relationships: []
       }
+      survival_item_catalog: {
+        Row: {
+          category: string
+          description: string
+          image_path: string | null
+          is_custom: boolean
+          item_id: string
+          name: string
+          rarity: string
+          updated_at: string
+          updated_by: string | null
+          weight: number
+        }
+        Insert: {
+          category?: string
+          description?: string
+          image_path?: string | null
+          is_custom?: boolean
+          item_id: string
+          name: string
+          rarity?: string
+          updated_at?: string
+          updated_by?: string | null
+          weight?: number
+        }
+        Update: {
+          category?: string
+          description?: string
+          image_path?: string | null
+          is_custom?: boolean
+          item_id?: string
+          name?: string
+          rarity?: string
+          updated_at?: string
+          updated_by?: string | null
+          weight?: number
+        }
+        Relationships: []
+      }
       survival_saves: {
         Row: {
           payload: Json
