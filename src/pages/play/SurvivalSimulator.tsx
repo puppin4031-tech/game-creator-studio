@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { SkillControls, ConstructionControls, CompanionControls, SkillEffect } from '@/components/survival/SurvivalAbilities';
 import SpriteAnimator from '@/components/survival/SpriteAnimator';
+import BackpackDiscard from '@/components/survival/BackpackDiscard';
 import { useSpriteAnimations, type SpriteAction } from '@/hooks/useSpriteAnimations';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -43,6 +44,20 @@ const PLAYER_SCALE = 1.2;
 const LANDMARK_FEATURE_SCALE = 1.15;
 // Hard materials (stone, wood, ore) use the strike animation; soft ones use gather.
 const STRIKE_NODES = new Set<string>(['flint_rock', 'branch_pile', 'oak_tree', 'pine_tree', 'hematite_rock', 'quartz_vein', 'obsidian_rock', 'jade_rock']);
+
+/** Visual-only wooden stake fence drawn around the main base when a palisade is built. */
+function PalisadeRing({ radius }: { radius: number }) {
+  const posts = Math.max(12, Math.round((2 * Math.PI * radius) / 9));
+  return (
+    <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2">
+      {Array.from({ length: posts }, (_, i) => {
+        const a = (i / posts) * Math.PI * 2;
+        return <div key={i} className="absolute h-3.5 w-1.5 border border-[hsl(var(--colonion-wood-dark))] bg-[hsl(var(--colonion-wood-edge))]"
+          style={{ left: Math.cos(a) * radius, top: Math.sin(a) * radius, transform: 'translate(-50%,-100%)', clipPath: 'polygon(50% 0,100% 25%,100% 100%,0 100%,0 25%)' }} />;
+      })}
+    </div>
+  );
+}
 
 function Sprite({ k, scale = 1, className = '' }: { k: SpriteKey; scale?: number; className?: string }) {
   const m = SPRITE_META[k];
@@ -233,11 +248,12 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               return (
                 <div className="absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
                   <div className="rounded-full border-2 border-dashed border-primary/70 bg-primary/10" style={{ width: r * 2, height: r * 2 }} />
-                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"><Sprite k={g.baseDef.sprite} /></div>
+                  {s.palisade && <PalisadeRing radius={Math.min(r, 70)} />}
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"><Sprite k={g.baseDef.sprite} scale={(s.base?.level ?? 1) >= 2 ? 1.2 : 1} /></div>
                 </div>
               );
             })()}
-            {s.outpost && (() => { const p = project(s.outpost); return <div className="pointer-events-none absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}><Sprite k="base-campfire" /><span className="bg-background text-[10px]">전진기지</span></div>; })()}
+            {s.outpost && (() => { const p = project(s.outpost); return <div className="pointer-events-none absolute flex flex-col items-center" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}><Sprite k="base-outpost" scale={1.2} /><span className="rounded bg-background px-1 text-[10px]">전진기지</span></div>; })()}
             {landmarks.filter((l) => l.kind === 'shaman' && distanceM(s.pos, l) <= g.vision + SANCTUARY_RADIUS_M).map((l) => {
               const p = project(l); const r = SANCTUARY_RADIUS_M / mpp;
               return <div key={`sanct-${l.id}`} aria-hidden className="pointer-events-none absolute rounded-full border-2 border-primary/60 bg-primary/5 shadow-[0_0_18px_hsl(var(--primary)/0.5)]" style={{ left: p.x, top: p.y, width: r * 2, height: r * 2, transform: 'translate(-50%,-50%)' }} />;
@@ -422,7 +438,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       )) : <p className="text-sm text-muted-foreground">맨손입니다. 기술을 깨우쳐 도구를 만드세요.</p>}
                     </div>
                   </div>
-                  <button type="button" onClick={() => { if (confirm('처음부터 다시 시작할까요?')) g.reset(); }} className="flex min-h-11 items-center gap-1 text-xs text-muted-foreground"><RotateCcw className="!h-4 !w-4" />처음부터 다시</button>
+                  <BackpackDiscard backpack={s.backpack} onDrop={g.dropItems} />
                 </>
               )}
 
