@@ -14,5 +14,10 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    // Single React instance; prevents "reading 'useEffect' of null" after dep re-optimization.
+    dedupe: ["react", "react-dom", "react/jsx-runtime", "@tanstack/react-query"],
+  },
+  optimizeDeps: {
+    include: ["react", "react-dom", "react/jsx-runtime", "@tanstack/react-query", "@radix-ui/react-checkbox"],
   },
 }));
