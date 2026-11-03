@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 interface Props {
   url: string;
@@ -8,17 +8,34 @@ interface Props {
   playing?: boolean;
   /** Play one full cycle then hold the last frame (for one-shot actions like gather/attack). */
   once?: boolean;
+  /** Static image shown until the sheet is decoded, or if it fails to load. */
+  fallback?: ReactNode;
+}
+
+// Cache of decoded sheet aspect ratios so switching actions never shows an empty frame.
+const loaded = new Map<string, number>();
+
+export function preloadSpriteSheet(url: string, frames: number): Promise<void> {
+  if (loaded.has(url)) return Promise.resolve();
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => { loaded.set(url, img.naturalWidth / frames / img.naturalHeight || 1); resolve(); };
+    img.onerror = () => resolve();
+    img.src = url;
+  });
 }
 
 /** Plays a horizontal sprite-sheet strip (equal-width frames, left to right). */
-export default function SpriteAnimator({ url, frames, fps, height = 64, playing = true, once = false }: Props) {
+export default function SpriteAnimator({ url, frames, fps, height = 64, playing = true, once = false, fallback }: Props) {
   const [frame, setFrame] = useState(0);
-  const [ratio, setRatio] = useState(1);
+  const [ratio, setRatio] = useState<number | null>(() => loaded.get(url) ?? null);
 
   useEffect(() => {
-    const img = new Image();
-    img.onload = () => setRatio(img.naturalWidth / frames / img.naturalHeight || 1);
-    img.src = url;
+    let alive = true;
+    if (loaded.has(url)) { setRatio(loaded.get(url)!); return; }
+    setRatio(null);
+    preloadSpriteSheet(url, frames).then(() => { if (alive) setRatio(loaded.get(url) ?? null); });
+    return () => { alive = false; };
   }, [url, frames]);
 
   useEffect(() => {
@@ -32,6 +49,7 @@ export default function SpriteAnimator({ url, frames, fps, height = 64, playing 
     return () => window.clearInterval(id);
   }, [frames, fps, playing, url, once]);
 
+  if (ratio === null) return <>{fallback ?? null}</>;
   const width = height * ratio;
   return (
     <div

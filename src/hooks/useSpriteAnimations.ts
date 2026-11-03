@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { preloadSpriteSheet } from '@/components/survival/SpriteAnimator';
 
 export const SPRITE_ACTIONS = ['idle', 'walk', 'gather', 'attack', 'talk'] as const;
 export type SpriteAction = (typeof SPRITE_ACTIONS)[number];
@@ -31,6 +32,8 @@ export function useSpriteAnimations(characterKey = 'hunter') {
         const url = signed?.[i]?.signedUrl;
         if (url) out[row.action as SpriteAction] = { ...(row as Omit<SpriteAnimation, 'url'>), action: row.action as SpriteAction, url };
       });
+      // Warm every action sheet so switching idle/gather/attack never flashes empty.
+      await Promise.all(Object.values(out).map(a => a && preloadSpriteSheet(a.url, a.frame_count)));
       return out;
     },
   });
