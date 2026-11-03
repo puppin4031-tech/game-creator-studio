@@ -135,7 +135,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     if (realGps && !gps.ready) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return; }
     if (!realGps && distanceM(s.pos, e) > C.interactRadiusM) { g.moveTo({ lat: e.lat, lng: e.lng }); return; }
     const inRange = distanceM(s.pos, e) <= C.interactRadiusM;
-    const act: SpriteAction = e.kind === 'creature' || STRIKE_NODES.has(e.type) ? 'attack' : 'gather';
+    const act: SpriteAction = e.kind === 'creature' || STRIKE_NODES.has(e.type) ? 'chop' : 'gather';
     if (inRange) {
       // Walk to the object (250ms), act, then wait 3s before walking back.
       setActorTarget({ lat: e.lat, lng: e.lng, anchor: s.pos });
@@ -172,7 +172,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     if (actorTarget && shouldReturnToCenter(s.pos, actorTarget, C.interactRadiusM)) returnToCenter();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.pos, actorTarget]);
-  const activeAnim = anims?.[action] ?? anims?.idle;
+  const activeAnim = anims?.[action] ?? (action === 'chop' ? anims?.attack : undefined) ?? anims?.idle;
 
   const zone = s.terrainZones[zoneCellKey(s.pos)] ?? 'plains';
   const onSurfaceZone = (c: LatLng, z: typeof zone) => g.recordTerrainZone(zoneCellKey(c), z);
@@ -322,7 +322,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       <motion.div className="absolute left-1/2 top-1/2" initial={false} animate={{ x: dx, y: dy }} transition={{ duration: actorTarget ? 0.25 : 0.5, ease: 'easeOut' }}>
                         <div className="-translate-x-1/2 -translate-y-[85%]">
                           {bubbles[presence.selfId] && <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbles[presence.selfId]}</span>}
-                          <HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined }}>{activeAnim ? <SpriteAnimator key={activeAnim.url} url={activeAnim.url} frames={activeAnim.frame_count} fps={activeAnim.fps} height={Math.round(SPRITE_META['char-hunter'].h * PLAYER_SCALE)} once={action === 'gather' || action === 'attack'} fallback={<Sprite k="char-hunter" scale={PLAYER_SCALE} />} /> : <Sprite k="char-hunter" scale={PLAYER_SCALE} />}</div></HitFlash>
+                          <HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined }}>{activeAnim ? <SpriteAnimator key={activeAnim.url} url={activeAnim.url} frames={activeAnim.frame_count} fps={activeAnim.fps} height={Math.round(SPRITE_META['char-hunter'].h * PLAYER_SCALE)} once={action === 'gather' || action === 'attack' || action === 'chop'} fallback={<Sprite k="char-hunter" scale={PLAYER_SCALE} />} /> : <Sprite k="char-hunter" scale={PLAYER_SCALE} />}</div></HitFlash>
                         </div>
                       </motion.div>
                     );
