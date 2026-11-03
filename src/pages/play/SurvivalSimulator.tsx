@@ -24,6 +24,8 @@ import { SPRITE_META, type SpriteKey } from '@/lib/survival/spriteMeta';
 import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
 import { SURVIVAL_CONFIG as C } from '@/lib/survival/config';
 import { distanceM } from '@/lib/survival/geo';
+import { isNodeAvailable } from '@/lib/survival/world';
+import { AUTO_PICKUP_INTERVAL_MS, AUTO_PICKUP_RADIUS_M, hasAutoPickup } from '@/lib/survival/utilitySkills';
 import { ACTOR_IDLE_RETURN_MS, shouldReturnToCenter, type ActorTarget } from '@/lib/survival/actorPos';
 import { TECHS, isRecipeUnlocked, prerequisitesMet, techForRecipe } from '@/lib/survival/tech';
 import { countOf } from '@/lib/survival/inventory';
@@ -562,6 +564,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       <div className="flex items-center gap-1"><b className="text-sm">거점 건설</b>
                         <span className="ml-auto">{s.base ? `${s.base.level}단계 · 반경 ${BASE_LEVELS[s.base.level].radiusM}m` : '미건설'}</span></div>
                       <p>현재 위치에 모닥불 거점을 세웁니다. 거점 안에서는 짐승이 나타나지 않습니다.</p>
+                      {s.base?.level === 1 && s.techs.includes('hut_building') && <p className="font-bold text-primary">움집 기술 습득 완료! 거점 안에서 [거점] 메뉴 → '뼈 움막으로 발전'을 눌러야 모닥불이 움막으로 바뀝니다. (창고: 통나무 12·날가죽 4·노끈 4·뼈 6)</p>}
                       <p>필요: 나뭇가지 {countOf(s.backpack, 'branch')}/{CAMP_COST[0].count}</p>
                       <button type="button" disabled={(realGps && !gps.ready) || countOf(s.backpack, 'branch') < CAMP_COST[0].count} onClick={g.placeBase}
                         className="pixel-btn h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">{s.base ? '현재 위치로 거점 옮기기' : '여기에 거점 건설'}</button>
