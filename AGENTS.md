@@ -24,3 +24,4 @@
 - survival_saves rows are validated by a DB trigger (size, vitals, item counts, future timestamps) and AI planning has a per-client daily cap in survival_ai_daily_usage; why: client-side state can be tampered with, so the server rejects impossible saves and bounds AI spend.
 - GPS jumps re-anchor only after repeated accurate fixes and then lock interactions for a cooldown (gps.ts); the survival_saves trigger also rejects implied travel over 100 m/s since the last save; why: spoofed teleports must never yield instant rewards or sync.
 - Survival item catalog merges code ITEMS with admin rows in survival_item_catalog (useItemCatalog); passive utility tech numbers live in utilitySkills.ts; why: new code items appear in /admin/items automatically and bonuses stay testable.
+- Vassal tribute settles via server RPCs only; why: no client writes another save.

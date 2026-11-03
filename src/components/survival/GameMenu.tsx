@@ -1,0 +1,71 @@
+import { useEffect, useState } from 'react';
+import { Menu, LogOut, Settings, DoorOpen } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
+import { getSettings, saveSettings, subscribeSettings, playSfx, haptic, type GameSettings, type VolumeLevel } from '@/lib/survival/gameSettings';
+
+interface Props { onExit: () => void; onLogout: () => Promise<void> | void; loggedIn: boolean }
+
+export function useGameSettings() {
+  const [s, setS] = useState<GameSettings>(getSettings);
+  useEffect(() => subscribeSettings(setS), []);
+  return s;
+}
+
+export default function GameMenu({ onExit, onLogout, loggedIn }: Props) {
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const s = useGameSettings();
+  const Row = ({ label, hint, k }: { label: string; hint: string; k: 'bgm' | 'sfx' | 'haptic' }) => (
+    <label className="flex min-h-11 items-center justify-between gap-3">
+      <span><b className="block text-sm">{label}</b><span className="text-xs text-muted-foreground">{hint}</span></span>
+      <Switch checked={s[k]} onCheckedChange={(v) => { saveSettings({ [k]: v }); if (k === 'sfx' && v) playSfx('notify'); if (k === 'haptic' && v) haptic(80); }} />
+    </label>
+  );
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" aria-label="메뉴" className="pixel-btn flex h-11 w-11 items-center justify-center bg-card"><Menu className="!h-6 !w-6" /></button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="font-pixel">
+          <DropdownMenuItem className="min-h-11" onSelect={onExit}><DoorOpen className="mr-2 !h-5 !w-5" />나가기</DropdownMenuItem>
+          <DropdownMenuItem className="min-h-11" onSelect={() => setSettingsOpen(true)}><Settings className="mr-2 !h-5 !w-5" />설정</DropdownMenuItem>
+          {loggedIn && <DropdownMenuItem className="min-h-11 text-destructive" onSelect={() => setConfirmLogout(true)}><LogOut className="mr-2 !h-5 !w-5" />로그아웃</DropdownMenuItem>}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <AlertDialog open={confirmLogout} onOpenChange={setConfirmLogout}>
+        <AlertDialogContent className="font-pixel">
+          <AlertDialogHeader><AlertDialogTitle>로그아웃 하시겠습니까?</AlertDialogTitle></AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="min-h-11">아니요</AlertDialogCancel>
+            <AlertDialogAction className="min-h-11" onClick={() => void onLogout()}>예</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="font-pixel">
+          <DialogHeader><DialogTitle>설정</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <Row k="bgm" label="배경음 (BGM)" hint="음악 앱과 함께 쓸 땐 꺼두세요" />
+            <Row k="sfx" label="효과음 (SFX)" hint="타격음·위험 경고음" />
+            <div>
+              <b className="text-sm">소리 크기</b>
+              <div className="mt-1 grid grid-cols-3 gap-1.5">
+                {(['S', 'M', 'L'] as VolumeLevel[]).map((v) => (
+                  <button key={v} type="button" aria-pressed={s.volume === v} onClick={() => { saveSettings({ volume: v }); playSfx('notify'); }}
+                    className={`pixel-btn min-h-11 text-sm ${s.volume === v ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>{v}</button>
+                ))}
+              </div>
+            </div>
+            <Row k="haptic" label="진동" hint="주머니 속에서도 위험·공격·알림을 진동으로" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}

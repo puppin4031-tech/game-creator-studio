@@ -7,7 +7,7 @@ import BackpackDiscard from '@/components/survival/BackpackDiscard';
 import { useSpriteAnimations, type SpriteAction } from '@/hooks/useSpriteAnimations';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Backpack, Flame, Lightbulb, LocateFixed, X, Lock, ListChecks, Compass, ChevronUp, Star, MapPin, Navigation } from 'lucide-react';
+import { Backpack, Flame, Lightbulb, LocateFixed, X, Lock, ListChecks, Compass, ChevronUp, Star, MapPin, Navigation } from 'lucide-react';
 import { bearingDeg, useSurvivalFavorites } from '@/hooks/useSurvivalFavorites';
 import { useDeviceHeading } from '@/hooks/useDeviceHeading';
 import { useSurvivalGps } from '@/hooks/useSurvivalGps';
@@ -35,7 +35,13 @@ import LandmarkSheet from '@/components/survival/LandmarkSheet';
 import { LANDMARK_INFO, SANCTUARY_RADIUS_M, type Landmark } from '@/lib/survival/landmarks';
 import PeerActionMenu from '@/components/survival/PeerActionMenu';
 import { useSurvivalPresence, type PeerEvent, type PeerPlayer } from '@/hooks/useSurvivalPresence';
-import { EMOTES, PVP_BASE_DAMAGE } from '@/lib/survival/presence';
+import { EMOTES, PVP_BASE_DAMAGE, DUEL_MAX_DISTANCE_M } from '@/lib/survival/presence';
+import GameMenu, { useGameSettings } from '@/components/survival/GameMenu';
+import { EMOTE_ICON } from '@/components/survival/emoteIcons';
+import { playSfx, haptic, setBgmPlaying } from '@/lib/survival/gameSettings';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { TECH_CATEGORIES, TECH_CATEGORY, type TechCategory } from '@/lib/survival/techCategories';
 
 const START: LatLng = { lat: 37.748, lng: 126.7496 };
@@ -156,6 +162,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const returnTimer = useRef<number>();
   const [actorTarget, setActorTarget] = useState<ActorTarget | null>(null);
   const playAction = (a: SpriteAction, ms: number) => {
+    if (a === 'attack' || a === 'chop') playSfx('hit');
     setAction(a); window.clearTimeout(actionTimer.current);
     actionTimer.current = window.setTimeout(() => setAction('idle'), ms);
   };
@@ -220,21 +227,53 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     setBubbles(b => ({ ...b, [id]: text }));
     window.setTimeout(() => setBubbles(b => { const n = { ...b }; if (n[id] === text) delete n[id]; return n; }), 3000);
   };
+  const { user, signOut } = useAuth();
+  const gameSettings = useGameSettings();
+  useEffect(() => { setBgmPlaying(gameSettings.bgm); return () => setBgmPlaying(false); }, [gameSettings.bgm]);
+  useEffect(() => { if (hit.n > 0) { playSfx('hit'); haptic(120); } }, [hit.n]);
+  const gRef = useRef(g); gRef.current = g;
+  const [duelWith, setDuelWith] = useState<string | null>(null);
+  const duelRef = useRef<string | null>(null); duelRef.current = duelWith;
+  const [vassalLinks, setVassalLinks] = useState<Set<string>>(() => new Set());
+  const pendingVassal = useRef(new Set<string>());
+  const [vassalOffer, setVassalOffer] = useState<{ id: string; name: string } | null>(null);
+  const shareAllyLocation = (p: { id: string; name: string; lat: number; lng: number }) => {
+    if (!favs.isFav(`ally-${p.id}`)) favs.toggle({ id: `ally-${p.id}`, name: `동료 ${p.name}`, lat: p.lat, lng: p.lng });
+  };
+  const bubbleView = (v: string) => v.startsWith('icon:')
+    ? <img src={EMOTE_ICON[v.slice(5) as keyof typeof EMOTE_ICON]} alt="" className="h-8 w-8 [image-rendering:pixelated]" />
+    : v;
   const peersRef = useRef<PeerPlayer[]>([]);
   const pendingAlly = useRef(new Set<string>());
   const onPeerEvent = (e: PeerEvent) => {
     const from = peersRef.current.find(p => p.id === e.from);
-    if (e.type === 'emote') showBubble(e.from, EMOTES.find(x => x.id === e.emote)?.text ?? '');
+    if (e.type === 'emote') { showBubble(e.from, `icon:${e.emote}`); playSfx('emote'); haptic(40); }
+    else if (e.type === 'duel') {
+      if (allies.some(a => a.id === e.from)) return;
+      setDuelWith(e.from); playSfx('warn'); haptic([200, 100, 200]);
+      toast.error(`${e.name}님이 전투를 걸었습니다! 공격하거나 도망치세요. ${DUEL_MAX_DISTANCE_M}m 멀어지면 전투가 끝납니다.`, { duration: 6000 });
+    } else if (e.type === 'duel-end') {
+      if (duelRef.current === e.from) { setDuelWith(null); toast('전투가 끝났습니다'); }
+    } else if (e.type === 'vassal-req') {
+      setVassalOffer({ id: e.from, name: e.name }); playSfx('notify'); haptic([80, 60, 80]);
+    } else if (e.type === 'vassal-res') {
+      if (!pendingVassal.current.delete(e.from)) return;
+      playSfx('notify'); haptic(80);
+      if (e.accept) { setVassalLinks(v => new Set(v).add(e.from)); if (from) shareAllyLocation(from); toast.success(`${e.name}님이 부하가 되었습니다`); }
+      else toast(`${e.name}님이 부하 임명을 거부했습니다`);
+    }
     else if (e.type === 'attack') {
-      // Ignore attacks from unknown, allied, or out-of-range players.
-      if (!from || allies.some(a => a.id === e.from) || distanceM(s.pos, from) > g.reach * 1.5) return;
+      // Attacks only count inside an accepted duel with that player, in range.
+      if (!from || duelRef.current !== e.from || distanceM(s.pos, from) > g.reach * 1.5) return;
       g.takeDamage(Math.min(30, e.dmg));
+      haptic([100, 50, 100]);
       toast.error(`${from.name}에게 공격받았습니다!`);
     } else if (e.type === 'ally') {
       if (allies.some(x => x.id === e.from)) return;
-      if (pendingAlly.current.has(e.from)) { pendingAlly.current.delete(e.from); setAllies(a => [...a, { id: e.from, name: e.name }]); toast.success(`${e.name}님과 동맹을 맺었습니다`); return; }
+      if (pendingAlly.current.has(e.from)) { pendingAlly.current.delete(e.from); setAllies(a => [...a, { id: e.from, name: e.name }]); if (from) shareAllyLocation(from); toast.success(`${e.name}님과 동맹을 맺었습니다`); return; }
       toast(`${e.name}님이 동맹을 제안했습니다`, { action: { label: '수락', onClick: () => {
         setAllies(a => a.some(x => x.id === e.from) ? a : [...a, { id: e.from, name: e.name }]);
+        if (from) shareAllyLocation(from);
         presence.send({ type: 'ally', to: e.from, name: presence.name });
       } } });
       // Auto-complete if we already proposed to them.
@@ -243,8 +282,71 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const presence = useSurvivalPresence(realGps ? gps.ready : true, s.pos, s.level, onPeerEvent, chiefName, s.base);
   peersRef.current = presence.peers;
   const selPeer = presence.peers.find(p => p.id === selPeerId) ?? null;
+
+  // Duel ends when the opponent leaves or is farther than DUEL_MAX_DISTANCE_M.
+  useEffect(() => {
+    if (!duelWith) return;
+    const op = presence.peers.find(p => p.id === duelWith);
+    if (op && distanceM(s.pos, op) <= DUEL_MAX_DISTANCE_M) return;
+    if (op) presence.send({ type: 'duel-end', to: op.id });
+    setDuelWith(null);
+    toast(`상대와 ${DUEL_MAX_DISTANCE_M}m 이상 멀어져 전투가 끝났습니다`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duelWith, presence.peers, s.pos]);
+
+  // Vassal links + daily tribute (pay as vassal, collect as lord). Real GPS + signed-in only.
+  useEffect(() => {
+    if (!user || !realGps) return;
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const { data: links, error: e0 } = await supabase.from('survival_vassals').select('vassal_id,lord_id');
+        if (e0) throw e0;
+        if (!cancelled) setVassalLinks(new Set((links ?? []).map(l => l.vassal_id === user.id ? l.lord_id : l.vassal_id)));
+        const { data: paid, error: e1 } = await supabase.rpc('pay_survival_tribute');
+        if (e1) throw e1;
+        const t = paid as { item_id: string | null; lord_name: string } | null;
+        if (!cancelled && t?.item_id && t.item_id in ITEMS) {
+          const id = t.item_id as ItemId;
+          gRef.current.adjustStorage([], [{ itemId: id, count: 1 }]);
+          toast(`주인 ${t.lord_name}에게 ${ITEMS[id].name} 1개를 상납했습니다`);
+        }
+        const { data: got, error: e2 } = await supabase.rpc('claim_survival_tributes');
+        if (e2) throw e2;
+        const rows = (got ?? []).filter(r => r.item_id in ITEMS);
+        if (!cancelled && rows.length) {
+          gRef.current.adjustStorage(rows.map(r => ({ itemId: r.item_id as ItemId, count: r.count })));
+          rows.forEach(r => toast.success(`부하 ${r.vassal_name}이(가) ${ITEMS[r.item_id as ItemId].name} ${r.count}개를 거점에 상납했습니다`));
+          playSfx('notify'); haptic(80);
+        }
+      } catch (err) { console.warn('[survivalTribute]', err); }
+    };
+    const t0 = window.setTimeout(run, 5000);
+    const iv = window.setInterval(run, 10 * 60_000);
+    return () => { cancelled = true; window.clearTimeout(t0); window.clearInterval(iv); };
+  }, [user?.id, realGps]);
+
+  const acceptVassal = async (accept: boolean) => {
+    const o = vassalOffer; setVassalOffer(null);
+    if (!o) return;
+    if (accept) {
+      try {
+        const { data, error } = await supabase.rpc('become_survival_vassal', { _lord: o.id, _lord_name: o.name, _vassal_name: presence.name });
+        if (error || !data) throw error ?? new Error('rejected');
+        setVassalLinks(v => new Set(v).add(o.id));
+        const lord = presence.peers.find(p => p.id === o.id); if (lord) shareAllyLocation(lord);
+        toast.success(`${o.name}님의 부하가 되었습니다. 매일 거점 물품 1개가 상납됩니다`);
+      } catch (err) {
+        console.warn('[survivalVassal]', err);
+        toast.error('부하 등록에 실패했어요. 잠시 후 다시 시도해 주세요');
+        presence.send({ type: 'vassal-res', to: o.id, name: presence.name, accept: false });
+        return;
+      }
+    } else toast('부하 임명을 거부했습니다');
+    presence.send({ type: 'vassal-res', to: o.id, name: presence.name, accept });
+  };
   const attackPeer = () => {
-    if (!selPeer) return;
+    if (!selPeer || duelWith !== selPeer.id) return;
     const dmg = PVP_BASE_DAMAGE + (g.weapon ? ITEMS[g.weapon.itemId].weapon?.atk ?? 0 : 0);
     presence.send({ type: 'attack', to: selPeer.id, dmg });
     setActorTarget({ lat: selPeer.lat, lng: selPeer.lng, anchor: s.pos });
@@ -319,7 +421,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 <button key={pr.id} type="button" aria-label={`${pr.name} 상호작용`} onClick={(ev) => { ev.stopPropagation(); setSelPeerId(pr.id); }}
                   className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center transition-[left,top] duration-1000 ease-linear"
                   style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}>
-                  {bubbles[pr.id] && <span className="whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbles[pr.id]}</span>}
+                  {bubbles[pr.id] && <span className="whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbleView(bubbles[pr.id])}</span>}
                   <Sprite k="char-hunter" className="opacity-90 hue-rotate-90" />
                   <span className={`rounded px-1 text-[10px] ${ally ? 'bg-primary text-primary-foreground' : 'bg-background/80'}`}>{pr.name}</span>
                 </button>
@@ -339,7 +441,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                     return (
                       <motion.div className="absolute left-1/2 top-1/2" initial={false} animate={{ x: dx, y: dy }} transition={{ duration: actorTarget ? 0.25 : 0.5, ease: 'easeOut' }}>
                         <div className="-translate-x-1/2 -translate-y-[85%]">
-                          {bubbles[presence.selfId] && <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbles[presence.selfId]}</span>}
+                          {bubbles[presence.selfId] && <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbleView(bubbles[presence.selfId])}</span>}
                           <HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined }}>{activeAnim ? <SpriteAnimator key={activeAnim.url} url={activeAnim.url} frames={activeAnim.frame_count} fps={activeAnim.fps} height={Math.round(SPRITE_META['char-hunter'].h * PLAYER_SCALE)} once={action === 'gather' || action === 'attack' || action === 'chop'} fallback={<Sprite k="char-hunter" scale={PLAYER_SCALE} />} /> : <Sprite k="char-hunter" scale={PLAYER_SCALE} />}</div></HitFlash>
                         </div>
                       </motion.div>
@@ -355,7 +457,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
       {/* Top HUD */}
       <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-background/80 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur">
-        <button type="button" aria-label="뒤로" onClick={() => navigate(realGps ? '/' : '/play')} className="pixel-btn flex h-11 w-11 items-center justify-center bg-card"><ArrowLeft className="!h-6 !w-6" /></button>
+        <GameMenu loggedIn={!!user} onExit={() => navigate(realGps ? '/' : '/play')}
+          onLogout={async () => { try { await signOut(); navigate('/login'); } catch { toast.error('로그아웃에 실패했어요. 다시 시도해 주세요'); } }} />
         <div className="flex-1 space-y-1 text-xs">
           <div className="flex items-center gap-1">체력<HpBar value={s.hp} max={C.baseMaxHp} />{s.hp}</div>
           <div className="flex items-center gap-1">허기<div className="h-2.5 flex-1 border border-foreground bg-muted"><div className="h-full bg-primary" style={{ width: `${s.hunger}%` }} /></div>{s.hunger}</div>
@@ -551,7 +654,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   })}
                   {techTab === 'talk' && (
                     <div className="space-y-2 text-xs">
-                      <p className="text-muted-foreground">주변 25m 안의 다른 생존자를 누르면 표현을 보내거나 동맹을 제안할 수 있습니다.</p>
+                      <p className="text-muted-foreground">주변 25m 안의 다른 생존자를 누르면 우우·호감 표현, 전투 신청, 동료 초대·부하 임명을 할 수 있습니다.</p>
                       <div className="grid grid-cols-2 gap-1.5">
                         {EMOTES.map((e) => <div key={e.id} className="pixel-frame bg-primary/15 p-2"><b>{e.label}</b><p>"{e.text}"</p></div>)}
                         <div className="pixel-frame bg-primary/15 p-2"><b>동맹 제안</b><p>친구로 추가하고 서로 공격하지 않음</p></div>
@@ -585,7 +688,11 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       <AnimatePresence>
         {selPeer && <PeerActionMenu peer={selPeer} distance={distanceM(s.pos, selPeer)} inRange={distanceM(s.pos, selPeer) <= g.reach}
           isAlly={allies.some(a => a.id === selPeer.id)} onClose={() => setSelPeerId(null)}
-          onEmote={(e) => { presence.send({ type: 'emote', to: selPeer.id, emote: e }); showBubble(presence.selfId, EMOTES.find(x => x.id === e)?.text ?? ''); playAction('talk', 900); setSelPeerId(null); }}
+          isVassalLink={vassalLinks.has(selPeer.id)} inDuel={duelWith === selPeer.id}
+          canVassal={!!user && !selPeer.id.startsWith('g-')}
+          onEmote={(e) => { presence.send({ type: 'emote', to: selPeer.id, emote: e }); showBubble(presence.selfId, `icon:${e}`); playSfx('emote'); playAction('talk', 900); setSelPeerId(null); }}
+          onDuel={() => { presence.send({ type: 'duel', to: selPeer.id, name: presence.name }); setDuelWith(selPeer.id); playSfx('warn'); toast.warning(`${selPeer.name}님에게 전투를 걸었습니다! ${DUEL_MAX_DISTANCE_M}m 멀어지면 끝납니다.`); }}
+          onVassal={() => { pendingVassal.current.add(selPeer.id); presence.send({ type: 'vassal-req', to: selPeer.id, name: presence.name }); toast('부하 임명을 요청했습니다'); setSelPeerId(null); }}
           onAlly={() => { pendingAlly.current.add(selPeer.id); presence.send({ type: 'ally', to: selPeer.id, name: presence.name }); toast('동맹을 제안했습니다'); setSelPeerId(null); }}
           onAttack={attackPeer} />}
       </AnimatePresence>
@@ -598,6 +705,18 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           onToggleFav={() => { const was = favs.isFav(selLandmark.id); favs.toggle({ id: selLandmark.id, name: LANDMARK_INFO[selLandmark.kind].name, lat: selLandmark.lat, lng: selLandmark.lng }); toast(was ? '즐겨찾기에서 뺐어요' : '즐겨찾기에 등록했어요'); }} />}
       </AnimatePresence>
       <DamageVignette hitKey={hit.n} />
+      <AlertDialog open={!!vassalOffer}>
+        <AlertDialogContent className="font-pixel">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{vassalOffer?.name}님이 당신을 부하로 임명하려 합니다</AlertDialogTitle>
+            <AlertDialogDescription>부하가 되면 서로 위치가 공유되고, 매일 내 거점 물품 중 1개가 주인의 거점으로 상납됩니다.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="min-h-11" onClick={() => void acceptVassal(false)}>거부한다</AlertDialogCancel>
+            <AlertDialogAction className="min-h-11" onClick={() => void acceptVassal(true)}>부하가 된다</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
