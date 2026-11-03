@@ -11,6 +11,11 @@
   }
 }
 
+/* Block mobile pull-to-refresh and bounce; inner scroll areas use overscroll-contain. */
+html, body, #root {
+  overscroll-behavior-y: none;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
