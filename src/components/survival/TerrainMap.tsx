@@ -8,6 +8,7 @@ import { terrainOnlyStyle, type TerrainPalette } from '@/lib/survival/mapStyle';
 import { terrainDecorations } from '@/lib/survival/terrainScenery';
 import { classifyPoi, clusterLandmarks, type Landmark } from '@/lib/survival/landmarks';
 import { classifyTerrain, type TerrainZone } from '@/lib/survival/terrainZone';
+import MapZoomControl, { DEFAULT_ZOOM } from './MapZoomControl';
 
 type Rgba = [number, number, number, number];
 function parseColor(c: string): Rgba {
@@ -279,6 +280,7 @@ export default function TerrainMap({ center, visionM, explored, onTap, zone = 'p
       <canvas ref={scenery} aria-hidden="true" data-terrain-scenery className="pointer-events-none absolute inset-0 h-full w-full" />
       <canvas ref={fog} className="pointer-events-none absolute inset-0 h-full w-full" />
       <div className="pointer-events-none absolute inset-0">{map && children(project, metersPerPx(map))}</div>
+      {map && <MapZoomControl onZoomBy={(d) => map.easeTo({ zoom: map.getZoom() + d, duration: 300 })} onReset={() => map.easeTo({ zoom: DEFAULT_ZOOM, duration: 400 })} />}
     </div>
   );
 }
