@@ -1,0 +1,2 @@
+ALTER TABLE public.survival_sprite_animations DROP CONSTRAINT IF EXISTS survival_sprite_animations_action_check;
+ALTER TABLE public.survival_sprite_animations ADD CONSTRAINT survival_sprite_animations_action_check CHECK (action IN ('idle','walk','gather','attack','chop','talk'));

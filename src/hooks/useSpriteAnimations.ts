@@ -2,9 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadSpriteSheet } from '@/components/survival/SpriteAnimator';
 
-export const SPRITE_ACTIONS = ['idle', 'walk', 'gather', 'attack', 'talk'] as const;
+export const SPRITE_ACTIONS = ['idle', 'walk', 'gather', 'attack', 'chop', 'talk'] as const;
 export type SpriteAction = (typeof SPRITE_ACTIONS)[number];
-export const SPRITE_ACTION_LABELS: Record<SpriteAction, string> = { idle: '대기', walk: '걷기', gather: '채집', attack: '공격', talk: '대화' };
+export const SPRITE_ACTION_LABELS: Record<SpriteAction, string> = { idle: '대기', walk: '걷기', gather: '채집', attack: '공격', chop: '찍기(나무·돌)', talk: '대화' };
 export const SPRITE_BUCKET = 'survival-sprites';
 
 export interface SpriteAnimation {
