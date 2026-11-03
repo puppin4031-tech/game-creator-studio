@@ -135,7 +135,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     if (realGps && !gps.ready) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return; }
     if (!realGps && distanceM(s.pos, e) > C.interactRadiusM) { g.moveTo({ lat: e.lat, lng: e.lng }); return; }
     const inRange = distanceM(s.pos, e) <= C.interactRadiusM;
-    const act: SpriteAction = e.kind === 'creature' || STRIKE_NODES.has(e.type) ? 'chop' : 'gather';
+    const act: SpriteAction = e.kind === 'creature' ? 'attack' : STRIKE_NODES.has(e.type) ? 'chop' : 'gather';
     if (inRange) {
       // Walk to the object (250ms), act, then wait 3s before walking back.
       setActorTarget({ lat: e.lat, lng: e.lng, anchor: s.pos });
