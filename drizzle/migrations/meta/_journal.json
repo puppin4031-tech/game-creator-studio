@@ -64,6 +64,13 @@
       "when": 1793660514684,
       "tag": "0008_server_authoritative_world_rewards",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793711236504,
+      "tag": "0009_sprite_action_chop",
+      "breakpoints": true
     }
   ]
 }
