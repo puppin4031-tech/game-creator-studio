@@ -9,7 +9,11 @@ export interface PeerPlayer { id: string; name: string; lat: number; lng: number
 export type PeerEvent =
   | { type: 'emote'; from: string; to?: string; emote: EmoteId }
   | { type: 'attack'; from: string; to: string; dmg: number }
-  | { type: 'ally'; from: string; to: string; name: string };
+  | { type: 'ally'; from: string; to: string; name: string }
+  | { type: 'duel'; from: string; to: string; name: string }
+  | { type: 'duel-end'; from: string; to: string }
+  | { type: 'vassal-req'; from: string; to: string; name: string }
+  | { type: 'vassal-res'; from: string; to: string; name: string; accept: boolean };
 
 function guestId() {
   let id = sessionStorage.getItem('survival-guest-id');

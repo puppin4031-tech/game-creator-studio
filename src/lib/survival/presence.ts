@@ -45,8 +45,8 @@ export function shouldBroadcast(last: { pos: LatLng; at: number } | null, pos: L
 
 export type EmoteId = 'love' | 'good' | 'bad' | 'hello';
 export const EMOTES: { id: EmoteId; label: string; text: string }[] = [
-  { id: 'hello', label: '인사', text: '우가!' },
-  { id: 'love', label: '사랑 표현', text: '♥ 좋아!' },
-  { id: 'good', label: '긍정', text: '좋다!' },
-  { id: 'bad', label: '불쾌', text: '싫다!' },
+  { id: 'hello', label: '우우', text: '우우!' },
+  { id: 'love', label: '호감', text: '좋아!' },
 ];
+/** A PK duel ends once the two players are farther apart than this. */
+export const DUEL_MAX_DISTANCE_M = 100;
