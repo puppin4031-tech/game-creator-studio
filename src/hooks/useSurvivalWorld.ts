@@ -484,6 +484,14 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (result.ok === false) { toast.warning(result.reason); return; }
     setS(result.state); toast.success('동료가 모은 재료를 창고에 보관했습니다');
   }, [setS]);
+  /** Apply externally settled storage changes (e.g. vassal tribute in/out). */
+  const adjustStorage = useCallback((add: Stack[], remove: Stack[] = []) => {
+    const p = ref.current;
+    const left = remove.length ? removeStacks(p.storage, remove) : p.storage;
+    if (!left) return false;
+    setS({ ...p, storage: addStacks(left, add) });
+    return true;
+  }, [setS]);
   const withdraw = useCallback((itemId: ItemId) => {
     const p = ref.current;
     if (!enabledRef.current || !atWorkshop(p)) { toast.warning('거점 안에서만 꺼낼 수 있습니다'); return; }
@@ -522,7 +530,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setS]);
 
-  return { setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked,
+  return { setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
     recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon,
     moveTo, interact, eat, placeBase, upgradeBase, research, craft, reset, dropItems,
