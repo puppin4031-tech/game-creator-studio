@@ -9,6 +9,7 @@ import { CREATURE_ATTACK_INTERVAL_MS, resolveCreatureHit, rollLoot } from '@/lib
 import { RECIPES, type Recipe } from '@/lib/survival/recipes';
 import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
 import { SURVIVAL_CONFIG as C } from '@/lib/survival/config';
+import { visionBonus, reachRadius, pocketBonusKg } from '@/lib/survival/utilitySkills';
 import { ACTIVE_SKILLS, atMainBase, atWorkshop, buildStructure, collectCompanionWork, prepareSkill, recruitCompanion, researchTechnology, tameWolf, type ActiveSkill, type Companion } from '@/lib/survival/abilities';
 import { advanceSurvivalVitals } from '@/lib/survival/metabolism';
 import { distanceM } from '@/lib/survival/geo';
@@ -135,13 +136,14 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [s, userId]);
 
   const isNight = dayPhase(new Date(now)) === 'night';
-  const vision = isNight ? C.visionNightM : C.visionDayM;
+  const vision = (isNight ? C.visionNightM : C.visionDayM) + visionBonus(s.techs);
+  const reach = reachRadius(s.techs);
   const baseDef = s.base ? BASE_LEVELS[s.base.level] : null;
   const [sanctuaries, setSanctuaries] = useState<LatLng[]>([]);
   const inSanctuary = sanctuaries.some((c) => distanceM(s.pos, c) <= SANCTUARY_RADIUS_M);
   const inBase = atWorkshop(s);
   const weight = stackWeight(s.backpack);
-  const capacity = C.baseCarryKg + (s.level - 1) * C.carryPerLevelKg + ((s.base?.level ?? 0) >= 2 ? 10 : 0);
+  const capacity = C.baseCarryKg + (s.level - 1) * C.carryPerLevelKg + ((s.base?.level ?? 0) >= 2 ? 10 : 0) + pocketBonusKg(s.techs);
   const questState: QuestState = { ...s, storedGear: [], stats: { gathered: s.gathered, crafted: s.crafted, kills: s.kills, deposits: s.deposits } };
   const quest = currentQuest(questState);
   const questProgress = quest?.progress(questState) ?? null;
@@ -217,7 +219,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const visitLandmark = useCallback((l: Landmark): string | null => {
     const p = ref.current;
     if (!enabledRef.current) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return null; }
-    if (distanceM(p.pos, l) > C.interactRadiusM) { toast.warning(`${C.interactRadiusM}m 안으로 다가가세요`); return null; }
+    const r = reachRadius(p.techs);
+    if (distanceM(p.pos, l) > r) { toast.warning(`${r}m 안으로 다가가세요`); return null; }
     const now = Date.now();
     const check = canClaimLandmark(p.landmarkClaims, l.id, now);
     const info = LANDMARK_INFO[l.kind];
@@ -275,7 +278,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (!enabledRef.current) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return; }
     const p = ref.current;
     if (e.kind === 'node' ? !isNodeAvailable(e.id, e.type, p.depleted, Date.now()) : !!p.depleted[e.id]) return;
-    if (distanceM(p.pos, e) > C.interactRadiusM) { toast.warning(`${C.interactRadiusM}m 안으로 다가가세요`); return; }
+    const r = reachRadius(p.techs);
+    if (distanceM(p.pos, e) > r) { toast.warning(`${r}m 안으로 다가가세요`); return; }
     if (e.kind === 'creature') {
       const at = Date.now();
       if (at - lastCreatureAttack.current < CREATURE_ATTACK_INTERVAL_MS) return;
@@ -520,7 +524,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
   return { setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked,
     recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
-    state: s, entities, vision, isNight, inBase, baseDef, weight, capacity, weapon,
+    state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon,
     moveTo, interact, eat, placeBase, upgradeBase, research, craft, reset, dropItems,
     quest, questProgress, canClaimQuest, claimQuest, nextLevelXp: xpToNext(s.level),
     canAfford: (st: Stack[]) => hasAll(s.storage, st),

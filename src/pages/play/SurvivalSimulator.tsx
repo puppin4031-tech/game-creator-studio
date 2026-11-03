@@ -133,8 +133,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
   const tapEntity = (e: WorldEntity) => {
     if (realGps && !gps.ready) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return; }
-    if (!realGps && distanceM(s.pos, e) > C.interactRadiusM) { g.moveTo({ lat: e.lat, lng: e.lng }); return; }
-    const inRange = distanceM(s.pos, e) <= C.interactRadiusM;
+    if (!realGps && distanceM(s.pos, e) > g.reach) { g.moveTo({ lat: e.lat, lng: e.lng }); return; }
+    const inRange = distanceM(s.pos, e) <= g.reach;
     const act: SpriteAction = e.kind === 'creature' ? 'attack' : STRIKE_NODES.has(e.type) ? 'chop' : 'gather';
     if (inRange) {
       // Walk to the object (250ms), act, then wait 3s before walking back.
@@ -169,7 +169,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   useEffect(() => () => { window.clearTimeout(actionTimer.current); window.clearTimeout(returnTimer.current); }, []);
   // Return sprite to GPS center when the player really walks or the object leaves the radius.
   useEffect(() => {
-    if (actorTarget && shouldReturnToCenter(s.pos, actorTarget, C.interactRadiusM)) returnToCenter();
+    if (actorTarget && shouldReturnToCenter(s.pos, actorTarget, g.reach)) returnToCenter();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.pos, actorTarget]);
   const activeAnim = anims?.[action] ?? (action === 'chop' ? anims?.attack : undefined) ?? anims?.idle;
@@ -209,7 +209,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     if (e.type === 'emote') showBubble(e.from, EMOTES.find(x => x.id === e.emote)?.text ?? '');
     else if (e.type === 'attack') {
       // Ignore attacks from unknown, allied, or out-of-range players.
-      if (!from || allies.some(a => a.id === e.from) || distanceM(s.pos, from) > C.interactRadiusM * 1.5) return;
+      if (!from || allies.some(a => a.id === e.from) || distanceM(s.pos, from) > g.reach * 1.5) return;
       g.takeDamage(Math.min(30, e.dmg));
       toast.error(`${from.name}에게 공격받았습니다!`);
     } else if (e.type === 'ally') {
@@ -308,7 +308,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               );
             })}
             {(() => {
-              const p = project(s.pos); const r = C.interactRadiusM / mpp;
+              const p = project(s.pos); const r = g.reach / mpp;
               return (
                 <div className="pointer-events-none absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
                   {g.skillEffect && Date.now() - g.skillEffect.at < 1200 && <div className="absolute left-1/2 top-1/2"><SkillEffect id={g.skillEffect.id} stamp={g.skillEffect.at} radius={r} /></div>}
@@ -564,14 +564,14 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         )}
       </AnimatePresence>
       <AnimatePresence>
-        {selPeer && <PeerActionMenu peer={selPeer} distance={distanceM(s.pos, selPeer)} inRange={distanceM(s.pos, selPeer) <= C.interactRadiusM}
+        {selPeer && <PeerActionMenu peer={selPeer} distance={distanceM(s.pos, selPeer)} inRange={distanceM(s.pos, selPeer) <= g.reach}
           isAlly={allies.some(a => a.id === selPeer.id)} onClose={() => setSelPeerId(null)}
           onEmote={(e) => { presence.send({ type: 'emote', to: selPeer.id, emote: e }); showBubble(presence.selfId, EMOTES.find(x => x.id === e)?.text ?? ''); playAction('talk', 900); setSelPeerId(null); }}
           onAlly={() => { pendingAlly.current.add(selPeer.id); presence.send({ type: 'ally', to: selPeer.id, name: presence.name }); toast('동맹을 제안했습니다'); setSelPeerId(null); }}
           onAttack={attackPeer} />}
       </AnimatePresence>
       <AnimatePresence>
-        {selLandmark && <LandmarkSheet landmark={selLandmark} inRange={distanceM(s.pos, selLandmark) <= C.interactRadiusM && (!realGps || gps.ready)}
+        {selLandmark && <LandmarkSheet landmark={selLandmark} inRange={distanceM(s.pos, selLandmark) <= g.reach && (!realGps || gps.ready)}
           claims={s.landmarkClaims} backpack={s.backpack} words={shamanWords}
           onVisit={() => { const w = g.visitLandmark(selLandmark); if (w) { setShamanWords(w); playAction('talk', 900); } }}
           onSell={g.sellItem} onBuy={g.buyItem} onClose={() => setSelLandmark(null)}
