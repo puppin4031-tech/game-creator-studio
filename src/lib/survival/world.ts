@@ -4,8 +4,8 @@ import { zoneCellKey, zoneWeight, type TerrainZone } from './terrainZone';
 import { PARK_CREATURE_MULT, SANCTUARY_RADIUS_M } from './landmarks';
 import type { LatLng, WorldCreature, WorldEntity, WorldNode } from './types';
 
-export const NODE_CELL_M = 32;
-export const NODE_DENSITY = 0.5;
+export const NODE_CELL_M = 24;
+export const NODE_DENSITY = 0.75;
 export const CREATURE_CELL_M = 90;
 /** Creatures re-roll their position every epoch, so herds appear to roam. */
 export const CREATURE_EPOCH_MS = 8 * 60_000;
