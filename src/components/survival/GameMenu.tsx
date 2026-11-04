@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Menu, LogOut, Settings, DoorOpen } from 'lucide-react';
+import { Menu, LogOut, Settings, DoorOpen, MessageSquare } from 'lucide-react';
+import SupportInquiryDialog from './SupportInquiryDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -17,6 +18,7 @@ export function useGameSettings() {
 export default function GameMenu({ onExit, onLogout, loggedIn }: Props) {
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
   const s = useGameSettings();
   const Row = ({ label, hint, k }: { label: string; hint: string; k: 'bgm' | 'sfx' | 'haptic' }) => (
     <label className="flex min-h-11 items-center justify-between gap-3">
@@ -63,9 +65,11 @@ export default function GameMenu({ onExit, onLogout, loggedIn }: Props) {
               </div>
             </div>
             <Row k="haptic" label="진동" hint="주머니 속에서도 위험·공격·알림을 진동으로" />
+            <button type="button" onClick={() => { setSettingsOpen(false); setSupportOpen(true); }} className="pixel-btn flex min-h-11 w-full items-center justify-center gap-2 bg-card text-sm"><MessageSquare className="!h-5 !w-5" />문의하기</button>
           </div>
         </DialogContent>
       </Dialog>
+      <SupportInquiryDialog open={supportOpen} onOpenChange={setSupportOpen} />
     </>
   );
 }
