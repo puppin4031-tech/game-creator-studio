@@ -23,6 +23,7 @@ const mainAdminItems = [
   { title: '관리자 관리', url: '/admin/users', icon: Users },
   { title: '캐릭터 애니메이션', url: '/admin/sprites', icon: Film },
   { title: '생존 아이템', url: '/admin/items', icon: Package },
+  { title: '문의함', url: '/admin/support', icon: ClipboardList },
   { title: '승인 관리', url: '/admin/approvals', icon: CheckSquare },
 ];
 
