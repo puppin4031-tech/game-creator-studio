@@ -373,7 +373,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 </div>
               );
             })()}
-            {s.outpost && (() => { const p = project(s.outpost); return <div className="pointer-events-none absolute flex flex-col items-center" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}><Sprite k="base-outpost" scale={1.2} /><span className="rounded bg-background px-1 text-[10px]">전진기지</span></div>; })()}
+            {s.outpost && (() => { const p = project(s.outpost); return <div className="pointer-events-none absolute flex flex-col items-center" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}><div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><Sprite k="base-outpost" scale={1.2} /></div><span className="rounded bg-background px-1 text-[10px]">전진기지</span></div>; })()}
             {landmarks.filter((l) => l.kind === 'shaman' && distanceM(s.pos, l) <= g.vision + SANCTUARY_RADIUS_M).map((l) => {
               const p = project(l); const r = SANCTUARY_RADIUS_M / mpp;
               return <div key={`sanct-${l.id}`} aria-hidden className="pointer-events-none absolute rounded-full border-2 border-primary/60 bg-primary/5 shadow-[0_0_18px_hsl(var(--primary)/0.5)]" style={{ left: p.x, top: p.y, width: r * 2, height: r * 2, transform: 'translate(-50%,-50%)' }} />;
@@ -402,9 +402,9 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   data-resource-id={e.id} data-lat={e.lat} data-lng={e.lng}
                   className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center"
                   style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}>
-                  <motion.div animate={{ y: e.kind === 'creature' ? [0, -3, 0] : 0 }} transition={{ repeat: Infinity, duration: 0.8 }}>
+                  <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><motion.div className={g.isNight ? '' : 'brightness-110 contrast-110 drop-shadow-[0_0_3px_hsl(var(--background))]'} animate={{ y: e.kind === 'creature' ? [0, -3, 0] : 0 }} transition={{ repeat: Infinity, duration: 0.8 }}>
                     <div className={boss ? 'scale-150 rounded-full ring-2 ring-destructive shadow-[0_0_18px_hsl(var(--destructive))]' : ''}><Sprite k={sprite} /></div>
-                  </motion.div>
+                  </motion.div></div>
                   {(s.calmUntil?.[e.id] ?? 0) > Date.now() && <span className="bg-primary text-[10px] text-primary-foreground">진정됨</span>}
                   {boss ? <span className="mt-2 rounded bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">우두머리</span> : null}
                   {creature ? <div className="mt-1 w-20 rounded bg-background/90 px-1 text-center text-[10px]" aria-label={`${name} 체력 ${remainingHp}/${creature.hp}, 공격력 ${creature.atk}`}>
@@ -422,7 +422,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center transition-[left,top] duration-1000 ease-linear"
                   style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}>
                   {bubbles[pr.id] && <span className="whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbleView(bubbles[pr.id])}</span>}
-                  <Sprite k="char-hunter" className="opacity-90 hue-rotate-90" />
+                  <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><Sprite k="char-hunter" className="opacity-90 hue-rotate-90" /></div>
                   <span className={`rounded px-1 text-[10px] ${ally ? 'bg-primary text-primary-foreground' : 'bg-background/80'}`}>{pr.name}</span>
                 </button>
               );
@@ -442,7 +442,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       <motion.div className="absolute left-1/2 top-1/2" initial={false} animate={{ x: dx, y: dy }} transition={{ duration: actorTarget ? 0.25 : 0.5, ease: 'easeOut' }}>
                         <div className="-translate-x-1/2 -translate-y-[85%]">
                           {bubbles[presence.selfId] && <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbleView(bubbles[presence.selfId])}</span>}
-                          <HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined }}>{activeAnim ? <SpriteAnimator key={activeAnim.url} url={activeAnim.url} frames={activeAnim.frame_count} fps={activeAnim.fps} height={Math.round(SPRITE_META['char-hunter'].h * PLAYER_SCALE)} once={action === 'gather' || action === 'attack' || action === 'chop'} fallback={<Sprite k="char-hunter" scale={PLAYER_SCALE} />} /> : <Sprite k="char-hunter" scale={PLAYER_SCALE} />}</div></HitFlash>
+                          <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined }}>{activeAnim ? <SpriteAnimator url={activeAnim.url} frames={activeAnim.frame_count} fps={activeAnim.fps} height={Math.round(SPRITE_META['char-hunter'].h * PLAYER_SCALE)} once={action === 'gather' || action === 'attack' || action === 'chop'} fallback={<Sprite k="char-hunter" scale={PLAYER_SCALE} />} /> : <Sprite k="char-hunter" scale={PLAYER_SCALE} />}</div></HitFlash></div>
                         </div>
                       </motion.div>
                     );
