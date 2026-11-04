@@ -391,6 +391,42 @@ export type Database = {
           },
         ]
       }
+      support_inquiries: {
+        Row: {
+          admin_reply: string | null
+          category: string
+          created_at: string
+          email: string | null
+          id: string
+          message: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_reply?: string | null
+          category?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          message: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_reply?: string | null
+          category?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          message?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       survival_ai_access_state: {
         Row: {
           blocked_at: string

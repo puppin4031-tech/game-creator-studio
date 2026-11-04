@@ -1,3 +1,5 @@
+import bgmTrack from '@/assets/bone_flute_ritual.mp3.asset.json';
+
 export type VolumeLevel = 'S' | 'M' | 'L';
 export interface GameSettings { bgm: boolean; sfx: boolean; volume: VolumeLevel; haptic: boolean }
 
@@ -53,18 +55,23 @@ export function haptic(pattern: number | number[]) {
   try { navigator.vibrate?.(pattern); } catch { /* unsupported */ }
 }
 
-// ---- BGM: soft procedural pentatonic loop ----
-const SCALE = [220, 247, 277, 330, 370, 440, 494];
-let bgmTimer: number | null = null;
+// ---- BGM: looping track ----
+let bgmEl: HTMLAudioElement | null = null;
+let bgmWanted = false;
+function syncBgmVolume() { if (bgmEl) bgmEl.volume = Math.min(1, VOLUME_GAIN[current.volume] * 1.8); }
+listeners.add(syncBgmVolume);
+function tryPlay() {
+  if (!bgmEl || !bgmWanted) return;
+  bgmEl.play().catch(() => {
+    // Autoplay blocked: start on the next user gesture.
+    const resume = () => { window.removeEventListener('pointerdown', resume); tryPlay(); };
+    window.addEventListener('pointerdown', resume, { once: true });
+  });
+}
 export function setBgmPlaying(on: boolean) {
-  if (!on) { if (bgmTimer !== null) window.clearInterval(bgmTimer); bgmTimer = null; return; }
-  if (bgmTimer !== null) return;
-  bgmTimer = window.setInterval(() => {
-    const a = audio(); if (!a || !current.bgm) return;
-    const o = a.createOscillator(); const g = a.createGain(); const t = a.currentTime;
-    o.type = 'sine'; o.frequency.value = SCALE[Math.floor(Math.random() * SCALE.length)] / (Math.random() < 0.3 ? 2 : 1);
-    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(VOLUME_GAIN[current.volume] * 0.35, t + 0.4);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
-    o.connect(g).connect(a.destination); o.start(t); o.stop(t + 2.3);
-  }, 1400);
+  bgmWanted = on;
+  if (!on) { bgmEl?.pause(); return; }
+  if (!bgmEl) { bgmEl = new Audio(bgmTrack.url); bgmEl.loop = true; bgmEl.preload = 'auto'; }
+  syncBgmVolume();
+  tryPlay();
 }
