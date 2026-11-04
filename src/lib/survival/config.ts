@@ -3,7 +3,7 @@ export const SURVIVAL_CONFIG = {
   /** Distance (m) within which a node/creature can be interacted with. Sized for typical phone GPS error. */
   interactRadiusM: 25,
   /** Always-visible radius (m) during the day. */
-  visionDayM: 75,
+  visionDayM: 86,
   /** Always-visible radius (m) at night. */
   visionNightM: 45,
   /** Radar pulse reveal radius (m). */
