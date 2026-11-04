@@ -85,6 +85,13 @@
       "when": 1793747953003,
       "tag": "0011_survival_vassals_tributes",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793807274387,
+      "tag": "0012_support_inquiries",
+      "breakpoints": true
     }
   ]
 }
