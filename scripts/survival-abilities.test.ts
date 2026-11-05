@@ -144,3 +144,38 @@ describe('NPC and pet lifecycle', () => {
     expect(JSON.parse(JSON.stringify(result.state))).toEqual(result.state);
   });
 });
+import { claimResearch, startResearch } from '../src/lib/survival/abilities';
+import { HOUR, researchDurationMs, mapFragments, payExpeditionFood, expeditionRewards } from '../src/lib/survival/homeActivities';
+describe('real-time research', () => {
+  test('duration tiers 2h/6h/12h/24h by material count', () => {
+    expect(researchDurationMs([{ itemId: 'flint', count: 5 }])).toBe(2 * HOUR);
+    expect(researchDurationMs([{ itemId: 'flint', count: 8 }])).toBe(6 * HOUR);
+    expect(researchDurationMs([{ itemId: 'flint', count: 12 }])).toBe(12 * HOUR);
+    expect(researchDurationMs([{ itemId: 'flint', count: 13 }])).toBe(24 * HOUR);
+  });
+  test('tech is learned only after the timer and claim', () => {
+    const tech = TECHS.find(t => t.id === 'roar')!;
+    const p = { ...fresh(), techs: tech.requires, storage: tech.research! };
+    const r = startResearch(p, 'roar', true, 0);
+    if (r.ok === false) throw new Error(r.reason);
+    expect(r.state.techs).not.toContain('roar');
+    expect(r.state.storage).toEqual([]);
+    expect(startResearch({ ...r.state, storage: tech.research! }, 'roar', true, 1).ok).toBe(false);
+    expect(claimResearch(r.state, r.state.researching!.readyAt - 1).ok).toBe(false);
+    const c = claimResearch(r.state, r.state.researching!.readyAt);
+    if (c.ok === false) throw new Error(c.reason);
+    expect(c.state.techs).toContain('roar');
+    expect(c.state.researching).toBeNull();
+  });
+});
+describe('expedition', () => {
+  test('one map fragment per 25 newly explored steps', () => {
+    expect(mapFragments(24, 0)).toBe(0);
+    expect(mapFragments(50, 25)).toBe(1);
+  });
+  test('needs 2 food and rewards only basic materials', () => {
+    expect(payExpeditionFood([{ itemId: 'jerky', count: 1 }], [])).toBeNull();
+    expect(payExpeditionFood([{ itemId: 'jerky', count: 1 }], [{ itemId: 'cooked_meat', count: 1 }])).not.toBeNull();
+    expect(expeditionRewards(42).every(s => ['raw_meat', 'bone', 'hide', 'branch'].includes(s.itemId))).toBe(true);
+  });
+});

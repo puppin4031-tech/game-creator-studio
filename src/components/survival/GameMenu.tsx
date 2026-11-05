@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Menu, LogOut, Settings, DoorOpen, MessageSquare } from 'lucide-react';
 import SupportInquiryDialog from './SupportInquiryDialog';
+import { toast } from 'sonner';
+import { enableNotifications, notifySupported } from '@/lib/survival/notify';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -65,6 +67,15 @@ export default function GameMenu({ onExit, onLogout, loggedIn }: Props) {
               </div>
             </div>
             <Row k="haptic" label="진동" hint="주머니 속에서도 위험·공격·알림을 진동으로" />
+            <label className="flex min-h-11 items-center justify-between gap-3">
+              <span><b className="block text-sm">알림</b><span className="text-xs text-muted-foreground">연구 완료·원정대 귀환·공격·전투 신청을 알림으로</span></span>
+              <Switch checked={s.notify} onCheckedChange={async (v) => {
+                if (!v) { saveSettings({ notify: false }); return; }
+                if (!notifySupported()) { toast.error('이 브라우저는 알림을 지원하지 않아요'); return; }
+                if (!(await enableNotifications())) toast.error('알림 권한이 거부되었어요. 브라우저 설정에서 허용해 주세요');
+                else toast.success('알림을 켰어요');
+              }} />
+            </label>
             <button type="button" onClick={() => { setSettingsOpen(false); setSupportOpen(true); }} className="pixel-btn flex min-h-11 w-full items-center justify-center gap-2 bg-card text-sm"><MessageSquare className="!h-5 !w-5" />문의하기</button>
           </div>
         </DialogContent>

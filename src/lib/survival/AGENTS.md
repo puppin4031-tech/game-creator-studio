@@ -1,1 +1,2 @@
 - Dolmen sanctuaries: site list in sanctuarySites.ts, rules in sanctuaries.ts (pure); network state lives in WorldSave.shrines so cloud sync carries it; why: any site can be first and sacred power must persist for future uses.
+- Research, base upgrades and expeditions are real-time jobs in WorldSave (homeActivities.ts, pure); materials are paid at start and results apply only on explicit claim; expedition fuel is outside-walked map fragments so home play never replaces GPS play.

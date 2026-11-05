@@ -5,10 +5,10 @@ import hitSfx from '@/assets/sfx/hit.wav.asset.json';
 import mineRock from '@/assets/sfx/mine_rock.wav.asset.json';
 
 export type VolumeLevel = 'S' | 'M' | 'L';
-export interface GameSettings { bgm: boolean; sfx: boolean; volume: VolumeLevel; haptic: boolean }
+export interface GameSettings { bgm: boolean; sfx: boolean; volume: VolumeLevel; haptic: boolean; notify: boolean }
 
 const KEY = 'survival-settings-v1';
-export const DEFAULT_SETTINGS: GameSettings = { bgm: false, sfx: true, volume: 'M', haptic: true };
+export const DEFAULT_SETTINGS: GameSettings = { bgm: false, sfx: true, volume: 'M', haptic: true, notify: false };
 /** All sound is 30% quieter than the original mix. */
 export const SOUND_REDUCTION = 0.7;
 export const VOLUME_GAIN: Record<VolumeLevel, number> = { S: 0.08 * SOUND_REDUCTION, M: 0.18 * SOUND_REDUCTION, L: 0.32 * SOUND_REDUCTION };

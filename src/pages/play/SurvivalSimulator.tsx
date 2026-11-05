@@ -46,6 +46,9 @@ import melchizedekImg from '@/assets/survival/melchizedek.png';
 import PeerActionMenu from '@/components/survival/PeerActionMenu';
 import { useSurvivalPresence, type PeerEvent, type PeerPlayer } from '@/hooks/useSurvivalPresence';
 import { EMOTES, PVP_BASE_DAMAGE, DUEL_MAX_DISTANCE_M } from '@/lib/survival/presence';
+import { JobCard, ExpeditionPanel } from '@/components/survival/HomeJobs';
+import { BASE_UPGRADE_MS, isReady, researchDurationMs } from '@/lib/survival/homeActivities';
+import { sendNotice } from '@/lib/survival/notify';
 import GameMenu, { useGameSettings } from '@/components/survival/GameMenu';
 import { EMOTE_ICON } from '@/components/survival/emoteIcons';
 import { playSfx, playSample, haptic, setBgmPlaying, type SampleId } from '@/lib/survival/gameSettings';
@@ -112,10 +115,13 @@ function Stacks({ stacks, onUse, have }: { stacks: Stack[]; onUse?: (id: ItemId)
 
 type Panel = 'none' | 'bag' | 'base' | 'tech' | 'quests' | 'favs';
 
-function MenuBtn({ icon: Icon, label, onClick }: { icon: typeof Backpack; label: string; onClick: () => void }) {
+function RedDot() {
+  return <span aria-label="새 알림" className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-destructive ring-2 ring-background" />;
+}
+function MenuBtn({ icon: Icon, label, onClick, dot }: { icon: typeof Backpack; label: string; onClick: () => void; dot?: boolean }) {
   return (
-    <Button type="button" variant="outline" onClick={onClick} className="pixel-btn flex h-14 min-h-14 w-14 flex-col items-center justify-center gap-0 bg-card px-0 text-[10px]">
-      <Icon className="!h-6 !w-6" />{label}
+    <Button type="button" variant="outline" onClick={onClick} className="pixel-btn relative flex h-14 min-h-14 w-14 flex-col items-center justify-center gap-0 bg-card px-0 text-[10px]">
+      <Icon className="!h-6 !w-6" />{label}{dot && <RedDot />}
     </Button>
   );
 }
@@ -246,6 +252,17 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
   const hit = useHitPulse(s.hp);
   const [techTab, setTechTab] = useState<TechCategory>('general');
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setNowTick(Date.now()), 15_000); return () => clearInterval(t); }, []);
+  const techDone = isReady(s.researching, nowTick);
+  const baseDone = isReady(s.baseUpgrade, nowTick) || isReady(s.expedition ? { id: 'e', ...s.expedition } : null, nowTick);
+  const noticed = useRef(new Set<string>());
+  useEffect(() => {
+    const fire = (key: string, title: string, body: string) => { if (noticed.current.has(key)) return; noticed.current.add(key); sendNotice(title, body, key); };
+    if (techDone && s.researching) fire(`r${s.researching.readyAt}`, '연구 완료', `${TECHS.find(t => t.id === s.researching?.id)?.name ?? '기술'} 연구가 끝났어요. 기술 메뉴에서 습득하세요`);
+    if (s.baseUpgrade && isReady(s.baseUpgrade, nowTick)) fire(`b${s.baseUpgrade.readyAt}`, '거점 공사 완료', '거점 메뉴에서 발전을 완료하세요');
+    if (s.expedition && nowTick >= s.expedition.readyAt) fire(`e${s.expedition.readyAt}`, '원정대 귀환', '전리품과 정찰 보고서가 도착했어요');
+  }, [nowTick, techDone, s.researching, s.baseUpgrade, s.expedition]);
   const [selPeerId, setSelPeerId] = useState<string | null>(null);
   const [bubbles, setBubbles] = useState<Record<string, string>>({});
   const [allies, setAllies] = useState<{ id: string; name: string }[]>(() => {
@@ -259,7 +276,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const { user, signOut } = useAuth();
   const gameSettings = useGameSettings();
   useEffect(() => { setBgmPlaying(gameSettings.bgm); return () => setBgmPlaying(false); }, [gameSettings.bgm]);
-  useEffect(() => { if (hit.n > 0) { playSample('strike'); haptic(120); } }, [hit.n]);
+  useEffect(() => { if (hit.n > 0) { playSample('strike'); haptic(120); if (document.hidden) sendNotice('짐승의 공격!', '거점 밖에서 짐승에게 공격받고 있어요', 'beast-hit'); } }, [hit.n]);
   // Beasts inside 10m (or chasing after being hit) strike the player first.
   const [aggroIds, setAggroIds] = useState<Set<string>>(() => new Set());
   const lastBeastStrike = useRef(0);
@@ -297,7 +314,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     if (e.type === 'emote') { showBubble(e.from, `icon:${e.emote}`); playSfx('emote'); haptic(40); }
     else if (e.type === 'duel') {
       if (allies.some(a => a.id === e.from)) return;
-      setDuelWith(e.from); playSfx('warn'); haptic([200, 100, 200]);
+      setDuelWith(e.from); playSfx('warn'); haptic([200, 100, 200]); sendNotice('전투 신청', `${e.name}님이 전투를 걸었습니다`, 'duel');
       toast.error(`${e.name}님이 전투를 걸었습니다! 공격하거나 도망치세요. ${DUEL_MAX_DISTANCE_M}m 멀어지면 전투가 끝납니다.`, { duration: 6000 });
     } else if (e.type === 'duel-end') {
       if (duelRef.current === e.from) { setDuelWith(null); toast('전투가 끝났습니다'); }
@@ -573,14 +590,14 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
       {/* Right drawer: survival actions */}
       <div className="absolute right-2 top-[calc(7.5rem+env(safe-area-inset-top))] z-20 flex flex-col items-end gap-2">
-        <Button type="button" variant="outline" aria-expanded={rightOpen} aria-label={rightOpen ? '생존 메뉴 접기' : '생존 메뉴 펼치기'} onClick={() => setRightOpen((v) => !v)} className={`pixel-btn h-11 w-11 p-0 ${rightOpen ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
-          {rightOpen ? <ChevronUp className="!h-6 !w-6" /> : <Backpack className="!h-6 !w-6" />}
+        <Button type="button" variant="outline" aria-expanded={rightOpen} aria-label={rightOpen ? '생존 메뉴 접기' : '생존 메뉴 펼치기'} onClick={() => setRightOpen((v) => !v)} className={`pixel-btn relative h-11 w-11 p-0 ${rightOpen ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
+          {rightOpen ? <ChevronUp className="!h-6 !w-6" /> : <Backpack className="!h-6 !w-6" />}{!rightOpen && baseDone && <RedDot />}
         </Button>
         <AnimatePresence>
           {rightOpen && (
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex flex-col gap-2">
               <MenuBtn icon={Backpack} label="배낭" onClick={() => setPanel('bag')} />
-              <MenuBtn icon={Flame} label="거점" onClick={() => setPanel('base')} />
+              <MenuBtn icon={Flame} label="거점" dot={baseDone} onClick={() => setPanel('base')} />
               {realGps && <MenuBtn icon={LocateFixed} label="GPS 갱신" onClick={gps.retry} />}
             </motion.div>
           )}
@@ -589,13 +606,13 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
       {/* Left drawer: skills & exploration */}
       <div className="absolute left-2 top-[calc(7.5rem+env(safe-area-inset-top))] z-20 flex flex-col items-start gap-2">
-        <Button type="button" variant="outline" aria-expanded={leftOpen} aria-label={leftOpen ? '기술 메뉴 접기' : '기술 메뉴 펼치기'} onClick={() => setLeftOpen((v) => !v)} className={`pixel-btn h-11 w-11 p-0 ${leftOpen ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
-          {leftOpen ? <ChevronUp className="!h-6 !w-6" /> : <Lightbulb className="!h-6 !w-6" />}
+        <Button type="button" variant="outline" aria-expanded={leftOpen} aria-label={leftOpen ? '기술 메뉴 접기' : '기술 메뉴 펼치기'} onClick={() => setLeftOpen((v) => !v)} className={`pixel-btn relative h-11 w-11 p-0 ${leftOpen ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
+          {leftOpen ? <ChevronUp className="!h-6 !w-6" /> : <Lightbulb className="!h-6 !w-6" />}{!leftOpen && techDone && <RedDot />}
         </Button>
         <AnimatePresence>
           {leftOpen && (
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex flex-col gap-2">
-              <MenuBtn icon={Lightbulb} label="기술" onClick={() => setPanel('tech')} />
+              <MenuBtn icon={Lightbulb} label="기술" dot={techDone} onClick={() => setPanel('tech')} />
               <MenuBtn icon={ListChecks} label="생존 목표" onClick={() => setPanel('quests')} />
               <MenuBtn icon={Star} label="즐겨찾기" onClick={() => setPanel('favs')} />
             </motion.div>
@@ -647,6 +664,11 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               {panel === 'base' && (!s.base ? <p className="text-sm">아직 거점이 없습니다.</p> : (
                 <>
                   {!g.inBase && <p className="pixel-frame bg-accent p-2 text-sm">거점 반경 안에서만 제작·연구할 수 있어요.</p>}
+                  {s.baseUpgrade && <JobCard title={`${BASE_LEVELS[Number(s.baseUpgrade.id) as 2 | 3].name} 공사`} job={s.baseUpgrade} now={nowTick} claimLabel="발전 완료" onClaim={g.claimBaseUpgrade} />}
+                  <ExpeditionPanel expedition={s.expedition} report={s.scoutReport} now={nowTick} exploredTotal={s.exploredTotal ?? s.explored.length} mark={s.expeditionMark ?? 0}
+                    foodOwned={[...s.backpack, ...s.storage].filter(x => x.itemId === 'jerky' || x.itemId === 'cooked_meat').reduce((a, x) => a + x.count, 0)}
+                    canSend={g.inBase && actionReady} onSend={g.startExpedition} onClaim={g.claimExpedition}
+                    onPin={(t) => { favs.toggle({ id: `scout-${t.pos.lat.toFixed(5)}-${t.pos.lng.toFixed(5)}`, name: t.label, lat: t.pos.lat, lng: t.pos.lng }); toast('즐겨찾기에 표시했어요'); }} />
                   <div className="pixel-frame bg-card p-2"><b className="text-sm">제단 · 발명</b><div className="mt-2"><AltarPanel altar={!!s.altar} ready={actionReady} inBase={g.inBase} owned={[...s.backpack, ...s.storage]} inventions={s.inventions ?? []} onBuild={g.buildAltar} onInvent={g.invent} /></div></div>
                   <div><b className="text-sm">창고</b><div className="mt-1"><Stacks stacks={s.storage} onUse={g.eat} /></div><div className="mt-2 flex flex-wrap gap-1">{s.storage.map(st => <Button key={st.itemId} variant="outline" size="sm" className="min-h-11 text-xs" disabled={!g.inBase || !actionReady} onClick={() => g.withdraw(st.itemId)}>{ITEMS[st.itemId].name} 1개 꺼내기</Button>)}</div></div>
                   <div>
@@ -675,7 +697,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       <div className="pixel-frame bg-card p-2 text-xs">
                         <b className="text-sm">{nx.name}(으)로 발전</b> — {nx.unlocks}
                         <div className="my-1"><Stacks stacks={nx.cost} have={s.storage} /></div>
-                        <button type="button" disabled={!g.inBase || !g.canAfford(nx.cost) || !actionReady || (s.base?.level === 1 && !s.techs.includes('hut_building'))} onClick={g.upgradeBase} className="pixel-btn h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">발전시키기</button>
+                        <button type="button" disabled={!g.inBase || !g.canAfford(nx.cost) || !actionReady || !!s.baseUpgrade || (s.base?.level === 1 && !s.techs.includes('hut_building'))} onClick={g.upgradeBase} className="pixel-btn h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">{s.baseUpgrade ? '공사 중' : `공사 시작 (${BASE_UPGRADE_MS[(s.base.level + 1) as 2 | 3] / 3_600_000}시간)`}</button>
                       </div>
                     );
                   })()}
@@ -713,6 +735,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                         className={`pixel-btn min-h-11 shrink-0 px-3 text-xs ${techTab === c.id ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>{c.label}</button>
                     ))}
                   </div>
+                  {s.researching && <JobCard title={`연구: ${TECHS.find(t => t.id === s.researching?.id)?.name ?? ''}`} job={s.researching} now={nowTick} claimLabel="연구가 완료되었습니다 · 습득" onClaim={g.claimTech} />}
                   {(techTab === 'general' || techTab === 'craft') && <p className="text-xs text-muted-foreground">처음엔 아무것도 만들 줄 모릅니다. 자원을 모으면 깨달음을 얻고, 일부 기술은 거점에서 재료를 바쳐 연구해야 합니다.</p>}
                   {TECHS.filter((t) => (TECH_CATEGORY[t.id] ?? 'general') === techTab).map((t) => {
                     const known = s.techs.includes(t.id);
@@ -728,7 +751,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                         {!known && t.research && (
                           <div className="mt-1">
                             <Stacks stacks={t.research} have={s.storage} />
-                            <button type="button" disabled={!ready || !g.inBase || !g.canAfford(t.research) || !actionReady} onClick={() => g.research(t.id)} className="pixel-btn mt-1 h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">거점에서 연구하기</button>
+                            <button type="button" disabled={!ready || !g.inBase || !g.canAfford(t.research) || !actionReady || !!s.researching} onClick={() => g.research(t.id)} className="pixel-btn mt-1 h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">{s.researching?.id === t.id ? '연구 중' : `연구하기 (${researchDurationMs(t.research) / 3_600_000}시간)`}</button>
                           </div>
                         )}
                       </div>

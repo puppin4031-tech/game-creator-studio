@@ -10,7 +10,8 @@ import { RECIPES, type Recipe } from '@/lib/survival/recipes';
 import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
 import { SURVIVAL_CONFIG as C } from '@/lib/survival/config';
 import { visionBonus, reachRadius, pocketBonusKg } from '@/lib/survival/utilitySkills';
-import { ACTIVE_SKILLS, atMainBase, atWorkshop, buildStructure, collectCompanionWork, prepareSkill, recruitCompanion, researchTechnology, tameWolf, type ActiveSkill, type Companion } from '@/lib/survival/abilities';
+import { BASE_UPGRADE_MS, EXPEDITION_FOOD_COUNT, EXPEDITION_MS, expeditionRewards, mapFragments, payExpeditionFood, scoutReport, type Expedition, type ScoutTarget, type TimedJob } from '@/lib/survival/homeActivities';
+import { ACTIVE_SKILLS, claimResearch, startResearch, atMainBase, atWorkshop, buildStructure, collectCompanionWork, prepareSkill, recruitCompanion, tameWolf, type ActiveSkill, type Companion } from '@/lib/survival/abilities';
 import { advanceSurvivalVitals } from '@/lib/survival/metabolism';
 import { distanceM } from '@/lib/survival/geo';
 import { generateWorld, isNodeAvailable } from '@/lib/survival/world';
@@ -61,6 +62,13 @@ export interface WorldSave extends WorldProgress {
   altar?: boolean;
   inventions?: InventedItem[];
   shrines?: ShrineState;
+  researching?: TimedJob | null;
+  baseUpgrade?: TimedJob | null;
+  expedition?: Expedition | null;
+  expeditionMark?: number;
+  /** Lifetime explored steps; explored[] itself is capped. */
+  exploredTotal?: number;
+  scoutReport?: ScoutTarget[];
   lastTickAt: number;
 }
 
@@ -212,7 +220,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     setS((p) => {
       const last = p.explored[p.explored.length - 1];
       const explored = !last || distanceM(last, pos) >= EXPLORE_STEP_M ? [...p.explored, pos].slice(-MAX_EXPLORED) : p.explored;
-      return { ...p, pos, explored };
+      const grew = explored !== p.explored;
+      return { ...p, pos, explored, exploredTotal: (p.exploredTotal ?? p.explored.length) + (grew ? 1 : 0) };
     });
   }, [setS]);
 
@@ -441,18 +450,52 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (!enabledRef.current || !p.base || distanceM(p.pos, p.base) > BASE_LEVELS[p.base.level].radiusM) return;
     if (!p.base || p.base.level >= 3) return;
     if (p.base.level === 1 && !p.techs.includes('hut_building')) { toast.error('움집 기술을 먼저 연구하세요'); return; }
+    if (p.baseUpgrade) { toast.warning('이미 발전 공사 중입니다'); return; }
     const lv = (p.base.level + 1) as 2 | 3;
     const left = removeStacks(p.storage, BASE_LEVELS[lv].cost);
     if (!left) { toast.error('창고 재료가 부족합니다'); return; }
-    setS({ ...p, storage: left, base: { ...p.base, level: lv } });
-    toast.success(`${BASE_LEVELS[lv].name}(으)로 발전!`);
+    const now = Date.now();
+    setS({ ...p, storage: left, baseUpgrade: { id: String(lv), startedAt: now, readyAt: now + BASE_UPGRADE_MS[lv] } });
+    toast.success(`${BASE_LEVELS[lv].name} 공사를 시작했습니다`);
   }, []);
+  /** Completes a finished base upgrade (no GPS needed: it was paid on site). */
+  const claimBaseUpgrade = useCallback(() => {
+    const p = ref.current; const job = p.baseUpgrade;
+    if (!p.base || !job || Date.now() < job.readyAt) return;
+    const lv = Number(job.id) as 2 | 3;
+    setS({ ...p, baseUpgrade: null, base: { ...p.base, level: lv } });
+    toast.success(`${BASE_LEVELS[lv].name}(으)로 발전!`);
+  }, [setS]);
 
   const research = useCallback((techId: string) => {
-    const result = researchTechnology(ref.current, techId, enabledRef.current);
+    const result = startResearch(ref.current, techId, enabledRef.current, Date.now());
     if (result.ok === false) { toast.warning(result.reason); return; }
     setS(result.state);
-    toast.success(`${techById(techId)?.name} 습득`);
+    toast.success(`${techById(techId)?.name} 연구 시작`);
+  }, [setS]);
+  const claimTech = useCallback(() => {
+    const result = claimResearch(ref.current, Date.now());
+    if (result.ok === false) { toast.warning(result.reason); return; }
+    const id = ref.current.researching?.id;
+    setS(result.state);
+    toast.success('연구가 완료되었습니다', { description: `${techById(id ?? '')?.name ?? ''} 습득` });
+  }, [setS]);
+  const startExpedition = useCallback(() => {
+    const p = ref.current;
+    if (!enabledRef.current || !atMainBase(p)) { toast.warning('본거지에서 원정대를 보낼 수 있어요'); return; }
+    if (p.expedition) { toast.warning('원정대가 이미 나가 있습니다'); return; }
+    if (mapFragments(p.exploredTotal ?? p.explored.length, p.expeditionMark ?? 0) < 1) { toast.error('사냥터 지도 조각이 없습니다. 밖에서 새 지역을 걸어 밝히세요'); return; }
+    const paid = payExpeditionFood(p.backpack, p.storage);
+    if (!paid) { toast.error(`식량이 부족합니다 (말린 고기·구운 고기 ${EXPEDITION_FOOD_COUNT}개)`); return; }
+    const now = Date.now();
+    setS({ ...p, ...paid, expeditionMark: (p.expeditionMark ?? 0) + 25, expedition: { startedAt: now, readyAt: now + EXPEDITION_MS, seed: (now ^ Math.floor(Math.random() * 1e9)) >>> 0 } });
+    toast.success('원정대가 사냥터로 떠났습니다');
+  }, [setS]);
+  const claimExpedition = useCallback(() => {
+    const p = ref.current; const e = p.expedition;
+    if (!e || Date.now() < e.readyAt || !p.base) return;
+    setS({ ...p, expedition: null, storage: addStacks(p.storage, expeditionRewards(e.seed)), scoutReport: scoutReport(e.seed, p.base) });
+    toast.success('원정대 귀환! 전리품을 창고에 넣었습니다', { description: '정찰 보고서가 도착했어요' });
   }, [setS]);
 
   const craft = useCallback((r: Recipe) => {
@@ -630,7 +673,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   return { awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
     recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon,
-    moveTo, interact, eat, placeBase, upgradeBase, research, craft, reset, dropItems,
+    moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,
     quest, questProgress, canClaimQuest, claimQuest, nextLevelXp: xpToNext(s.level),
     canAfford: (st: Stack[]) => hasAll(s.storage, st),
     recipes: RECIPES, NODES, CREATURES,
