@@ -171,7 +171,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     if (distanceM(p.pos, e) > w.reach) { toast('대상과 멀어져 작업을 멈췄습니다'); returnToCenter(); return 'stop'; }
     if (e.kind === 'node' && w.weight >= w.capacity) { toast.warning('배낭이 가득 찼습니다'); return 'stop'; }
     const act: SpriteAction = e.kind === 'creature' ? 'attack' : STRIKE_NODES.has(e.type) ? 'chop' : 'gather';
-    w.interact(e);
+    if (!w.interact(e)) { setActorTarget(null); return 'stop'; }
     playAction(act, 900);
     playSample(workKind(e).sample);
     return 'continue';
