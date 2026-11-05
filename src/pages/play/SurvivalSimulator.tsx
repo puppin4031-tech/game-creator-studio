@@ -430,13 +430,13 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               const awake = !!s.shrines?.found.includes(sh.id);
               return (
                 <div key={sh.id} className="absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
-                  <div aria-hidden className={`pointer-events-none rounded-full border-2 border-primary bg-primary/15 shadow-[0_0_24px_hsl(var(--primary)/0.7)] ${awake ? 'animate-pulse' : 'opacity-60'}`} style={{ width: r * 2, height: r * 2 }} />
+                  <div aria-hidden className={`pointer-events-none rounded-full border-[3px] border-[hsl(var(--sacred))] bg-[hsl(var(--sacred)/0.18)] shadow-[0_0_28px_hsl(var(--sacred)/0.8)] ${awake ? 'animate-pulse' : 'opacity-60'}`} style={{ width: r * 2, height: r * 2 }} />
                   <button type="button" aria-label={sh.name} onClick={(ev) => { ev.stopPropagation(); setShrineWords(null); setSelShrine(sh); }}
                     className="pointer-events-auto absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-[85%] flex-col items-center">
                     <div className="relative">
                       <div aria-hidden className="absolute bottom-1 left-1/2 h-3 w-20 -translate-x-1/2 rounded-full bg-foreground/30 blur-[3px]" />
                       <img src={dolmenShrine} alt="" width={96} height={85} className="relative w-24 [image-rendering:pixelated]" />
-                      <img src={melchizedekImg} alt="멜키체덱" width={26} height={54} className="absolute -bottom-3 left-1/2 w-[26px] -translate-x-1/2 [image-rendering:pixelated] drop-shadow-[0_0_6px_hsl(var(--primary))]" />
+                      <img src={melchizedekImg} alt="멜키체덱" width={26} height={54} className="absolute -bottom-3 left-1/2 w-[26px] -translate-x-1/2 [image-rendering:pixelated] drop-shadow-[0_0_6px_hsl(var(--sacred))]" />
                     </div>
                     <span className="mt-3 whitespace-nowrap rounded bg-primary px-1 text-[10px] text-primary-foreground">{awake ? '고석 성소' : '잠든 성소'}</span>
                   </button>

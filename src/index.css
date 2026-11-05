@@ -37,6 +37,7 @@ html, body, #root {
     --muted-foreground: 220 10% 45%;
 
     --accent: 35 90% 50%;
+    --sacred: 48 96% 55%;
     --accent-foreground: 220 20% 10%;
 
     --destructive: 0 75% 50%;
