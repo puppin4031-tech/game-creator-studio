@@ -19,7 +19,8 @@ import { addStacks, hasAll, removeStacks, splitDeathDrop, stackWeight } from '@/
 import { addExperience, dayPhase, xpToNext } from '@/lib/survival/progression';
 import { claimWorldQuest, freshProgress, type WorldProgress } from '@/lib/survival/worldProgress';
 import { currentQuest, questReady, type QuestState } from '@/lib/survival/quests';
-import { IRON_SKIN_DEF, PRIMAL_STRIKE_MULT, checkInspiration, isRecipeUnlocked, prerequisitesMet, readSkillBook, techById, type TechDef } from '@/lib/survival/tech';
+import { checkInspiration, isRecipeUnlocked, prerequisitesMet, readSkillBook, techById, type TechDef } from '@/lib/survival/tech';
+import { giantHeartHpBonus, ironSkinDef, primalStrikeMult, techLevel, wildVitalityRegenBonus } from '@/lib/survival/techLevels';
 import { SANCTUARY_RADIUS_M, SANCTUARY_REGEN_PER_TICK, LANDMARK_INFO, SHAMAN_BLESS_XP, SHAMAN_RUMORS, SHAMAN_TIPS, TRADER_STOCK, canClaimLandmark, landmarkReward, recordLandmarkClaim, sellPrice, type Landmark, type LandmarkClaims } from '@/lib/survival/landmarks';
 import type { TerrainZone } from '@/lib/survival/terrainZone';
 import { MELCHIZEDEK_FIRST, MELCHIZEDEK_LINK, RITES, blessingGift, canBless, discoverShrine, emptyShrineState, performRite, recordBlessing, type Shrine, type ShrineState } from '@/lib/survival/sanctuaries';
@@ -45,6 +46,8 @@ export interface WorldSave extends WorldProgress {
   damage: Record<string, number>;
   gathered: Partial<Record<ItemId, number>>;
   techs: string[];
+  /** Re-research levels per tech (absent = Lv.1). */
+  techLevels?: Record<string, number>;
   explored: LatLng[];
   /** Real-world terrain zone per coarse cell, sampled once from the map. */
   terrainZones: Record<string, TerrainZone>;
@@ -93,6 +96,10 @@ function load(start: LatLng, saveKey: string): WorldSave {
 }
 
 const fmt = (st: Stack[]) => st.map((s) => `${ITEMS[s.itemId].name} ×${s.count}`).join(', ');
+
+/** Max HP grows with the giant_heart tech level. */
+const maxHpOf = (p: { techs: string[]; techLevels?: Record<string, number> }) =>
+  C.baseMaxHp + (p.techs.includes('giant_heart') ? giantHeartHpBonus(techLevel(p.techLevels, 'giant_heart')) : 0);
 
 export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; saveKey?: string; cloudSync?: boolean } = {}) {
   const enabled = options.enabled ?? true;
@@ -185,12 +192,13 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     safeZone: s.base && baseDef ? { center: s.base, radiusM: baseDef.radiusM + (s.palisade ? 15 : 0) } : null,
   }).filter(e => !(e.kind === 'creature' && s.outpost && distanceM(e, s.outpost) < C.outpostRadiusM + 15)), [s.pos, vision, now, isNight, s.depleted, s.base, baseDef, s.terrainZones, s.parkCells, sanctuaries, s.palisade, s.outpost]);
 
-  // Survival tick: hunger drain, starvation, base regen.
+  // Survival tick: hunger drain, starvation, base regen (wild_vitality level boosts rest regen).
   useEffect(() => {
     if (!enabled || now - s.lastTickAt < C.tickMs) return;
     const locationRegen = inBase && baseDef ? baseDef.regenPerTick : inSanctuary ? SANCTUARY_REGEN_PER_TICK : 0;
-    setS((p) => advanceSurvivalVitals(p, now, locationRegen));
-  }, [now, s.lastTickAt, inBase, inSanctuary, baseDef, enabled, setS]);
+    const regen = locationRegen > 0 && s.techs.includes('wild_vitality') ? locationRegen + wildVitalityRegenBonus(techLevel(s.techLevels, 'wild_vitality')) : locationRegen;
+    setS((p) => advanceSurvivalVitals(p, now, regen, maxHpOf(p)));
+  }, [now, s.lastTickAt, inBase, inSanctuary, baseDef, enabled, setS, s.techs, s.techLevels]);
 
   // Auto deposit on entering base. Shell currency stays in the backpack (and is
   // pulled back out of storage) so it can be spent at traders.
@@ -336,7 +344,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const die = (p: WorldSave): WorldSave => {
     const { kept, dropped } = splitDeathDrop(p.backpack, C.deathDropRatio);
     toast.error('쓰러졌습니다…', { description: dropped.length ? `잃어버림: ${fmt(dropped)}` : undefined });
-    return { ...p, backpack: kept, hp: Math.round(C.baseMaxHp / 2), pos: p.base ?? p.pos };
+    return { ...p, backpack: kept, hp: Math.round(maxHpOf(p) / 2), pos: p.base ?? p.pos };
   };
 
   // Report whether a hit succeeded so automatic actions stop on rejected attempts.
@@ -375,10 +383,10 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const d = creatureDef(e.type);
       label = d.name; need = d.hp; loot = d.loot;
       power = weapon ? ITEMS[weapon.itemId].weapon?.atk ?? C.fistAtk : C.fistAtk;
-      if (p.techs.includes('primal_strike')) power *= PRIMAL_STRIKE_MULT;
+      if (p.techs.includes('primal_strike')) power *= primalStrikeMult(techLevel(p.techLevels, 'primal_strike'));
       const ranged = !!(weapon && ITEMS[weapon.itemId].weapon?.ranged) && !p.damage[e.id];
       power += (p.companions ?? []).some(c => c.kind === 'wolf') ? 3 : 0;
-      const defense = (atMainBase(p) && p.palisade ? 3 : 0) + (armor ? ITEMS[armor.itemId].armor?.def ?? 0 : 0) + (p.techs.includes('iron_skin') ? IRON_SKIN_DEF : 0);
+      const defense = (atMainBase(p) && p.palisade ? 3 : 0) + (armor ? ITEMS[armor.itemId].armor?.def ?? 0 : 0) + (p.techs.includes('iron_skin') ? ironSkinDef(techLevel(p.techLevels, 'iron_skin')) : 0);
       const exchange = resolveCreatureHit(e.type, p.damage[e.id] ?? 0, power, defense, ranged || (p.calmUntil?.[e.id] ?? 0) > Date.now());
       power = exchange.dealt - (p.damage[e.id] ?? 0);
       hp -= exchange.counterDamage;
@@ -433,7 +441,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const left = removeStacks(p[from], [{ itemId, count: 1 }]);
     if (!left) return;
     const hpGain = it.food?.hp ?? it.heal ?? 0;
-    setS({ ...p, [from]: left, hunger: Math.min(100, p.hunger + (it.food?.hunger ?? 0)), hp: Math.max(1, Math.min(C.baseMaxHp, p.hp + hpGain)) });
+    setS({ ...p, [from]: left, hunger: Math.min(100, p.hunger + (it.food?.hunger ?? 0)), hp: Math.max(1, Math.min(maxHpOf(p), p.hp + hpGain)) });
     toast(`${it.name} 사용`);
   }, []);
 
@@ -478,7 +486,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const result = claimResearch(ref.current, id, Date.now());
     if (result.ok === false) { toast.warning(result.reason); return; }
     setS(result.state);
-    toast.success('연구가 완료되었습니다', { description: `${techById(id ?? '')?.name ?? ''} 습득` });
+    const lv = result.state.techLevels?.[id];
+    toast.success('연구가 완료되었습니다', { description: `${techById(id ?? '')?.name ?? ''}${lv && lv > 1 ? ` Lv.${lv}` : ''} 습득` });
   }, [setS]);
   const startExpedition = useCallback(() => {
     const p = ref.current;
@@ -624,7 +633,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const takeDamage = useCallback((amount: number) => {
     const p = ref.current;
     const armorGear = p.gear.find((x) => ITEMS[x.itemId].armor);
-    const dmg = Math.max(1, Math.round(amount) - (armorGear ? ITEMS[armorGear.itemId].armor?.def ?? 0 : 0) - (p.techs.includes('iron_skin') ? IRON_SKIN_DEF : 0));
+    const dmg = Math.max(1, Math.round(amount) - (armorGear ? ITEMS[armorGear.itemId].armor?.def ?? 0 : 0) - (p.techs.includes('iron_skin') ? ironSkinDef(techLevel(p.techLevels, 'iron_skin')) : 0));
     const hp = p.hp - dmg;
     setS(hp <= 0 ? die({ ...p, hp }) : { ...p, hp });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -672,7 +681,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
   return { awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
     recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
-    state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon,
+    state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,
     quest, questProgress, canClaimQuest, claimQuest, nextLevelXp: xpToNext(s.level),
     canAfford: (st: Stack[]) => hasAll(s.storage, st),

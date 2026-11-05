@@ -6,7 +6,7 @@ import { hash01 } from './homeRandom';
 /** Real-time research/upgrade timers and base expeditions. Pure so the hook and tests share rules. */
 export const HOUR = 3_600_000;
 
-export interface TimedJob { id: string; startedAt: number; readyAt: number }
+export interface TimedJob { id: string; startedAt: number; readyAt: number; /** Target tech level for level-up research (absent = first learn). */ level?: number }
 
 /** Research time grows with material cost: 2h / 6h / 12h / 24h. */
 export function researchDurationMs(cost: Stack[]): number {

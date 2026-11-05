@@ -4,6 +4,7 @@ import { creatureDef } from './entities';
 import { distanceM } from './geo';
 import { addStacks, removeStacks } from './inventory';
 import { techById, prerequisitesMet } from './tech';
+import { techLevel, techUpgradeCost } from './techLevels';
 import type { LatLng, Stack, WorldCreature } from './types';
 import { researchDurationMs, type TimedJob } from './homeActivities';
 
@@ -20,6 +21,7 @@ export interface AbilitySave {
   hp: number;
   hunger: number;
   techs: string[];
+  techLevels?: Record<string, number>;
   storage: Stack[];
   backpack: Stack[];
   outpost?: LatLng | null;
@@ -79,6 +81,18 @@ export function researchJobsOf(p: { researching?: TimedJob | null; researchJobs?
 export function startResearch<T extends ResearchSave>(p: T, id: string, gpsReady: boolean, now: number): ActionResult<T> {
   const jobs = researchJobsOf(p);
   if (jobs.some(j => j.id === id)) return { ok: false, reason: '이미 연구 중인 기술입니다' };
+  if (p.techs.includes(id)) {
+    // Level-up research for a known tech: scaled cost, learned as the next level.
+    const level = techLevel(p.techLevels, id);
+    const cost = techUpgradeCost(id, level);
+    if (!cost) return { ok: false, reason: '더 이상 강화할 수 없는 기술입니다' };
+    if (!gpsReady) return { ok: false, reason: '정확한 GPS 신호가 필요합니다' };
+    if (!atWorkshop(p)) return { ok: false, reason: '거점 안에서 연구하세요' };
+    const storage = removeStacks(p.storage, cost);
+    if (!storage) return { ok: false, reason: '창고의 연구 재료가 부족합니다' };
+    const job: TimedJob = { id, startedAt: now, readyAt: now + researchDurationMs(cost), level: level + 1 };
+    return { ok: true, state: { ...p, storage, researching: null, researchJobs: [...jobs, job] } };
+  }
   const r = researchTechnology(p, id, gpsReady);
   if (r.ok === false) return r;
   const job: TimedJob = { id, startedAt: now, readyAt: now + researchDurationMs(techById(id)!.research!) };
@@ -90,7 +104,7 @@ export function claimResearch<T extends ResearchSave>(p: T, id: string, now: num
   const job = jobs.find(j => j.id === id);
   if (!job) return { ok: false, reason: '진행 중인 연구가 없습니다' };
   if (now < job.readyAt) return { ok: false, reason: '아직 연구 중입니다' };
-  return { ok: true, state: { ...p, researching: null, researchJobs: jobs.filter(j => j.id !== id), techs: p.techs.includes(id) ? p.techs : [...p.techs, id] } };
+  return { ok: true, state: { ...p, researching: null, researchJobs: jobs.filter(j => j.id !== id), techs: p.techs.includes(id) ? p.techs : [...p.techs, id], techLevels: job.level ? { ...p.techLevels, [id]: job.level } : p.techLevels } };
 }
 export function prepareSkill<T extends AbilitySave>(p: T, id: ActiveSkill, targets: WorldCreature[], now: number, gpsReady: boolean): ActionResult<T> & { targets?: WorldCreature[] } {
   if (!gpsReady) return { ok: false, reason: '정확한 GPS 신호가 필요합니다' };

@@ -8,7 +8,7 @@ interface SurvivalVitals {
 }
 
 /** Settle elapsed time once, discarding capped backlog rather than replaying it. */
-export function advanceSurvivalVitals<T extends SurvivalVitals>(state: T, now: number, locationRegen = 0): T {
+export function advanceSurvivalVitals<T extends SurvivalVitals>(state: T, now: number, locationRegen = 0, maxHp: number = C.baseMaxHp): T {
   const elapsedTicks = Math.floor((now - state.lastTickAt) / C.tickMs);
   if (elapsedTicks <= 0) return state;
   const ticks = Math.min(C.maxOfflineTicks, elapsedTicks);
@@ -18,7 +18,7 @@ export function advanceSurvivalVitals<T extends SurvivalVitals>(state: T, now: n
     if (hunger === 0) hp -= C.starveHpPerTick;
     hp += locationRegen;
     if (hunger >= NATURAL_REGEN_MIN_HUNGER) hp += NATURAL_REGEN_PER_TICK;
-    hp = Math.max(1, Math.min(C.baseMaxHp, hp));
+    hp = Math.max(1, Math.min(maxHp, hp));
   }
   return { ...state, hp, hunger, lastTickAt: state.lastTickAt + elapsedTicks * C.tickMs };
 }

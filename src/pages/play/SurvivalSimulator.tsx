@@ -57,6 +57,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { TECH_CATEGORIES, TECH_CATEGORY, type TechCategory } from '@/lib/survival/techCategories';
+import { MAX_TECH_LEVEL, techLevel, techUpgradeCost } from '@/lib/survival/techLevels';
 
 const START: LatLng = { lat: 37.748, lng: 126.7496 };
 const spriteUrls = import.meta.glob('../../assets/survival/*.png', { eager: true, import: 'default' }) as Record<string, string>;
@@ -559,7 +560,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         <GameMenu loggedIn={!!user} onExit={() => navigate(realGps ? '/' : '/play')}
           onLogout={async () => { try { await signOut(); navigate('/login'); } catch { toast.error('로그아웃에 실패했어요. 다시 시도해 주세요'); } }} />
         <div className="flex-1 space-y-1 text-xs">
-          <div className="flex items-center gap-1">체력<HpBar value={s.hp} max={C.baseMaxHp} />{s.hp}</div>
+          <div className="flex items-center gap-1">체력<HpBar value={s.hp} max={g.maxHp} />{s.hp}/{g.maxHp}</div>
           <div className="flex items-center gap-1">허기<div className="h-2.5 flex-1 border border-foreground bg-muted"><div className="h-full bg-primary" style={{ width: `${s.hunger}%` }} /></div>{s.hunger}</div>
         </div>
         <div className="text-right text-[11px] leading-tight">
@@ -737,14 +738,17 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                         className={`pixel-btn min-h-11 shrink-0 px-3 text-xs ${techTab === c.id ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>{c.label}</button>
                     ))}
                   </div>
-                  {researchJobs.map(j => <JobCard key={j.id} title={`연구: ${TECHS.find(t => t.id === j.id)?.name ?? ''}`} job={j} now={nowTick} claimLabel="연구가 완료되었습니다 · 습득" onClaim={() => g.claimTech(j.id)} />)}
+                   {researchJobs.map(j => <JobCard key={j.id} title={`연구: ${TECHS.find(t => t.id === j.id)?.name ?? ''}${j.level ? ` Lv.${j.level}` : ''}`} job={j} now={nowTick} claimLabel="연구가 완료되었습니다 · 습득" onClaim={() => g.claimTech(j.id)} />)}
                   {(techTab === 'general' || techTab === 'craft') && <p className="text-xs text-muted-foreground">처음엔 아무것도 만들 줄 모릅니다. 자원을 모으면 깨달음을 얻고, 일부 기술은 거점에서 재료를 바쳐 연구해야 합니다.</p>}
                   {TECHS.filter((t) => (TECH_CATEGORY[t.id] ?? 'general') === techTab).map((t) => {
                     const known = s.techs.includes(t.id);
                     const ready = prerequisitesMet(t, s.techs);
+                    const lv = techLevel(s.techLevels, t.id);
+                    const upCost = known ? techUpgradeCost(t.id, lv) : null;
+                    const researching = researchJobs.some(j => j.id === t.id);
                     return (
                       <div key={t.id} className={`pixel-frame p-2 text-xs ${known ? 'bg-primary/15' : 'bg-card'} ${!ready && !known ? 'opacity-50' : ''}`}>
-                        <div className="flex items-center gap-1"><b className="text-sm">{t.name}</b>{known ? <span className="ml-auto text-primary">습득</span> : <Lock className="ml-auto !h-4 !w-4" />}</div>
+                        <div className="flex items-center gap-1"><b className="text-sm">{t.name}</b>{known ? <span className="ml-auto text-primary">습득 Lv.{lv}/{MAX_TECH_LEVEL}</span> : <Lock className="ml-auto !h-4 !w-4" />}</div>
                         <p>{t.desc}</p>
                         {t.requires.length > 0 && <p className="text-muted-foreground">선행: {t.requires.map((r) => TECHS.find((x) => x.id === r)?.name).join(', ')}</p>}
                         {t.bookOnly && !known && <p className="text-primary">공원 우두머리 전리품 스킬북을 읽어 습득</p>}
@@ -753,9 +757,16 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                         {!known && t.research && (
                           <div className="mt-1">
                             <Stacks stacks={t.research} have={s.storage} />
-                            <button type="button" disabled={!ready || !g.inBase || !g.canAfford(t.research) || !actionReady || researchJobs.some(j => j.id === t.id)} onClick={() => g.research(t.id)} className="pixel-btn mt-1 h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">{researchJobs.some(j => j.id === t.id) ? '연구 중' : `연구하기 (${researchDurationMs(t.research) / 3_600_000}시간)`}</button>
+                            <button type="button" disabled={!ready || !g.inBase || !g.canAfford(t.research) || !actionReady || researching} onClick={() => g.research(t.id)} className="pixel-btn mt-1 h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">{researching ? '연구 중' : `연구하기 (${researchDurationMs(t.research) / 3_600_000}시간)`}</button>
                           </div>
                         )}
+                        {known && upCost && (
+                          <div className="mt-1">
+                            <Stacks stacks={upCost} have={s.storage} />
+                            <button type="button" disabled={!g.inBase || !g.canAfford(upCost) || !actionReady || researching} onClick={() => g.research(t.id)} className="pixel-btn mt-1 h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">{researching ? '연구 중' : `Lv.${lv + 1} 재연구 (${researchDurationMs(upCost) / 3_600_000}시간)`}</button>
+                          </div>
+                        )}
+                        {known && !upCost && (t.research || t.bookOnly) && <p className="mt-1 text-primary">최고 레벨입니다</p>}
                       </div>
                     );
                   })}
