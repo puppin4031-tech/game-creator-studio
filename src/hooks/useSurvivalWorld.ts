@@ -21,6 +21,10 @@ import { currentQuest, questReady, type QuestState } from '@/lib/survival/quests
 import { IRON_SKIN_DEF, PRIMAL_STRIKE_MULT, checkInspiration, isRecipeUnlocked, prerequisitesMet, readSkillBook, techById, type TechDef } from '@/lib/survival/tech';
 import { SANCTUARY_RADIUS_M, SANCTUARY_REGEN_PER_TICK, LANDMARK_INFO, SHAMAN_BLESS_XP, SHAMAN_RUMORS, SHAMAN_TIPS, TRADER_STOCK, canClaimLandmark, landmarkReward, recordLandmarkClaim, sellPrice, type Landmark, type LandmarkClaims } from '@/lib/survival/landmarks';
 import type { TerrainZone } from '@/lib/survival/terrainZone';
+import { skillCooldownMs, skillDamage, skillLevel, skillUpgradeCost } from '@/lib/survival/skillLevels';
+import { ALTAR_COST, INVENTED_DURABILITY, inventionId, registerInventions, type InventedItem } from '@/lib/survival/inventedItems';
+import { checkInvention, type InventionInput } from '@/lib/survival/invention';
+import { payAccessible } from '@/lib/survival/abilities';
 import type { GearInstance, LatLng, Stack, WorldEntity } from '@/lib/survival/types';
 
 const SAVE_KEY = 'survival-world-v1';
@@ -52,6 +56,9 @@ export interface WorldSave extends WorldProgress {
   calmUntil?: Record<string, number>;
   companions?: Companion[];
   rescueTokens?: number;
+  skillLevels?: Record<string, number>;
+  altar?: boolean;
+  inventions?: InventedItem[];
   lastTickAt: number;
 }
 
@@ -84,6 +91,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const [s, setState] = useState<WorldSave>(() => load(start, saveKey));
   const ref = useRef(s);
   ref.current = s;
+  registerInventions(s.inventions);
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
   const setS = useCallback((next: WorldSave | ((previous: WorldSave) => WorldSave)) => {
@@ -330,7 +338,6 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const dealt = (p.damage[e.id] ?? 0) + power;
     if (dealt < need) {
       next.damage[e.id] = dealt;
-      toast(`${label} 타격! (${Math.round((dealt / need) * 100)}%)`);
       setS(next);
       return;
     }
@@ -436,10 +443,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const targets = entities.filter((e): e is Extract<WorldEntity, { kind: 'creature' }> => e.kind === 'creature' && !p.depleted[e.id]);
     const result = prepareSkill(p, id, targets, at, enabledRef.current);
     if (result.ok === false) { toast.warning(result.reason); return false; }
-    let next = { ...result.state, damage: { ...p.damage }, depleted: { ...p.depleted } };
+    const lv = skillLevel(p.skillLevels, id);
+    let next: WorldSave = { ...result.state, damage: { ...p.damage }, depleted: { ...p.depleted }, cooldowns: { ...result.state.cooldowns, [id]: at + skillCooldownMs(id, lv) } };
     if (id !== 'roar') for (const e of result.targets ?? []) {
       const def = creatureDef(e.type);
-      const damage = (next.damage[e.id] ?? 0) + ACTIVE_SKILLS[id].damage;
+      const damage = (next.damage[e.id] ?? 0) + skillDamage(id, lv);
       if (damage < def.hp) { next.damage[e.id] = damage; continue; }
       delete next.damage[e.id];
       next.depleted[e.id] = at;
@@ -530,7 +538,47 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setS]);
 
-  return { setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
+  const upgradeSkill = useCallback((id: ActiveSkill) => {
+    const p = ref.current;
+    if (!p.techs.includes(id)) { toast.warning('기술을 먼저 배우세요'); return; }
+    const lv = skillLevel(p.skillLevels, id);
+    const cost = skillUpgradeCost(lv);
+    if (!cost) { toast('이미 최고 레벨입니다'); return; }
+    const paid = payAccessible(p, cost);
+    if (!paid) { toast.error(`재료 부족: ${fmt(cost)}`); return; }
+    setS({ ...paid, skillLevels: { ...p.skillLevels, [id]: lv + 1 } });
+    toast.success(`${ACTIVE_SKILLS[id].name} Lv.${lv + 1}`);
+  }, [setS]);
+  const buildAltar = useCallback(() => {
+    const p = ref.current;
+    if (!enabledRef.current || !atMainBase(p)) { toast.warning('정확한 GPS 신호가 있는 본거지에서 세우세요'); return; }
+    if (p.altar) return;
+    const paid = payAccessible(p, ALTAR_COST);
+    if (!paid) { toast.error(`재료 부족: ${fmt(ALTAR_COST)}`); return; }
+    setS({ ...paid, altar: true });
+    toast.success('제단을 세웠습니다. 이제 발명할 수 있어요');
+  }, [setS]);
+  /** Consumes the materials and adds one invented item as equipped gear. */
+  const invent = useCallback((input: InventionInput, naming?: { name: string; desc: string }) => {
+    const p = ref.current;
+    if (!enabledRef.current || !p.altar || !atMainBase(p)) { toast.warning('본거지 제단 앞에서 발명하세요'); return null; }
+    const check = checkInvention(input);
+    if (check.ok === false) return null;
+    const cost = Object.entries(input.materials).filter(([, q]) => q > 0).map(([itemId, count]) => ({ itemId: itemId as ItemId, count }));
+    const paid = payAccessible(p, cost);
+    if (!paid) { toast.error('재료가 부족합니다 (배낭 또는 창고)'); return null; }
+    const id = inventionId(check.hash);
+    const known = (p.inventions ?? []).find(x => x.id === id);
+    const inv: InventedItem = known ?? { id, hash: check.hash, name: naming?.name ?? id, desc: naming?.desc ?? '', category: input.category, materials: input.materials, power: check.power, createdAt: Date.now() };
+    const inventions = known ? p.inventions ?? [] : [...(p.inventions ?? []), inv];
+    registerInventions(inventions);
+    const g: GearInstance = { uid: crypto.randomUUID(), itemId: id as ItemId, quality: 'NORMAL', durability: INVENTED_DURABILITY, maxDurability: INVENTED_DURABILITY };
+    setS({ ...paid, inventions, gear: [...paid.gear, g] });
+    toast.success(`${inv.name} 완성!`, { description: known ? '알려진 발명품을 다시 만들었습니다' : '새 발명품이 기술 목록에 기록되었습니다' });
+    return inv;
+  }, [setS]);
+
+  return { upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
     recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon,
     moveTo, interact, eat, placeBase, upgradeBase, research, craft, reset, dropItems,

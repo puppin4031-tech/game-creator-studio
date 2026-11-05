@@ -22,3 +22,16 @@ export function rollLoot(loot: LootRoll[], random: () => number = Math.random): 
 }
 
 export const CREATURE_ATTACK_INTERVAL_MS = 900;
+/** Beasts notice the player inside this radius and strike first. */
+export const AGGRO_RADIUS_M = 10;
+/** Beyond this the beast gives up and returns home. */
+export const LEASH_RADIUS_M = 25;
+export const BEAST_STRIKE_INTERVAL_MS = 2500;
+
+/** Whether a beast attacks a nearby player on its own. */
+export function beastAggro(type: CreatureType, distance: number, opts: { isNight: boolean; engaged: boolean; calm: boolean }): boolean {
+  const c = creatureDef(type);
+  if (opts.calm || c.atk <= 0 || c.temper === 'passive') return false;
+  const hostile = c.temper === 'aggressive' || (!!c.nightAggressive && opts.isNight) || opts.engaged;
+  return hostile && distance <= (opts.engaged ? LEASH_RADIUS_M : AGGRO_RADIUS_M);
+}

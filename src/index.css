@@ -172,3 +172,6 @@ html, body, #root {
   .pixel-btn:active { transform: translate(4px, 4px); box-shadow: none; }
   .pixel-btn:disabled { opacity: .45; }
 }
+
+/* Rapid taps on the game must not trigger double-tap zoom. */
+html, body { touch-action: manipulation; }
