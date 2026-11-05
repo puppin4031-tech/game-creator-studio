@@ -39,6 +39,10 @@ import type { LatLng, Stack, WorldEntity } from '@/lib/survival/types';
 import { DamageVignette, HitFlash, HpBar, useHitPulse } from '@/components/survival/HitFeedback';
 import LandmarkSheet from '@/components/survival/LandmarkSheet';
 import { LANDMARK_INFO, SANCTUARY_RADIUS_M, type Landmark } from '@/lib/survival/landmarks';
+import { SHRINE_AURA_M, emptyShrineState, shrinesNear, type Shrine } from '@/lib/survival/sanctuaries';
+import ShrineSheet from '@/components/survival/ShrineSheet';
+import dolmenShrine from '@/assets/survival/dolmen-shrine.png';
+import melchizedekImg from '@/assets/survival/melchizedek.png';
 import PeerActionMenu from '@/components/survival/PeerActionMenu';
 import { useSurvivalPresence, type PeerEvent, type PeerPlayer } from '@/hooks/useSurvivalPresence';
 import { EMOTES, PVP_BASE_DAMAGE, DUEL_MAX_DISTANCE_M } from '@/lib/survival/presence';
@@ -229,7 +233,10 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const inPark = !!s.parkCells?.[zoneCellKey(s.pos)];
   const [landmarks, setLandmarks] = useState<Landmark[]>([]);
   const { setSanctuaries } = g;
-  useEffect(() => { setSanctuaries(landmarks.filter((l) => l.kind === 'shaman').map((l) => ({ lat: l.lat, lng: l.lng }))); }, [landmarks, setSanctuaries]);
+  const nearShrines = useMemo(() => shrinesNear(s.pos, 600), [Math.round(s.pos.lat * 2000), Math.round(s.pos.lng * 2000)]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [selShrine, setSelShrine] = useState<Shrine | null>(null);
+  const [shrineWords, setShrineWords] = useState<string | null>(null);
+  useEffect(() => { setSanctuaries([...landmarks.filter((l) => l.kind === 'shaman'), ...nearShrines].map((l) => ({ lat: l.lat, lng: l.lng }))); }, [landmarks, nearShrines, setSanctuaries]);
   const [selLandmark, setSelLandmark] = useState<Landmark | null>(null);
   const favs = useSurvivalFavorites();
   const [leftOpen, setLeftOpen] = useState(false);
@@ -417,6 +424,24 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
             {landmarks.filter((l) => l.kind === 'shaman' && distanceM(s.pos, l) <= g.vision + SANCTUARY_RADIUS_M).map((l) => {
               const p = project(l); const r = SANCTUARY_RADIUS_M / mpp;
               return <div key={`sanct-${l.id}`} aria-hidden className="pointer-events-none absolute rounded-full border-2 border-primary/60 bg-primary/5 shadow-[0_0_18px_hsl(var(--primary)/0.5)]" style={{ left: p.x, top: p.y, width: r * 2, height: r * 2, transform: 'translate(-50%,-50%)' }} />;
+            })}
+            {nearShrines.filter((sh) => distanceM(s.pos, sh) <= g.vision + SHRINE_AURA_M).map((sh) => {
+              const p = project(sh); const r = SHRINE_AURA_M / mpp;
+              const awake = !!s.shrines?.found.includes(sh.id);
+              return (
+                <div key={sh.id} className="absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
+                  <div aria-hidden className={`pointer-events-none rounded-full border-2 border-primary bg-primary/15 shadow-[0_0_24px_hsl(var(--primary)/0.7)] ${awake ? 'animate-pulse' : 'opacity-60'}`} style={{ width: r * 2, height: r * 2 }} />
+                  <button type="button" aria-label={sh.name} onClick={(ev) => { ev.stopPropagation(); setShrineWords(null); setSelShrine(sh); }}
+                    className="pointer-events-auto absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-[85%] flex-col items-center">
+                    <div className="relative">
+                      <div aria-hidden className="absolute bottom-1 left-1/2 h-3 w-20 -translate-x-1/2 rounded-full bg-foreground/30 blur-[3px]" />
+                      <img src={dolmenShrine} alt="" width={96} height={85} className="relative w-24 [image-rendering:pixelated]" />
+                      <img src={melchizedekImg} alt="멜키체덱" width={26} height={54} className="absolute -bottom-3 left-1/2 w-[26px] -translate-x-1/2 [image-rendering:pixelated] drop-shadow-[0_0_6px_hsl(var(--primary))]" />
+                    </div>
+                    <span className="mt-3 whitespace-nowrap rounded bg-primary px-1 text-[10px] text-primary-foreground">{awake ? '고석 성소' : '잠든 성소'}</span>
+                  </button>
+                </div>
+              );
             })}
             {landmarks.filter((l) => distanceM(s.pos, l) <= g.vision).map((l) => {
               const p = project(l); const info = LANDMARK_INFO[l.kind];
@@ -765,6 +790,14 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           onSell={g.sellItem} onBuy={g.buyItem} onClose={() => setSelLandmark(null)}
           isFav={favs.isFav(selLandmark.id)}
           onToggleFav={() => { const was = favs.isFav(selLandmark.id); favs.toggle({ id: selLandmark.id, name: LANDMARK_INFO[selLandmark.kind].name, lat: selLandmark.lat, lng: selLandmark.lng }); toast(was ? '즐겨찾기에서 뺐어요' : '즐겨찾기에 등록했어요'); }} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {selShrine && <ShrineSheet shrine={selShrine} state={s.shrines ?? emptyShrineState()} pos={s.pos} backpack={s.backpack} words={shrineWords}
+          inRange={distanceM(s.pos, selShrine) <= g.reach && (!realGps || gps.ready)}
+          onAwaken={() => { const w = g.awakenShrine(selShrine); if (w) { setShrineWords(w); playAction('talk', 900); } }}
+          onRite={(id) => { if (g.shrineRite(selShrine, id)) playAction('gather', 900); }}
+          onBless={() => { if (g.shrineBless(selShrine)) playAction('talk', 900); }}
+          onClose={() => setSelShrine(null)} />}
       </AnimatePresence>
       <DamageVignette hitKey={hit.n} />
       <AlertDialog open={!!vassalOffer}>
