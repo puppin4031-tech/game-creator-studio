@@ -4,6 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import { SkillControls, ConstructionControls, CompanionControls, SkillEffect } from '@/components/survival/SurvivalAbilities';
 import SpriteAnimator from '@/components/survival/SpriteAnimator';
 import BackpackDiscard from '@/components/survival/BackpackDiscard';
+import { AltarPanel } from '@/components/survival/AltarPanel';
+import { SkillQuickBar } from '@/components/survival/SkillQuickBar';
+import { useAutoAction } from '@/hooks/useAutoAction';
+import { AGGRO_RADIUS_M, BEAST_STRIKE_INTERVAL_MS, beastAggro } from '@/lib/survival/combat';
+import { ACTIVE_SKILLS, type ActiveSkill } from '@/lib/survival/abilities';
+import { MAX_SKILL_LEVEL, skillLevel, skillUpgradeCost } from '@/lib/survival/skillLevels';
 import { useSpriteAnimations, type SpriteAction } from '@/hooks/useSpriteAnimations';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -38,7 +44,7 @@ import { useSurvivalPresence, type PeerEvent, type PeerPlayer } from '@/hooks/us
 import { EMOTES, PVP_BASE_DAMAGE, DUEL_MAX_DISTANCE_M } from '@/lib/survival/presence';
 import GameMenu, { useGameSettings } from '@/components/survival/GameMenu';
 import { EMOTE_ICON } from '@/components/survival/emoteIcons';
-import { playSfx, haptic, setBgmPlaying } from '@/lib/survival/gameSettings';
+import { playSfx, playSample, haptic, setBgmPlaying, type SampleId } from '@/lib/survival/gameSettings';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -51,6 +57,14 @@ const url = (k: SpriteKey) => spriteUrls[`../../assets/survival/${k}.png`];
 const PLAYER_SCALE = 1.2;
 const LANDMARK_FEATURE_SCALE = 1.15;
 // Hard materials (stone, wood, ore) use the strike animation; soft ones use gather.
+/** Per-target work label and sound so gathering, logging, mining and hunting read differently. */
+export function workKind(e: WorldEntity): { label: string; sample: SampleId } {
+  if (e.kind === 'creature') return { label: '사냥 중', sample: 'strike' };
+  const req = nodeDef(e.type).requires.kind;
+  if (req === 'chop' || /tree|branch/.test(e.type)) return { label: '벌목 중', sample: 'chop' };
+  if (req === 'mine' || /rock|vein/.test(e.type)) return { label: '채광 중', sample: 'mine' };
+  return { label: '채집 중', sample: 'gather' };
+}
 const STRIKE_NODES = new Set<string>(['flint_rock', 'branch_pile', 'oak_tree', 'pine_tree', 'hematite_rock', 'quartz_vein', 'obsidian_rock', 'jade_rock']);
 
 /** Visual-only wooden stake fence drawn around the main base when a palisade is built. */
@@ -133,6 +147,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [panel, setPanel] = useState<Panel>('none');
 
   const onTap = (p: LatLng) => {
+    if (auto.job) { auto.stop(); returnToCenter(); }
     if (realGps) return;
     const d = distanceM(s.pos, p);
     if (d > g.vision * 1.2) { toast('안개 속으로는 한 걸음씩 나아가세요'); return; }
@@ -142,19 +157,26 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const tapEntity = (e: WorldEntity) => {
     if (realGps && !gps.ready) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return; }
     if (!realGps && distanceM(s.pos, e) > g.reach) { g.moveTo({ lat: e.lat, lng: e.lng }); return; }
-    const inRange = distanceM(s.pos, e) <= g.reach;
-    const act: SpriteAction = e.kind === 'creature' ? 'attack' : STRIKE_NODES.has(e.type) ? 'chop' : 'gather';
-    if (inRange) {
-      // Walk to the object (250ms), act, then wait 3s before walking back.
-      setActorTarget({ lat: e.lat, lng: e.lng, anchor: s.pos });
-      setAction('walk'); window.clearTimeout(actionTimer.current); window.clearTimeout(returnTimer.current);
-      actionTimer.current = window.setTimeout(() => {
-        g.interact(e);
-        playAction(act, 900);
-        returnTimer.current = window.setTimeout(returnToCenter, 900 + ACTOR_IDLE_RETURN_MS);
-      }, 250);
-    } else g.interact(e);
+    if (auto.job?.id === e.id) { auto.stop(); toast('작업을 멈췄습니다'); return; }
+    if (distanceM(s.pos, e) > g.reach) { g.interact(e); return; }
+    // Walk beside the object, then repeat the action automatically until done.
+    setActorTarget({ lat: e.lat, lng: e.lng, anchor: s.pos });
+    window.clearTimeout(returnTimer.current);
+    auto.start(e, workKind(e).label);
   };
+  const autoStep = (e: WorldEntity): 'continue' | 'stop' => {
+    const w = gRef.current; const p = w.state;
+    const alive = w.entities.some(x => x.id === e.id) && (e.kind === 'node' ? isNodeAvailable(e.id, e.type, p.depleted, Date.now()) : !p.depleted[e.id]);
+    if (!alive) { window.clearTimeout(returnTimer.current); returnTimer.current = window.setTimeout(returnToCenter, ACTOR_IDLE_RETURN_MS); return 'stop'; }
+    if (distanceM(p.pos, e) > w.reach) { toast('대상과 멀어져 작업을 멈췄습니다'); returnToCenter(); return 'stop'; }
+    if (e.kind === 'node' && w.weight >= w.capacity) { toast.warning('배낭이 가득 찼습니다'); return 'stop'; }
+    const act: SpriteAction = e.kind === 'creature' ? 'attack' : STRIKE_NODES.has(e.type) ? 'chop' : 'gather';
+    w.interact(e);
+    playAction(act, 900);
+    playSample(workKind(e).sample);
+    return 'continue';
+  };
+  const auto = useAutoAction((e) => autoStep(e));
 
   const { data: anims } = useSpriteAnimations('hunter');
   const [action, setAction] = useState<SpriteAction>('idle');
@@ -162,7 +184,6 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const returnTimer = useRef<number>();
   const [actorTarget, setActorTarget] = useState<ActorTarget | null>(null);
   const playAction = (a: SpriteAction, ms: number) => {
-    if (a === 'attack' || a === 'chop') playSfx('hit');
     setAction(a); window.clearTimeout(actionTimer.current);
     actionTimer.current = window.setTimeout(() => setAction('idle'), ms);
   };
@@ -187,6 +208,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const onSurfaceZone = (c: LatLng, z: typeof zone) => g.recordTerrainZone(zoneCellKey(c), z);
   const onSurfacePark = (c: LatLng, park: boolean) => g.recordPark(zoneCellKey(c), park);
   const actionReady = !realGps || gps.ready;
+  const gpsReadyRef = useRef(actionReady); gpsReadyRef.current = actionReady;
   // Auto pickup tech: gather one hand-gatherable node within 10m every few seconds.
   const autoRef = useRef({ g, ready: actionReady });
   autoRef.current = { g, ready: actionReady };
@@ -203,7 +225,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     }, AUTO_PICKUP_INTERVAL_MS);
     return () => window.clearInterval(id);
   }, [autoOn]);
-  const activateSkill = (id: Parameters<typeof g.useSkill>[0]) => { if (g.useSkill(id)) playAction('attack', 900); };
+  const activateSkill = (id: Parameters<typeof g.useSkill>[0]) => { if (g.useSkill(id)) { playAction('attack', 900); playSample('strike'); } };
   const inPark = !!s.parkCells?.[zoneCellKey(s.pos)];
   const [landmarks, setLandmarks] = useState<Landmark[]>([]);
   const { setSanctuaries } = g;
@@ -230,7 +252,25 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const { user, signOut } = useAuth();
   const gameSettings = useGameSettings();
   useEffect(() => { setBgmPlaying(gameSettings.bgm); return () => setBgmPlaying(false); }, [gameSettings.bgm]);
-  useEffect(() => { if (hit.n > 0) { playSfx('hit'); haptic(120); } }, [hit.n]);
+  useEffect(() => { if (hit.n > 0) { playSample('strike'); haptic(120); } }, [hit.n]);
+  // Beasts inside 10m (or chasing after being hit) strike the player first.
+  const [aggroIds, setAggroIds] = useState<Set<string>>(() => new Set());
+  const lastBeastStrike = useRef(0);
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const w = gRef.current; const p = w.state; const t = Date.now();
+      if (realGps && !gpsReadyRef.current) return;
+      const hostile = w.entities.filter(e => e.kind === 'creature' && !p.depleted[e.id] && beastAggro(e.type, distanceM(p.pos, e), { isNight: w.isNight, engaged: (p.damage[e.id] ?? 0) > 0, calm: (p.calmUntil?.[e.id] ?? 0) > t || w.inSanctuary }));
+      setAggroIds(prev => { const n = new Set(hostile.map(e => e.id)); return n.size === prev.size && [...n].every(x => prev.has(x)) ? prev : n; });
+      const near = hostile.sort((a, b) => distanceM(p.pos, a) - distanceM(p.pos, b))[0];
+      if (!near || near.kind !== 'creature' || t - lastBeastStrike.current < BEAST_STRIKE_INTERVAL_MS) return;
+      lastBeastStrike.current = t;
+      const def = creatureDef(near.type);
+      w.takeDamage(def.atk);
+      toast.error(`${def.name}이(가) 먼저 공격했습니다! 공격하거나 도망치세요`);
+    }, 500);
+    return () => window.clearInterval(id);
+  }, [realGps]);
   const gRef = useRef(g); gRef.current = g;
   const [duelWith, setDuelWith] = useState<string | null>(null);
   const duelRef = useRef<string | null>(null); duelRef.current = duelWith;
@@ -402,7 +442,14 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   data-resource-id={e.id} data-lat={e.lat} data-lng={e.lng}
                   className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center"
                   style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}>
-                  <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><motion.div className={g.isNight ? '' : 'brightness-110 contrast-110 drop-shadow-[0_0_3px_hsl(var(--background))]'} animate={{ y: e.kind === 'creature' ? [0, -3, 0] : 0 }} transition={{ repeat: Infinity, duration: 0.8 }}>
+                  {e.kind === 'creature' && creature && creature.temper !== 'passive' && <div aria-hidden className={`pointer-events-none absolute left-1/2 top-full -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed ${aggroIds.has(e.id) ? 'border-destructive bg-destructive/10' : 'border-destructive/40'}`} style={{ width: (AGGRO_RADIUS_M / mpp) * 2, height: (AGGRO_RADIUS_M / mpp) * 2 }} />}
+                  <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><motion.div key={`${e.id}:${dmg ?? 0}`} className={g.isNight ? '' : 'brightness-110 contrast-110 drop-shadow-[0_0_3px_hsl(var(--background))]'}
+                    animate={(() => {
+                      if (aggroIds.has(e.id)) { const me = project(s.pos); return { x: [0, (me.x - p.x) * 0.35, 0], y: [0, (me.y - p.y) * 0.35, 0] }; }
+                      if (dmg) return { x: [0, -4, 4, -3, 3, 0], y: 0 };
+                      return { x: 0, y: e.kind === 'creature' ? [0, -3, 0] : 0 };
+                    })()}
+                    transition={aggroIds.has(e.id) ? { repeat: Infinity, duration: 1.2 } : dmg ? { duration: 0.35 } : { repeat: Infinity, duration: 0.8 }}>
                     <div className={boss ? 'scale-150 rounded-full ring-2 ring-destructive shadow-[0_0_18px_hsl(var(--destructive))]' : ''}><Sprite k={sprite} /></div>
                   </motion.div></div>
                   {(s.calmUntil?.[e.id] ?? 0) > Date.now() && <span className="bg-primary text-[10px] text-primary-foreground">진정됨</span>}
@@ -410,7 +457,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   {creature ? <div className="mt-1 w-20 rounded bg-background/90 px-1 text-center text-[10px]" aria-label={`${name} 체력 ${remainingHp}/${creature.hp}, 공격력 ${creature.atk}`}>
                     <div className="flex items-center gap-1"><HpBar value={remainingHp} max={creature.hp} /></div>
                     <span>{remainingHp}/{creature.hp} · 공격 {creature.atk}</span>
-                  </div> : dmg ? <span className="rounded bg-background/80 px-1 text-[10px]">타격 중</span> : null}
+                  </div> : auto.job?.id === e.id ? <span className="rounded bg-background/80 px-1 text-[10px]">{auto.job.label}</span> : null}
                 </button>
               );
             })}
@@ -441,6 +488,14 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                     return (
                       <motion.div className="absolute left-1/2 top-1/2" initial={false} animate={{ x: dx, y: dy }} transition={{ duration: actorTarget ? 0.25 : 0.5, ease: 'easeOut' }}>
                         <div className="-translate-x-1/2 -translate-y-[85%]">
+                          {auto.job && (() => {
+                            const tgt = g.entities.find(x => x.id === auto.job!.id);
+                            const need = tgt ? (tgt.kind === 'node' ? nodeDef(tgt.type).hp : creatureDef(tgt.type).hp) : 1;
+                            const pct = Math.min(100, Math.round(((s.damage[auto.job.id] ?? 0) / need) * 100));
+                            return <div className="absolute -top-9 left-1/2 w-20 -translate-x-1/2 rounded bg-background/90 px-1 py-0.5 text-center text-[10px] font-bold" role="status">
+                              {auto.job.label} {pct}%<div className="mt-0.5 h-1.5 w-full bg-muted"><div className="h-full bg-primary transition-[width]" style={{ width: `${pct}%` }} /></div>
+                            </div>;
+                          })()}
                           {bubbles[presence.selfId] && <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbleView(bubbles[presence.selfId])}</span>}
                           <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined }}>{activeAnim ? <SpriteAnimator url={activeAnim.url} frames={activeAnim.frame_count} fps={activeAnim.fps} height={Math.round(SPRITE_META['char-hunter'].h * PLAYER_SCALE)} once={action === 'gather' || action === 'attack' || action === 'chop'} fallback={<Sprite k="char-hunter" scale={PLAYER_SCALE} />} /> : <Sprite k="char-hunter" scale={PLAYER_SCALE} />}</div></HitFlash></div>
                         </div>
@@ -530,6 +585,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         </div>
       )}
 
+      <SkillQuickBar known={s.techs} cooldowns={s.cooldowns} levels={s.skillLevels} ready={actionReady} onUse={(id) => activateSkill(id)} />
       {s.base && <button type="button" onClick={() => setPanel('quests')} className="pixel-frame absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-2 z-20 flex min-h-11 max-w-[60%] items-center gap-2 bg-card px-2.5 py-1.5 text-left text-xs">
         <ListChecks className="!h-4 !w-4 shrink-0" />
         <span className="min-w-0 truncate">{g.quest?.title ?? '모든 목표 완료'}</span>
@@ -566,6 +622,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               {panel === 'base' && (!s.base ? <p className="text-sm">아직 거점이 없습니다.</p> : (
                 <>
                   {!g.inBase && <p className="pixel-frame bg-accent p-2 text-sm">거점 반경 안에서만 제작·연구할 수 있어요.</p>}
+                  <div className="pixel-frame bg-card p-2"><b className="text-sm">제단 · 발명</b><div className="mt-2"><AltarPanel altar={!!s.altar} ready={actionReady} inBase={g.inBase} owned={[...s.backpack, ...s.storage]} inventions={s.inventions ?? []} onBuild={g.buildAltar} onInvent={g.invent} /></div></div>
                   <div><b className="text-sm">창고</b><div className="mt-1"><Stacks stacks={s.storage} onUse={g.eat} /></div><div className="mt-2 flex flex-wrap gap-1">{s.storage.map(st => <Button key={st.itemId} variant="outline" size="sm" className="min-h-11 text-xs" disabled={!g.inBase || !actionReady} onClick={() => g.withdraw(st.itemId)}>{ITEMS[st.itemId].name} 1개 꺼내기</Button>)}</div></div>
                   <div>
                     <b className="text-sm">제작</b>
@@ -674,6 +731,11 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                     </div>
                   )}
                   {techTab === 'special' && <SkillControls known={s.techs} cooldowns={s.cooldowns} ready={actionReady} onUse={activateSkill} />}
+                  {techTab === 'special' && (Object.keys(ACTIVE_SKILLS) as ActiveSkill[]).filter(id => s.techs.includes(id)).map(id => {
+                    const lv = skillLevel(s.skillLevels, id); const cost = skillUpgradeCost(lv);
+                    return <div key={`up-${id}`} className="flex items-center gap-2 text-xs"><span className="flex-1">{ACTIVE_SKILLS[id].name} Lv.{lv}/{MAX_SKILL_LEVEL}{cost ? ` · 강화: ${cost.map(c => `${ITEMS[c.itemId].name} ${c.count}`).join(' · ')}` : ''}</span>
+                      <Button size="sm" variant="outline" className="h-11" disabled={!cost} onClick={() => g.upgradeSkill(id)}>{cost ? '강화' : '최고'}</Button></div>;
+                  })}
                   {techTab === 'build' && <ConstructionControls known={s.techs} palisade={s.palisade} outpost={!!s.outpost} ready={actionReady} onBuild={g.construct} />}
                   {techTab === 'companion' && <CompanionControls known={s.techs} companions={s.companions ?? []} ready={actionReady} rescueTokens={s.rescueTokens ?? 0} onCollect={g.collectWork}
                     onRecruit={kind => g.recruit(kind, landmarks.find(l => l.kind === 'shaman' && distanceM(s.pos, l) <= 25))} onTame={g.tame}
