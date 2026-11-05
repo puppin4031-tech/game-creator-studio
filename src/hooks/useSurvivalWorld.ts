@@ -282,15 +282,16 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return { ...p, backpack: kept, hp: Math.round(C.baseMaxHp / 2), pos: p.base ?? p.pos };
   };
 
-  const interact = useCallback((e: WorldEntity) => {
-    if (!enabledRef.current) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return; }
+  // Report whether a hit succeeded so automatic actions stop on rejected attempts.
+  const interact = useCallback((e: WorldEntity): boolean => {
+    if (!enabledRef.current) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return false; }
     const p = ref.current;
-    if (e.kind === 'node' ? !isNodeAvailable(e.id, e.type, p.depleted, Date.now()) : !!p.depleted[e.id]) return;
+    if (e.kind === 'node' ? !isNodeAvailable(e.id, e.type, p.depleted, Date.now()) : !!p.depleted[e.id]) return false;
     const r = reachRadius(p.techs);
-    if (distanceM(p.pos, e) > r) { toast.warning(`${r}m 안으로 다가가세요`); return; }
+    if (distanceM(p.pos, e) > r) { toast.warning(`${r}m 안으로 다가가세요`); return false; }
     if (e.kind === 'creature') {
       const at = Date.now();
-      if (at - lastCreatureAttack.current < CREATURE_ATTACK_INTERVAL_MS) return;
+      if (at - lastCreatureAttack.current < CREATURE_ATTACK_INTERVAL_MS) return false;
       lastCreatureAttack.current = at;
     }
     let next: WorldSave = { ...p, damage: { ...p.damage } };
@@ -308,9 +309,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         const tier = tool ? ITEMS[tool.itemId].tool?.[kind] ?? 0 : 0;
         if (tier < d.requires.tier) {
           toast.error(`${d.name}: ${kind === 'chop' ? '도끼' : '곡괭이'}가 필요합니다`, { description: '제작 기술을 먼저 깨우치세요' });
-          return;
+          return false;
         }
-        if (!tool) return;
+        if (!tool) return false;
         power = ITEMS[tool.itemId].tool?.power ?? 1;
       }
     } else {
@@ -325,21 +326,21 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       power = exchange.dealt - (p.damage[e.id] ?? 0);
       hp -= exchange.counterDamage;
       if (exchange.counterDamage) toast.error(`${d.name} 반격! 체력 -${exchange.counterDamage}`);
-      if (hp <= 0) { setS(die({ ...next, hp })); return; }
+      if (hp <= 0) { setS(die({ ...next, hp })); return false; }
       if (!exchange.defeated && d.temper === 'passive' && Math.random() < (d.escapeChance ?? 0)) {
         toast(`${d.name}이(가) 달아났습니다`);
         delete next.damage[e.id];
         setS({ ...next, hp, depleted: { ...p.depleted, [e.id]: Date.now() } });
-        return;
+        return true;
       }
     }
-    if (hp <= 0) { setS(die({ ...next, hp })); return; }
+    if (hp <= 0) { setS(die({ ...next, hp })); return false; }
     next.hp = hp;
     const dealt = (p.damage[e.id] ?? 0) + power;
     if (dealt < need) {
       next.damage[e.id] = dealt;
       setS(next);
-      return;
+      return true;
     }
     delete next.damage[e.id];
     const got = rollLoot(loot);
@@ -357,6 +358,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     else if (fits) toast.success(`획득: ${fmt(got) || '없음'}`); else toast.warning('배낭이 너무 무겁습니다! 거점에 다녀오세요');
     next = learn(next, checkInspiration(gathered, next.techs));
     setS(next);
+    return true;
   }, [best, weapon, armor, capacity]);
 
   const eat = useCallback((itemId: ItemId) => {

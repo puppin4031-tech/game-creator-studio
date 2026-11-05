@@ -1,0 +1,1 @@
+- Survival `interact` returns whether the hit succeeded; automatic workers stop before animation/audio on rejection so failed tool, GPS, and cooldown checks cannot loop.
