@@ -58,6 +58,10 @@ export const ITEMS = def({
   coconut: { name: '야자 열매', desc: '허기 +14 · 체력 +6', category: 'food', rarity: 'uncommon', weight: 0.5, sprite: 'item-apple', food: { hunger: 14, hp: 6 } },
   jerky: { name: '말린 고기', desc: '허기 +28 · 체력 +5', category: 'food', rarity: 'uncommon', weight: 0.25, sprite: 'item-cooked-meat', food: { hunger: 28, hp: 5 } },
   shell: { name: '조개 화폐', desc: '만물상에서 물건을 사고팔 때 쓰는 화폐.', category: 'material', rarity: 'common', weight: 0, sprite: 'item-quartz' },
+  // ── Sanctuary gifts
+  sacred_bread: { name: '생명의 떡', desc: '성소의 축복. 허기 +50 · 체력 +40', category: 'food', rarity: 'rare', weight: 0.25, sprite: 'item-cooked-meat', food: { hunger: 50, hp: 40 } },
+  purify_dew: { name: '정화의 이슬', desc: '고석 틈의 이슬. 허기 +10 · 체력 +30', category: 'food', rarity: 'rare', weight: 0.25, sprite: 'item-clay-pot', food: { hunger: 10, hp: 30 } },
+  sacred_essence: { name: '성스러운 정수', desc: '제사로 응결된 신성력. 훗날 신성한 발명의 재료.', category: 'material', rarity: 'epic', weight: 0.25, sprite: 'item-quartz' },
   // ── Processed
   cordage: { name: '노끈', desc: '섬유를 꼬아 만든 튼튼한 끈.', category: 'processed', rarity: 'common', weight: 0.25, sprite: 'item-cordage' },
   leather: { name: '가죽', desc: '무두질한 질긴 가죽.', category: 'processed', rarity: 'uncommon', weight: 0.75, sprite: 'item-leather' },
