@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Menu, LogOut, Settings, DoorOpen, MessageSquare } from 'lucide-react';
+import { Menu, LogOut, Settings, DoorOpen, MessageSquare, BookOpen } from 'lucide-react';
 import SupportInquiryDialog from './SupportInquiryDialog';
+import GuideBook from './GuideBook';
 import { toast } from 'sonner';
 import { enableNotifications, notifySupported } from '@/lib/survival/notify';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -21,6 +22,7 @@ export default function GameMenu({ onExit, onLogout, loggedIn }: Props) {
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const s = useGameSettings();
   const Row = ({ label, hint, k }: { label: string; hint: string; k: 'bgm' | 'sfx' | 'haptic' }) => (
     <label className="flex min-h-11 items-center justify-between gap-3">
@@ -36,6 +38,7 @@ export default function GameMenu({ onExit, onLogout, loggedIn }: Props) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="font-pixel">
           <DropdownMenuItem className="min-h-11" onSelect={onExit}><DoorOpen className="mr-2 !h-5 !w-5" />나가기</DropdownMenuItem>
+          <DropdownMenuItem className="min-h-11" onSelect={() => setGuideOpen(true)}><BookOpen className="mr-2 !h-5 !w-5" />가이드</DropdownMenuItem>
           <DropdownMenuItem className="min-h-11" onSelect={() => setSettingsOpen(true)}><Settings className="mr-2 !h-5 !w-5" />설정</DropdownMenuItem>
           {loggedIn && <DropdownMenuItem className="min-h-11 text-destructive" onSelect={() => setConfirmLogout(true)}><LogOut className="mr-2 !h-5 !w-5" />로그아웃</DropdownMenuItem>}
         </DropdownMenuContent>
@@ -81,6 +84,7 @@ export default function GameMenu({ onExit, onLogout, loggedIn }: Props) {
         </DialogContent>
       </Dialog>
       <SupportInquiryDialog open={supportOpen} onOpenChange={setSupportOpen} />
+      <GuideBook open={guideOpen} onOpenChange={setGuideOpen} />
     </>
   );
 }
