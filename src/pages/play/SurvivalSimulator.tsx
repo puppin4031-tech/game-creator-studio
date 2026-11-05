@@ -46,6 +46,7 @@ import melchizedekImg from '@/assets/survival/melchizedek.png';
 import PeerActionMenu from '@/components/survival/PeerActionMenu';
 import { useSurvivalPresence, type PeerEvent, type PeerPlayer } from '@/hooks/useSurvivalPresence';
 import { EMOTES, PVP_BASE_DAMAGE, DUEL_MAX_DISTANCE_M } from '@/lib/survival/presence';
+import { researchJobsOf } from '@/lib/survival/abilities';
 import { JobCard, ExpeditionPanel } from '@/components/survival/HomeJobs';
 import { BASE_UPGRADE_MS, isReady, researchDurationMs } from '@/lib/survival/homeActivities';
 import { sendNotice } from '@/lib/survival/notify';
@@ -254,15 +255,16 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [techTab, setTechTab] = useState<TechCategory>('general');
   const [nowTick, setNowTick] = useState(() => Date.now());
   useEffect(() => { const t = setInterval(() => setNowTick(Date.now()), 15_000); return () => clearInterval(t); }, []);
-  const techDone = isReady(s.researching, nowTick);
+  const researchJobs = researchJobsOf(s);
+  const techDone = researchJobs.some(j => isReady(j, nowTick));
   const baseDone = isReady(s.baseUpgrade, nowTick) || isReady(s.expedition ? { id: 'e', ...s.expedition } : null, nowTick);
   const noticed = useRef(new Set<string>());
   useEffect(() => {
     const fire = (key: string, title: string, body: string) => { if (noticed.current.has(key)) return; noticed.current.add(key); sendNotice(title, body, key); };
-    if (techDone && s.researching) fire(`r${s.researching.readyAt}`, '연구 완료', `${TECHS.find(t => t.id === s.researching?.id)?.name ?? '기술'} 연구가 끝났어요. 기술 메뉴에서 습득하세요`);
+    researchJobs.filter(j => isReady(j, nowTick)).forEach(j => fire(`r${j.id}${j.readyAt}`, '연구 완료', `${TECHS.find(t => t.id === j.id)?.name ?? '기술'} 연구가 끝났어요. 기술 메뉴에서 습득하세요`));
     if (s.baseUpgrade && isReady(s.baseUpgrade, nowTick)) fire(`b${s.baseUpgrade.readyAt}`, '거점 공사 완료', '거점 메뉴에서 발전을 완료하세요');
     if (s.expedition && nowTick >= s.expedition.readyAt) fire(`e${s.expedition.readyAt}`, '원정대 귀환', '전리품과 정찰 보고서가 도착했어요');
-  }, [nowTick, techDone, s.researching, s.baseUpgrade, s.expedition]);
+  }, [nowTick, researchJobs, s.baseUpgrade, s.expedition]);
   const [selPeerId, setSelPeerId] = useState<string | null>(null);
   const [bubbles, setBubbles] = useState<Record<string, string>>({});
   const [allies, setAllies] = useState<{ id: string; name: string }[]>(() => {
@@ -735,7 +737,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                         className={`pixel-btn min-h-11 shrink-0 px-3 text-xs ${techTab === c.id ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>{c.label}</button>
                     ))}
                   </div>
-                  {s.researching && <JobCard title={`연구: ${TECHS.find(t => t.id === s.researching?.id)?.name ?? ''}`} job={s.researching} now={nowTick} claimLabel="연구가 완료되었습니다 · 습득" onClaim={g.claimTech} />}
+                  {researchJobs.map(j => <JobCard key={j.id} title={`연구: ${TECHS.find(t => t.id === j.id)?.name ?? ''}`} job={j} now={nowTick} claimLabel="연구가 완료되었습니다 · 습득" onClaim={() => g.claimTech(j.id)} />)}
                   {(techTab === 'general' || techTab === 'craft') && <p className="text-xs text-muted-foreground">처음엔 아무것도 만들 줄 모릅니다. 자원을 모으면 깨달음을 얻고, 일부 기술은 거점에서 재료를 바쳐 연구해야 합니다.</p>}
                   {TECHS.filter((t) => (TECH_CATEGORY[t.id] ?? 'general') === techTab).map((t) => {
                     const known = s.techs.includes(t.id);
@@ -751,7 +753,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                         {!known && t.research && (
                           <div className="mt-1">
                             <Stacks stacks={t.research} have={s.storage} />
-                            <button type="button" disabled={!ready || !g.inBase || !g.canAfford(t.research) || !actionReady || !!s.researching} onClick={() => g.research(t.id)} className="pixel-btn mt-1 h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">{s.researching?.id === t.id ? '연구 중' : `연구하기 (${researchDurationMs(t.research) / 3_600_000}시간)`}</button>
+                            <button type="button" disabled={!ready || !g.inBase || !g.canAfford(t.research) || !actionReady || researchJobs.some(j => j.id === t.id)} onClick={() => g.research(t.id)} className="pixel-btn mt-1 h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">{researchJobs.some(j => j.id === t.id) ? '연구 중' : `연구하기 (${researchDurationMs(t.research) / 3_600_000}시간)`}</button>
                           </div>
                         )}
                       </div>

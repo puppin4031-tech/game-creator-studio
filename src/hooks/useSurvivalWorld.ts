@@ -63,6 +63,7 @@ export interface WorldSave extends WorldProgress {
   inventions?: InventedItem[];
   shrines?: ShrineState;
   researching?: TimedJob | null;
+  researchJobs?: TimedJob[];
   baseUpgrade?: TimedJob | null;
   expedition?: Expedition | null;
   expeditionMark?: number;
@@ -473,10 +474,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     setS(result.state);
     toast.success(`${techById(techId)?.name} 연구 시작`);
   }, [setS]);
-  const claimTech = useCallback(() => {
-    const result = claimResearch(ref.current, Date.now());
+  const claimTech = useCallback((id: string) => {
+    const result = claimResearch(ref.current, id, Date.now());
     if (result.ok === false) { toast.warning(result.reason); return; }
-    const id = ref.current.researching?.id;
     setS(result.state);
     toast.success('연구가 완료되었습니다', { description: `${techById(id ?? '')?.name ?? ''} 습득` });
   }, [setS]);

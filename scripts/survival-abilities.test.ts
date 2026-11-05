@@ -161,11 +161,19 @@ describe('real-time research', () => {
     expect(r.state.techs).not.toContain('roar');
     expect(r.state.storage).toEqual([]);
     expect(startResearch({ ...r.state, storage: tech.research! }, 'roar', true, 1).ok).toBe(false);
-    expect(claimResearch(r.state, r.state.researching!.readyAt - 1).ok).toBe(false);
-    const c = claimResearch(r.state, r.state.researching!.readyAt);
+    const readyAt = r.state.researchJobs![0].readyAt;
+    expect(claimResearch(r.state, 'roar', readyAt - 1).ok).toBe(false);
+    const c = claimResearch(r.state, 'roar', readyAt);
     if (c.ok === false) throw new Error(c.reason);
     expect(c.state.techs).toContain('roar');
-    expect(c.state.researching).toBeNull();
+    expect(c.state.researchJobs).toEqual([]);
+  });
+  test('several techs can be researched at the same time', () => {
+    const a = TECHS.find(t => t.id === 'roar')!; const b = TECHS.find(t => t.id === 'stone_barrage')!;
+    const p = { ...fresh(), techs: [...a.requires, ...b.requires], storage: [...a.research!, ...b.research!] };
+    const r1 = startResearch(p, 'roar', true, 0); if (r1.ok === false) throw new Error(r1.reason);
+    const r2 = startResearch(r1.state, 'stone_barrage', true, 0); if (r2.ok === false) throw new Error(r2.reason);
+    expect(r2.state.researchJobs!.map(j => j.id)).toEqual(['roar', 'stone_barrage']);
   });
 });
 describe('expedition', () => {

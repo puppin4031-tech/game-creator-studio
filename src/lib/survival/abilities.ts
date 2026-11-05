@@ -70,20 +70,27 @@ export function researchTechnology<T extends AbilitySave>(p: T, id: string, gpsR
   const storage = removeStacks(p.storage, t.research);
   return storage ? { ok: true, state: { ...p, storage, techs: [...p.techs, id] } } : { ok: false, reason: '창고의 연구 재료가 부족합니다' };
 }
-/** Pays research materials now; the tech is learned only after the real-time timer is claimed. */
-export function startResearch<T extends AbilitySave & { researching?: TimedJob | null }>(p: T, id: string, gpsReady: boolean, now: number): ActionResult<T> {
-  if (p.researching) return { ok: false, reason: '이미 다른 기술을 연구 중입니다' };
+type ResearchSave = AbilitySave & { researching?: TimedJob | null; researchJobs?: TimedJob[] };
+/** All running research jobs, including a legacy single `researching` entry. */
+export function researchJobsOf(p: { researching?: TimedJob | null; researchJobs?: TimedJob[] }): TimedJob[] {
+  return [...(p.researchJobs ?? []), ...(p.researching ? [p.researching] : [])];
+}
+/** Pays research materials now; several techs can run in parallel, each learned after its own timer. */
+export function startResearch<T extends ResearchSave>(p: T, id: string, gpsReady: boolean, now: number): ActionResult<T> {
+  const jobs = researchJobsOf(p);
+  if (jobs.some(j => j.id === id)) return { ok: false, reason: '이미 연구 중인 기술입니다' };
   const r = researchTechnology(p, id, gpsReady);
   if (r.ok === false) return r;
   const job: TimedJob = { id, startedAt: now, readyAt: now + researchDurationMs(techById(id)!.research!) };
-  return { ok: true, state: { ...r.state, techs: p.techs, researching: job } };
+  return { ok: true, state: { ...r.state, techs: p.techs, researching: null, researchJobs: [...jobs, job] } };
 }
-/** Learns a finished research; nothing happens before readyAt. */
-export function claimResearch<T extends AbilitySave & { researching?: TimedJob | null }>(p: T, now: number): ActionResult<T> {
-  const job = p.researching;
+/** Learns one finished research; nothing happens before its readyAt. */
+export function claimResearch<T extends ResearchSave>(p: T, id: string, now: number): ActionResult<T> {
+  const jobs = researchJobsOf(p);
+  const job = jobs.find(j => j.id === id);
   if (!job) return { ok: false, reason: '진행 중인 연구가 없습니다' };
   if (now < job.readyAt) return { ok: false, reason: '아직 연구 중입니다' };
-  return { ok: true, state: { ...p, researching: null, techs: p.techs.includes(job.id) ? p.techs : [...p.techs, job.id] } };
+  return { ok: true, state: { ...p, researching: null, researchJobs: jobs.filter(j => j.id !== id), techs: p.techs.includes(id) ? p.techs : [...p.techs, id] } };
 }
 export function prepareSkill<T extends AbilitySave>(p: T, id: ActiveSkill, targets: WorldCreature[], now: number, gpsReady: boolean): ActionResult<T> & { targets?: WorldCreature[] } {
   if (!gpsReady) return { ok: false, reason: '정확한 GPS 신호가 필요합니다' };
