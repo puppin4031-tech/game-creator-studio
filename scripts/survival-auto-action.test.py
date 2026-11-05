@@ -25,15 +25,15 @@ async def check_target(browser, name, tool=None):
         const start = AudioBufferSourceNode.prototype.start;
         AudioBufferSourceNode.prototype.start = function(...args) {window.audioStarts++; return start.apply(this,args);};
     }""")
-    target = await page.get_by_role("button", name=name, exact=True).first.element_handle()
-    assert target is not None
-    # First tap may move the simulator into reach; dispatch directly to avoid overlapping map icons.
-    await target.dispatch_event("click")
-    await page.wait_for_timeout(300)
-    if await page.evaluate("window.toolErrors") == 0 and not tool:
-        await target.dispatch_event("click")
-    elif tool:
-        await target.dispatch_event("click")
+    # Terrain sampling can replace the initial target after simulator movement.
+    # Re-select after each move until an interaction actually occurs.
+    for _ in range(8):
+        await page.get_by_role("button", name=name, exact=True).first.dispatch_event("click")
+        await page.wait_for_timeout(300)
+        attempted = await page.evaluate("""() => window.toolErrors > 0 ||
+            Object.keys(JSON.parse(localStorage.getItem('survival-world-v1')).damage).length > 0""")
+        if attempted:
+            break
     await page.wait_for_timeout(4200)
     result = await page.evaluate("""() => ({errors:window.toolErrors, audio:window.audioStarts,
         save:JSON.parse(localStorage.getItem('survival-world-v1'))})""")
