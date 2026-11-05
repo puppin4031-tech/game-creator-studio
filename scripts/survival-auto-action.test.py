@@ -1,6 +1,5 @@
 """Run with python3 scripts/survival-auto-action.test.py against the local preview."""
 import asyncio
-import json
 from playwright.async_api import async_playwright
 
 
@@ -26,7 +25,8 @@ async def check_target(browser, name, tool=None):
         const start = AudioBufferSourceNode.prototype.start;
         AudioBufferSourceNode.prototype.start = function(...args) {window.audioStarts++; return start.apply(this,args);};
     }""")
-    target = page.get_by_role("button", name=name, exact=True).first
+    target = await page.get_by_role("button", name=name, exact=True).first.element_handle()
+    assert target is not None
     # First tap may move the simulator into reach; dispatch directly to avoid overlapping map icons.
     await target.dispatch_event("click")
     await page.wait_for_timeout(300)
