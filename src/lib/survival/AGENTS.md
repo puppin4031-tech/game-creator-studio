@@ -1,0 +1,1 @@
+- Dolmen sanctuaries: site list in sanctuarySites.ts, rules in sanctuaries.ts (pure); network state lives in WorldSave.shrines so cloud sync carries it; why: any site can be first and sacred power must persist for future uses.
