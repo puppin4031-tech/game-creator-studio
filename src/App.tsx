@@ -85,7 +85,8 @@ const App = () => (
     <GoogleMapsProvider>
       <TooltipProvider>
         <Toaster />
-        <Sonner />
+        {/* Compact top notices so pickups never cover the bottom action panels. */}
+        <Sonner position="top-center" visibleToasts={2} duration={2200} offset="calc(env(safe-area-inset-top) + 64px)" />
         <BrowserRouter>
           <AuthProvider>
             <Routes>
