@@ -2,3 +2,6 @@ project_id = "tbltazlzwmkixphcplbq"
 
 [functions.survival-plan]
 verify_jwt = false
+
+[functions.survival-invent]
+verify_jwt = false
