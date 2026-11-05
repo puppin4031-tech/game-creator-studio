@@ -21,6 +21,7 @@ import { currentQuest, questReady, type QuestState } from '@/lib/survival/quests
 import { IRON_SKIN_DEF, PRIMAL_STRIKE_MULT, checkInspiration, isRecipeUnlocked, prerequisitesMet, readSkillBook, techById, type TechDef } from '@/lib/survival/tech';
 import { SANCTUARY_RADIUS_M, SANCTUARY_REGEN_PER_TICK, LANDMARK_INFO, SHAMAN_BLESS_XP, SHAMAN_RUMORS, SHAMAN_TIPS, TRADER_STOCK, canClaimLandmark, landmarkReward, recordLandmarkClaim, sellPrice, type Landmark, type LandmarkClaims } from '@/lib/survival/landmarks';
 import type { TerrainZone } from '@/lib/survival/terrainZone';
+import { MELCHIZEDEK_FIRST, MELCHIZEDEK_LINK, RITES, blessingGift, canBless, discoverShrine, emptyShrineState, performRite, recordBlessing, type Shrine, type ShrineState } from '@/lib/survival/sanctuaries';
 import { skillCooldownMs, skillDamage, skillLevel, skillUpgradeCost } from '@/lib/survival/skillLevels';
 import { ALTAR_COST, INVENTED_DURABILITY, inventionId, registerInventions, type InventedItem } from '@/lib/survival/inventedItems';
 import { checkInvention, type InventionInput } from '@/lib/survival/invention';
@@ -59,6 +60,7 @@ export interface WorldSave extends WorldProgress {
   skillLevels?: Record<string, number>;
   altar?: boolean;
   inventions?: InventedItem[];
+  shrines?: ShrineState;
   lastTickAt: number;
 }
 
@@ -253,6 +255,51 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     setS({ ...next, backpack: addStacks(p.backpack, got) });
     toast.success(`${info.name}: ${fmt(got)}`);
     return null;
+  }, [capacity]);
+
+  /** Shared GPS/range gate for sanctuary actions. */
+  const shrineGate = (sh: Shrine): WorldSave | null => {
+    const p = ref.current;
+    if (!enabledRef.current) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return null; }
+    const r = reachRadius(p.techs);
+    if (distanceM(p.pos, sh) > r) { toast.warning(`${r}m 안으로 다가가세요`); return null; }
+    return p;
+  };
+
+  /** Awaken a sanctuary into the player's network. Returns Melchizedek's words. */
+  const awakenShrine = useCallback((sh: Shrine): string | null => {
+    const p = shrineGate(sh); if (!p) return null;
+    const res = discoverShrine(p.shrines ?? emptyShrineState(), sh.id);
+    if (!res) return null;
+    setS({ ...p, shrines: res.state });
+    toast.success(`${sh.name} 각성 · 신성력 +${res.gained}`);
+    return res.first ? MELCHIZEDEK_FIRST : MELCHIZEDEK_LINK;
+  }, []);
+
+  const shrineRite = useCallback((sh: Shrine, riteId: string): boolean => {
+    const p = shrineGate(sh); if (!p) return false;
+    const st = p.shrines ?? emptyShrineState();
+    if (!st.found.includes(sh.id)) { toast.warning('먼저 성소를 깨우세요'); return false; }
+    const rite = RITES.find((r) => r.id === riteId); if (!rite) return false;
+    const left = removeStacks(p.backpack, rite.cost);
+    if (!left) { toast.error('제물이 부족합니다'); return false; }
+    setS({ ...p, backpack: rite.reward ? addStacks(left, rite.reward) : left, shrines: performRite(st, rite) });
+    toast.success(`${rite.name} · 신성력 +${rite.sacred}${rite.reward ? ` · ${fmt(rite.reward)}` : ''}`);
+    return true;
+  }, []);
+
+  const shrineBless = useCallback((sh: Shrine): boolean => {
+    const p = shrineGate(sh); if (!p) return false;
+    const st = p.shrines ?? emptyShrineState();
+    if (!st.found.includes(sh.id)) { toast.warning('먼저 성소를 깨우세요'); return false; }
+    const now = Date.now();
+    const check = canBless(st, sh.id, now);
+    if (!check.ok) { toast(`제단이 아직 비어 있습니다 · ${Math.ceil((check as { waitMs: number }).waitMs / 3_600_000)}시간 뒤`); return false; }
+    const gift = blessingGift(st);
+    if (stackWeight(gift) > capacity - stackWeight(p.backpack)) { toast.warning('배낭이 너무 무겁습니다'); return false; }
+    setS({ ...p, backpack: addStacks(p.backpack, gift), shrines: recordBlessing(st, sh.id, now) });
+    toast.success(`제단의 축복: ${fmt(gift)}`);
+    return true;
   }, [capacity]);
 
   const sellItem = useCallback((itemId: ItemId) => {
@@ -580,7 +627,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return inv;
   }, [setS]);
 
-  return { upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
+  return { awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
     recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon,
     moveTo, interact, eat, placeBase, upgradeBase, research, craft, reset, dropItems,
