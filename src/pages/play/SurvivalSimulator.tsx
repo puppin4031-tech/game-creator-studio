@@ -1,6 +1,6 @@
 // @refresh reset
 // Custom GPS/world hook changes must remount this screen instead of reusing stale hook queues.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { SkillControls, ConstructionControls, CompanionControls, SkillEffect } from '@/components/survival/SurvivalAbilities';
 import SpriteAnimator from '@/components/survival/SpriteAnimator';
 import BackpackDiscard from '@/components/survival/BackpackDiscard';

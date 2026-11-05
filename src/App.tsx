@@ -85,7 +85,9 @@ const App = () => (
     <GoogleMapsProvider>
       <TooltipProvider>
         <Toaster />
-        <Sonner />
+        {/* Compact top notices so pickups never cover the bottom action panels. */}
+        <Sonner position="top-center" visibleToasts={2} duration={2200} offset="calc(env(safe-area-inset-top) + 64px)"
+          toastOptions={{ className: '!w-auto !max-w-[85vw] !mx-auto !py-2 !px-3 !text-xs !min-h-0 opacity-95' }} />)
         <BrowserRouter>
           <AuthProvider>
             <Routes>
