@@ -45,7 +45,7 @@ export function AltarPanel({ altar, ready, inBase, owned, inventions, onBuild, o
     const next = { ...m, [id]: n }; if (!n) delete next[id]; return next;
   });
   const run = async () => {
-    if (check.ok === false) return;
+    if (!('hash' in check)) return;
     setBusy(true);
     let naming = { name: fallbackInventionName(cat, mats), desc: '제단에서 태어난 발명품.' };
     try {
@@ -70,7 +70,7 @@ export function AltarPanel({ altar, ready, inBase, owned, inventions, onBuild, o
       <Button size="sm" variant="outline" className="h-11 w-11" onClick={() => step(id, 1)}>+</Button>
     </div>) : <p className="text-muted-foreground">발명에 쓸 자연 재료가 없어요.</p>}</div>
     <div className="pixel-frame bg-card p-2 text-xs" role="status">
-      {check.ok ? <>예상 {CATS.find(c => c.id === cat)!.effect} <b>{check.power}</b> · 개연성 {check.score}/10</> : REASON[check.reason] ?? '조합 불가'}
+      {check.ok ? <>예상 {CATS.find(c => c.id === cat)!.effect} <b>{check.power}</b> · 개연성 {check.score}/10</> : ('reason' in check ? REASON[check.reason] : undefined) ?? '조합 불가'}
     </div>
     <Button className="h-11 w-full" disabled={!ready || !inBase || !check.ok || busy} onClick={run}>{busy ? <Loader2 className="animate-spin" /> : <Sparkles />}제단에 바쳐 발명하기</Button>
     {!!inventions.length && <div className="space-y-1 border-t border-border pt-2">

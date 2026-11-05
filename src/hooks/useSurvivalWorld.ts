@@ -444,7 +444,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const result = prepareSkill(p, id, targets, at, enabledRef.current);
     if (result.ok === false) { toast.warning(result.reason); return false; }
     const lv = skillLevel(p.skillLevels, id);
-    let next = { ...result.state, damage: { ...p.damage }, depleted: { ...p.depleted }, cooldowns: { ...result.state.cooldowns, [id]: at + skillCooldownMs(id, lv) } };
+    let next: WorldSave = { ...result.state, damage: { ...p.damage }, depleted: { ...p.depleted }, cooldowns: { ...result.state.cooldowns, [id]: at + skillCooldownMs(id, lv) } };
     if (id !== 'roar') for (const e of result.targets ?? []) {
       const def = creatureDef(e.type);
       const damage = (next.damage[e.id] ?? 0) + skillDamage(id, lv);
