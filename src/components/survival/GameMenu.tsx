@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Menu, LogOut, Settings, DoorOpen, MessageSquare, BookOpen } from 'lucide-react';
+import { Menu, LogOut, Settings, DoorOpen, MessageSquare, BookOpen, Megaphone } from 'lucide-react';
 import SupportInquiryDialog from './SupportInquiryDialog';
+import NoticeDialog from './NoticeDialog';
+import { hasUnreadNotice, markNoticeRead } from '@/lib/survival/notices';
 import GuideBook from './GuideBook';
 import { toast } from 'sonner';
 import { enableNotifications, notifySupported } from '@/lib/survival/notify';
@@ -23,6 +25,8 @@ export default function GameMenu({ onExit, onLogout, loggedIn }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [noticeOpen, setNoticeOpen] = useState(false);
+  const [unread, setUnread] = useState(hasUnreadNotice);
   const s = useGameSettings();
   const Row = ({ label, hint, k }: { label: string; hint: string; k: 'bgm' | 'sfx' | 'haptic' }) => (
     <label className="flex min-h-11 items-center justify-between gap-3">
@@ -34,10 +38,11 @@ export default function GameMenu({ onExit, onLogout, loggedIn }: Props) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button type="button" aria-label="메뉴" className="pixel-btn flex h-11 w-11 items-center justify-center bg-card"><Menu className="!h-6 !w-6" /></button>
+          <button type="button" aria-label="메뉴" className="pixel-btn relative flex h-11 w-11 items-center justify-center bg-card"><Menu className="!h-6 !w-6" />{unread && <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-destructive" />}</button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="font-pixel">
           <DropdownMenuItem className="min-h-11" onSelect={onExit}><DoorOpen className="mr-2 !h-5 !w-5" />나가기</DropdownMenuItem>
+          <DropdownMenuItem className="min-h-11" onSelect={() => { setNoticeOpen(true); markNoticeRead(); setUnread(false); }}><Megaphone className="mr-2 !h-5 !w-5" />공지사항{unread && <span className="ml-2 h-2 w-2 rounded-full bg-destructive" />}</DropdownMenuItem>
           <DropdownMenuItem className="min-h-11" onSelect={() => setGuideOpen(true)}><BookOpen className="mr-2 !h-5 !w-5" />가이드</DropdownMenuItem>
           <DropdownMenuItem className="min-h-11" onSelect={() => setSettingsOpen(true)}><Settings className="mr-2 !h-5 !w-5" />설정</DropdownMenuItem>
           {loggedIn && <DropdownMenuItem className="min-h-11 text-destructive" onSelect={() => setConfirmLogout(true)}><LogOut className="mr-2 !h-5 !w-5" />로그아웃</DropdownMenuItem>}
@@ -85,6 +90,7 @@ export default function GameMenu({ onExit, onLogout, loggedIn }: Props) {
       </Dialog>
       <SupportInquiryDialog open={supportOpen} onOpenChange={setSupportOpen} />
       <GuideBook open={guideOpen} onOpenChange={setGuideOpen} />
+      <NoticeDialog open={noticeOpen} onOpenChange={setNoticeOpen} />
     </>
   );
 }
