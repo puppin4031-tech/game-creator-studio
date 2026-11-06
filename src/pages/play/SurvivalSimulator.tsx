@@ -6,6 +6,8 @@ import SpriteAnimator from '@/components/survival/SpriteAnimator';
 import BackpackDiscard from '@/components/survival/BackpackDiscard';
 import { BaseFortressOverlay } from '@/components/survival/BaseFortressOverlay';
 import { AltarPanel } from '@/components/survival/AltarPanel';
+import { EquipmentSlots } from '@/components/survival/EquipmentSlots';
+import { addStacks, hasAll } from "@/lib/survival/inventory";
 import { SkillQuickBar } from '@/components/survival/SkillQuickBar';
 import { useAutoAction } from '@/hooks/useAutoAction';
 import { AGGRO_RADIUS_M, BEAST_STRIKE_INTERVAL_MS, beastAggro } from '@/lib/survival/combat';
@@ -144,6 +146,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   useEffect(() => setGpsReady(gps.ready), [gps.ready]);
   const { state: s } = g;
   const [panel, setPanel] = useState<Panel>('none');
+  const [baseTab, setBaseTab] = useState<'lab' | 'craft' | 'storage' | 'expedition'>('lab');
 
   const onTap = (p: LatLng) => {
     if (auto.job) { auto.stop(); returnToCenter(); }
@@ -638,14 +641,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   <p className="text-xs text-muted-foreground">음식은 눌러서 먹을 수 있어요.</p>
                   <Stacks stacks={s.backpack} onUse={g.eat} />
                   {!!s.packedItems?.length && <Button variant="outline" disabled={!g.inBase || !actionReady} className="h-11 w-full" onClick={g.storePacked}>휴대 재료 모두 창고에 보관</Button>}
-                  <div>
-                    <b className="text-sm">장비</b>
-                    <div className="mt-1 flex flex-wrap gap-1.5">
-                      {s.gear.length ? s.gear.map((x) => (
-                        <div key={x.uid} className="pixel-frame flex items-center gap-1 bg-card px-1.5 py-1 text-xs"><Sprite k={ITEMS[x.itemId].sprite} scale={0.75} />{ITEMS[x.itemId].name}</div>
-                      )) : <p className="text-sm text-muted-foreground">맨손입니다. 기술을 깨우쳐 도구를 만드세요.</p>}
-                    </div>
-                  </div>
+                  <EquipmentSlots gear={s.gear} loadout={g.loadout} level={s.level} onEquip={g.equip} icon={(x) => <Sprite k={ITEMS[x.itemId].sprite} scale={0.75} />} />
                   <BackpackDiscard backpack={s.backpack} onDrop={g.dropItems} />
                 </>
               )}
@@ -653,13 +649,27 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               {panel === 'base' && (!s.base ? <p className="text-sm">아직 거점이 없습니다.</p> : (
                 <>
                   {!g.inBase && <p className="pixel-frame bg-accent p-2 text-sm">거점 반경 안에서만 제작·연구할 수 있어요.</p>}
-                  {s.baseUpgrade && <JobCard title={`${BASE_LEVELS[Number(s.baseUpgrade.id) as 2 | 3].name} 공사`} job={s.baseUpgrade} now={nowTick} claimLabel="발전 완료" onClaim={g.claimBaseUpgrade} />}
-                  <ExpeditionPanel expedition={s.expedition} report={s.scoutReport} now={nowTick} exploredTotal={s.exploredTotal ?? s.explored.length} mark={s.expeditionMark ?? 0}
-                    foodOwned={[...s.backpack, ...s.storage].filter(x => x.itemId === 'jerky' || x.itemId === 'cooked_meat').reduce((a, x) => a + x.count, 0)}
-                    canSend={g.inBase && actionReady} onSend={g.startExpedition} onClaim={g.claimExpedition}
-                    onPin={(t) => { favs.toggle({ id: `scout-${t.pos.lat.toFixed(5)}-${t.pos.lng.toFixed(5)}`, name: t.label, lat: t.pos.lat, lng: t.pos.lng }); toast('즐겨찾기에 표시했어요'); }} />
+                  <div className="sticky top-0 z-10 -mx-3 -mt-3 grid grid-cols-4 gap-1 border-b border-border bg-background p-2">
+                    {([['lab','연구·발명'],['craft','제작'],['storage','창고'],['expedition','원정대']] as const).map(([id, label]) => (
+                      <button key={id} type="button" onClick={() => setBaseTab(id)} className={`pixel-btn min-h-11 px-1 text-xs ${baseTab === id ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>{label}{id === 'expedition' && s.expedition && nowTick >= s.expedition.readyAt ? ' •' : ''}</button>
+                    ))}
+                  </div>
+                  {baseTab === 'lab' && <>
+                                    {s.baseUpgrade && <JobCard title={`${BASE_LEVELS[Number(s.baseUpgrade.id) as 2 | 3].name} 공사`} job={s.baseUpgrade} now={nowTick} claimLabel="발전 완료" onClaim={g.claimBaseUpgrade} />}
                   <div className="border-y border-border py-3"><b className="text-sm">연구 시설 · 발명</b><div className="mt-2"><AltarPanel altar={!!s.altar} baseLevel={s.base.level} remote={realGps} credits={s.inventionCredits} walkedMeters={Math.min(200, Math.max(0, ((s.walkSteps ?? 0) - Math.min(s.inventionWalkMark ?? 0, s.walkSteps ?? 0)) * 20))} onCredits={g.updateInventionCredits} inviteUrl={`${window.location.origin}/?invite=${encodeURIComponent(user?.id ?? "pioneer")}`} ready={actionReady} inBase={g.inBase} owned={[...s.backpack, ...s.storage]} inventions={s.inventions ?? []} onBuild={g.buildAltar} onInvent={g.invent} /></div></div>
-                  <div><b className="text-sm">창고</b><div className="mt-1"><Stacks stacks={s.storage} onUse={g.eat} /></div><div className="mt-2 flex flex-wrap gap-1">{s.storage.map(st => <Button key={st.itemId} variant="outline" size="sm" className="min-h-11 text-xs" disabled={!g.inBase || !actionReady} onClick={() => g.withdraw(st.itemId)}>{ITEMS[st.itemId].name} 1개 꺼내기</Button>)}</div></div>
+                  {s.base.level < 3 && (() => {
+                    const nx = BASE_LEVELS[(s.base.level + 1) as 2 | 3];
+                    return (
+                      <div className="pixel-frame bg-card p-2 text-xs">
+                        <b className="text-sm">{nx.name}(으)로 발전</b> — {nx.unlocks}
+                        <div className="my-1"><Stacks stacks={nx.cost} have={s.storage} /></div>
+                        <button type="button" disabled={!g.inBase || !g.canAfford(nx.cost) || !actionReady || !!s.baseUpgrade || (s.base?.level === 1 && !s.techs.includes('hut_building'))} onClick={g.upgradeBase} className="pixel-btn h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">{s.baseUpgrade ? '공사 중' : `공사 시작 (${BASE_UPGRADE_MS[(s.base.level + 1) as 2 | 3] / 3_600_000}시간)`}</button>
+                      </div>
+                    );
+                  })()}
+<button type="button" onClick={g.placeBase} className="min-h-11 text-xs text-muted-foreground underline">현재 위치로 거점 옮기기 (나뭇가지 3)</button>
+                  </>}
+                  {baseTab === 'craft' && <>
                   <div>
                     <b className="text-sm">제작</b>
                     <div className="mt-1 space-y-2">
@@ -680,17 +690,32 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       })}
                     </div>
                   </div>
-                  {s.base.level < 3 && (() => {
-                    const nx = BASE_LEVELS[(s.base.level + 1) as 2 | 3];
-                    return (
-                      <div className="pixel-frame bg-card p-2 text-xs">
-                        <b className="text-sm">{nx.name}(으)로 발전</b> — {nx.unlocks}
-                        <div className="my-1"><Stacks stacks={nx.cost} have={s.storage} /></div>
-                        <button type="button" disabled={!g.inBase || !g.canAfford(nx.cost) || !actionReady || !!s.baseUpgrade || (s.base?.level === 1 && !s.techs.includes('hut_building'))} onClick={g.upgradeBase} className="pixel-btn h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">{s.baseUpgrade ? '공사 중' : `공사 시작 (${BASE_UPGRADE_MS[(s.base.level + 1) as 2 | 3] / 3_600_000}시간)`}</button>
-                      </div>
-                    );
-                  })()}
-                  <button type="button" onClick={g.placeBase} className="min-h-11 text-xs text-muted-foreground underline">현재 위치로 거점 옮기기 (나뭇가지 3)</button>
+
+                  {!!s.inventions?.length && (
+                    <div><b className="text-sm">나만의 발명 레시피</b><div className="mt-1 space-y-2">
+                      {s.inventions.map(inv => {
+                        const cost = Object.entries(inv.materials).filter(([, q]) => q > 0).map(([itemId, count]) => ({ itemId: itemId as ItemId, count }));
+                        const ok = g.inBase && actionReady && hasAll(addStacks(s.backpack, s.storage), cost);
+                        return (
+                          <div key={inv.id} className="pixel-frame flex items-center gap-2 bg-card p-2">
+                            <div className="flex-1 text-xs"><b className="text-sm">{inv.name}{inv.masterwork ? ' · 명품' : ''}</b><div className="mt-1"><Stacks stacks={cost} have={addStacks(s.backpack, s.storage)} /></div></div>
+                            <button type="button" disabled={!ok} onClick={() => g.craftInvention(inv.id)} className="pixel-btn h-11 bg-primary px-3 text-primary-foreground disabled:opacity-40">제작</button>
+                          </div>
+                        );
+                      })}
+                    </div></div>
+                  )}
+                  </>}
+                  {baseTab === 'storage' && <>
+                  {!!s.packedItems?.length && <Button variant="outline" disabled={!g.inBase || !actionReady} className="h-11 w-full" onClick={g.storePacked}>휴대 재료 모두 창고에 보관</Button>}
+                  <div><b className="text-sm">창고</b><div className="mt-1"><Stacks stacks={s.storage} onUse={g.eat} /></div><div className="mt-2 flex flex-wrap gap-1">{s.storage.map(st => <Button key={st.itemId} variant="outline" size="sm" className="min-h-11 text-xs" disabled={!g.inBase || !actionReady} onClick={() => g.withdraw(st.itemId)}>{ITEMS[st.itemId].name} 1개 꺼내기</Button>)}</div></div>
+                  </>}
+                  {baseTab === 'expedition' && <>
+                  <ExpeditionPanel expedition={s.expedition} report={s.scoutReport} now={nowTick} exploredTotal={s.exploredTotal ?? s.explored.length} mark={s.expeditionMark ?? 0}
+                    foodOwned={[...s.backpack, ...s.storage].filter(x => x.itemId === 'jerky' || x.itemId === 'cooked_meat').reduce((a, x) => a + x.count, 0)}
+                    canSend={g.inBase && actionReady} onSend={g.startExpedition} onClaim={g.claimExpedition}
+                    onPin={(t) => { favs.toggle({ id: `scout-${t.pos.lat.toFixed(5)}-${t.pos.lng.toFixed(5)}`, name: t.label, lat: t.pos.lat, lng: t.pos.lng }); toast('즐겨찾기에 표시했어요'); }} />
+                  </>}
                 </>
               ))}
 

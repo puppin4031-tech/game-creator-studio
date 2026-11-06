@@ -28,6 +28,7 @@ import { MELCHIZEDEK_FIRST, MELCHIZEDEK_LINK, RITES, blessingGift, canBless, dis
 import { skillCooldownMs, skillDamage, skillLevel, skillUpgradeCost } from '@/lib/survival/skillLevels';
 import { ALTAR_COST, INVENTED_DURABILITY, inventionId, registerInventions, type InventedItem } from '@/lib/survival/inventedItems';
 import { checkFacility, type InventionInput } from '@/lib/survival/invention';
+import { equipInSlot, resolveLoadout, type Equipped, type GearSlot } from '@/lib/survival/equipment';
 import { type InventionCredits } from '@/lib/survival/inventionCredits';
 import { payAccessible } from '@/lib/survival/abilities';
 import type { GearInstance, LatLng, Stack, WorldEntity } from '@/lib/survival/types';
@@ -64,6 +65,8 @@ export interface WorldSave extends WorldProgress {
   companions?: Companion[];
   rescueTokens?: number;
   skillLevels?: Record<string, number>;
+  /** Worn gear per slot (see equipment.ts). */
+  equipped?: Equipped;
   altar?: boolean;
   inventions?: InventedItem[];
   inventionCredits?: InventionCredits;
@@ -187,11 +190,12 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return { ...p, ...progress };
   };
 
-  // Best tool/weapon/armor are used automatically.
+  // Only gear worn in an unlocked slot counts.
+  const loadout = useMemo(() => resolveLoadout(s.gear, s.equipped, s.level), [s.gear, s.equipped, s.level]);
   const best = useCallback((pick: (g: GearInstance) => number) =>
-    s.gear.reduce<GearInstance | null>((b, g) => (pick(g) > (b ? pick(b) : 0) ? g : b), null), [s.gear]);
-  const weapon = best((g) => ITEMS[g.itemId].weapon?.atk ?? 0);
-  const armor = best((g) => ITEMS[g.itemId].armor?.def ?? 0);
+    [loadout.tool1, loadout.tool2].reduce<GearInstance | null>((b, g) => (g && pick(g) > (b ? pick(b) : 0) ? g : b), null), [loadout]);
+  const weapon = loadout.weapon;
+  const armor = loadout.armor;
 
   const entities: WorldEntity[] = useMemo(() => generateWorld({
     center: s.pos, radiusM: vision, now, isNight, depleted: s.depleted, terrainZones: s.terrainZones, parkCells: s.parkCells, sanctuaries,
@@ -534,7 +538,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     } else {
       setS({ ...next, storage: addStacks(left, [{ itemId: r.result, count: r.count }]) });
     }
-    toast.success(`${it.name} 제작 완료!`);
+    toast.success(`${it.name} 제작 완료!`, { description: it.durability !== undefined ? '배낭에 담았어요' : '창고에 넣었어요' });
   }, []);
 
   const claimQuest = useCallback(() => {
@@ -644,7 +648,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   /** Apply external damage (e.g. another player's attack), reduced by worn armor. */
   const takeDamage = useCallback((amount: number) => {
     const p = ref.current;
-    const armorGear = p.gear.find((x) => ITEMS[x.itemId].armor);
+    const armorGear = resolveLoadout(p.gear, p.equipped, p.level).armor;
     const dmg = Math.max(1, Math.round(amount) - (armorGear ? ITEMS[armorGear.itemId].armor?.def ?? 0 : 0) - (p.techs.includes('iron_skin') ? ironSkinDef(techLevel(p.techLevels, 'iron_skin')) : 0));
     const hp = p.hp - dmg;
     setS(hp <= 0 ? die({ ...p, hp }) : { ...p, hp });
@@ -688,13 +692,31 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     registerInventions(inventions);
     const g: GearInstance = { uid: crypto.randomUUID(), itemId: id as ItemId, quality: naming?.masterwork ? 'MASTERWORK' : 'NORMAL', durability: INVENTED_DURABILITY, maxDurability: INVENTED_DURABILITY };
     setS({ ...paid, inventions, gear: [...paid.gear, g] });
-    toast.success(`${inv.name} 완성!`, { description: known ? '알려진 발명품을 다시 만들었습니다' : '새 발명품이 기술 목록에 기록되었습니다' });
+    toast.success(`${inv.name} 완성! 배낭에 담았어요`, { description: known ? '알려진 발명품을 다시 만들었습니다' : '제작 탭에 레시피가 등록되었어요. 배낭에서 착용할 수 있어요' });
     return inv;
+  }, [setS]);
+
+  /** Re-make a known invention from its recorded materials (no invention credit). */
+  const craftInvention = useCallback((id: string) => {
+    const p = ref.current;
+    if (!enabledRef.current || !atMainBase(p)) { toast.warning('본거지 안에서 제작하세요'); return; }
+    const inv = (p.inventions ?? []).find(x => x.id === id);
+    if (!inv) return;
+    const cost = Object.entries(inv.materials).filter(([, q]) => q > 0).map(([itemId, count]) => ({ itemId: itemId as ItemId, count }));
+    const paid = payAccessible(p, cost);
+    if (!paid) { toast.error('재료가 부족합니다 (배낭 또는 창고)'); return; }
+    const g: GearInstance = { uid: crypto.randomUUID(), itemId: id as ItemId, quality: 'NORMAL', durability: INVENTED_DURABILITY, maxDurability: INVENTED_DURABILITY };
+    setS({ ...paid, gear: [...paid.gear, g] });
+    toast.success(`${inv.name} 제작 완료! 배낭에 담았어요`);
+  }, [setS]);
+
+  const equip = useCallback((slot: GearSlot, uid: string | null) => {
+    setS(p => ({ ...p, equipped: equipInSlot(p.equipped, slot, uid) }));
   }, [setS]);
 
   const updateInventionCredits = useCallback((credits: InventionCredits) => setS(p => ({ ...p, inventionCredits: credits, inventionWalkMark: credits.walkMeters === 0 ? p.walkSteps ?? 0 : p.inventionWalkMark })), [setS]);
 
-  return { updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
+  return { craftInvention, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
     recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,
