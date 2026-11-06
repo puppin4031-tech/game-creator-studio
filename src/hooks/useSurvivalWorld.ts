@@ -1,3 +1,4 @@
+import { isWalkingPace } from '@/lib/survival/walkPace';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -67,6 +68,8 @@ export interface WorldSave extends WorldProgress {
   inventions?: InventedItem[];
   inventionCredits?: InventionCredits;
   inventionWalkMark?: number;
+  /** New explored steps taken at walking pace (<= 13 km/h); fuels walk rewards. */
+  walkSteps?: number;
   shrines?: ShrineState;
   researching?: TimedJob | null;
   researchJobs?: TimedJob[];
@@ -228,12 +231,18 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return techs.length ? { ...p, techs: [...p.techs, ...techs.map((t) => t.id)] } : p;
   };
 
+  const lastMoveAt = useRef(0);
   const moveTo = useCallback((pos: LatLng) => {
+    const now = Date.now();
+    const prevAt = lastMoveAt.current;
+    lastMoveAt.current = now;
     setS((p) => {
       const last = p.explored[p.explored.length - 1];
       const explored = !last || distanceM(last, pos) >= EXPLORE_STEP_M ? [...p.explored, pos].slice(-MAX_EXPLORED) : p.explored;
       const grew = explored !== p.explored;
-      return { ...p, pos, explored, exploredTotal: (p.exploredTotal ?? p.explored.length) + (grew ? 1 : 0) };
+      // Reward walking only counts new steps taken at <= 13 km/h.
+      const walking = grew && prevAt > 0 && isWalkingPace(distanceM(p.pos, pos), now - prevAt);
+      return { ...p, pos, explored, exploredTotal: (p.exploredTotal ?? p.explored.length) + (grew ? 1 : 0), walkSteps: (p.walkSteps ?? 0) + (walking ? 1 : 0) };
     });
   }, [setS]);
 
@@ -683,7 +692,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return inv;
   }, [setS]);
 
-  const updateInventionCredits = useCallback((credits: InventionCredits) => setS(p => ({ ...p, inventionCredits: credits, inventionWalkMark: credits.walkMeters === 0 ? p.exploredTotal ?? p.explored.length : p.inventionWalkMark })), [setS]);
+  const updateInventionCredits = useCallback((credits: InventionCredits) => setS(p => ({ ...p, inventionCredits: credits, inventionWalkMark: credits.walkMeters === 0 ? p.walkSteps ?? 0 : p.inventionWalkMark })), [setS]);
 
   return { updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
     recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
