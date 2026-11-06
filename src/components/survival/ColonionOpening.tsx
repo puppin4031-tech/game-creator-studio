@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { normalizePioneerName, PIONEER_ERAS, PIONEER_NAME_KEY } from "@/lib/pioneer";
 import titleArt from "@/assets/colonion_title.jpg.asset.json";
 import hunter from "@/assets/survival/char-hunter.png";
-import { SpriteAnimator } from "@/components/survival/SpriteAnimator";
+import SpriteAnimator from "@/components/survival/SpriteAnimator";
 import { useSpriteAnimations } from "@/hooks/useSpriteAnimations";
 
 export { PIONEER_NAME_KEY } from "@/lib/pioneer";
