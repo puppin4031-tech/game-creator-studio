@@ -117,6 +117,16 @@ function MenuBtn({ icon: Icon, label, onClick, dot }: { icon: typeof Backpack; l
   );
 }
 
+type CraftCat = 'all' | 'tool' | 'weapon' | 'armor' | 'trinket' | 'etc';
+const CRAFT_CATS: { id: CraftCat; label: string }[] = [
+  { id: 'all', label: '전체' }, { id: 'tool', label: '도구' }, { id: 'weapon', label: '무기' },
+  { id: 'armor', label: '방어구' }, { id: 'trinket', label: '부적' }, { id: 'etc', label: '기타' },
+];
+const craftCatOf = (id: ItemId): CraftCat => {
+  const c = ITEMS[id].category;
+  return c === 'tool' || c === 'weapon' || c === 'armor' || c === 'trinket' ? c : 'etc';
+};
+
 export default function SurvivalSimulator({ realGps = false }: { realGps?: boolean }) {
   // Opening now lives on the main page ("/"); the world starts immediately.
   const [showOpening, setShowOpening] = useState(false);
@@ -146,6 +156,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   useEffect(() => setGpsReady(gps.ready), [gps.ready]);
   const { state: s } = g;
   const [panel, setPanel] = useState<Panel>('none');
+  const [craftCat, setCraftCat] = useState<CraftCat>('all');
   const [baseTab, setBaseTab] = useState<'lab' | 'craft' | 'storage' | 'expedition'>('lab');
 
   const onTap = (p: LatLng) => {
@@ -672,18 +683,26 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   {baseTab === 'craft' && <>
                   <div>
                     <b className="text-sm">제작</b>
+                    {s.level >= 5 && (
+                      <div className="mt-1 flex gap-1 overflow-x-auto">
+                        {CRAFT_CATS.map(c => (
+                          <button key={c.id} type="button" onClick={() => setCraftCat(c.id)} className={`pixel-btn min-h-11 shrink-0 px-2 text-xs ${craftCat === c.id ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>{c.label}</button>
+                        ))}
+                      </div>
+                    )}
                     <div className="mt-1 space-y-2">
-                      {g.recipes.map((r) => {
+                      {g.recipes.filter(r => s.level < 5 || craftCat === 'all' || craftCatOf(r.result) === craftCat).map((r) => {
                         const known = isRecipeUnlocked(r, s.techs);
                         const it = ITEMS[r.result];
                         if (!known) return (
                           <div key={r.id} className="flex items-center gap-2 text-xs text-muted-foreground"><Lock className="!h-4 !w-4" />??? — 「{techForRecipe(r.id)?.name}」 기술 필요</div>
                         );
-                        const ok = g.inBase && (s.base?.level ?? 0) >= r.baseLevel && g.canAfford(r.ingredients);
+                        const lvOk = (r.minLevel ?? 1) <= s.level;
+                        const ok = lvOk && g.inBase && (s.base?.level ?? 0) >= r.baseLevel && g.canAfford(r.ingredients);
                         return (
                           <div key={r.id} className="pixel-frame flex items-center gap-2 bg-card p-2">
                             <Sprite k={it.sprite} />
-                            <div className="flex-1 text-xs"><b className="text-sm">{it.name}</b>{r.baseLevel > 1 && ` (거점 ${r.baseLevel}단계)`}<div className="mt-1"><Stacks stacks={r.ingredients} have={s.storage} /></div></div>
+                            <div className="flex-1 text-xs"><b className="text-sm">{it.name}</b>{r.baseLevel > 1 && ` (거점 ${r.baseLevel}단계)`}{!lvOk && ` · 족장 Lv.${r.minLevel} 필요`}<div className="mt-1"><Stacks stacks={r.ingredients} have={s.storage} /></div></div>
                             <button type="button" disabled={!ok} onClick={() => g.craft(r)} className="pixel-btn h-11 bg-primary px-3 text-primary-foreground disabled:opacity-40">제작</button>
                           </div>
                         );

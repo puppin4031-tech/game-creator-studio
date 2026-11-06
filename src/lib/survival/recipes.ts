@@ -18,6 +18,8 @@ export interface Recipe {
   baseLevel: 1 | 2 | 3;
   /** Real-time processing (s). 0 = instant after the minigame. */
   processSec: number;
+  /** Minimum chief level (defaults to 1). */
+  minLevel?: number;
 }
 
 export const RECIPES: Recipe[] = [
@@ -43,6 +45,18 @@ export const RECIPES: Recipe[] = [
   { id: 'obsidian_pickaxe', result: 'obsidian_pickaxe', count: 1, ingredients: [{ itemId: 'obsidian', count: 4 }, { itemId: 'bone', count: 2 }, { itemId: 'leather', count: 2 }], minigame: 'knap', difficulty: 3, baseLevel: 3, processSec: 0 },
   { id: 'fur_cloak', result: 'fur_cloak', count: 1, ingredients: [{ itemId: 'hide', count: 6 }, { itemId: 'leather', count: 2 }, { itemId: 'bone', count: 2 }], minigame: 'bind', difficulty: 3, baseLevel: 3, processSec: 0 },
   { id: 'jade_amulet', result: 'jade_amulet', count: 1, ingredients: [{ itemId: 'jade', count: 1 }, { itemId: 'cordage', count: 1 }, { itemId: 'quartz', count: 1 }], minigame: 'knap', difficulty: 3, baseLevel: 3, processSec: 0 },
+  // Tool-slot variety (chief-level gated)
+  { id: 'wood_mallet', result: 'wood_mallet', count: 1, ingredients: [{ itemId: 'wooden_club', count: 1 }, { itemId: 'flint', count: 1 }, { itemId: 'fiber', count: 2 }], minigame: 'bind', difficulty: 1, baseLevel: 1, processSec: 0 },
+  { id: 'bark_vest', result: 'bark_vest', count: 1, ingredients: [{ itemId: 'branch', count: 5 }, { itemId: 'fiber', count: 4 }], minigame: 'bind', difficulty: 1, baseLevel: 1, processSec: 0, minLevel: 2 },
+  { id: 'bone_dagger', result: 'bone_dagger', count: 1, ingredients: [{ itemId: 'bone', count: 3 }, { itemId: 'cordage', count: 1 }], minigame: 'knap', difficulty: 1, baseLevel: 1, processSec: 0, minLevel: 2 },
+  { id: 'bone_pick', result: 'bone_pick', count: 1, ingredients: [{ itemId: 'bone', count: 4 }, { itemId: 'branch', count: 1 }, { itemId: 'cordage', count: 1 }], minigame: 'bind', difficulty: 2, baseLevel: 1, processSec: 0, minLevel: 3 },
+  { id: 'flint_hatchet', result: 'flint_hatchet', count: 1, ingredients: [{ itemId: 'flint', count: 3 }, { itemId: 'branch', count: 2 }, { itemId: 'cordage', count: 2 }], minigame: 'knap', difficulty: 2, baseLevel: 1, processSec: 0, minLevel: 4 },
+  { id: 'bone_charm', result: 'bone_charm', count: 1, ingredients: [{ itemId: 'bone', count: 2 }, { itemId: 'cordage', count: 1 }, { itemId: 'berry', count: 2 }], minigame: 'bind', difficulty: 2, baseLevel: 1, processSec: 0, minLevel: 5 },
+  { id: 'digging_stick', result: 'digging_stick', count: 1, ingredients: [{ itemId: 'clay', count: 3 }, { itemId: 'branch', count: 2 }, { itemId: 'cordage', count: 1 }], minigame: 'fire', difficulty: 2, baseLevel: 1, processSec: 60, minLevel: 5 },
+  { id: 'stone_maul', result: 'stone_maul', count: 1, ingredients: [{ itemId: 'flint', count: 4 }, { itemId: 'wooden_club', count: 1 }, { itemId: 'leather', count: 1 }], minigame: 'bind', difficulty: 2, baseLevel: 2, processSec: 0, minLevel: 6 },
+  { id: 'bone_plate', result: 'bone_plate', count: 1, ingredients: [{ itemId: 'bone', count: 8 }, { itemId: 'leather', count: 2 }, { itemId: 'cordage', count: 2 }], minigame: 'bind', difficulty: 3, baseLevel: 2, processSec: 0, minLevel: 7 },
+  { id: 'obsidian_axe', result: 'obsidian_axe', count: 1, ingredients: [{ itemId: 'obsidian', count: 3 }, { itemId: 'branch', count: 2 }, { itemId: 'leather', count: 1 }], minigame: 'knap', difficulty: 3, baseLevel: 3, processSec: 0, minLevel: 8 },
+  { id: 'quartz_charm', result: 'quartz_charm', count: 1, ingredients: [{ itemId: 'quartz', count: 2 }, { itemId: 'cordage', count: 1 }, { itemId: 'bone', count: 1 }], minigame: 'knap', difficulty: 3, baseLevel: 2, processSec: 0, minLevel: 8 },
 ];
 
 export const recipeById = (id: string) => RECIPES.find((r) => r.id === id);

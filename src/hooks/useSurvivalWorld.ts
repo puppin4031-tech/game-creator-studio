@@ -527,6 +527,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const p = ref.current;
     if (!enabledRef.current || !atWorkshop(p)) return;
     if (!isRecipeUnlocked(r, p.techs)) { toast.error('아직 제작법을 모릅니다'); return; }
+    if ((r.minLevel ?? 1) > p.level) { toast.error(`족장 Lv.${r.minLevel}부터 만들 수 있어요`); return; }
     if (!p.base || p.base.level < r.baseLevel) { toast.error(`거점 ${r.baseLevel}단계 이상 필요`); return; }
     const left = removeStacks(p.storage, r.ingredients);
     if (!left) { toast.error('창고 재료가 부족합니다'); return; }
