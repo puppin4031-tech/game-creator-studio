@@ -25,4 +25,3 @@
 - GPS jumps re-anchor only after repeated accurate fixes and then lock interactions for a cooldown (gps.ts); the survival_saves trigger also rejects implied travel over 100 m/s since the last save; why: spoofed teleports must never yield instant rewards or sync.
 - Survival item catalog merges code ITEMS with admin rows in survival_item_catalog (useItemCatalog); passive utility tech numbers live in utilitySkills.ts; why: new code items appear in /admin/items automatically and bonuses stay testable.
 - Vassal tribute settles via server RPCs only; why: no client writes another save.
-- Notices: build-time git subjects auto-merge with HAND_NOTICES; unread key includes build id so each deploy announces itself.
