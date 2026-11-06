@@ -11,7 +11,7 @@ export function SkillQuickBar({ known, cooldowns, levels, ready, onUse }: { know
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
   const ids = (Object.keys(ACTIVE_SKILLS) as ActiveSkill[]).filter(id => known.includes(id));
   if (!ids.length) return null;
-  return <div className="absolute bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+3.5rem)] right-2 z-20 flex flex-col gap-2">
+  return <div className="absolute right-2 top-[58%] z-20 -translate-y-1/2 flex flex-col gap-2">
     {ids.map(id => {
       const Icon = icons[id]; const lv = skillLevel(levels, id);
       const left = Math.max(0, (cooldowns?.[id] ?? 0) - now);
