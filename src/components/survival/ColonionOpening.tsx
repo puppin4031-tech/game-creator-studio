@@ -5,19 +5,27 @@ import { Button } from "@/components/ui/button";
 import { normalizePioneerName, PIONEER_ERAS, PIONEER_NAME_KEY } from "@/lib/pioneer";
 import titleArt from "@/assets/colonion_title.jpg.asset.json";
 import hunter from "@/assets/survival/char-hunter.png";
+import { SpriteAnimator } from "@/components/survival/SpriteAnimator";
+import { useSpriteAnimations } from "@/hooks/useSpriteAnimations";
 
 export { PIONEER_NAME_KEY } from "@/lib/pioneer";
 
 /** Full-screen opening shown before entering the survival world. */
 export function ColonionOpening({ onEnter, onClose }: { onEnter: (name: string) => void; onClose?: () => void }) {
-  const [name, setName] = useState(() => localStorage.getItem(PIONEER_NAME_KEY) ?? "");
+  // A saved nickname is fixed; only first-time players type one.
+  const [savedName] = useState(() => normalizePioneerName(localStorage.getItem(PIONEER_NAME_KEY) ?? ""));
+  const [name, setName] = useState(savedName);
+  const { data: anims } = useSpriteAnimations("hunter");
+  const idle = anims?.idle;
+  const finalName = normalizePioneerName(name);
 
   const enter = () => {
-    const trimmed = normalizePioneerName(name);
-    if (!trimmed) return;
-    localStorage.setItem(PIONEER_NAME_KEY, trimmed);
-    onEnter(trimmed);
+    if (!finalName) return;
+    if (!savedName) localStorage.setItem(PIONEER_NAME_KEY, finalName);
+    onEnter(finalName);
   };
+
+  const fallback = <img src={hunter} alt="구석기 개척자 캐릭터" className="h-20 w-20 object-contain [image-rendering:pixelated]" draggable={false} />;
 
   return (
     <motion.div
@@ -66,27 +74,36 @@ export function ColonionOpening({ onEnter, onClose }: { onEnter: (name: string) 
           ))}
         </div>
         <div className="rounded-b-md border-2 border-colonion-wood-edge bg-colonion-wood p-4 shadow-2xl">
-          <h2 className="mb-2 text-center text-base text-colonion-parchment">개척자</h2>
+          <div className="mb-3">
+            <span className="mb-1 block text-xs text-colonion-parchment/70">닉네임</span>
+            {savedName ? (
+              <p className="flex h-12 items-center justify-center rounded border-2 border-colonion-wood-edge bg-colonion-wood-dark px-3 text-lg text-colonion-parchment">{savedName}</p>
+            ) : (
+              <input
+                id="pioneer-name"
+                aria-label="닉네임"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={16}
+                placeholder="족장 닉네임 입력"
+                onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) enter(); }}
+                className="h-12 w-full rounded border-2 border-colonion-wood-edge bg-colonion-wood-dark px-3 text-base text-colonion-parchment placeholder:text-colonion-parchment/40 focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            )}
+          </div>
+          <span className="mb-1 block text-xs text-colonion-parchment/70">캐릭터</span>
           <Button
             onClick={enter}
-            disabled={!normalizePioneerName(name)}
-            aria-label={`${normalizePioneerName(name) || '개척자'} 캐릭터로 접속`}
+            disabled={!finalName}
+            aria-label={`${finalName || '개척자'} 캐릭터로 접속`}
             variant="ghost"
-            className="mb-3 flex h-32 w-full flex-col gap-2 border border-colonion-wood-edge bg-colonion-wood-dark text-colonion-parchment hover:bg-colonion-wood-dark hover:ring-2 hover:ring-primary"
+            className="flex h-36 w-full flex-col gap-2 border border-colonion-wood-edge bg-colonion-wood-dark text-colonion-parchment hover:bg-colonion-wood-dark hover:ring-2 hover:ring-primary"
           >
-            <img src={hunter} alt="구석기 개척자 캐릭터" className="h-20 w-20 object-contain [image-rendering:pixelated]" draggable={false} />
-            <span className="max-w-full truncate text-base">{normalizePioneerName(name) || '개척자'}</span>
+            <div className="flex h-24 items-end justify-center">
+              {idle ? <SpriteAnimator url={idle.url} frames={idle.frame_count} fps={idle.fps} height={96} fallback={fallback} /> : fallback}
+            </div>
+            <span className="text-xs text-colonion-parchment/70">눌러서 접속</span>
           </Button>
-          <label htmlFor="pioneer-name" className="mb-1 block text-xs text-colonion-parchment">닉네임</label>
-          <input
-            id="pioneer-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={16}
-            placeholder="족장 닉네임 입력"
-            onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) enter(); }}
-            className="h-12 w-full rounded border-2 border-colonion-wood-edge bg-colonion-wood-dark px-3 text-base text-colonion-parchment placeholder:text-colonion-parchment/40 focus:outline-none focus:ring-2 focus:ring-primary"
-          />
         </div>
       </motion.div>
     </motion.div>
