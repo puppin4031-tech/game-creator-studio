@@ -7,8 +7,33 @@ export interface Notice {
   items: { tag: NoticeTag; text: string }[];
 }
 
-// Newest first. Add a new entry at the top on every update.
-export const NOTICES: Notice[] = [
+declare const __BUILD_ID__: string;
+declare const __BUILD_NOTES__: { day: string; subject: string }[];
+
+/** Guess a tag from a commit subject (English or Korean). */
+export function tagOf(subject: string): NoticeTag {
+  if (/(fix|bug|오류|버그|고침|수정)/i.test(subject)) return 'fix';
+  if (/(balance|tune|adjust|reduce|increase|조정|완화|감소|증가)/i.test(subject)) return 'balance';
+  return 'feature';
+}
+
+/** Group build-time commit notes by day into notices; days covered by hand-written notes are skipped. */
+export function autoNotices(notes: { day: string; subject: string }[], handIds: Set<string>): Notice[] {
+  const byDay = new Map<string, string[]>();
+  for (const n of notes) {
+    if (handIds.has(n.day)) continue;
+    byDay.set(n.day, [...(byDay.get(n.day) ?? []), n.subject]);
+  }
+  return [...byDay.entries()].map(([day, subjects]) => ({
+    id: day,
+    date: day.replace(/-/g, '.'),
+    title: '업데이트 패치노트',
+    items: subjects.slice(0, 8).map((text) => ({ tag: tagOf(text), text })),
+  }));
+}
+
+// Hand-written notes (friendlier wording) win over auto notes for the same day.
+const HAND_NOTICES: Notice[] = [
   {
     id: '2026-11-06',
     date: '2026.11.06',
@@ -33,7 +58,15 @@ export const NOTICES: Notice[] = [
   },
 ];
 
-export const LATEST_NOTICE_ID = NOTICES[0]?.id ?? '';
+const buildNotes = typeof __BUILD_NOTES__ !== 'undefined' ? __BUILD_NOTES__ : [];
+export const BUILD_ID = typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : '';
+
+// Newest first: auto notes from the current build merged with hand-written ones.
+export const NOTICES: Notice[] = [...HAND_NOTICES, ...autoNotices(buildNotes, new Set(HAND_NOTICES.map((n) => n.id)))]
+  .sort((a, b) => b.id.localeCompare(a.id));
+
+// Any new build version re-marks notices as unread.
+export const LATEST_NOTICE_ID = `${NOTICES[0]?.id ?? ''}@${BUILD_ID}`;
 const SEEN_KEY = 'colonion.noticeSeen';
 
 export function hasUnreadNotice(): boolean {
