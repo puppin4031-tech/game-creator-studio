@@ -6,20 +6,49 @@ import type { GearInstance } from '@/lib/survival/types';
 
 interface Props { gear: GearInstance[]; loadout: Loadout; level: number; onEquip: (slot: GearSlot, uid: string | null) => void; icon: (g: GearInstance) => ReactNode }
 
+const pct = (v: number) => (v > 0 && v < 1 ? `${Math.round(v * 100)}%` : `${v}`);
+
 const stat = (g: GearInstance) => {
   const d = ITEMS[g.itemId];
-  if (d.weapon) return `공격 ${d.weapon.atk}`;
-  if (d.armor) return `방어 ${d.armor.def}`;
-  if (d.tool) return `${d.tool.chop ? '벌목' : ''}${d.tool.chop && d.tool.mine ? '·' : ''}${d.tool.mine ? `채굴 ${d.tool.mine}` : ''}`;
+  if (d.weapon) return `공격력 +${d.weapon.atk}${d.weapon.ranged ? ' · 원거리' : ''}`;
+  if (d.armor) return `방어력 +${d.armor.def}`;
+  if (d.tool) return `채집 속도 +${d.tool.power}${d.tool.chop ? ` · 벌목 ${d.tool.chop}단계` : ''}${d.tool.mine ? ` · 채굴 ${d.tool.mine}단계` : ''}`;
+  if (d.trinket) return `전리품 +${pct(d.trinket.lootBonus)} · 경험치 +${pct(d.trinket.xpBonus)}`;
   return d.desc;
 };
+
+/** Sum of worn gear stats for the stat panel. */
+function totals(loadout: Loadout) {
+  const t = { atk: 0, def: 0, gather: 0, loot: 0, xp: 0 };
+  for (const g of Object.values(loadout)) {
+    if (!g) continue;
+    const d = ITEMS[g.itemId];
+    t.atk += d.weapon?.atk ?? 0;
+    t.def += d.armor?.def ?? 0;
+    t.gather = Math.max(t.gather, d.tool?.power ?? 0);
+    t.loot += d.trinket?.lootBonus ?? 0;
+    t.xp += d.trinket?.xpBonus ?? 0;
+  }
+  return t;
+}
 
 /** Worn slots (one item each, level-gated) plus carried spare gear. */
 export function EquipmentSlots({ gear, loadout, level, onEquip, icon }: Props) {
   const worn = new Set(Object.values(loadout).filter(Boolean).map(g => g!.uid));
   const spare = gear.filter(g => !worn.has(g.uid));
+  const t = totals(loadout);
+  const rows: [string, string][] = [
+    ['공격력', `+${t.atk}`], ['방어력', `+${t.def}`], ['채집 속도', `+${t.gather}`],
+    ['특수 효과', t.loot || t.xp ? `전리품 +${pct(t.loot)} · 경험치 +${pct(t.xp)}` : '없음'],
+  ];
   return (
     <div className="space-y-2">
+      <b className="text-sm">장비 능력치</b>
+      <div className="pixel-frame grid grid-cols-2 gap-x-3 gap-y-1 bg-card p-2 text-xs">
+        {rows.map(([k, v]) => (
+          <div key={k} className={`flex justify-between gap-1 ${k === '특수 효과' ? 'col-span-2' : ''}`}><span className="text-muted-foreground">{k}</span><b>{v}</b></div>
+        ))}
+      </div>
       <b className="text-sm">착용 장비</b>
       <div className="grid grid-cols-2 gap-1.5">
         {GEAR_SLOTS.map(slot => {
