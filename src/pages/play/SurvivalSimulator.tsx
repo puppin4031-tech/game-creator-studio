@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { SkillControls, ConstructionControls, CompanionControls, SkillEffect } from '@/components/survival/SurvivalAbilities';
 import SpriteAnimator from '@/components/survival/SpriteAnimator';
 import BackpackDiscard from '@/components/survival/BackpackDiscard';
+import { BaseFortressOverlay } from '@/components/survival/BaseFortressOverlay';
 import { AltarPanel } from '@/components/survival/AltarPanel';
 import { SkillQuickBar } from '@/components/survival/SkillQuickBar';
 import { useAutoAction } from '@/hooks/useAutoAction';
@@ -75,20 +76,6 @@ export function workKind(e: WorldEntity): { label: string; sample: SampleId } {
   return { label: '채집 중', sample: 'gather' };
 }
 const STRIKE_NODES = new Set<string>(['flint_rock', 'branch_pile', 'oak_tree', 'pine_tree', 'hematite_rock', 'quartz_vein', 'obsidian_rock', 'jade_rock']);
-
-/** Visual-only wooden stake fence drawn around the main base when a palisade is built. */
-function PalisadeRing({ radius }: { radius: number }) {
-  const posts = Math.max(12, Math.round((2 * Math.PI * radius) / 9));
-  return (
-    <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2">
-      {Array.from({ length: posts }, (_, i) => {
-        const a = (i / posts) * Math.PI * 2;
-        return <div key={i} className="absolute h-3.5 w-1.5 border border-[hsl(var(--colonion-wood-dark))] bg-[hsl(var(--colonion-wood-edge))]"
-          style={{ left: Math.cos(a) * radius, top: Math.sin(a) * radius, transform: 'translate(-50%,-100%)', clipPath: 'polygon(50% 0,100% 25%,100% 100%,0 100%,0 25%)' }} />;
-      })}
-    </div>
-  );
-}
 
 function Sprite({ k, scale = 1, className = '' }: { k: SpriteKey; scale?: number; className?: string }) {
   const m = SPRITE_META[k];
@@ -433,10 +420,9 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
             {s.base && g.baseDef && (() => {
               const p = project(s.base); const r = (g.baseDef.radiusM + (s.palisade ? 15 : 0)) / mpp;
               return (
-                <div className="absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
+                <div className="pointer-events-none absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
                   <div className="rounded-full border-2 border-dashed border-primary/70 bg-primary/10" style={{ width: r * 2, height: r * 2 }} />
-                  {s.palisade && <PalisadeRing radius={Math.min(r, 70)} />}
-                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"><Sprite k={g.baseDef.sprite} scale={(s.base?.level ?? 1) >= 2 ? 1.2 : 1} /></div>
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"><BaseFortressOverlay baseLevel={s.base.level} hasPalisade={!!s.palisade} hasAltar={!!s.altar} /></div>
                 </div>
               );
             })()}
@@ -672,7 +658,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                     foodOwned={[...s.backpack, ...s.storage].filter(x => x.itemId === 'jerky' || x.itemId === 'cooked_meat').reduce((a, x) => a + x.count, 0)}
                     canSend={g.inBase && actionReady} onSend={g.startExpedition} onClaim={g.claimExpedition}
                     onPin={(t) => { favs.toggle({ id: `scout-${t.pos.lat.toFixed(5)}-${t.pos.lng.toFixed(5)}`, name: t.label, lat: t.pos.lat, lng: t.pos.lng }); toast('즐겨찾기에 표시했어요'); }} />
-                  <div className="pixel-frame bg-card p-2"><b className="text-sm">제단 · 발명</b><div className="mt-2"><AltarPanel altar={!!s.altar} ready={actionReady} inBase={g.inBase} owned={[...s.backpack, ...s.storage]} inventions={s.inventions ?? []} onBuild={g.buildAltar} onInvent={g.invent} /></div></div>
+                  <div className="border-y border-border py-3"><b className="text-sm">연구 시설 · 발명</b><div className="mt-2"><AltarPanel altar={!!s.altar} baseLevel={s.base.level} remote={realGps} credits={s.inventionCredits} walkedMeters={Math.max(0, ((s.exploredTotal ?? s.explored.length) - (s.inventionWalkMark ?? s.exploredTotal ?? s.explored.length)) * 20)} onCredits={g.updateInventionCredits} inviteUrl={`${window.location.origin}/?invite=${encodeURIComponent(user?.id ?? "pioneer")}`} ready={actionReady} inBase={g.inBase} owned={[...s.backpack, ...s.storage]} inventions={s.inventions ?? []} onBuild={g.buildAltar} onInvent={g.invent} /></div></div>
                   <div><b className="text-sm">창고</b><div className="mt-1"><Stacks stacks={s.storage} onUse={g.eat} /></div><div className="mt-2 flex flex-wrap gap-1">{s.storage.map(st => <Button key={st.itemId} variant="outline" size="sm" className="min-h-11 text-xs" disabled={!g.inBase || !actionReady} onClick={() => g.withdraw(st.itemId)}>{ITEMS[st.itemId].name} 1개 꺼내기</Button>)}</div></div>
                   <div>
                     <b className="text-sm">제작</b>

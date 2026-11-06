@@ -1,6 +1,6 @@
 // Turns altar inventions into real item definitions so gear lookups (weapon/tool/armor/trinket) apply them in the world.
 import { ITEMS, type ItemDef } from './items';
-import { checkInvention, type InventionCategory } from './invention';
+import { checkFacility, type InventionCategory } from './invention';
 import type { Stack } from './types';
 
 export interface InventedItem {
@@ -12,9 +12,12 @@ export interface InventedItem {
   materials: Record<string, number>;
   power: number;
   createdAt: number;
+  heat?: boolean;
+  sacred?: boolean;
+  masterwork?: boolean;
 }
 
-export const ALTAR_COST: Stack[] = [{ itemId: 'log', count: 4 }, { itemId: 'bone', count: 4 }, { itemId: 'flint', count: 2 }];
+export const ALTAR_COST: Stack[] = [{ itemId: 'flint', count: 8 }, { itemId: 'obsidian', count: 3 }, { itemId: 'quartz', count: 4 }];
 export const INVENTED_DURABILITY = 60;
 
 export function inventionId(hash: string): string {
@@ -40,7 +43,10 @@ export function inventedItemDef(inv: InventedItem): ItemDef {
 /** Register invented items into the runtime catalog (idempotent). */
 export function registerInventions(list: InventedItem[] | undefined) {
   const table = ITEMS as Record<string, ItemDef>;
-  for (const inv of list ?? []) if (checkInvention({ category: inv.category, materials: inv.materials }).ok) table[inv.id] = inventedItemDef(inv);
+  for (const inv of list ?? []) {
+    const check = checkFacility(inv, true);
+    if (check.ok) table[inv.id] = inventedItemDef({ ...inv, power: check.power });
+  }
 }
 
 export function fallbackInventionName(category: InventionCategory, materials: Record<string, number>): string {

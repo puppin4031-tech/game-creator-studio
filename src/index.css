@@ -53,6 +53,11 @@ html, body, #root {
     --game-warning: 35 90% 55%;
     --game-danger: 0 75% 55%;
     --survival-ground: #aabd87;
+    --fortress-wood: #4b3929;
+    --fortress-wood-light: #b48b50;
+    --fortress-stone: #999f91;
+    --fortress-stone-edge: #4b5149;
+    --invention-synergy: 193 85% 43%;
     --colonion-night: 230 45% 12%;
     --colonion-wood: 28 35% 22%;
     --colonion-wood-dark: 28 35% 14%;
@@ -176,3 +181,15 @@ html, body, #root {
 
 /* Rapid taps on the game must not trigger double-tap zoom. */
 html, body { touch-action: manipulation; }
+
+.base-fortress { position: relative; width: 96px; height: 96px; pointer-events: none; isolation: isolate; }
+.fortress-shadow { position:absolute; width:80px; height:30px; left:8px; bottom:10px; border-radius:50%; background:hsl(var(--foreground)/.22); filter:blur(3px); }
+.fortress-wall { position:absolute; inset:0; width:96px; height:96px; z-index:1; }
+.fortress-main { position:absolute; width:64px; height:64px; object-fit:contain; left:9px; top:7px; z-index:2; }
+.fortress-facility { position:absolute; width:34px; height:38px; object-fit:contain; right:4px; bottom:22px; z-index:3; }
+.fortress-fire { position:absolute; right:17px; bottom:46px; z-index:4; width:7px; height:12px; background:currentColor; clip-path:polygon(50% 0,100% 70%,70% 100%,15% 85%,0 40%); animation:fortress-flicker 1.4s ease-in-out infinite; }
+@keyframes fortress-flicker { 50% { transform:scaleY(.8); opacity:.7; } }
+.signal-smoke { color:hsl(var(--muted-foreground)); }
+.signal-experiment { color:hsl(var(--accent)); }
+.signal-sacred { color:hsl(var(--invention-synergy)); }
+@media (prefers-reduced-motion:reduce) { .fortress-fire { animation:none; } }

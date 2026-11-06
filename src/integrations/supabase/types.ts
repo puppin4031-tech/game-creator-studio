@@ -481,6 +481,45 @@ export type Database = {
         }
         Relationships: []
       }
+      survival_invention_credits: {
+        Row: {
+          bonus: number
+          day_key: string
+          fragments: number
+          free_left: number
+          invite_claimed: boolean
+          reservation: string | null
+          reserved_at: string | null
+          timer_started_at: string | null
+          user_id: string
+          walk_mark: number
+        }
+        Insert: {
+          bonus?: number
+          day_key: string
+          fragments?: number
+          free_left?: number
+          invite_claimed?: boolean
+          reservation?: string | null
+          reserved_at?: string | null
+          timer_started_at?: string | null
+          user_id: string
+          walk_mark?: number
+        }
+        Update: {
+          bonus?: number
+          day_key?: string
+          fragments?: number
+          free_left?: number
+          invite_claimed?: boolean
+          reservation?: string | null
+          reserved_at?: string | null
+          timer_started_at?: string | null
+          user_id?: string
+          walk_mark?: number
+        }
+        Relationships: []
+      }
       survival_item_catalog: {
         Row: {
           category: string
@@ -1035,6 +1074,10 @@ export type Database = {
         Returns: boolean
       }
       pay_survival_tribute: { Args: never; Returns: Json }
+      survival_invention_credit_action: {
+        Args: { p_action: string; p_token?: string; p_user: string }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "main_admin" | "sub_admin"

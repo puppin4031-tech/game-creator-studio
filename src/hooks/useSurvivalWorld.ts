@@ -26,7 +26,8 @@ import type { TerrainZone } from '@/lib/survival/terrainZone';
 import { MELCHIZEDEK_FIRST, MELCHIZEDEK_LINK, RITES, blessingGift, canBless, discoverShrine, emptyShrineState, performRite, recordBlessing, type Shrine, type ShrineState } from '@/lib/survival/sanctuaries';
 import { skillCooldownMs, skillDamage, skillLevel, skillUpgradeCost } from '@/lib/survival/skillLevels';
 import { ALTAR_COST, INVENTED_DURABILITY, inventionId, registerInventions, type InventedItem } from '@/lib/survival/inventedItems';
-import { checkInvention, type InventionInput } from '@/lib/survival/invention';
+import { checkFacility, type InventionInput } from '@/lib/survival/invention';
+import { type InventionCredits } from '@/lib/survival/inventionCredits';
 import { payAccessible } from '@/lib/survival/abilities';
 import type { GearInstance, LatLng, Stack, WorldEntity } from '@/lib/survival/types';
 
@@ -64,6 +65,8 @@ export interface WorldSave extends WorldProgress {
   skillLevels?: Record<string, number>;
   altar?: boolean;
   inventions?: InventedItem[];
+  inventionCredits?: InventionCredits;
+  inventionWalkMark?: number;
   shrines?: ShrineState;
   researching?: TimedJob | null;
   researchJobs?: TimedJob[];
@@ -654,32 +657,35 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const p = ref.current;
     if (!enabledRef.current || !atMainBase(p)) { toast.warning('정확한 GPS 신호가 있는 본거지에서 세우세요'); return; }
     if (p.altar) return;
+    if ((p.base?.level ?? 0) < 2) { toast.warning('뼈 움막을 먼저 완공하세요'); return; }
     const paid = payAccessible(p, ALTAR_COST);
     if (!paid) { toast.error(`재료 부족: ${fmt(ALTAR_COST)}`); return; }
     setS({ ...paid, altar: true });
     toast.success('제단을 세웠습니다. 이제 발명할 수 있어요');
   }, [setS]);
   /** Consumes the materials and adds one invented item as equipped gear. */
-  const invent = useCallback((input: InventionInput, naming?: { name: string; desc: string }) => {
+  const invent = useCallback((input: InventionInput, naming?: { name: string; desc: string; masterwork?: boolean }) => {
     const p = ref.current;
-    if (!enabledRef.current || !p.altar || !atMainBase(p)) { toast.warning('본거지 제단 앞에서 발명하세요'); return null; }
-    const check = checkInvention(input);
+    if (!enabledRef.current || !atMainBase(p)) { toast.warning('본거지 연구 시설 앞에서 발명하세요'); return null; }
+    const check = checkFacility(input, !!p.altar);
     if (check.ok === false) return null;
     const cost = Object.entries(input.materials).filter(([, q]) => q > 0).map(([itemId, count]) => ({ itemId: itemId as ItemId, count }));
     const paid = payAccessible(p, cost);
     if (!paid) { toast.error('재료가 부족합니다 (배낭 또는 창고)'); return null; }
     const id = inventionId(check.hash);
     const known = (p.inventions ?? []).find(x => x.id === id);
-    const inv: InventedItem = known ?? { id, hash: check.hash, name: naming?.name ?? id, desc: naming?.desc ?? '', category: input.category, materials: input.materials, power: check.power, createdAt: Date.now() };
+    const inv: InventedItem = known ?? { id, hash: check.hash, name: naming?.name ?? id, desc: naming?.desc ?? '', category: input.category, materials: input.materials, heat: input.heat, sacred: input.sacred, masterwork: naming?.masterwork, power: check.power, createdAt: Date.now() };
     const inventions = known ? p.inventions ?? [] : [...(p.inventions ?? []), inv];
     registerInventions(inventions);
-    const g: GearInstance = { uid: crypto.randomUUID(), itemId: id as ItemId, quality: 'NORMAL', durability: INVENTED_DURABILITY, maxDurability: INVENTED_DURABILITY };
+    const g: GearInstance = { uid: crypto.randomUUID(), itemId: id as ItemId, quality: naming?.masterwork ? 'MASTERWORK' : 'NORMAL', durability: INVENTED_DURABILITY, maxDurability: INVENTED_DURABILITY };
     setS({ ...paid, inventions, gear: [...paid.gear, g] });
     toast.success(`${inv.name} 완성!`, { description: known ? '알려진 발명품을 다시 만들었습니다' : '새 발명품이 기술 목록에 기록되었습니다' });
     return inv;
   }, [setS]);
 
-  return { awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
+  const updateInventionCredits = useCallback((credits: InventionCredits) => setS(p => ({ ...p, inventionCredits: credits, inventionWalkMark: credits.walkMeters === 0 ? p.exploredTotal ?? p.explored.length : p.inventionWalkMark })), [setS]);
+
+  return { updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
     recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,

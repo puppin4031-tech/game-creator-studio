@@ -53,7 +53,7 @@ export const STAT_CAP: Record<InventionCategory, number> = { tool: 2.5, weapon: 
 export const RESEARCH_BASE_COST = 10;
 export const RESEARCH_COST_PER_UNIT = 1;
 
-export interface InventionInput { category: InventionCategory; materials: Record<string, number>; }
+export interface InventionInput { category: InventionCategory; materials: Record<string, number>; heat?: boolean; sacred?: boolean; }
 
 export type InventionCheck =
   | { ok: true; hash: string; score: number; power: number; cost: number; primaryColor: string; secondaryColor: string }
@@ -65,7 +65,7 @@ export function recipeHash(input: InventionInput): string {
     .filter(([, q]) => q > 0)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([id, q]) => `${id}:${Math.floor(q)}`);
-  return `CAT:${input.category}|${parts.join('|')}`;
+  return `CAT:${input.category}|${parts.join('|')}${input.heat ? '|HEAT' : ''}${input.sacred ? '|SACRED' : ''}`;
 }
 
 export function researchCost(materials: Record<string, number>): number {
@@ -74,6 +74,8 @@ export function researchCost(materials: Record<string, number>): number {
 }
 
 export function checkInvention(input: InventionInput): InventionCheck {
+  if (!CATEGORY_WEIGHTS[input.category]) return { ok: false, reason: 'implausible' };
+  if (Object.values(input.materials).some(q => !Number.isFinite(q) || q < 0)) return { ok: false, reason: 'bad_qty' };
   const entries = Object.entries(input.materials).filter(([, q]) => q > 0);
   if (entries.length === 0) return { ok: false, reason: 'empty' };
   if (entries.length > MAX_SLOTS) return { ok: false, reason: 'too_many_slots' };
@@ -113,4 +115,33 @@ export function checkInvention(input: InventionInput): InventionCheck {
     primaryColor: MATERIAL_PHYSICS[sorted[0][0]].color,
     secondaryColor: MATERIAL_PHYSICS[(sorted[1] ?? sorted[0])[0]].color,
   };
+}
+
+export const ANVIL_SLOTS = 2;
+export const BASE_MASTERWORK_CHANCE = 0.05;
+export const ALTAR_MASTERWORK_CHANCE = BASE_MASTERWORK_CHANCE * 3;
+export function masterworkChance(altar: boolean) { return altar ? ALTAR_MASTERWORK_CHANCE : BASE_MASTERWORK_CHANCE; }
+export function checkFacility(input: InventionInput, altar: boolean): InventionCheck {
+  if (!altar && (Object.values(input.materials).filter(q => q > 0).length > ANVIL_SLOTS)) return { ok: false, reason: 'too_many_slots' };
+  if (!altar && (input.heat || input.sacred || !['tool', 'weapon'].includes(input.category))) return { ok: false, reason: 'implausible' };
+  const result = checkInvention(input);
+  if (!result.ok) return result;
+  // Fire hardens suitable clay/bone; sacred minerals amplify relics. Neither bypasses plausibility or stat caps.
+  const heat = input.heat && ['clay', 'bone', 'flint'].some(id => (input.materials[id] ?? 0) > 0) ? 1.08 : 1;
+  const sacred = input.sacred && ['jade', 'quartz', 'ancient_fang'].some(id => (input.materials[id] ?? 0) > 0) ? 1.08 : 1;
+  return { ...result, power: Math.min(STAT_CAP[input.category], Math.round(result.power * heat * sacred * 100) / 100) };
+}
+
+export function physicsSignal(input: InventionInput, altar: boolean) {
+  const result = checkFacility(input, altar);
+  const entries = Object.entries(input.materials).filter(([,q]) => q > 0);
+  const total = entries.reduce((sum,[,q]) => sum+q,0);
+  const sum = (key: keyof Omit<MaterialPhysics,'color'>) => entries.reduce((n,[id,q]) => n+(MATERIAL_PHYSICS[id]?.[key] ?? 0)*q,0);
+  const hardness = sum('hardness'), elasticity = sum('toughness'), sharpness = sum('sharpness');
+  const flammability = entries.reduce((n,[id,q]) => n+(['branch','log','fiber','cordage','resin','hide','leather'].includes(id) ? 8 : 0)*q,0);
+  const ratio = elasticity ? hardness / elasticity : 0;
+  const synergy = result.ok && (result.score >= 6.5 || (ratio >= 1.4 && ratio <= 1.8) || entries.some(([id]) => ['jade','ancient_fang','obsidian'].includes(id)));
+  const reason = 'reason' in result ? result.reason : null;
+  const advice = result.ok ? (synergy ? '현자의 조언: 서로의 물성이 조화롭게 맞물립니다.' : '현자의 조언: 형태를 갖출 수 있는 조합입니다.') : reason === 'no_binding' ? '현자의 조언: 부품을 묶을 노끈·송진·가죽이 필요합니다.' : reason === 'too_many_slots' ? `현자의 조언: 이 시설에는 ${altar ? MAX_SLOTS : ANVIL_SLOTS}종의 재료만 올릴 수 있습니다.` : '현자의 조언: 타격력을 낼 수 있는 단단한 재료(돌, 뼈)가 필요합니다.';
+  return { result, kind: !result.ok ? 'smoke' as const : synergy ? 'sacred' as const : 'experiment' as const, advice, hardness, elasticity, sharpness, flammability, total };
 }

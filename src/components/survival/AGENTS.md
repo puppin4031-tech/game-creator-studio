@@ -1,0 +1,3 @@
+- BaseFortressOverlay composes fixed-pixel buildings at one projected MapLibre anchor separately from the meter safety ring; avoid a second map engine.
+- Real-game invention credits and reservations are server-owned; simulator credits stay isolated. Replace the useRewardTrigger provider for future rewarded SDKs, not UI actions.
+- Copy the pure invention.ts rules into survival-invent/rules when changing them; both sides validate facilities and physics and never derive stats from AI text.
