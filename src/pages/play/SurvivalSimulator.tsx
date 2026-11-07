@@ -2,7 +2,7 @@
 // Custom GPS/world hook changes must remount this screen instead of reusing stale hook queues.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SkillControls, ConstructionControls, CompanionControls, SkillEffect } from '@/components/survival/SurvivalAbilities';
-import SpriteAnimator from '@/components/survival/SpriteAnimator';
+import CharacterSprite from '@/components/survival/CharacterSprite';
 import BackpackDiscard from '@/components/survival/BackpackDiscard';
 import { BaseFortressOverlay } from '@/components/survival/BaseFortressOverlay';
 import { AltarPanel } from '@/components/survival/AltarPanel';
@@ -13,7 +13,7 @@ import { useAutoAction } from '@/hooks/useAutoAction';
 import { AGGRO_RADIUS_M, BEAST_STRIKE_INTERVAL_MS, beastAggro } from '@/lib/survival/combat';
 import { ACTIVE_SKILLS, type ActiveSkill } from '@/lib/survival/abilities';
 import { MAX_SKILL_LEVEL, skillLevel, skillUpgradeCost } from '@/lib/survival/skillLevels';
-import { useSpriteAnimations, type SpriteAction } from '@/hooks/useSpriteAnimations';
+import { type SpriteAction } from '@/hooks/useSpriteAnimations';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Backpack, Flame, Lightbulb, LocateFixed, X, Lock, ListChecks, Compass, ChevronUp, Star, MapPin, Navigation } from 'lucide-react';
@@ -81,6 +81,7 @@ const STRIKE_NODES = new Set<string>(['flint_rock', 'branch_pile', 'oak_tree', '
 
 function Sprite({ k, scale = 1, className = '' }: { k: SpriteKey; scale?: number; className?: string }) {
   const m = SPRITE_META[k];
+  if (k.startsWith('char-')) return <CharacterSprite height={m.h * scale} className={className} />;
   return <img src={url(k)} width={m.w * scale} height={m.h * scale} alt="" draggable={false} className={`pixelated select-none ${className}`} />;
 }
 
@@ -191,7 +192,6 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   };
   const auto = useAutoAction((e) => autoStep(e));
 
-  const { data: anims } = useSpriteAnimations('hunter');
   const [action, setAction] = useState<SpriteAction>('idle');
   const actionTimer = useRef<number>();
   const returnTimer = useRef<number>();
@@ -215,7 +215,6 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     if (actorTarget && shouldReturnToCenter(s.pos, actorTarget, g.reach)) returnToCenter();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.pos, actorTarget]);
-  const activeAnim = anims?.[action] ?? (action === 'chop' ? anims?.attack : undefined) ?? anims?.idle;
 
   const zone = s.terrainZones[zoneCellKey(s.pos)] ?? 'plains';
   const onSurfaceZone = (c: LatLng, z: typeof zone) => g.recordTerrainZone(zoneCellKey(c), z);
@@ -542,7 +541,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                             </div>;
                           })()}
                           {bubbles[presence.selfId] && <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbleView(bubbles[presence.selfId])}</span>}
-                          <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined }}>{activeAnim ? <SpriteAnimator url={activeAnim.url} frames={activeAnim.frame_count} fps={activeAnim.fps} height={Math.round(SPRITE_META['char-hunter'].h * PLAYER_SCALE)} once={action === 'gather' || action === 'attack' || action === 'chop'} fallback={<Sprite k="char-hunter" scale={PLAYER_SCALE} />} /> : <Sprite k="char-hunter" scale={PLAYER_SCALE} />}</div></HitFlash></div>
+                          <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined }}><CharacterSprite action={action} height={Math.round(SPRITE_META['char-hunter'].h * PLAYER_SCALE)} /></div></HitFlash></div>
                         </div>
                       </motion.div>
                     );

@@ -4,9 +4,7 @@ import { Lock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { normalizePioneerName, PIONEER_ERAS, PIONEER_NAME_KEY } from "@/lib/pioneer";
 import titleArt from "@/assets/colonion_title.jpg.asset.json";
-import hunter from "@/assets/survival/char-hunter.png";
-import SpriteAnimator from "@/components/survival/SpriteAnimator";
-import { useSpriteAnimations } from "@/hooks/useSpriteAnimations";
+import CharacterSprite from "@/components/survival/CharacterSprite";
 
 export { PIONEER_NAME_KEY } from "@/lib/pioneer";
 
@@ -15,8 +13,6 @@ export function ColonionOpening({ onEnter, onClose }: { onEnter: (name: string) 
   // A saved nickname is fixed; only first-time players type one.
   const [savedName] = useState(() => normalizePioneerName(localStorage.getItem(PIONEER_NAME_KEY) ?? ""));
   const [name, setName] = useState(savedName);
-  const { data: anims } = useSpriteAnimations("hunter");
-  const idle = anims?.idle;
   const finalName = normalizePioneerName(name);
 
   const enter = () => {
@@ -24,8 +20,6 @@ export function ColonionOpening({ onEnter, onClose }: { onEnter: (name: string) 
     if (!savedName) localStorage.setItem(PIONEER_NAME_KEY, finalName);
     onEnter(finalName);
   };
-
-  const fallback = <img src={hunter} alt="구석기 개척자 캐릭터" className="h-20 w-20 object-contain [image-rendering:pixelated]" draggable={false} />;
 
   return (
     <motion.div
@@ -100,7 +94,7 @@ export function ColonionOpening({ onEnter, onClose }: { onEnter: (name: string) 
             className="flex h-36 w-full flex-col gap-2 border border-colonion-wood-edge bg-colonion-wood-dark text-colonion-parchment hover:bg-colonion-wood-dark hover:ring-2 hover:ring-primary"
           >
             <div className="flex h-24 items-end justify-center">
-              {idle ? <SpriteAnimator url={idle.url} frames={idle.frame_count} fps={idle.fps} height={96} fallback={fallback} /> : fallback}
+              <CharacterSprite height={96} />
             </div>
             <span className="text-xs text-colonion-parchment/70">눌러서 접속</span>
           </Button>

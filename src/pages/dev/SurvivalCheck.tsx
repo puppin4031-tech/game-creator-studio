@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { CheckCircle2, XCircle, RefreshCw, ArrowLeft, Hammer } from 'lucide-react';
 import { runSurvivalSelfCheck, summarizeChecks, type CheckResult } from '@/lib/survival/selfCheck';
 import { SPRITE_META, type SpriteKey } from '@/lib/survival/spriteMeta';
+import CharacterSprite from '@/components/survival/CharacterSprite';
 
 const spriteModules = import.meta.glob('../../assets/survival/*.png', { eager: true, import: 'default' }) as Record<string, string>;
 const spriteUrl = (key: SpriteKey) =>
@@ -14,7 +15,7 @@ function SpriteGallery() {
     <div className="grid grid-cols-6 gap-2">
       {keys.map((k) => (
         <div key={k} className="flex flex-col items-center gap-1 rounded border border-border bg-card p-1.5">
-          <img src={spriteUrl(k)} alt={k} className="pixelated h-8 w-8 object-contain" />
+          {k.startsWith('char-') ? <CharacterSprite height={32} /> : <img src={spriteUrl(k)} alt={k} className="pixelated h-8 w-8 object-contain" />}
           <span className="w-full truncate text-center text-[9px] text-muted-foreground">{k}</span>
         </div>
       ))}

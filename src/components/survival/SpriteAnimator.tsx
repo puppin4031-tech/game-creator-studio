@@ -34,7 +34,10 @@ interface Shown { url: string; frames: number; ratio: number }
 /** Plays a horizontal sprite-sheet strip. Keeps the previous sheet visible until the next one is decoded. */
 export default function SpriteAnimator({ url, frames, fps, height = 64, playing = true, once = false, fallback }: Props) {
   const [frame, setFrame] = useState(0);
-  const [shown, setShown] = useState<Shown | null>(() => (loaded.has(url) ? { url, frames, ratio: loaded.get(url)! } : null));
+  const [shown, setShown] = useState<Shown | null>(() => {
+    const ratio = loaded.get(url);
+    return ratio ? { url, frames, ratio } : null;
+  });
 
   useEffect(() => {
     let alive = true;
