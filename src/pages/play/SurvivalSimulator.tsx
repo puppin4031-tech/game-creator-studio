@@ -162,7 +162,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [expeditionTarget, setExpeditionTarget] = useState<LatLng | null>(null);
   const [watchExpedition, setWatchExpedition] = useState(true);
   const crew = s.observedExpedition;
-  useExpeditionCombatSound(crew);
+  useExpeditionCombatSound(crew, e => workKind(e).sample);
   const reducedMotion = useReducedMotion();
   const expeditionHit = freshCombatHit(crew);
   const [expeditionFocus, setExpeditionFocus] = useState<ExpeditionFocus>('materials');

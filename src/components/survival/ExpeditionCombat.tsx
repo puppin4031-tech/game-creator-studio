@@ -2,8 +2,8 @@ import { useEffect, useRef } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Swords } from 'lucide-react';
 import type { ObservedExpedition } from '@/lib/survival/expedition';
-import type { LatLng } from '@/lib/survival/types';
-import { haptic, playFootstep, playSample, playSfx, unlockSound } from '@/lib/survival/gameSettings';
+import type { LatLng, WorldEntity } from '@/lib/survival/types';
+import { haptic, playFootstep, playSample, playSfx, unlockSound, type SampleId } from '@/lib/survival/gameSettings';
 
 export const CREATURE_RING_RADIUS_M = 20;
 export const freshCombatHit = (crew?: ObservedExpedition | null) => {
@@ -22,19 +22,29 @@ export function expeditionActorPoint(crew: ObservedExpedition, project: (p: LatL
   return { x: target.x + (length > 1 ? dx / length : -1) * 40, y: target.y + (length > 1 ? dy / length : 0) * 40 };
 }
 
-export function useExpeditionCombatSound(crew?: ObservedExpedition | null) {
+// Touch pointerdown is not a user-activation event on mobile; unlock on release/click too.
+const UNLOCK_EVENTS = ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'] as const;
+
+export function useExpeditionCombatSound(crew?: ObservedExpedition | null, sampleFor?: (e: WorldEntity) => SampleId) {
   const lastAt = useRef(crew?.combatHit?.at ?? 0);
+  const lastWorkAt = useRef(crew?.hitAt ?? 0);
   const lastPosition = useRef(crew?.pos);
   const lat = crew?.pos.lat;
   const lng = crew?.pos.lng;
   useEffect(() => {
-    window.addEventListener('pointerdown', unlockSound);
-    window.addEventListener('keydown', unlockSound);
-    return () => {
-      window.removeEventListener('pointerdown', unlockSound);
-      window.removeEventListener('keydown', unlockSound);
-    };
+    UNLOCK_EVENTS.forEach(ev => window.addEventListener(ev, unlockSound, { passive: true }));
+    return () => UNLOCK_EVENTS.forEach(ev => window.removeEventListener(ev, unlockSound));
   }, []);
+  // Gathering, logging and mining hits on resource nodes.
+  useEffect(() => {
+    const at = crew?.hitAt ?? 0;
+    if (!at || at === lastWorkAt.current) return;
+    lastWorkAt.current = at;
+    const target = crew?.target;
+    if (!target || target.kind !== 'node' || document.hidden) return;
+    playSample(sampleFor?.(target) ?? 'gather');
+    haptic(20);
+  }, [crew?.hitAt]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const previous = lastPosition.current;
     lastPosition.current = lat === undefined || lng === undefined ? undefined : { lat, lng };

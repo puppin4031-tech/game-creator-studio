@@ -32,14 +32,32 @@ export function subscribeSettings(l: (s: GameSettings) => void) { listeners.add(
 
 // ---- Sound (WebAudio synth, no asset files) ----
 let ctx: AudioContext | null = null;
+let unlocked = false;
 function audio() {
-  if (!ctx) { try { ctx = new AudioContext(); } catch { return null; } }
-  if (ctx.state === 'suspended') void ctx.resume().catch(() => { /* Retry on the next user gesture. */ });
+  if (!ctx) {
+    try {
+      // iOS: "playback" session keeps effects audible even with the ringer switch on silent.
+      const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+      if (session) session.type = 'playback';
+      ctx = new AudioContext();
+    } catch { return null; }
+  }
+  if (ctx.state !== 'running') void ctx.resume().catch(() => { /* Retry on the next user gesture. */ });
   return ctx;
 }
 
 /** Call during a user gesture before timer-driven expedition effects start. */
-export function unlockSound() { if (current.sfx) audio(); }
+export function unlockSound() {
+  if (!current.sfx) return;
+  const a = audio(); if (!a) return;
+  if (unlocked && a.state === 'running') return;
+  // A silent one-sample buffer started inside the gesture fully unlocks mobile Safari.
+  try {
+    const src = a.createBufferSource(); src.buffer = a.createBuffer(1, 1, a.sampleRate);
+    src.connect(a.destination); src.start();
+    unlocked = a.state === 'running';
+  } catch { /* unsupported */ }
+}
 
 /** Short filtered ground crunch and a low heel thud, without downloading a sample. */
 export function playFootstep() {
@@ -50,12 +68,13 @@ export function playFootstep() {
   const data = buffer.getChannelData(0);
   for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (a.sampleRate * 0.025));
   const source = a.createBufferSource(); source.buffer = buffer;
-  const filter = a.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 1100;
-  const gain = a.createGain(); gain.gain.value = SAMPLE_GAIN[current.volume];
+  // Phone speakers drop low frequencies, so keep the crunch bright enough to hear.
+  const filter = a.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 2400;
+  const gain = a.createGain(); gain.gain.value = Math.min(1, SAMPLE_GAIN[current.volume] * 1.5);
   source.connect(filter).connect(gain).connect(a.destination); source.start(now);
   const heel = a.createOscillator(); const heelGain = a.createGain();
-  heel.frequency.setValueAtTime(125, now); heel.frequency.exponentialRampToValueAtTime(55, now + 0.08);
-  heelGain.gain.setValueAtTime(VOLUME_GAIN[current.volume], now);
+  heel.frequency.setValueAtTime(220, now); heel.frequency.exponentialRampToValueAtTime(90, now + 0.08);
+  heelGain.gain.setValueAtTime(VOLUME_GAIN[current.volume] * 1.5, now);
   heelGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
   heel.connect(heelGain).connect(a.destination); heel.start(now); heel.stop(now + 0.1);
 }
