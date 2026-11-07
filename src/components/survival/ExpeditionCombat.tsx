@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { Swords } from 'lucide-react';
 import type { ObservedExpedition } from '@/lib/survival/expedition';
 import type { LatLng } from '@/lib/survival/types';
-import { haptic, playSample, playSfx } from '@/lib/survival/gameSettings';
+import { haptic, playFootstep, playSample, playSfx, unlockSound } from '@/lib/survival/gameSettings';
 
 export const CREATURE_RING_RADIUS_M = 20;
 export const freshCombatHit = (crew?: ObservedExpedition | null) => {
@@ -24,6 +24,28 @@ export function expeditionActorPoint(crew: ObservedExpedition, project: (p: LatL
 
 export function useExpeditionCombatSound(crew?: ObservedExpedition | null) {
   const lastAt = useRef(crew?.combatHit?.at ?? 0);
+  const lastPosition = useRef(crew?.pos);
+  const lat = crew?.pos.lat;
+  const lng = crew?.pos.lng;
+  useEffect(() => {
+    window.addEventListener('pointerdown', unlockSound);
+    window.addEventListener('keydown', unlockSound);
+    return () => {
+      window.removeEventListener('pointerdown', unlockSound);
+      window.removeEventListener('keydown', unlockSound);
+    };
+  }, []);
+  useEffect(() => {
+    const previous = lastPosition.current;
+    lastPosition.current = lat === undefined || lng === undefined ? undefined : { lat, lng };
+    if (!previous || lat === undefined || lng === undefined || (lat === previous.lat && lng === previous.lng)) return;
+    const step = () => { if (!document.hidden) playFootstep(); };
+    step();
+    const interval = window.setInterval(step, 360);
+    // Geographic ticks arrive once per second; never keep playing after movement stops.
+    const stop = window.setTimeout(() => window.clearInterval(interval), 1000);
+    return () => { window.clearInterval(interval); window.clearTimeout(stop); };
+  }, [lat, lng]);
   useEffect(() => {
     const hit = freshCombatHit(crew);
     if (!hit || hit.at === lastAt.current) return;

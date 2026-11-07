@@ -34,8 +34,30 @@ export function subscribeSettings(l: (s: GameSettings) => void) { listeners.add(
 let ctx: AudioContext | null = null;
 function audio() {
   if (!ctx) { try { ctx = new AudioContext(); } catch { return null; } }
-  if (ctx.state === 'suspended') void ctx.resume();
+  if (ctx.state === 'suspended') void ctx.resume().catch(() => { /* Retry on the next user gesture. */ });
   return ctx;
+}
+
+/** Call during a user gesture before timer-driven expedition effects start. */
+export function unlockSound() { if (current.sfx) audio(); }
+
+/** Short filtered ground crunch and a low heel thud, without downloading a sample. */
+export function playFootstep() {
+  if (!current.sfx) return;
+  const a = audio(); if (!a || a.state !== 'running') return;
+  const now = a.currentTime;
+  const buffer = a.createBuffer(1, Math.ceil(a.sampleRate * 0.11), a.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (a.sampleRate * 0.025));
+  const source = a.createBufferSource(); source.buffer = buffer;
+  const filter = a.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 1100;
+  const gain = a.createGain(); gain.gain.value = SAMPLE_GAIN[current.volume];
+  source.connect(filter).connect(gain).connect(a.destination); source.start(now);
+  const heel = a.createOscillator(); const heelGain = a.createGain();
+  heel.frequency.setValueAtTime(125, now); heel.frequency.exponentialRampToValueAtTime(55, now + 0.08);
+  heelGain.gain.setValueAtTime(VOLUME_GAIN[current.volume], now);
+  heelGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
+  heel.connect(heelGain).connect(a.destination); heel.start(now); heel.stop(now + 0.1);
 }
 
 export type SampleId = 'chop' | 'mine' | 'gather' | 'strike';
