@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { SkillControls, ConstructionControls, CompanionControls, SkillEffect } from '@/components/survival/SurvivalAbilities';
 import CharacterSprite from '@/components/survival/CharacterSprite';
 import ExpeditionSystem, { ExpeditionMarker } from '@/components/survival/ExpeditionSystem';
+import { CombatImpact, CREATURE_RING_RADIUS_M, expeditionActorPoint, freshCombatHit, useExpeditionCombatSound } from '@/components/survival/ExpeditionCombat';
 import type { ExpeditionFocus } from '@/lib/survival/expedition';
 import BackpackDiscard from '@/components/survival/BackpackDiscard';
 import { BaseFortressOverlay } from '@/components/survival/BaseFortressOverlay';
@@ -12,12 +13,12 @@ import { EquipmentSlots } from '@/components/survival/EquipmentSlots';
 import { addStacks, hasAll } from "@/lib/survival/inventory";
 import { SkillQuickBar } from '@/components/survival/SkillQuickBar';
 import { useAutoAction } from '@/hooks/useAutoAction';
-import { AGGRO_RADIUS_M, BEAST_STRIKE_INTERVAL_MS, beastAggro } from '@/lib/survival/combat';
+import { BEAST_STRIKE_INTERVAL_MS, beastAggro } from '@/lib/survival/combat';
 import { ACTIVE_SKILLS, type ActiveSkill } from '@/lib/survival/abilities';
 import { MAX_SKILL_LEVEL, skillLevel, skillUpgradeCost } from '@/lib/survival/skillLevels';
 import { type SpriteAction } from '@/hooks/useSpriteAnimations';
 import { useNavigate } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Backpack, Flame, Lightbulb, LocateFixed, X, Lock, ListChecks, Compass, ChevronUp, Star, MapPin, Navigation } from 'lucide-react';
 import { bearingDeg, useSurvivalFavorites } from '@/hooks/useSurvivalFavorites';
 import { useDeviceHeading } from '@/hooks/useDeviceHeading';
@@ -161,6 +162,9 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [expeditionTarget, setExpeditionTarget] = useState<LatLng | null>(null);
   const [watchExpedition, setWatchExpedition] = useState(true);
   const crew = s.observedExpedition;
+  useExpeditionCombatSound(crew);
+  const reducedMotion = useReducedMotion();
+  const expeditionHit = freshCombatHit(crew);
   const [expeditionFocus, setExpeditionFocus] = useState<ExpeditionFocus>('materials');
   const observationEntities = crew ? generateWorld({ center: crew.pos, radiusM: g.vision, now: Date.now(), isNight: g.isNight, depleted: s.depleted, terrainZones: s.terrainZones, parkCells: s.parkCells }) : [];
   const visibleEntities = [...new Map([...g.entities, ...observationEntities].map(e => [e.id, e])).values()];
@@ -493,7 +497,9 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               const p = project(e);
               const sprite = e.kind === 'node' ? nodeDef(e.type).sprite : creatureDef(e.type).sprite;
               const name = e.kind === 'node' ? nodeDef(e.type).name : creatureDef(e.type).name;
-              const dmg = s.damage[e.id];
+              const engaged = crew?.target?.id === e.id;
+              const combatHit = expeditionHit?.target.id === e.id ? expeditionHit : undefined;
+              const dmg = engaged ? crew.damage : s.damage[e.id];
               const creature = e.kind === 'creature' ? creatureDef(e.type) : null;
               const remainingHp = creature ? Math.max(0, creature.hp - (dmg ?? 0)) : 0;
               const boss = e.kind === 'creature' && !!creatureDef(e.type).boss;
@@ -502,16 +508,23 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   data-resource-id={e.id} data-lat={e.lat} data-lng={e.lng}
                   className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center"
                   style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}>
-                  {e.kind === 'creature' && creature && creature.temper !== 'passive' && <div aria-hidden className={`pointer-events-none absolute left-1/2 top-full -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed ${aggroIds.has(e.id) ? 'border-destructive bg-destructive/10' : 'border-destructive/40'}`} style={{ width: (AGGRO_RADIUS_M / mpp) * 2, height: (AGGRO_RADIUS_M / mpp) * 2 }} />}
-                  <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><motion.div key={`${e.id}:${dmg ?? 0}`} className={g.isNight ? '' : 'brightness-110 contrast-110 drop-shadow-[0_0_3px_hsl(var(--background))]'}
+                  <div className="relative">
+                  {creature && (creature.temper !== 'passive' || engaged) && <div data-creature-ring={e.id} aria-hidden className={`pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed ${aggroIds.has(e.id) || engaged ? 'border-destructive bg-destructive/10' : 'border-destructive/40'}`} style={{ width: (CREATURE_RING_RADIUS_M / mpp) * 2, height: (CREATURE_RING_RADIUS_M / mpp) * 2 }} />}
+                  <div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><motion.div key={`${e.id}:${combatHit?.at ?? dmg ?? 0}`} data-creature-strike={combatHit?.at} className={g.isNight ? '' : 'brightness-110 contrast-110 drop-shadow-[0_0_3px_hsl(var(--background))]'}
                     animate={(() => {
+                      if (reducedMotion) return { x: 0, y: 0 };
+                      if (combatHit && crew) {
+                        const actor = expeditionActorPoint(crew, project);
+                        const dx = actor.x - p.x, dy = actor.y - p.y, len = Math.hypot(dx, dy) || 1;
+                        return { x: [0, -dx / len * 8, dx / len * 22, 0], y: [0, -dy / len * 8, dy / len * 22, 0] };
+                      }
                       if (aggroIds.has(e.id)) { const me = project(s.pos); return { x: [0, (me.x - p.x) * 0.35, 0], y: [0, (me.y - p.y) * 0.35, 0] }; }
                       if (dmg) return { x: [0, -4, 4, -3, 3, 0], y: 0 };
                       return { x: 0, y: e.kind === 'creature' ? [0, -3, 0] : 0 };
                     })()}
-                    transition={aggroIds.has(e.id) ? { repeat: Infinity, duration: 1.2 } : dmg ? { duration: 0.35 } : { repeat: Infinity, duration: 0.8 }}>
+                    transition={combatHit ? { duration: 0.7, times: [0, 0.25, 0.65, 1] } : aggroIds.has(e.id) && !reducedMotion ? { repeat: Infinity, duration: 1.2 } : dmg ? { duration: 0.35 } : { repeat: reducedMotion ? 0 : Infinity, duration: 0.8 }}>
                     <div className={boss ? 'scale-150 rounded-full ring-2 ring-destructive shadow-[0_0_18px_hsl(var(--destructive))]' : ''}><Sprite k={sprite} /></div>
-                  </motion.div></div>
+                  </motion.div>{combatHit && <CombatImpact stamp={combatHit.at} damage={combatHit.damage} />}</div>
                   {(s.calmUntil?.[e.id] ?? 0) > Date.now() && <span className="bg-primary text-[10px] text-primary-foreground">진정됨</span>}
                   {boss ? <span className="mt-2 rounded bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">우두머리</span> : null}
                   {creature ? <div className="mt-1 w-20 rounded bg-background/90 px-1 text-center text-[10px]" aria-label={`${name} 체력 ${remainingHp}/${creature.hp}, 공격력 ${creature.atk}`}>
@@ -521,6 +534,10 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 </button>
               );
             })}
+            {expeditionHit?.killed && !visibleEntities.some(e => e.id === expeditionHit.target.id) && (() => {
+              const p = project(expeditionHit.target);
+              return <div className="pointer-events-none absolute h-10 w-10 -translate-x-1/2 -translate-y-full" style={{ left: p.x, top: p.y }}><CombatImpact stamp={expeditionHit.at} damage={expeditionHit.damage} defeated /></div>;
+            })()}
             {presence.peers.filter((pr) => distanceM(s.pos, pr) <= g.vision).map((pr) => {
               const p = project(pr);
               const ally = allies.some(a => a.id === pr.id);

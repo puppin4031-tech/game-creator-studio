@@ -4,12 +4,23 @@ import { FOCUS_LABEL, type ExpeditionFocus, type ExpeditionLog, type ObservedExp
 import type { LatLng } from '@/lib/survival/types';
 import { distanceM } from '@/lib/survival/geo';
 import CharacterSprite from './CharacterSprite';
+import { motion, useReducedMotion } from 'framer-motion';
+import { CombatImpact, expeditionActorPoint, freshCombatHit } from './ExpeditionCombat';
 
 export function ExpeditionMarker({ crew, project }: { crew: ObservedExpedition; project: (p: LatLng) => { x: number; y: number } }) {
-  const pos = project(crew.pos);
-  return <div data-expedition-marker className="pointer-events-none absolute flex w-24 -translate-x-1/2 -translate-y-full flex-col items-center transition-[left,top] duration-1000 ease-linear motion-reduce:transition-none" style={{ left: pos.x, top: pos.y }}>
-    <span className="rounded bg-card px-1 text-[10px]">원정대 · HP {crew.hp}</span>
-    <div style={{ transform: crew.facing === -1 ? 'scaleX(-1)' : undefined }}><CharacterSprite height={48} action={crew.target ? crew.target.kind === 'node' ? 'chop' : 'attack' : 'walk'} /></div>
+  const pos = expeditionActorPoint(crew, project);
+  const hit = freshCombatHit(crew);
+  const reduced = useReducedMotion();
+  const target = crew.target?.kind === 'creature' ? project(crew.target) : hit ? project(hit.target) : null;
+  const dx = target ? target.x - pos.x : 0, dy = target ? target.y - pos.y : 0;
+  const length = Math.hypot(dx, dy) || 1;
+  const striking = !!hit;
+  return <div data-expedition-marker className={`pointer-events-none absolute z-10 flex w-24 -translate-x-1/2 -translate-y-full flex-col items-center ${target ? '' : 'transition-[left,top] duration-1000 ease-linear motion-reduce:transition-none'}`} style={{ left: pos.x, top: pos.y }}>
+    <span className="absolute -top-5 whitespace-nowrap rounded bg-card px-1 text-[10px]">원정 · HP {crew.hp}</span>
+    <motion.div key={hit?.at ?? 'march'} data-expedition-strike={hit?.at} className="relative" initial={false} animate={striking && !reduced ? { x: [0, dx / length * 28, -dx / length * 7, 0], y: [0, dy / length * 28, -dy / length * 7, 0] } : { x: 0, y: 0 }} transition={{ duration: 0.65, times: [0, 0.23, 0.6, 1] }}>
+      <div style={{ transform: (target ? dx < 0 : crew.facing === -1) ? 'scaleX(-1)' : undefined }}><CharacterSprite height={48} action={hit ? 'attack' : crew.target ? crew.target.kind === 'node' ? 'chop' : 'attack' : 'walk'} /></div>
+      {hit && hit.counterDamage > 0 && <CombatImpact stamp={hit.at} damage={hit.counterDamage} />}
+    </motion.div>
     {crew.target && <Zap className="absolute right-1 top-6 !h-6 !w-6 animate-pulse text-primary" />}
   </div>;
 }

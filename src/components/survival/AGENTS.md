@@ -3,3 +3,4 @@
 - Copy the pure invention.ts rules into survival-invent/rules when changing them; both sides validate facilities and physics and never derive stats from AI text.
 - Stored altars retain invention access regardless of base level; level gates apply only to new construction so older saves remain playable.
 - ExpeditionSystem uses the existing map projection and current CharacterSprite; observed camera resources are regenerated around crew position without modifying player GPS/exploration.
+- ExpeditionCombat consumes presentation-only hit metadata and reuses sound settings; projected collision offsets never change GPS, combat reach, damage or rewards.

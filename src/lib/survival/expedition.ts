@@ -29,6 +29,8 @@ export interface ObservedExpedition {
   waypoints?: LatLng[];
   /** -1 when last moving west (sprite mirrored), 1 otherwise. */
   facing?: 1 | -1;
+  /** Presentation-only record; retains the final strike after the target is removed. */
+  combatHit?: { at: number; target: Extract<WorldEntity, { kind: 'creature' }>; damage: number; counterDamage: number; killed: boolean };
 }
 export interface ExpeditionLog { at: number; text: string }
 
@@ -102,6 +104,7 @@ export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEnt
       const power = (target.kind === 'node' ? 2 : 12) * (outdoor ? 2 : 1) * (now < crew.moraleUntil ? 1.5 : 1);
       if (target.kind === 'creature') {
         const hit = resolveCreatureHit(target.type, crew.damage, power, 3, false);
+        crew.combatHit = { at: now, target, damage: hit.dealt - crew.damage, counterDamage: hit.counterDamage, killed: hit.dealt >= creatureDef(target.type).hp };
         crew.damage = hit.dealt;
         crew.hp = Math.max(0, crew.hp - hit.counterDamage);
         text = `${creatureDef(target.type).name} 교전 · HP ${crew.hp}/100`;
@@ -132,7 +135,7 @@ export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEnt
     if (spotted) {
       if (!previous.target && distanceM(before, spotted) > EXPEDITION_RADIUS_M && !text) text = `${FOCUS_LABEL[crew.focus ?? 'materials']} 단서 포착 · ${spotted.kind === 'node' ? nodeDef(spotted.type).name : creatureDef(spotted.type).name} 쪽으로 이동`;
     } else if (waypoint && distanceM(crew.pos, waypoint) < 1) {
-      crew.waypoints = crew.waypoints!.slice(1);
+      crew.waypoints = crew.waypoints?.slice(1);
     } else if (!waypoint && distanceM(crew.pos, destination) < 1) {
       if (crew.phase === 'outbound') { crew.phase = 'returning'; text = '목표 타일 도착 · 거점으로 귀환합니다'; }
       else if (repeat) {

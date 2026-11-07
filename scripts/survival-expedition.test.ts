@@ -32,6 +32,20 @@ describe('Indoor expeditions and outdoor pocket rules', () => {
     const raptor: WorldEntity = { ...home, id: 'raptor', kind: 'creature', type: 'raptor' };
     const result = advanceExpedition({ ...crew, hp: 26 }, [raptor], 2000, false, false);
     expect(result.crew.phase).toBe('returning'); expect(result.crew.hp).toBe(22);
+    expect(result.crew.combatHit?.counterDamage).toBe(4);
+    expect(result.crew.combatHit?.target.id).toBe('raptor');
+  });
+  test('strike feedback records actual damage and survives a finishing blow without duplicate loot', () => {
+    const crew = startObservedExpedition(home, offsetM(home, 180, 0), 1000, 'hunt');
+    if (!crew) throw new Error('missing crew');
+    const rabbit: WorldEntity = { ...home, id: 'rabbit', kind: 'creature', type: 'rabbit' };
+    const result = advanceExpedition(crew, [rabbit], 2000, false, false, () => 0.5);
+    expect(result.crew.combatHit?.at).toBe(2000);
+    expect(result.crew.combatHit?.damage).toBe(6);
+    expect(result.crew.combatHit?.killed).toBe(true);
+    expect(result.crew.combatHit?.counterDamage).toBe(0);
+    expect(result.crew.target).toBeUndefined();
+    expect(advanceExpedition(result.crew, [], 3000, false, false).rewards).toHaveLength(0);
   });
 });
 import { matchesFocus, patrolWaypoints, startObservedExpedition as startFocus } from '../src/lib/survival/expedition';
@@ -45,7 +59,8 @@ t2('expedition focus filters targets by theme', () => {
   e2(matchesFocus({ ...at, id: 'e', kind: 'creature', type: 'rabbit' } as never, 'materials')).toBe(false);
 });
 t2('expeditions patrol through two zig-zag waypoints', () => {
-  const crew = startFocus({ lat: 37.5, lng: 127 }, { lat: 37.5, lng: 127.002 }, 0, 'hunt')!;
+  const crew = startFocus({ lat: 37.5, lng: 127 }, { lat: 37.5, lng: 127.002 }, 0, 'hunt');
+  if (!crew) throw new Error('missing crew');
   e2(crew.focus).toBe('hunt');
   e2(crew.waypoints).toHaveLength(2);
   e2(patrolWaypoints(crew.home, crew.destination)[0].lat).not.toBe(crew.home.lat);
