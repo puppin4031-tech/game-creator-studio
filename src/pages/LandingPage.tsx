@@ -8,6 +8,7 @@ import { EXPLORATION_LOGIN_URL } from "@/lib/authNavigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { ColonionOpening } from "@/components/survival/ColonionOpening";
 import titleArt from "@/assets/colonion_title.jpg.asset.json";
+import { enterGuestSession } from '@/lib/guestEntry';
 
 function AnimatedSection({
   children,
@@ -69,19 +70,27 @@ export default function LandingPage() {
   const { user, isLoading } = useAuth();
   const [params, setParams] = useSearchParams();
   const [showSetup, setShowSetup] = useState(false);
+  const [entering, setEntering] = useState(false);
 
   // Step 2 opens automatically after login (or guest entry) returns to "/?start=1".
   useEffect(() => {
     if (params.get("start") === "1" && !isLoading) {
-      setShowSetup(true);
+      void startExploration();
       params.delete("start");
       setParams(params, { replace: true });
     }
   }, [params, setParams, user, isLoading]);
 
-  const startExploration = () => {
-    if (isLoading) return;
-    setShowSetup(true); // guests play a trial without signing up
+  const startExploration = async () => {
+    if (isLoading || entering) return;
+    setEntering(true);
+    try {
+      await enterGuestSession();
+      navigate('/play/survival');
+    } catch {
+      toast.error('간편 입장 연결이 지연됩니다. 기기 체험판으로 시작합니다.');
+      navigate('/play/survival');
+    } finally { setEntering(false); }
   };
 
   const enterWorld = (name: string) => {
@@ -121,12 +130,13 @@ export default function LandingPage() {
           transition={{ delay: 0.6, duration: 0.6 }}
         >
           <p className="mb-4 text-sm text-colonion-parchment">GPS기반 문명개척 무료게임</p>
-          <button
+          <Button
             onClick={startExploration}
+            disabled={isLoading || entering}
             className="flex h-14 w-full items-center justify-center gap-2 rounded border-2 border-colonion-wood-edge bg-gradient-to-b from-primary to-colonion-ember text-base font-bold text-colonion-night shadow-lg active:translate-y-0.5"
           >
-            {user ? "문명 개척 시작하기" : "로그인하고 탐험 시작하기"} <Play className="!h-5 !w-5 fill-current" />
-          </button>
+            {entering ? '입장 중…' : '바로 문명 개척 시작하기'} <Play className="!h-5 !w-5 fill-current" />
+          </Button>
         </motion.div>
       </section>
 

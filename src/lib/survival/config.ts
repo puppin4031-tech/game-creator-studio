@@ -17,7 +17,7 @@ export const SURVIVAL_CONFIG = {
   /** Aggressive creatures ambush the player inside this radius (m). */
   ambushRadiusM: 18,
   /** Base carry capacity (kg). */
-  baseCarryKg: 40,
+  baseCarryKg: 60,
   /** Extra carry capacity per level (kg). */
   carryPerLevelKg: 2,
   /** Max carried gear pieces (equipped included). */

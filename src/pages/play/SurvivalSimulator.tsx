@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SkillControls, ConstructionControls, CompanionControls, SkillEffect } from '@/components/survival/SurvivalAbilities';
 import CharacterSprite from '@/components/survival/CharacterSprite';
+import ExpeditionSystem, { ExpeditionMarker } from '@/components/survival/ExpeditionSystem';
 import BackpackDiscard from '@/components/survival/BackpackDiscard';
 import { BaseFortressOverlay } from '@/components/survival/BaseFortressOverlay';
 import { AltarPanel } from '@/components/survival/AltarPanel';
@@ -32,8 +33,8 @@ import { nodeDef, creatureDef } from '@/lib/survival/entities';
 import { SPRITE_META, type SpriteKey } from '@/lib/survival/spriteMeta';
 import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
 import { SURVIVAL_CONFIG as C } from '@/lib/survival/config';
-import { distanceM } from '@/lib/survival/geo';
-import { isNodeAvailable } from '@/lib/survival/world';
+import { distanceM, offsetM } from '@/lib/survival/geo';
+import { generateWorld, isNodeAvailable } from '@/lib/survival/world';
 import { AUTO_PICKUP_INTERVAL_MS, AUTO_PICKUP_RADIUS_M, hasAutoPickup } from '@/lib/survival/utilitySkills';
 import { ACTOR_IDLE_RETURN_MS, shouldReturnToCenter, type ActorTarget } from '@/lib/survival/actorPos';
 import { TECHS, isRecipeUnlocked, prerequisitesMet, techForRecipe } from '@/lib/survival/tech';
@@ -152,17 +153,27 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   };
   const navigate = useNavigate();
   const [gpsReady, setGpsReady] = useState(false);
-  const g = useSurvivalWorld(START, { enabled: !realGps || gpsReady, saveKey: realGps ? 'survival-gps-world-v1' : 'survival-world-v1', cloudSync: realGps });
+  const g = useSurvivalWorld(START, { enabled: !realGps || gpsReady, saveKey: realGps ? 'survival-gps-world-v1' : 'survival-world-v1', cloudSync: realGps, indoor: realGps });
   const gps = useSurvivalGps(realGps, g.moveTo);
   useEffect(() => setGpsReady(gps.ready), [gps.ready]);
   const { state: s } = g;
+  const [expeditionTarget, setExpeditionTarget] = useState<LatLng | null>(null);
+  const [watchExpedition, setWatchExpedition] = useState(true);
+  const crew = s.observedExpedition;
+  const observationEntities = crew ? generateWorld({ center: crew.pos, radiusM: g.vision, now: Date.now(), isNight: g.isNight, depleted: s.depleted, terrainZones: s.terrainZones, parkCells: s.parkCells }) : [];
+  const visibleEntities = [...new Map([...g.entities, ...observationEntities].map(e => [e.id, e])).values()];
+  const expeditionDestination = expeditionTarget ?? offsetM(s.base ?? s.pos, 180, 0);
+  const canDispatch = !!s.base && (!realGps || !gps.ready || g.inBase);
+  const expeditionControls = <ExpeditionSystem crew={crew} logs={s.expeditionLogs ?? []} target={expeditionTarget} home={s.base} auto={!!s.expeditionAuto} pocket={g.pocketMode} outdoor={g.outdoorMoving && (g.pocketMode || (!!crew && distanceM(s.pos, crew.pos) <= 40))} watching={watchExpedition} gpsReady={gps.ready} canSend={canDispatch}
+    onSend={() => { if (g.dispatchObserved(expeditionDestination)) { setWatchExpedition(true); setPanel('none'); } }}
+    onAuto={() => { g.toggleExpeditionAuto(expeditionDestination); setWatchExpedition(true); }} onPocket={g.togglePocket} onMorale={g.rallyExpedition} onReturn={g.recallExpedition} onWatch={() => setWatchExpedition(v => !v)} />;
   const [panel, setPanel] = useState<Panel>('none');
   const [craftCat, setCraftCat] = useState<CraftCat>('all');
   const [baseTab, setBaseTab] = useState<'lab' | 'craft' | 'storage' | 'expedition'>('lab');
 
   const onTap = (p: LatLng) => {
     if (auto.job) { auto.stop(); returnToCenter(); }
-    if (realGps) return;
+    if (realGps) { setExpeditionTarget(p); return; }
     const d = distanceM(s.pos, p);
     if (d > g.vision * 1.2) { toast('안개 속으로는 한 걸음씩 나아가세요'); return; }
     g.moveTo(p);
@@ -427,9 +438,11 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden font-pixel">
       <AnimatePresence>{showOpening && <ColonionOpening onEnter={enterWorld} />}</AnimatePresence>
-      {(!realGps || gps.fix) && <TerrainMap center={s.pos} visionM={g.vision} explored={s.explored} onTap={onTap} zone={zone} onSurfaceZone={onSurfaceZone} onSurfacePark={onSurfacePark} onLandmarks={setLandmarks} bearing={compassOn && heading !== null ? heading : 0}>
+      {<TerrainMap center={watchExpedition && crew ? crew.pos : s.pos} visionM={g.vision} explored={s.explored} onTap={onTap} zone={zone} onSurfaceZone={onSurfaceZone} onSurfacePark={onSurfacePark} onLandmarks={setLandmarks} bearing={compassOn && heading !== null ? heading : 0}>
         {(project, mpp) => (
           <>
+            {crew && <ExpeditionMarker crew={crew} project={project} />}
+            {expeditionTarget && (() => { const p = project(expeditionTarget); return <div className="pointer-events-none absolute -translate-x-1/2 -translate-y-full rounded bg-primary px-2 py-1 text-xs text-primary-foreground" style={{ left: p.x, top: p.y }}>원정 목표</div>; })()}
             {s.base && g.baseDef && (() => {
               const p = project(s.base); const r = (g.baseDef.radiusM + (s.palisade ? 15 : 0)) / mpp;
               return (
@@ -473,7 +486,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 </button>
               );
             })}
-            {g.entities.map((e) => {
+            {visibleEntities.map((e) => {
               const p = project(e);
               const sprite = e.kind === 'node' ? nodeDef(e.type).sprite : creatureDef(e.type).sprite;
               const name = e.kind === 'node' ? nodeDef(e.type).name : creatureDef(e.type).name;
@@ -552,7 +565,6 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           </>
         )}
       </TerrainMap>}
-      {realGps && !gps.fix && <div className="absolute inset-0 flex items-center justify-center bg-muted px-6 text-center text-sm">{gps.error ?? '현재 GPS 위치를 확인하고 있습니다…'}</div>}
 
       {/* Top HUD */}
       <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-background/80 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur">
@@ -576,7 +588,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       </button>
 
       {realGps && <div className="absolute left-2 right-16 top-[calc(4.5rem+env(safe-area-inset-top))] z-20 flex items-center gap-1.5">
-        <span className="min-w-0 truncate rounded bg-background/80 px-2 py-1 text-[10px]" role="status">{gps.error ? `GPS ±${gps.fix ? Math.round(gps.fix.accuracy) : '?'}m · 신호 대기` : gps.fix ? `GPS ±${Math.round(gps.fix.accuracy)}m` : 'GPS 연결 중'}</span>
+        <span className="min-w-0 truncate rounded bg-background/80 px-2 py-1 text-[10px]" role="status">{!gps.ready ? '실내 원정 가능 · 야외 GPS 대기' : `GPS ±${Math.round(gps.fix?.accuracy ?? 0)}m`}</span>
         {!gps.ready && <Button variant="outline" size="sm" className="h-9 shrink-0 px-2 text-xs" onClick={gps.retry}>재시도</Button>}
       </div>}
 
@@ -629,8 +641,9 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         </div>
       )}
 
-      <SkillQuickBar known={s.techs} cooldowns={s.cooldowns} levels={s.skillLevels} ready={actionReady} onUse={(id) => activateSkill(id)} />
-      {s.base && <button type="button" onClick={() => setPanel('quests')} className="pixel-frame absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-2 z-20 flex min-h-11 max-w-[60%] items-center gap-2 bg-card px-2.5 py-1.5 text-left text-xs">
+      {!realGps && <SkillQuickBar known={s.techs} cooldowns={s.cooldowns} levels={s.skillLevels} ready={actionReady} onUse={(id) => activateSkill(id)} />}
+      {realGps && s.base && panel === 'none' && <div className="absolute inset-x-0 bottom-0 z-20 max-h-[42dvh] overflow-y-auto pb-[env(safe-area-inset-bottom)]">{expeditionControls}</div>}
+      {!realGps && s.base && <button type="button" onClick={() => setPanel('quests')} className="pixel-frame absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-2 z-20 flex min-h-11 max-w-[60%] items-center gap-2 bg-card px-2.5 py-1.5 text-left text-xs">
         <ListChecks className="!h-4 !w-4 shrink-0" />
         <span className="min-w-0 truncate">{g.quest?.title ?? '모든 목표 완료'}</span>
         <span className="shrink-0 text-primary">{g.canClaimQuest ? '보상!' : g.questProgress ? `${g.questProgress.cur}/${g.questProgress.max}` : '완료'}</span>
@@ -729,10 +742,11 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   <div><b className="text-sm">창고</b><div className="mt-1"><Stacks stacks={s.storage} onUse={g.eat} /></div><div className="mt-2 flex flex-wrap gap-1">{s.storage.map(st => <Button key={st.itemId} variant="outline" size="sm" className="min-h-11 text-xs" disabled={!g.inBase || !actionReady} onClick={() => g.withdraw(st.itemId)}>{ITEMS[st.itemId].name} 1개 꺼내기</Button>)}</div></div>
                   </>}
                   {baseTab === 'expedition' && <>
-                  <ExpeditionPanel expedition={s.expedition} report={s.scoutReport} now={nowTick} exploredTotal={s.exploredTotal ?? s.explored.length} mark={s.expeditionMark ?? 0}
+                  {realGps && expeditionControls}
+                  {(!realGps || s.expedition) && <ExpeditionPanel expedition={s.expedition} report={s.scoutReport} now={nowTick} exploredTotal={s.exploredTotal ?? s.explored.length} mark={s.expeditionMark ?? 0}
                     foodOwned={[...s.backpack, ...s.storage].filter(x => x.itemId === 'jerky' || x.itemId === 'cooked_meat').reduce((a, x) => a + x.count, 0)}
                     canSend={g.inBase && actionReady} onSend={g.startExpedition} onClaim={g.claimExpedition}
-                    onPin={(t) => { favs.toggle({ id: `scout-${t.pos.lat.toFixed(5)}-${t.pos.lng.toFixed(5)}`, name: t.label, lat: t.pos.lat, lng: t.pos.lng }); toast('즐겨찾기에 표시했어요'); }} />
+                    onPin={(t) => { favs.toggle({ id: `scout-${t.pos.lat.toFixed(5)}-${t.pos.lng.toFixed(5)}`, name: t.label, lat: t.pos.lat, lng: t.pos.lng }); toast('즐겨찾기에 표시했어요'); }} />}
                   </>}
                 </>
               ))}

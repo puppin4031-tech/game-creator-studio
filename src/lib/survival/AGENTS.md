@@ -1,5 +1,5 @@
 - Dolmen sanctuaries: site list in sanctuarySites.ts, rules in sanctuaries.ts (pure); network state lives in WorldSave.shrines so cloud sync carries it; why: any site can be first and sacred power must persist for future uses.
-- Research, base upgrades and expeditions are real-time jobs in WorldSave (homeActivities.ts, pure); materials are paid at start and results apply only on explicit claim; expedition fuel is outside-walked map fragments so home play never replaces GPS play.
+- Research, base upgrades and legacy timed expeditions remain paid jobs in homeActivities.ts; observed level-one expeditions use expedition.ts and award to storage without changing player travel, so indoor play never earns GPS walking credits.
 - Tech levels live in WorldSave.techLevels via techLevels.ts (pure): re-researching a known tech queues the next level (max 5) with scaled cost/time, and combat/vital stats (primal strike, iron skin, giant heart, wild vitality) scale with that level; why: research must produce real growth while client and tests share identical numbers.
 - Reward walk distance counts only WorldSave.walkSteps (new explored steps at <= walkPace.ts limit); the credit RPC reads walkSteps, so vehicles/scooters never earn walk credits.
 - Notices: build-time git subjects auto-merge with HAND_NOTICES; unread key includes build id so each deploy announces itself.

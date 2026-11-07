@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MapPin, Shield } from 'lucide-react';
 import { loginAudience, loginDestination, type LoginAudience } from '@/lib/authNavigation';
+import { enterGuestSession } from '@/lib/guestEntry';
 
 const LOGIN_COPY: Record<LoginAudience, { title: string; subtitle: string; note: string; signUp: string }> = {
   player: {
@@ -47,7 +48,7 @@ export default function Login() {
 
   // Redirect if already logged in
   useEffect(() => {
-    if (!isLoading && user) {
+    if (!isLoading && user && !user.is_anonymous) {
       navigate(destination, { replace: true });
     }
   }, [user, isLoading, navigate, destination]);
@@ -96,7 +97,7 @@ export default function Login() {
     }
   };
 
-  if (!isLoading && user) return null;
+  if (!isLoading && user && !user.is_anonymous) return null;
 
   return (
     <div className="flex min-h-[100dvh] items-center justify-center px-4 py-8 pb-[max(2rem,env(safe-area-inset-bottom))]">
@@ -129,7 +130,12 @@ export default function Login() {
                 variant="outline"
                 className="w-full min-h-12"
                 disabled={loading || isLoading}
-                onClick={() => navigate('/?start=1')}
+                onClick={async () => {
+                  setLoading(true);
+                  try { await enterGuestSession(); navigate('/play/survival'); }
+                  catch { setError('간편 입장에 실패했습니다. 잠시 후 다시 시도해 주세요.'); }
+                  finally { setLoading(false); }
+                }}
               >
                 비회원으로 바로 입장하기
               </Button>

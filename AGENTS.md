@@ -3,7 +3,7 @@
 - Pioneer entry shares era availability and nickname normalization through src/lib/pioneer.ts, retaining the existing name storage key; why: character selection reuses in-game names without resetting survival progress or enabling unsupported eras.
 - Survival planning uses a server-only streaming AI Gateway Edge Function; regenerate shared rules with `bun scripts/sync-survival-ai-rules.ts` before deploying it so recommendations use the same recipes and technologies as gameplay.
 - Survival AI remains guest-accessible with a server-side request throttle; provider/credit blocks persist in server-only access state until access is restored and the block is explicitly cleared, preventing reloads from bypassing denials.
-- `/world` and `/play/survival` use actual GPS survival with no mock fallback; `/play/survival-sim` retains isolated simulator saves so test movement cannot contaminate real GPS progress.
+- GPS routes allow indoor expeditions without moving player GPS; direct/pocket actions require actual GPS, and simulator saves remain isolated to prevent false walking rewards.
 - Survival resource coordinates derive from the shared geographic seed, not the current camera/player center; GPS signal quality gates all real-world interactions and base actions to prevent remote or stale-location play.
 - Survival GPS progression reuses progression.ts and quests.ts through worldProgress.ts; persist counters and quest index with the world save, and claim rewards only at a GPS-valid base to avoid duplicate rewards or divergent rules.
 - Keep the survival screen's Fast Refresh reset directive: custom world/GPS hook updates can change hook order across modules, so preview refresh must remount from the persisted save rather than reuse stale React hook queues.

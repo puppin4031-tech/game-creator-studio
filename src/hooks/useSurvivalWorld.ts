@@ -1,4 +1,5 @@
 import { isWalkingPace } from '@/lib/survival/walkPace';
+import { advanceExpedition, expeditionLoot, isPocketMovement, startObservedExpedition, EXPEDITION_RADIUS_M, type ObservedExpedition, type ExpeditionLog } from '@/lib/survival/expedition';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,7 +17,7 @@ import { ACTIVE_SKILLS, claimResearch, startResearch, atMainBase, atWorkshop, bu
 import { advanceSurvivalVitals } from '@/lib/survival/metabolism';
 import { distanceM } from '@/lib/survival/geo';
 import { generateWorld, isNodeAvailable } from '@/lib/survival/world';
-import { addStacks, hasAll, removeStacks, splitDeathDrop, stackWeight } from '@/lib/survival/inventory';
+import { addStacks, hasAll, removeStacks, splitDeathDrop, splitByCapacity, stackWeight } from '@/lib/survival/inventory';
 import { addExperience, dayPhase, xpToNext } from '@/lib/survival/progression';
 import { claimWorldQuest, freshProgress, type WorldProgress } from '@/lib/survival/worldProgress';
 import { currentQuest, questReady, type QuestState } from '@/lib/survival/quests';
@@ -78,6 +79,11 @@ export interface WorldSave extends WorldProgress {
   researchJobs?: TimedJob[];
   baseUpgrade?: TimedJob | null;
   expedition?: Expedition | null;
+  observedExpedition?: ObservedExpedition | null;
+  expeditionAuto?: boolean;
+  expeditionLogs?: ExpeditionLog[];
+  /** Placeholder camps may be anchored once to the first accepted actual GPS fix. */
+  starterCampPending?: boolean;
   expeditionMark?: number;
   /** Lifetime explored steps; explored[] itself is capped. */
   exploredTotal?: number;
@@ -110,7 +116,7 @@ const fmt = (st: Stack[]) => st.map((s) => `${ITEMS[s.itemId].name} ×${s.count}
 const maxHpOf = (p: { techs: string[]; techLevels?: Record<string, number> }) =>
   C.baseMaxHp + (p.techs.includes('giant_heart') ? giantHeartHpBonus(techLevel(p.techLevels, 'giant_heart')) : 0);
 
-export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; saveKey?: string; cloudSync?: boolean } = {}) {
+export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; saveKey?: string; cloudSync?: boolean; indoor?: boolean } = {}) {
   const enabled = options.enabled ?? true;
   const saveKey = options.saveKey ?? SAVE_KEY;
   const { user } = useAuth();
@@ -128,6 +134,14 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, []);
   const [now, setNow] = useState(Date.now());
   const lastCreatureAttack = useRef(0);
+  const [pocketMode, setPocketMode] = useState(false);
+  const [movingUntil, setMovingUntil] = useState(0);
+  const outdoorMovingRef = useRef(0);
+
+  const ensureStarterCamp = useCallback(() => {
+    setS(p => p.base ? p : { ...p, base: { ...p.pos, level: 1, placedAt: Date.now() }, starterCampPending: true });
+  }, [setS]);
+  useEffect(() => { if (options.indoor) ensureStarterCamp(); }, [options.indoor, ensureStarterCamp]);
 
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(t); }, []);
   useEffect(() => {
@@ -169,6 +183,17 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     }, 2500);
     return () => clearTimeout(t);
   }, [s, userId]);
+
+  // Continuous one-second crew ticks must not postpone the ordinary save debounce forever.
+  useEffect(() => {
+    if (!userId || !s.observedExpedition) return;
+    const timer = window.setInterval(() => {
+      if (!cloudReadyRef.current) return;
+      void supabase.from('survival_saves').upsert({ user_id: userId, payload: ref.current as unknown as Json, updated_at: new Date().toISOString() })
+        .then(({ error }) => { if (error) console.error('[survival] expedition save failed', error); });
+    }, 15_000);
+    return () => window.clearInterval(timer);
+  }, [userId, !!s.observedExpedition]);
 
   const isNight = dayPhase(new Date(now)) === 'night';
   const vision = (isNight ? C.visionNightM : C.visionDayM) + visionBonus(s.techs);
@@ -246,9 +271,84 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const grew = explored !== p.explored;
       // Reward walking only counts new steps taken at <= 13 km/h.
       const walking = grew && prevAt > 0 && isWalkingPace(distanceM(p.pos, pos), now - prevAt);
-      return { ...p, pos, explored, exploredTotal: (p.exploredTotal ?? p.explored.length) + (grew ? 1 : 0), walkSteps: (p.walkSteps ?? 0) + (walking ? 1 : 0) };
+      if (options.indoor && prevAt > 0 && isPocketMovement(distanceM(p.pos, pos), now - prevAt)) {
+        outdoorMovingRef.current = now + 10_000;
+        setMovingUntil(now + 10_000);
+      } else if (options.indoor && prevAt > 0) {
+        outdoorMovingRef.current = 0;
+        setMovingUntil(0);
+      }
+      const anchor = p.starterCampPending && p.base && !p.observedExpedition;
+      return { ...p, pos, base: anchor ? { ...p.base, ...pos } : p.base, starterCampPending: anchor ? false : p.starterCampPending, explored, exploredTotal: (p.exploredTotal ?? p.explored.length) + (grew ? 1 : 0), walkSteps: (p.walkSteps ?? 0) + (walking ? 1 : 0) };
     });
+  }, [setS, options.indoor]);
+
+  const appendLog = (p: WorldSave, text: string, at: number): ExpeditionLog[] => [...(p.expeditionLogs ?? []), { at, text }].slice(-20);
+  const dispatchObserved = useCallback((destination: LatLng) => {
+    const p = ref.current;
+    if (!p.base || p.observedExpedition || (enabledRef.current && !atMainBase(p))) return false;
+    const crew = startObservedExpedition(p.base, destination, Date.now());
+    if (!crew) { toast.warning('거점에서 10~1,500m 이내 목표를 선택하세요'); return false; }
+    setS({ ...p, starterCampPending: false, observedExpedition: crew, expeditionLogs: appendLog(p, '원정대 출발 · 기본 전투력·보상 100%', Date.now()) });
+    return true;
   }, [setS]);
+  const toggleExpeditionAuto = useCallback((destination: LatLng) => {
+    const p = ref.current;
+    if (p.expeditionAuto) { setS({ ...p, expeditionAuto: false }); return; }
+    if (p.observedExpedition) { setS({ ...p, expeditionAuto: true }); return; }
+    if (dispatchObserved(destination)) setS(p => ({ ...p, expeditionAuto: true }));
+  }, [dispatchObserved, setS]);
+  const rallyExpedition = useCallback(() => {
+    const p = ref.current; const crew = p.observedExpedition; const at = Date.now();
+    if (!crew || at < crew.moraleReadyAt) return;
+    setS({ ...p, observedExpedition: { ...crew, moraleUntil: at + 30_000, moraleReadyAt: at + 60_000 }, expeditionLogs: appendLog(p, '사기 진작! 30초 공격력·채집 속도 상승', at) });
+  }, [setS]);
+  const recallExpedition = useCallback(() => {
+    const p = ref.current; if (!p.observedExpedition) return;
+    setS({ ...p, expeditionAuto: false, observedExpedition: null, expeditionLogs: appendLog(p, '즉시 귀환 완료 · 원정대 안전 복귀', Date.now()) });
+  }, [setS]);
+
+  useEffect(() => {
+    if (!s.observedExpedition) return;
+    const timer = window.setInterval(() => {
+      const p = ref.current; const crew = p.observedExpedition;
+      if (!crew) return;
+      const at = Date.now();
+      const outdoors = enabledRef.current && at < outdoorMovingRef.current && distanceM(p.pos, crew.pos) <= 40;
+      const nearby = generateWorld({ center: crew.pos, radiusM: 30, now: at, isNight: dayPhase(new Date(at)) === 'night', depleted: p.depleted, terrainZones: p.terrainZones, parkCells: p.parkCells });
+      const result = advanceExpedition(crew, nearby, at, outdoors, !!p.expeditionAuto);
+      let next = { ...p, observedExpedition: result.finished ? null : result.crew };
+      if (result.completed) {
+        const e = result.completed;
+        const gathered = { ...p.gathered };
+        for (const item of result.rewards) gathered[item.itemId] = (gathered[item.itemId] ?? 0) + item.count;
+        next = { ...next, storage: addStacks(p.storage, result.rewards), gathered, depleted: { ...p.depleted, [e.id]: at }, kills: p.kills + (e.kind === 'creature' ? 1 : 0), ...addExperience(p, e.kind === 'node' ? nodeDef(e.type).xp : creatureDef(e.type).xp) };
+        const learned = checkInspiration(gathered, next.techs);
+        next.techs = [...next.techs, ...learned.map(t => t.id)];
+      }
+      if (result.text) next.expeditionLogs = appendLog(p, result.text + (result.rewards.length ? ` · 창고: ${fmt(result.rewards)}` : ''), at);
+      setS(next);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [!!s.observedExpedition, setS]);
+
+  useEffect(() => {
+    if (!pocketMode) return;
+    const timer = window.setInterval(() => {
+      if (!enabledRef.current || Date.now() >= outdoorMovingRef.current) return;
+      const p = ref.current; const at = Date.now();
+      const target = generateWorld({ center: p.pos, radiusM: EXPEDITION_RADIUS_M, now: at, isNight: false, depleted: p.depleted, terrainZones: p.terrainZones }).find(e => e.kind === 'node' && nodeDef(e.type).requires.tier <= 1);
+      if (!target) return;
+      const cap = C.baseCarryKg + (p.level - 1) * C.carryPerLevelKg + ((p.base?.level ?? 0) >= 2 ? 10 : 0) + pocketBonusKg(p.techs);
+      const { fit } = splitByCapacity(expeditionLoot(target, true), cap - stackWeight(p.backpack));
+      if (!fit.length) return;
+      const gathered = { ...p.gathered };
+      for (const item of fit) gathered[item.itemId] = (gathered[item.itemId] ?? 0) + item.count;
+      const learned = checkInspiration(gathered, p.techs);
+      setS({ ...p, backpack: addStacks(p.backpack, fit), packedItems: [...new Set([...(p.packedItems ?? []), ...fit.map(x => x.itemId)])], gathered, techs: [...p.techs, ...learned.map(t => t.id)], depleted: { ...p.depleted, [target.id]: at }, ...addExperience(p, target.kind === 'node' ? nodeDef(target.type).xp : 0), expeditionLogs: appendLog(p, `포켓 자동채집 · 배낭: ${fmt(fit)}`, at) });
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [pocketMode, setS]);
 
   /** First sample wins so a cell's resource mix never flips after being seen. */
   const recordTerrainZone = useCallback((cell: string, zone: TerrainZone) => {
@@ -424,7 +524,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       return true;
     }
     delete next.damage[e.id];
-    const got = rollLoot(loot);
+    const got = options.indoor && Date.now() < outdoorMovingRef.current ? expeditionLoot(e, true) : rollLoot(loot);
     const free = capacity - stackWeight(p.backpack);
     const fits = stackWeight(got) <= free;
     next.backpack = fits ? addStacks(p.backpack, got) : p.backpack;
@@ -440,7 +540,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     next = learn(next, checkInspiration(gathered, next.techs));
     setS(next);
     return true;
-  }, [best, weapon, armor, capacity]);
+  }, [best, weapon, armor, capacity, options.indoor]);
 
   const eat = useCallback((itemId: ItemId) => {
     const it = ITEMS[itemId];
@@ -717,7 +817,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
   const updateInventionCredits = useCallback((credits: InventionCredits) => setS(p => ({ ...p, inventionCredits: credits, inventionWalkMark: credits.walkMeters === 0 ? p.walkSteps ?? 0 : p.inventionWalkMark })), [setS]);
 
-  return { craftInvention, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
+  return { ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
     recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,

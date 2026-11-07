@@ -2,3 +2,4 @@
 - Authenticated GPS invention credits and reservations are server-owned; GPS guests use local rule-based naming and credits without authenticated polling, and simulator saves stay isolated. Replace the useRewardTrigger provider for future rewarded SDKs, not UI actions.
 - Copy the pure invention.ts rules into survival-invent/rules when changing them; both sides validate facilities and physics and never derive stats from AI text.
 - Stored altars retain invention access regardless of base level; level gates apply only to new construction so older saves remain playable.
+- ExpeditionSystem uses the existing map projection and current CharacterSprite; observed camera resources are regenerated around crew position without modifying player GPS/exploration.
