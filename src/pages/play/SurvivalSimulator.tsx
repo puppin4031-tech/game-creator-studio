@@ -557,7 +557,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                             </div>;
                           })()}
                           {bubbles[presence.selfId] && <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbleView(bubbles[presence.selfId])}</span>}
-                          <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined }}><CharacterSprite action={action} height={Math.round(SPRITE_META['char-hunter'].h * PLAYER_SCALE)} /></div></HitFlash></div>
+                          <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined, opacity: crew ? 0.35 : 1, transition: 'opacity 0.3s' }}><CharacterSprite action={action} height={Math.round(SPRITE_META['char-hunter'].h * PLAYER_SCALE)} /></div></HitFlash></div>
                         </div>
                       </motion.div>
                     );
@@ -645,7 +645,6 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       )}
 
       {!realGps && <SkillQuickBar known={s.techs} cooldowns={s.cooldowns} levels={s.skillLevels} ready={actionReady} onUse={(id) => activateSkill(id)} />}
-      {realGps && s.base && panel === 'none' && <div className="absolute inset-x-0 bottom-0 z-20 max-h-[42dvh] overflow-y-auto pb-[env(safe-area-inset-bottom)]">{expeditionControls}</div>}
       {!realGps && s.base && <button type="button" onClick={() => setPanel('quests')} className="pixel-frame absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-2 z-20 flex min-h-11 max-w-[60%] items-center gap-2 bg-card px-2.5 py-1.5 text-left text-xs">
         <ListChecks className="!h-4 !w-4 shrink-0" />
         <span className="min-w-0 truncate">{g.quest?.title ?? '모든 목표 완료'}</span>
