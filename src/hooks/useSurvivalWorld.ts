@@ -1,5 +1,5 @@
 import { isWalkingPace } from '@/lib/survival/walkPace';
-import { advanceExpedition, expeditionLoot, isPocketMovement, startObservedExpedition, EXPEDITION_RADIUS_M, type ObservedExpedition, type ExpeditionLog } from '@/lib/survival/expedition';
+import { advanceExpedition, expeditionLoot, isPocketMovement, startObservedExpedition, EXPEDITION_RADIUS_M, FOCUS_LABEL, type ExpeditionFocus, type ObservedExpedition, type ExpeditionLog } from '@/lib/survival/expedition';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -284,19 +284,19 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS, options.indoor]);
 
   const appendLog = (p: WorldSave, text: string, at: number): ExpeditionLog[] => [...(p.expeditionLogs ?? []), { at, text }].slice(-20);
-  const dispatchObserved = useCallback((destination: LatLng) => {
+  const dispatchObserved = useCallback((destination: LatLng, focus: ExpeditionFocus = 'materials') => {
     const p = ref.current;
     if (!p.base || p.observedExpedition || (enabledRef.current && !atMainBase(p))) return false;
-    const crew = startObservedExpedition(p.base, destination, Date.now());
+    const crew = startObservedExpedition(p.base, destination, Date.now(), focus);
     if (!crew) { toast.warning('거점에서 10~1,500m 이내 목표를 선택하세요'); return false; }
-    setS({ ...p, starterCampPending: false, observedExpedition: crew, expeditionLogs: appendLog(p, '원정대 출발 · 기본 전투력·보상 100%', Date.now()) });
+    setS({ ...p, starterCampPending: false, observedExpedition: crew, expeditionLogs: appendLog(p, `원정대 출발 · 목표: ${FOCUS_LABEL[focus]}`, Date.now()) });
     return true;
   }, [setS]);
-  const toggleExpeditionAuto = useCallback((destination: LatLng) => {
+  const toggleExpeditionAuto = useCallback((destination: LatLng, focus: ExpeditionFocus = 'materials') => {
     const p = ref.current;
     if (p.expeditionAuto) { setS({ ...p, expeditionAuto: false }); return; }
     if (p.observedExpedition) { setS({ ...p, expeditionAuto: true }); return; }
-    if (dispatchObserved(destination)) setS(p => ({ ...p, expeditionAuto: true }));
+    if (dispatchObserved(destination, focus)) setS(p => ({ ...p, expeditionAuto: true }));
   }, [dispatchObserved, setS]);
   const rallyExpedition = useCallback(() => {
     const p = ref.current; const crew = p.observedExpedition; const at = Date.now();

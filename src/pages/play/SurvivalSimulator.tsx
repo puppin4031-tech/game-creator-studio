@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { SkillControls, ConstructionControls, CompanionControls, SkillEffect } from '@/components/survival/SurvivalAbilities';
 import CharacterSprite from '@/components/survival/CharacterSprite';
 import ExpeditionSystem, { ExpeditionMarker } from '@/components/survival/ExpeditionSystem';
+import type { ExpeditionFocus } from '@/lib/survival/expedition';
 import BackpackDiscard from '@/components/survival/BackpackDiscard';
 import { BaseFortressOverlay } from '@/components/survival/BaseFortressOverlay';
 import { AltarPanel } from '@/components/survival/AltarPanel';
@@ -160,13 +161,15 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [expeditionTarget, setExpeditionTarget] = useState<LatLng | null>(null);
   const [watchExpedition, setWatchExpedition] = useState(true);
   const crew = s.observedExpedition;
+  const [expeditionFocus, setExpeditionFocus] = useState<ExpeditionFocus>('materials');
   const observationEntities = crew ? generateWorld({ center: crew.pos, radiusM: g.vision, now: Date.now(), isNight: g.isNight, depleted: s.depleted, terrainZones: s.terrainZones, parkCells: s.parkCells }) : [];
   const visibleEntities = [...new Map([...g.entities, ...observationEntities].map(e => [e.id, e])).values()];
   const expeditionDestination = expeditionTarget ?? offsetM(s.base ?? s.pos, 180, 0);
   const canDispatch = !!s.base && (!realGps || !gps.ready || g.inBase);
   const expeditionControls = <ExpeditionSystem crew={crew} logs={s.expeditionLogs ?? []} target={expeditionTarget} home={s.base} auto={!!s.expeditionAuto} pocket={g.pocketMode} outdoor={g.outdoorMoving && (g.pocketMode || (!!crew && distanceM(s.pos, crew.pos) <= 40))} watching={watchExpedition} gpsReady={gps.ready} canSend={canDispatch}
-    onSend={() => { if (g.dispatchObserved(expeditionDestination)) { setWatchExpedition(true); setPanel('none'); } }}
-    onAuto={() => { g.toggleExpeditionAuto(expeditionDestination); setWatchExpedition(true); }} onPocket={g.togglePocket} onMorale={g.rallyExpedition} onReturn={g.recallExpedition} onWatch={() => setWatchExpedition(v => !v)} />;
+    focus={crew?.focus ?? expeditionFocus} onFocus={setExpeditionFocus}
+    onSend={() => { if (g.dispatchObserved(expeditionDestination, expeditionFocus)) { setWatchExpedition(true); setPanel('none'); } }}
+    onAuto={() => { g.toggleExpeditionAuto(expeditionDestination, expeditionFocus); setWatchExpedition(true); }} onPocket={g.togglePocket} onMorale={g.rallyExpedition} onReturn={g.recallExpedition} onWatch={() => setWatchExpedition(v => !v)} />;
   const [panel, setPanel] = useState<Panel>('none');
   const [craftCat, setCraftCat] = useState<CraftCat>('all');
   const [baseTab, setBaseTab] = useState<'lab' | 'craft' | 'storage' | 'expedition'>('lab');

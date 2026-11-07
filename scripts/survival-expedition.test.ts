@@ -27,10 +27,26 @@ describe('Indoor expeditions and outdoor pocket rules', () => {
   });
   test('pocket loot never overfills the bag', () => { const result = splitByCapacity([{ itemId: 'flint', count: 20 }], 1); expect(stackWeight(result.fit)).toBeLessThanOrEqual(1); expect(result.overflow.length).toBeGreaterThan(0); });
   test('danger triggers return instead of player damage', () => {
-    const crew = startObservedExpedition(home, offsetM(home, 180, 0), 1000);
+    const crew = startObservedExpedition(home, offsetM(home, 180, 0), 1000, 'hunt');
     if (!crew) throw new Error('missing crew');
     const raptor: WorldEntity = { ...home, id: 'raptor', kind: 'creature', type: 'raptor' };
     const result = advanceExpedition({ ...crew, hp: 26 }, [raptor], 2000, false, false);
     expect(result.crew.phase).toBe('returning'); expect(result.crew.hp).toBe(22);
   });
+});
+import { matchesFocus, patrolWaypoints, startObservedExpedition as startFocus } from '../src/lib/survival/expedition';
+import { test as t2, expect as e2 } from 'bun:test';
+t2('expedition focus filters targets by theme', () => {
+  const at = { lat: 37.5, lng: 127 };
+  e2(matchesFocus({ ...at, id: 'a', kind: 'node', type: 'berry_bush' } as never, 'survival')).toBe(true);
+  e2(matchesFocus({ ...at, id: 'b', kind: 'node', type: 'flint_rock' } as never, 'survival')).toBe(false);
+  e2(matchesFocus({ ...at, id: 'c', kind: 'node', type: 'flint_rock' } as never, 'materials')).toBe(true);
+  e2(matchesFocus({ ...at, id: 'd', kind: 'creature', type: 'rabbit' } as never, 'hunt')).toBe(true);
+  e2(matchesFocus({ ...at, id: 'e', kind: 'creature', type: 'rabbit' } as never, 'materials')).toBe(false);
+});
+t2('expeditions patrol through two zig-zag waypoints', () => {
+  const crew = startFocus({ lat: 37.5, lng: 127 }, { lat: 37.5, lng: 127.002 }, 0, 'hunt')!;
+  e2(crew.focus).toBe('hunt');
+  e2(crew.waypoints).toHaveLength(2);
+  e2(patrolWaypoints(crew.home, crew.destination)[0].lat).not.toBe(crew.home.lat);
 });
