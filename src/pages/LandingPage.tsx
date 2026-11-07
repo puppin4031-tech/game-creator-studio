@@ -81,13 +81,20 @@ export default function LandingPage() {
 
   const startExploration = () => {
     if (isLoading) return;
-    if (!user) { navigate(EXPLORATION_LOGIN_URL); return; } // step 1
-    setShowSetup(true); // step 2
+    setShowSetup(true); // guests play a trial without signing up
   };
 
   const enterWorld = (name: string) => {
     if (name) toast.success(`${name} 족장님, 구석기 시대에 오신 것을 환영합니다`);
-    navigate("/world"); // step 3; browser back returns to "/"
+    if (!user) {
+      // Guest trial: real-GPS play with a device-only save.
+      toast.info("체험판으로 시작해요. 로그인하면 진행 상황이 다른 기기에도 저장돼요.", {
+        action: { label: "로그인", onClick: () => navigate(EXPLORATION_LOGIN_URL) },
+      });
+      navigate("/play/survival");
+      return;
+    }
+    navigate("/world"); // browser back returns to "/"
   };
 
   return (
