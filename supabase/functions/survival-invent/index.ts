@@ -4,6 +4,7 @@ import { APICallError } from 'npm:ai@6';
 import { z } from 'npm:zod@3';
 import { createResponsesCall } from '../_shared/responses.ts';
 import { checkFacility, physicsSignal, masterworkChance } from './rules/invention.ts';
+import { savedAltar } from './facility-state.ts';
 
 const json = (body: object, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 const Body = z.discriminatedUnion('action', [
@@ -36,7 +37,7 @@ Deno.serve(async (request) => {
     if (body.action !== 'invent') { const r = await act(body.action); return json({ ok: !!r.ok, message: r.message, credits: credits(r) }); }
     const { data: save } = await db.from('survival_saves').select('payload').eq('user_id', auth.user.id).maybeSingle();
     const payload = save?.payload as { altar?: boolean; base?: { level?: number } } | undefined;
-    const altar = !!payload?.altar && (payload.base?.level ?? 0) >= 2;
+    const altar = savedAltar(payload);
     if (body.altar !== altar) return json({ ok: false, message: '저장된 제단 상태와 맞지 않습니다. 잠시 후 다시 시도하세요.' }, 409);
     const check = checkFacility(body, altar);
     if (!check.ok) return json({ ok: false, message: physicsSignal(body, altar).advice }, 400);

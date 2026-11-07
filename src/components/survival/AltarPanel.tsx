@@ -9,6 +9,8 @@ import { MATERIAL_PHYSICS, ANVIL_SLOTS, MAX_SLOTS, physicsSignal, masterworkChan
 import { ALTAR_COST, fallbackInventionName, type InventedItem } from '@/lib/survival/inventedItems';
 import { normalizeCredits, settleCredits, type InventionCredits } from '@/lib/survival/inventionCredits';
 import { useRewardTrigger } from '@/hooks/useRewardTrigger';
+import { useAuth } from '@/contexts/AuthContext';
+import { usesRemoteInventions } from '@/lib/survival/inventionAccess';
 import { RewardChargeModal } from './RewardChargeModal';
 import type { Stack } from '@/lib/survival/types';
 
@@ -21,7 +23,9 @@ interface Props {
   credits?: InventionCredits; walkedMeters: number; inviteUrl: string; onCredits: (c: InventionCredits) => void;
   onBuild: () => void; onInvent: (input: InventionInput, naming: { name: string; desc: string; masterwork?: boolean }) => InventedItem | null;
 }
-export function AltarPanel({ altar, baseLevel, ready, inBase, owned, inventions, remote, credits, walkedMeters, inviteUrl, onCredits, onBuild, onInvent }: Props) {
+export function AltarPanel({ altar, baseLevel, ready, inBase, owned, inventions, remote: realGps, credits, walkedMeters, inviteUrl, onCredits, onBuild, onInvent }: Props) {
+  const { user, isLoading: authLoading } = useAuth();
+  const remote = usesRemoteInventions(realGps, user?.id);
   const [cat, setCat] = useState<InventionCategory>('weapon');
   const [mats, setMats] = useState<Record<string, number>>({});
   const [heat, setHeat] = useState(false), [sacred, setSacred] = useState(false);
@@ -40,7 +44,7 @@ export function AltarPanel({ altar, baseLevel, ready, inBase, owned, inventions,
     const next = { ...m, [id]: n }; if (!n) delete next[id]; return next;
   });
   const run = async () => {
-    if (!signal.result.ok || busy || !ready || !inBase) return;
+    if (!signal.result.ok || busy || authLoading || !ready || !inBase) return;
     if (reward.credits.freeLeft + reward.credits.bonus === 0) { setCharge(true); return; }
     setBusy(true);
     try {
@@ -62,7 +66,7 @@ export function AltarPanel({ altar, baseLevel, ready, inBase, owned, inventions,
     finally { setBusy(false); }
   };
   const openHint = async () => {
-    if (busy) return; setBusy(true);
+    if (busy || authLoading) return; setBusy(true);
     try {
       if (remote) { const { data, error } = await supabase.functions.invoke('survival-invent', { body: { action: 'hint' } }); if (error || !data?.ok) throw new Error(data?.message ?? '힌트를 열지 못했습니다'); reward.setCredits(data.credits); }
       else { const cur = normalizeCredits(credits); if (cur.fragments < 3) return; onCredits({ ...cur, fragments: cur.fragments - 3 }); }
@@ -77,7 +81,7 @@ export function AltarPanel({ altar, baseLevel, ready, inBase, owned, inventions,
     <div className="flex flex-wrap gap-4 text-xs"><label className="flex min-h-11 items-center gap-2"><Flame className="!h-4 !w-4" />고열 제련<Switch checked={heat} disabled={!altar || busy} onCheckedChange={setHeat} /></label><label className="flex min-h-11 items-center gap-2"><Zap className="!h-4 !w-4" />신성 부여<Switch checked={sacred} disabled={!altar || busy} onCheckedChange={setSacred} /></label></div>
     <div className="max-h-48 space-y-1 overflow-y-auto overscroll-contain">{usable.map(id => <div key={id} className="flex items-center gap-2"><span className="min-w-0 flex-1">{name(id)} <span className="text-xs text-muted-foreground">({have(id)})</span></span><Button aria-label={`${name(id)} 빼기`} size="icon" variant="outline" className="h-11 w-11" disabled={busy || !mats[id]} onClick={() => step(id,-1)}><Minus /></Button><b className="w-6 text-center">{mats[id] ?? 0}</b><Button aria-label={`${name(id)} 올리기`} size="icon" variant="outline" className="h-11 w-11" disabled={busy || (selected.length >= slots && !mats[id]) || mats[id] >= have(id)} onClick={() => step(id,1)}><Plus /></Button></div>)}</div>
     <div className={`space-y-2 border border-border p-3 text-xs signal-${signal.kind}`} role="status"><b className="flex items-center gap-2"><Flame className="!h-6 !w-6" />{signal.kind === 'smoke' ? '회색 연기 · 불가능' : signal.kind === 'sacred' ? '푸른 신성 불꽃 · 고효율 시너지' : '주황 불꽃 · 실험 가능'}</b><p>{signal.advice}</p><p>경도 {signal.hardness} · 탄성 {signal.elasticity} · 가연성 {signal.flammability} · 예리함 {signal.sharpness} · 수량 {signal.total}</p>{signal.result.ok && <p>예상 {CATS.find(c => c.id === cat)?.effect} {signal.result.power}</p>}</div>
-    <Button className="min-h-11 h-auto w-full whitespace-normal py-2" disabled={!ready || !inBase || busy || reward.loading || (!signal.result.ok && reward.credits.freeLeft + reward.credits.bonus > 0)} onClick={reward.credits.freeLeft + reward.credits.bonus === 0 ? () => setCharge(true) : run}>{busy ? <Loader2 className="animate-spin" /> : <Sparkles />}{reward.credits.freeLeft + reward.credits.bonus === 0 ? '광고/미션 수행하고 발명권 충전' : '계시를 받아 발명하기'}</Button>
+    <Button className="min-h-11 h-auto w-full whitespace-normal py-2" disabled={!ready || !inBase || busy || authLoading || reward.loading || (!signal.result.ok && reward.credits.freeLeft + reward.credits.bonus > 0)} onClick={reward.credits.freeLeft + reward.credits.bonus === 0 ? () => setCharge(true) : run}>{busy ? <Loader2 className="animate-spin" /> : <Sparkles />}{reward.credits.freeLeft + reward.credits.bonus === 0 ? '광고/미션 수행하고 발명권 충전' : '계시를 받아 발명하기'}</Button>
     <Button variant="outline" className="min-h-11 w-full text-xs" disabled={reward.credits.fragments < 3 || busy} onClick={openHint}>시행착오 파편 {reward.credits.fragments}/3 · 레시피 힌트</Button>
     {hint && <p className="text-xs">확정 조합: 부싯돌 3 + 노끈 1 → 기초 도구. 고대 제단: 옥 2 + 수정 1 → 부적.</p>}
     {!!inventions.length && <div className="space-y-2 border-t border-border pt-2"><b>발명 기록</b>{inventions.map(inv => <div key={inv.id} className="text-xs"><b>{inv.name}{inv.masterwork ? ' · 명품' : ''}</b> · {inv.desc}<p className="text-muted-foreground">{Object.entries(inv.materials).map(([id,q]) => `${name(id)} ${q}`).join(' + ')}</p></div>)}</div>}
