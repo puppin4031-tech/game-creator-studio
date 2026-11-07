@@ -124,7 +124,18 @@ export default function Login() {
                 Google로 계속하기
               </Button>
               {error && <p className="text-sm text-destructive">{error}</p>}
-              <p className="text-center text-xs text-muted-foreground">{copy.note}</p>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full min-h-12"
+                disabled={loading || isLoading}
+                onClick={() => navigate('/?start=1')}
+              >
+                비회원으로 바로 입장하기
+              </Button>
+              <p className="text-center text-xs text-muted-foreground">
+                체험판 기록은 이 기기에만 저장돼요. {copy.note}
+              </p>
             </div>
           )}
           {audience !== 'admin' ? (

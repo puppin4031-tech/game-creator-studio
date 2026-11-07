@@ -70,9 +70,9 @@ export default function LandingPage() {
   const [params, setParams] = useSearchParams();
   const [showSetup, setShowSetup] = useState(false);
 
-  // Step 2 opens automatically after login returns to "/?start=1".
+  // Step 2 opens automatically after login (or guest entry) returns to "/?start=1".
   useEffect(() => {
-    if (params.get("start") === "1" && !isLoading && user) {
+    if (params.get("start") === "1" && !isLoading) {
       setShowSetup(true);
       params.delete("start");
       setParams(params, { replace: true });
