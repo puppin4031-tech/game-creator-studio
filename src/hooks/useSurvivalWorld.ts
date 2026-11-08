@@ -13,6 +13,7 @@ import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
 import { SURVIVAL_CONFIG as C } from '@/lib/survival/config';
 import { visionBonus, reachRadius, pocketBonusKg } from '@/lib/survival/utilitySkills';
 import { BASE_UPGRADE_MS, EXPEDITION_FOOD_COUNT, EXPEDITION_MS, expeditionRewards, mapFragments, payExpeditionFood, scoutReport, type Expedition, type ScoutTarget, type TimedJob } from '@/lib/survival/homeActivities';
+import { EGG_PICK_RADIUS_M, babyFor, eggReady, type BabyDinoId, type CarriedEgg, type EggSpawn } from '@/lib/survival/dinoEggs';
 import { ACTIVE_SKILLS, claimResearch, startResearch, atMainBase, atWorkshop, buildStructure, collectCompanionWork, prepareSkill, recruitCompanion, tameWolf, type ActiveSkill, type Companion } from '@/lib/survival/abilities';
 import { advanceSurvivalVitals } from '@/lib/survival/metabolism';
 import { distanceM } from '@/lib/survival/geo';
@@ -74,6 +75,9 @@ export interface WorldSave extends WorldProgress {
   inventionWalkMark?: number;
   /** New explored steps taken at walking pace (<= 13 km/h); fuels walk rewards. */
   walkSteps?: number;
+  /** Carried dino eggs with the walk step count at pickup. */
+  dinoEggs?: CarriedEgg[];
+  babyDinos?: BabyDinoId[];
   shrines?: ShrineState;
   researching?: TimedJob | null;
   researchJobs?: TimedJob[];
@@ -815,9 +819,30 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     setS(p => ({ ...p, equipped: equipInSlot(p.equipped, slot, uid) }));
   }, [setS]);
 
+  const pickEgg = useCallback((egg: EggSpawn) => {
+    const p = ref.current;
+    if (!enabledRef.current) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return false; }
+    if (p.depleted[egg.id]) return false;
+    if (distanceM(p.pos, egg) > EGG_PICK_RADIUS_M) { toast.warning(`${EGG_PICK_RADIUS_M}m 안으로 다가가세요`); return false; }
+    setS({ ...p, backpack: addStacks(p.backpack, [{ itemId: 'dino_egg', count: 1 }]), depleted: { ...p.depleted, [egg.id]: Date.now() },
+      dinoEggs: [...(p.dinoEggs ?? []), { id: egg.id, startSteps: p.walkSteps ?? 0 }] });
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(200);
+    toast.success('신비한 픽셀 공룡 알을 주웠어요!', { description: '300m를 걸은 뒤 거점에 오면 부화해요.' });
+    return true;
+  }, [setS]);
+  const hatchEgg = useCallback((eggId: string) => {
+    const p = ref.current;
+    const egg = (p.dinoEggs ?? []).find(e => e.id === eggId);
+    if (!egg || !inBase || !eggReady(egg, p.walkSteps ?? 0)) return null;
+    const fromPack = removeStacks(p.backpack, [{ itemId: 'dino_egg', count: 1 }]);
+    const fromStore = fromPack ? null : removeStacks(p.storage, [{ itemId: 'dino_egg', count: 1 }]);
+    const baby = babyFor(egg.id);
+    setS({ ...p, backpack: fromPack ?? p.backpack, storage: fromStore ?? p.storage, dinoEggs: (p.dinoEggs ?? []).filter(e => e.id !== eggId), babyDinos: [...(p.babyDinos ?? []), baby.id] });
+    return baby;
+  }, [setS, inBase]);
   const updateInventionCredits = useCallback((credits: InventionCredits) => setS(p => ({ ...p, inventionCredits: credits, inventionWalkMark: credits.walkMeters === 0 ? p.walkSteps ?? 0 : p.inventionWalkMark })), [setS]);
 
-  return { ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
+  return { pickEgg, hatchEgg, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
     recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,

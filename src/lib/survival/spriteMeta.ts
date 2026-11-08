@@ -39,6 +39,7 @@ export const SPRITE_META = {
   'item-bone-plate': { w: 32, h: 32 },
   'item-bone-charm': { w: 32, h: 32 },
   'item-quartz-charm': { w: 32, h: 32 },
+  'item-dino-egg': { w: 32, h: 32 },
   'item-herb': { w: 32, h: 32 },
   'item-hide-armor': { w: 32, h: 32 },
   'item-hide': { w: 32, h: 32 },

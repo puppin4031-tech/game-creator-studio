@@ -12,6 +12,7 @@ import { useRewardTrigger } from '@/hooks/useRewardTrigger';
 import { useAuth } from '@/contexts/AuthContext';
 import { usesRemoteInventions } from '@/lib/survival/inventionAccess';
 import { RewardChargeModal } from './RewardChargeModal';
+import { WinterRecipeHints } from './WinterRecipeHints';
 import type { Stack } from '@/lib/survival/types';
 
 const CATS: { id: InventionCategory; label: string; effect: string }[] = [
@@ -76,6 +77,7 @@ export function AltarPanel({ altar, baseLevel, ready, inBase, owned, inventions,
   return <div className="space-y-3 text-sm">
     <div className="flex flex-wrap items-center justify-between gap-2"><b>{altar ? '고대 제단' : '기초 돌모루'} · {slots}슬롯</b><span className="flex items-center gap-1" aria-label="발명권"><Zap className="!h-4 !w-4 text-accent" />{reward.credits.freeLeft}/5 {reward.credits.bonus > 0 && `+${reward.credits.bonus}`}</span></div>
     {!altar && <div className="space-y-2 border-b border-border pb-3 text-xs"><p>개인 제단 · 4슬롯 · 고열 제련 · 신성 부여 · 명품 확률 3배</p><p>재료: {ALTAR_COST.map(c => `${name(c.itemId)} ${c.count}`).join(' · ')}</p><Button className="h-11 w-full" disabled={baseLevel < 2 || !ready || !inBase || !ALTAR_COST.every(c => have(c.itemId) >= c.count)} onClick={onBuild}>{baseLevel < 2 ? '뼈 움막 완공 후 제단 건설' : '개인 제단 건설'}</Button></div>}
+    <WinterRecipeHints have={have} />
     <div className="grid grid-cols-4 gap-1">{CATS.map(c => <Button key={c.id} size="sm" variant={cat === c.id ? 'default' : 'outline'} disabled={!altar && !['tool','weapon'].includes(c.id) || busy} className="h-11 px-1" onClick={() => setCat(c.id)}>{c.label}</Button>)}</div>
     <div className="grid grid-cols-4 gap-2">{Array.from({length:4},(_,i) => <div key={i} className={`flex h-16 items-center justify-center border border-border text-center text-xs ${i >= slots ? 'bg-muted text-muted-foreground' : 'bg-card'}`}>{i >= slots ? '제단 해금' : selected[i] ? `${name(selected[i])} ×${mats[selected[i]]}` : '빈 슬롯'}</div>)}</div>
     <div className="flex flex-wrap gap-4 text-xs"><label className="flex min-h-11 items-center gap-2"><Flame className="!h-4 !w-4" />고열 제련<Switch checked={heat} disabled={!altar || busy} onCheckedChange={setHeat} /></label><label className="flex min-h-11 items-center gap-2"><Zap className="!h-4 !w-4" />신성 부여<Switch checked={sacred} disabled={!altar || busy} onCheckedChange={setSacred} /></label></div>

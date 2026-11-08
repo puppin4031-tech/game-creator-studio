@@ -5,6 +5,8 @@ import { SkillControls, ConstructionControls, CompanionControls, SkillEffect } f
 import CharacterSprite from '@/components/survival/CharacterSprite';
 import WinterThemeOverlay from '@/components/WinterThemeOverlay';
 import { Snowflake } from 'lucide-react';
+import DinoEggHatchModal, { EGG_ART } from '@/components/survival/DinoEggHatchModal';
+import { EGG_HATCH_M, EGG_SPAWN_RADIUS_M, eggReady, eggSpawnsNear, eggWalkedM, type BabyDinoId } from '@/lib/survival/dinoEggs';
 import CreatureSprite from '@/components/survival/CreatureSprite';
 import ExpeditionSystem, { ExpeditionMarker } from '@/components/survival/ExpeditionSystem';
 import { CombatImpact, CREATURE_RING_RADIUS_M, expeditionActorPoint, freshCombatHit, useExpeditionCombatSound } from '@/components/survival/ExpeditionCombat';
@@ -304,6 +306,15 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   // Beasts inside 10m (or chasing after being hit) strike the player first.
   const [aggroIds, setAggroIds] = useState<Set<string>>(() => new Set());
   const winterOn = gameSettings.winter;
+  const [hatched, setHatched] = useState<{ id: BabyDinoId; name: string } | null>(null);
+  const eggSpawns = useMemo(() => realGps && !g.inBase ? eggSpawnsNear(s.pos, s.depleted, Date.now()).filter(e => distanceM(s.pos, e) <= EGG_SPAWN_RADIUS_M) : [],
+    [realGps, g.inBase, s.pos, s.depleted]); // eslint-disable-line react-hooks/exhaustive-deps
+  const readyEgg = (s.dinoEggs ?? []).find(e => eggReady(e, s.walkSteps ?? 0));
+  useEffect(() => {
+    if (!readyEgg || !g.inBase || hatched || (realGps && !gps.ready)) return;
+    const baby = g.hatchEgg(readyEgg.id);
+    if (baby) setHatched(baby);
+  }, [readyEgg?.id, g.inBase, hatched]); // eslint-disable-line react-hooks/exhaustive-deps
   const [beastStrike, setBeastStrike] = useState<{ id: string; at: number } | null>(null);
   const lastBeastStrike = useRef(0);
   useEffect(() => {
@@ -455,6 +466,11 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         {(project, mpp) => (
           <>
             {crew && <ExpeditionMarker crew={crew} project={project} />}
+            {eggSpawns.map(egg => { const p = project(egg); return (
+              <button key={egg.id} type="button" aria-label="신비한 픽셀 공룡 알" onClick={ev => { ev.stopPropagation(); g.pickEgg(egg); }}
+                className="pointer-events-auto absolute z-10 flex min-h-11 min-w-11 -translate-x-1/2 -translate-y-full items-center justify-center" style={{ left: p.x, top: p.y }}>
+                <motion.img src={EGG_ART} alt="" className="pixelated h-10 w-10 drop-shadow-[0_0_8px_hsl(var(--accent))]" animate={reducedMotion ? undefined : { y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 1.4 }} />
+              </button>); })}
             {expeditionTarget && (() => { const p = project(expeditionTarget); return <div className="pointer-events-none absolute -translate-x-1/2 -translate-y-full rounded bg-primary px-2 py-1 text-xs text-primary-foreground" style={{ left: p.x, top: p.y }}>원정 목표</div>; })()}
             {s.base && g.baseDef && (() => {
               const p = project(s.base); const r = (g.baseDef.radiusM + (s.palisade ? 15 : 0)) / mpp;
@@ -596,6 +612,10 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       </TerrainMap>}
 
       {winterOn && <WinterThemeOverlay />}
+      {!!s.dinoEggs?.length && <div className="pointer-events-none absolute bottom-[calc(7rem+env(safe-area-inset-bottom))] left-2 z-20 flex items-center gap-1 rounded bg-card/90 px-2 py-1 text-xs" aria-label="공룡 알 부화 진행">
+        <img src={EGG_ART} alt="" className="pixelated h-6 w-6" />알 {s.dinoEggs.length}개 · {Math.min(EGG_HATCH_M, Math.max(...s.dinoEggs.map(e => eggWalkedM(e, s.walkSteps ?? 0))))}/{EGG_HATCH_M}m
+        {readyEgg && !g.inBase && <b className="text-primary"> · 거점으로!</b>}</div>}
+      <DinoEggHatchModal baby={hatched} onClose={() => setHatched(null)} />
       {/* Top HUD */}
       <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-background/80 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur">
         <GameMenu loggedIn={!!user} onExit={() => navigate(realGps ? '/' : '/play')}

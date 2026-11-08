@@ -4,3 +4,4 @@
 - Reward walk distance counts only WorldSave.walkSteps (new explored steps at <= walkPace.ts limit); the credit RPC reads walkSteps, so vehicles/scooters never earn walk credits.
 - Notices: build-time git subjects auto-merge with HAND_NOTICES; unread key includes build id so each deploy announces itself.
 - Worn gear goes through equipment.ts slots (weapon, two tools, armor, trinket; level-gated); only resolveLoadout gear affects combat/gathering; why: carried spares must not stack stats.
+- Dino eggs: spawn/hatch rules live in pure dinoEggs.ts (geographic seed, 24h respawn via depleted); hatch distance counts only WorldSave.walkSteps and hatching needs the base; why: rides walking-pace rules so vehicles can't hatch eggs.
