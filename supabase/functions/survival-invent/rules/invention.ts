@@ -15,6 +15,8 @@ export interface MaterialPhysics {
 
 export const MATERIAL_PHYSICS: Record<string, MaterialPhysics> = {
   branch:       { hardness: 2, toughness: 4, sharpness: 1, binding: 1, mass: 2, mystic: 0, color: '#8b5a2b' },
+  frost_pelt:   { hardness: 1, toughness: 7, sharpness: 0, binding: 3, mass: 2, mystic: 1, color: '#e2e8f0' },
+  frost_shard:  { hardness: 6, toughness: 2, sharpness: 7, binding: 0, mass: 3, mystic: 2, color: '#bae6fd' },
   log:          { hardness: 3, toughness: 6, sharpness: 0, binding: 0, mass: 7, mystic: 0, color: '#6b4423' },
   fiber:        { hardness: 0, toughness: 3, sharpness: 0, binding: 6, mass: 0, mystic: 0, color: '#a3b18a' },
   cordage:      { hardness: 1, toughness: 5, sharpness: 0, binding: 9, mass: 0, mystic: 0, color: '#c2a878' },

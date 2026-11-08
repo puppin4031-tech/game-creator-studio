@@ -28,7 +28,7 @@ export default function GameMenu({ onExit, onLogout, loggedIn }: Props) {
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [unread, setUnread] = useState(hasUnreadNotice);
   const s = useGameSettings();
-  const Row = ({ label, hint, k }: { label: string; hint: string; k: 'bgm' | 'sfx' | 'haptic' }) => (
+  const Row = ({ label, hint, k }: { label: string; hint: string; k: 'bgm' | 'sfx' | 'haptic' | 'winter' }) => (
     <label className="flex min-h-11 items-center justify-between gap-3">
       <span><b className="block text-sm">{label}</b><span className="text-xs text-muted-foreground">{hint}</span></span>
       <Switch checked={s[k]} onCheckedChange={(v) => { saveSettings({ [k]: v }); if (k === 'sfx' && v) playSfx('notify'); if (k === 'haptic' && v) haptic(80); }} />
@@ -74,6 +74,7 @@ export default function GameMenu({ onExit, onLogout, loggedIn }: Props) {
                 ))}
               </div>
             </div>
+            <Row k="winter" label="겨울 눈 효과" hint="끄면 눈 내림 애니메이션을 멈춰 배터리를 아껴요" />
             <Row k="haptic" label="진동" hint="주머니 속에서도 위험·공격·알림을 진동으로" />
             <label className="flex min-h-11 items-center justify-between gap-3">
               <span><b className="block text-sm">알림</b><span className="text-xs text-muted-foreground">연구 완료·원정대 귀환·공격·전투 신청을 알림으로</span></span>

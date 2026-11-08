@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SkillControls, ConstructionControls, CompanionControls, SkillEffect } from '@/components/survival/SurvivalAbilities';
 import CharacterSprite from '@/components/survival/CharacterSprite';
+import WinterThemeOverlay from '@/components/WinterThemeOverlay';
+import { Snowflake } from 'lucide-react';
 import CreatureSprite from '@/components/survival/CreatureSprite';
 import ExpeditionSystem, { ExpeditionMarker } from '@/components/survival/ExpeditionSystem';
 import { CombatImpact, CREATURE_RING_RADIUS_M, expeditionActorPoint, freshCombatHit, useExpeditionCombatSound } from '@/components/survival/ExpeditionCombat';
@@ -301,6 +303,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   useEffect(() => { if (hit.n > 0) { playSample('strike'); haptic(120); if (document.hidden) sendNotice('짐승의 공격!', '거점 밖에서 짐승에게 공격받고 있어요', 'beast-hit'); } }, [hit.n]);
   // Beasts inside 10m (or chasing after being hit) strike the player first.
   const [aggroIds, setAggroIds] = useState<Set<string>>(() => new Set());
+  const winterOn = gameSettings.winter;
   const [beastStrike, setBeastStrike] = useState<{ id: string; at: number } | null>(null);
   const lastBeastStrike = useRef(0);
   useEffect(() => {
@@ -592,6 +595,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         )}
       </TerrainMap>}
 
+      {winterOn && <WinterThemeOverlay />}
       {/* Top HUD */}
       <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-background/80 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur">
         <GameMenu loggedIn={!!user} onExit={() => navigate(realGps ? '/' : '/play')}
@@ -602,6 +606,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         </div>
         <div className="text-right text-[11px] leading-tight">
           <div>{g.isNight ? '밤' : '낮'} · {TERRAIN_ZONE_LABEL[zone]}{inPark ? ' · 공원(짐승 多)' : ''}{g.inSanctuary ? ' · 성소(안전)' : ''} · 시야 {g.vision}m</div>
+          <div className="inline-flex items-center gap-0.5 rounded bg-primary/15 px-1 font-bold text-primary"><Snowflake className="!h-3 !w-3" />혹한기 구석기 시즌: 동토의 개척자</div>
           <div>배낭 {g.weight}/{g.capacity}kg</div>
           <div aria-label="성장 진행도">족장 {presence.name} · Lv.{s.level} · XP {s.xp}/{g.nextLevelXp}</div>
         </div>

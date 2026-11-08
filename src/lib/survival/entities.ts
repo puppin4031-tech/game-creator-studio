@@ -104,8 +104,8 @@ export const NODES = {
     biomes: { forest: 4, rocky: 1 },
   },
   hematite_rock: {
-    name: '적철석 바위', sprite: 'node-hematite', hp: 5, requires: { kind: 'mine', tier: 1 },
-    loot: [{ itemId: 'ochre', min: 1, max: 2 }, { itemId: 'flint', min: 0, max: 1 }], xp: 10, respawnMin: 40,
+    name: '얼어붙은 빙결석', sprite: 'node-hematite', hp: 5, requires: { kind: 'mine', tier: 1 },
+    loot: [{ itemId: 'ochre', min: 1, max: 2 }, { itemId: 'frost_shard', min: 1, max: 1 }, { itemId: 'flint', min: 0, max: 1 }], xp: 10, respawnMin: 40,
     biomes: { rocky: 3, plains: 1 },
   },
   quartz_vein: {
@@ -149,8 +149,8 @@ export const CREATURES = {
     biomes: { rocky: 3, forest: 1, plains: 1 }, nightWeight: 1.4,
   },
   mammoth: {
-    name: '매머드', sprite: 'mob-mammoth', hp: 90, atk: 10, temper: 'neutral',
-    loot: [{ itemId: 'raw_meat', min: 6, max: 8 }, { itemId: 'hide', min: 4, max: 5 }, { itemId: 'tusk', min: 2, max: 2 }, { itemId: 'bone', min: 4, max: 5 }], xp: 130,
+    name: '눈보라 털매머드', sprite: 'mob-mammoth', hp: 90, atk: 10, temper: 'neutral',
+    loot: [{ itemId: 'frost_pelt', min: 1, max: 2 }, { itemId: 'raw_meat', min: 6, max: 8 }, { itemId: 'hide', min: 4, max: 5 }, { itemId: 'tusk', min: 2, max: 2 }, { itemId: 'bone', min: 4, max: 5 }], xp: 130,
     biomes: { wetland: 1.2, plains: 0.8, rocky: 0.6 }, nightWeight: 0.6,
   },
   boss_direwolf: {

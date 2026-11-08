@@ -69,6 +69,8 @@ export const ITEMS = def({
   salve: { name: '약초 연고', desc: '체력 +40', category: 'processed', rarity: 'rare', weight: 0.25, sprite: 'item-salve', heal: 40 },
   // ── Boss trophies & rare drops
   ancient_fang: { name: '고대의 송곳니', desc: '우두머리의 송곳니. 최상급 무기 재료.', category: 'material', rarity: 'epic', weight: 0.5, sprite: 'item-tusk' },
+  frost_pelt: { name: '혹한의 모피', desc: '눈보라 털매머드의 두꺼운 겨울 모피.', category: 'material', rarity: 'rare', weight: 1.5, sprite: 'item-hide' },
+  frost_shard: { name: '빙결석 조각', desc: '얼어붙은 돌. 제단에서 얼음 창·썰매 발명 재료.', category: 'ore', rarity: 'uncommon', weight: 1, sprite: 'item-quartz' },
   prime_pelt: { name: '우두머리 털가죽', desc: '두껍고 윤기 나는 최상급 가죽.', category: 'material', rarity: 'rare', weight: 1.5, sprite: 'item-hide' },
   alpha_heart: { name: '야수의 심장', desc: '허기 +30 · 체력 +30', category: 'food', rarity: 'epic', weight: 0.5, sprite: 'item-raw-meat', food: { hunger: 30, hp: 30 } },
   taming_snare: { name: '가죽 올가미', desc: '짐승을 길들일 때 쓰는 테이밍 도구.', category: 'processed', rarity: 'rare', weight: 0.5, sprite: 'item-cordage' },

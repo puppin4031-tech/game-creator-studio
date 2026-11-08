@@ -12,6 +12,7 @@ export const BaseFortressOverlay = memo(function BaseFortressOverlay({ baseLevel
       <path d="M9 55h15M72 55h15M27 80h42" stroke="var(--fortress-wood)" strokeWidth="4" />
     </svg>}
     <img className="fortress-main pixelated" src={baseLevel >= 2 ? hut : campfire} alt="" />
+    {baseLevel < 2 && <svg className="pointer-events-none absolute bottom-0 left-1/2 w-16 -translate-x-1/2" viewBox="0 0 32 6" aria-hidden shapeRendering="crispEdges"><path d="M0 6h8V4h2V3h4v3h4V4h2V2h4v2h2v2h6V4h-2V3h-4v3" fill="hsl(var(--snow))" /></svg>}
     {hasAltar ? <><img className="fortress-facility pixelated" src={altar} alt="" /><span className="fortress-fire text-accent"><span /></span></> : <svg className="fortress-facility" viewBox="0 0 32 32" aria-hidden shapeRendering="crispEdges"><path d="M8 28h19v-5H8zM11 23h12v-8H11zM4 9h24v7H8L4 12z" fill="var(--fortress-stone)" stroke="var(--fortress-stone-edge)" strokeWidth="2" /></svg>}
   </div>;
 });
