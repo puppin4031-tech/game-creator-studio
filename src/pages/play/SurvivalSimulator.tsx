@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SkillControls, ConstructionControls, CompanionControls, SkillEffect } from '@/components/survival/SurvivalAbilities';
 import CharacterSprite from '@/components/survival/CharacterSprite';
+import CreatureSprite from '@/components/survival/CreatureSprite';
 import ExpeditionSystem, { ExpeditionMarker } from '@/components/survival/ExpeditionSystem';
 import { CombatImpact, CREATURE_RING_RADIUS_M, expeditionActorPoint, freshCombatHit, useExpeditionCombatSound } from '@/components/survival/ExpeditionCombat';
 import type { ExpeditionFocus } from '@/lib/survival/expedition';
@@ -300,6 +301,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   useEffect(() => { if (hit.n > 0) { playSample('strike'); haptic(120); if (document.hidden) sendNotice('짐승의 공격!', '거점 밖에서 짐승에게 공격받고 있어요', 'beast-hit'); } }, [hit.n]);
   // Beasts inside 10m (or chasing after being hit) strike the player first.
   const [aggroIds, setAggroIds] = useState<Set<string>>(() => new Set());
+  const [beastStrike, setBeastStrike] = useState<{ id: string; at: number } | null>(null);
   const lastBeastStrike = useRef(0);
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -310,6 +312,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       const near = hostile.sort((a, b) => distanceM(p.pos, a) - distanceM(p.pos, b))[0];
       if (!near || near.kind !== 'creature' || t - lastBeastStrike.current < BEAST_STRIKE_INTERVAL_MS) return;
       lastBeastStrike.current = t;
+      setBeastStrike({ id: near.id, at: t });
       const def = creatureDef(near.type);
       w.takeDamage(def.atk);
       toast.error(`${def.name}이(가) 먼저 공격했습니다! 공격하거나 도망치세요`);
@@ -523,7 +526,10 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       return { x: 0, y: e.kind === 'creature' ? [0, -3, 0] : 0 };
                     })()}
                     transition={combatHit ? { duration: 0.7, times: [0, 0.25, 0.65, 1] } : aggroIds.has(e.id) && !reducedMotion ? { repeat: Infinity, duration: 1.2 } : dmg ? { duration: 0.35 } : { repeat: reducedMotion ? 0 : Infinity, duration: 0.8 }}>
-                    <div className={boss ? 'scale-150 rounded-full ring-2 ring-destructive shadow-[0_0_18px_hsl(var(--destructive))]' : ''}><Sprite k={sprite} /></div>
+                    <div className={boss ? 'scale-150 rounded-full ring-2 ring-destructive shadow-[0_0_18px_hsl(var(--destructive))]' : ''}>{e.kind === 'creature'
+                      ? <CreatureSprite key={e.type} type={e.type} fallbackUrl={url(sprite)} width={SPRITE_META[sprite].w} height={SPRITE_META[sprite].h}
+                          attacking={!!combatHit?.counterDamage || (beastStrike?.id === e.id && Date.now() - beastStrike.at < 1000)} />
+                      : <Sprite k={sprite} />}</div>
                   </motion.div>{combatHit && <CombatImpact stamp={combatHit.at} damage={combatHit.damage} />}</div>
                   {(s.calmUntil?.[e.id] ?? 0) > Date.now() && <span className="bg-primary text-[10px] text-primary-foreground">진정됨</span>}
                   {boss ? <span className="mt-2 rounded bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">우두머리</span> : null}

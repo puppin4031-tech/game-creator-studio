@@ -10,9 +10,12 @@ import { Slider } from '@/components/ui/slider';
 import SpriteAnimator from '@/components/survival/SpriteAnimator';
 import { SPRITE_ACTIONS, SPRITE_ACTION_LABELS, SPRITE_BUCKET, useSpriteAnimations, type SpriteAction } from '@/hooks/useSpriteAnimations';
 
-const CHARACTER = 'hunter';
+import { CREATURES } from '@/lib/survival/entities';
 
-function ActionCard({ action }: { action: SpriteAction }) {
+const TARGETS = [{ key: 'hunter', label: '플레이어 캐릭터' }, ...Object.entries(CREATURES).map(([k, c]) => ({ key: `mob:${k}`, label: `몹 · ${c.name}` }))];
+const MOB_ACTIONS: SpriteAction[] = ['idle', 'attack'];
+
+function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARACTER: string }) {
   const qc = useQueryClient();
   const { data } = useSpriteAnimations(CHARACTER);
   const current = data?.[action];
@@ -34,7 +37,7 @@ function ActionCard({ action }: { action: SpriteAction }) {
     try {
       let path = current?.image_path;
       if (file) {
-        path = `${CHARACTER}/${action}-${Date.now()}.${file.name.split('.').pop() ?? 'png'}`;
+        path = `${CHARACTER.replace(':', '-')}/${action}-${Date.now()}.${file.name.split('.').pop() ?? 'png'}`;
         const { error } = await supabase.storage.from(SPRITE_BUCKET).upload(path, file, { contentType: file.type });
         if (error) throw error;
       }
@@ -86,14 +89,19 @@ function ActionCard({ action }: { action: SpriteAction }) {
 }
 
 export default function SpriteAssets() {
+  const [target, setTarget] = useState('hunter');
+  const actions = target === 'hunter' ? SPRITE_ACTIONS : MOB_ACTIONS;
   return (
     <div className="space-y-4 p-4">
       <div>
-        <h1 className="text-2xl font-bold">캐릭터 애니메이션</h1>
+        <h1 className="text-2xl font-bold">캐릭터·몹 애니메이션</h1>
         <p className="text-sm text-muted-foreground">프레임을 가로 한 줄로 이어 붙인 스프라이트 시트(PNG/WebP)를 올리세요. 모든 프레임은 같은 너비여야 합니다.</p>
       </div>
+      <select aria-label="대상 선택" className="min-h-11 w-full max-w-xs rounded-md border bg-background px-3" value={target} onChange={e => setTarget(e.target.value)}>
+        {TARGETS.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+      </select>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {SPRITE_ACTIONS.map(a => <ActionCard key={a} action={a} />)}
+        {actions.map(a => <ActionCard key={`${target}-${a}`} action={a} CHARACTER={target} />)}
       </div>
     </div>
   );
