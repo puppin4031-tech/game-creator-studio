@@ -102,8 +102,11 @@ export function playSample(id: SampleId) {
   });
 }
 
-export type SfxId = 'hit' | 'warn' | 'notify' | 'emote';
+export type SfxId = 'hit' | 'warn' | 'notify' | 'emote' | 'crack' | 'burst' | 'fanfare';
 const SFX: Record<SfxId, { f: number[]; type: OscillatorType; dur: number }> = {
+  crack: { f: [1800, 1200], type: 'square', dur: 0.04 },
+  burst: { f: [300, 600, 1200], type: 'sawtooth', dur: 0.07 },
+  fanfare: { f: [523, 659, 784, 1047], type: 'triangle', dur: 0.14 },
   hit: { f: [140, 70], type: 'square', dur: 0.12 },
   warn: { f: [880, 440, 880, 440], type: 'sawtooth', dur: 0.12 },
   notify: { f: [660, 990], type: 'triangle', dur: 0.1 },
