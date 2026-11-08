@@ -6,7 +6,8 @@ import CharacterSprite from '@/components/survival/CharacterSprite';
 import WinterThemeOverlay from '@/components/WinterThemeOverlay';
 import { Snowflake } from 'lucide-react';
 import DinoEggHatchModal, { EGG_ART } from '@/components/survival/DinoEggHatchModal';
-import { EGG_HATCH_M, EGG_SPAWN_RADIUS_M, eggReady, eggSpawnsNear, eggWalkedM, type BabyDinoId } from '@/lib/survival/dinoEggs';
+import { EGG_SPAWN_RADIUS_M, eggNeedM, eggReady, eggSpawnsNear, eggWalkedM } from '@/lib/survival/dinoEggs';
+import { useCustomCatalog } from '@/hooks/useCustomCatalog';
 import CreatureSprite from '@/components/survival/CreatureSprite';
 import ExpeditionSystem, { ExpeditionMarker } from '@/components/survival/ExpeditionSystem';
 import { CombatImpact, CREATURE_RING_RADIUS_M, expeditionActorPoint, freshCombatHit, useExpeditionCombatSound } from '@/components/survival/ExpeditionCombat';
@@ -306,7 +307,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   // Beasts inside 10m (or chasing after being hit) strike the player first.
   const [aggroIds, setAggroIds] = useState<Set<string>>(() => new Set());
   const winterOn = gameSettings.winter;
-  const [hatched, setHatched] = useState<{ id: BabyDinoId; name: string } | null>(null);
+  useCustomCatalog();
+  const [hatched, setHatched] = useState<{ id: string; name: string; custom?: boolean } | null>(null);
   const eggSpawns = useMemo(() => realGps && !g.inBase ? eggSpawnsNear(s.pos, s.depleted, Date.now()).filter(e => distanceM(s.pos, e) <= EGG_SPAWN_RADIUS_M) : [],
     [realGps, g.inBase, s.pos, s.depleted]); // eslint-disable-line react-hooks/exhaustive-deps
   const readyEgg = (s.dinoEggs ?? []).find(e => eggReady(e, s.walkSteps ?? 0));
@@ -613,7 +615,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
       {winterOn && <WinterThemeOverlay />}
       {!!s.dinoEggs?.length && <div className="pointer-events-none absolute bottom-[calc(7rem+env(safe-area-inset-bottom))] left-2 z-20 flex items-center gap-1 rounded bg-card/90 px-2 py-1 text-xs" aria-label="공룡 알 부화 진행">
-        <img src={EGG_ART} alt="" className="pixelated h-6 w-6" />알 {s.dinoEggs.length}개 · {Math.min(EGG_HATCH_M, Math.max(...s.dinoEggs.map(e => eggWalkedM(e, s.walkSteps ?? 0))))}/{EGG_HATCH_M}m
+        <img src={EGG_ART} alt="" className="pixelated h-6 w-6" />알 {s.dinoEggs.length}개 · {(() => { const e = [...s.dinoEggs].sort((a, b) => (eggNeedM(a) - eggWalkedM(a, s.walkSteps ?? 0)) - (eggNeedM(b) - eggWalkedM(b, s.walkSteps ?? 0)))[0]; return `${Math.min(eggNeedM(e), eggWalkedM(e, s.walkSteps ?? 0))}/${eggNeedM(e)}m`; })()}
         {readyEgg && !g.inBase && <b className="text-primary"> · 거점으로!</b>}</div>}
       <DinoEggHatchModal baby={hatched} onClose={() => setHatched(null)} />
       {/* Top HUD */}

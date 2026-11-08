@@ -15,7 +15,7 @@ import { CREATURES } from '@/lib/survival/entities';
 const TARGETS = [{ key: 'hunter', label: '플레이어 캐릭터' }, ...Object.entries(CREATURES).map(([k, c]) => ({ key: `mob:${k}`, label: `몹 · ${c.name}` }))];
 const MOB_ACTIONS: SpriteAction[] = ['idle', 'attack'];
 
-function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARACTER: string }) {
+export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARACTER: string }) {
   const qc = useQueryClient();
   const { data } = useSpriteAnimations(CHARACTER);
   const current = data?.[action];

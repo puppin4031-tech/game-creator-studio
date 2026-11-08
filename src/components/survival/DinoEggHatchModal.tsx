@@ -5,16 +5,20 @@ import baby_raptor from '@/assets/survival/dinos/baby_raptor.png';
 import mini_triceratops from '@/assets/survival/dinos/mini_triceratops.png';
 import baby_stego from '@/assets/survival/dinos/baby_stego.png';
 import baby_ptera from '@/assets/survival/dinos/baby_ptera.png';
-import type { BabyDinoId } from '@/lib/survival/dinoEggs';
+import SpriteAnimator from './SpriteAnimator';
+import { useSpriteAnimations } from '@/hooks/useSpriteAnimations';
 
-export const BABY_ART: Record<BabyDinoId, string> = { baby_raptor, mini_triceratops, baby_stego, baby_ptera };
+export const BABY_ART: Record<string, string> = { baby_raptor, mini_triceratops, baby_stego, baby_ptera };
 export const EGG_ART = egg;
 
 const PARTICLES = Array.from({ length: 14 }, (_, i) => ({ a: (i / 14) * Math.PI * 2, d: 70 + (i % 3) * 22 }));
 
 /** Hatch celebration: egg shakes, cracks, bursts into pixel particles and reveals the baby. */
-export default function DinoEggHatchModal({ baby, onClose }: { baby: { id: BabyDinoId; name: string } | null; onClose: () => void }) {
+export default function DinoEggHatchModal({ baby, onClose }: { baby: { id: string; name: string; custom?: boolean } | null; onClose: () => void }) {
   const reduced = useReducedMotion();
+  const { data: art } = useSpriteAnimations(baby?.custom ? `pet:${baby.id}` : 'none');
+  const sheet = baby && !BABY_ART[baby.id] ? art?.idle : undefined;
+  const babySrc = baby ? BABY_ART[baby.id] ?? egg : egg;
   return (
     <AnimatePresence>
       {baby && (
@@ -30,8 +34,9 @@ export default function DinoEggHatchModal({ baby, onClose }: { baby: { id: BabyD
                   initial={{ x: 0, y: 0, opacity: 0 }} animate={{ x: Math.cos(p.a) * p.d, y: Math.sin(p.a) * p.d, opacity: [0, 1, 0] }}
                   transition={{ delay: 1.45, duration: 0.8 }} />
               ))}
-              <motion.img src={BABY_ART[baby.id]} alt={baby.name} className="pixelated absolute h-36 w-36"
-                initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: reduced ? 0.2 : 1.55, type: 'spring', stiffness: 260, damping: 14 }} />
+              <motion.div className="absolute" initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: reduced ? 0.2 : 1.55, type: 'spring', stiffness: 260, damping: 14 }}>
+                {sheet ? <SpriteAnimator url={sheet.url} frames={sheet.frame_count} fps={sheet.fps} height={144} /> : <img src={babySrc} alt={baby.name} className="pixelated h-36 w-36" />}
+              </motion.div>
             </div>
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduced ? 0.3 : 1.8 }} className="space-y-1">
               <p className="text-lg font-bold">{baby.name} 탄생!</p>

@@ -174,7 +174,7 @@ export const BOSS_TYPES = ['boss_direwolf', 'boss_mammoth'] as const;
 export type CreatureType = keyof typeof CREATURES;
 
 export const nodeDef = (t: NodeType): NodeDef => NODES[t];
-export const creatureDef = (t: CreatureType): CreatureDef => CREATURES[t];
+export const creatureDef = (t: CreatureType): CreatureDef => CREATURES[t] ?? CREATURES.boar;
 
 export const isHostileNow = (t: CreatureType, isNight: boolean) => {
   const d = creatureDef(t);

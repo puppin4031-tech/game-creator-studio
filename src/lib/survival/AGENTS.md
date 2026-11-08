@@ -5,3 +5,4 @@
 - Notices: build-time git subjects auto-merge with HAND_NOTICES; unread key includes build id so each deploy announces itself.
 - Worn gear goes through equipment.ts slots (weapon, two tools, armor, trinket; level-gated); only resolveLoadout gear affects combat/gathering; why: carried spares must not stack stats.
 - Dino eggs: spawn/hatch rules live in pure dinoEggs.ts (geographic seed, 24h respawn via depleted); hatch distance counts only WorldSave.walkSteps and hatching needs the base; why: rides walking-pace rules so vehicles can't hatch eggs.
+- Admin pets/mobs live in survival_custom_pets/survival_custom_mobs and register at runtime (dinoEggs.registerCustomPets, customMobs.registerCustomMobs with custom_ prefixed creature keys); sprites reuse survival_sprite_animations keys pet:<id> and mob:<type>; why: admins add content without code changes while built-ins stay untouched.

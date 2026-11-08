@@ -13,7 +13,7 @@ import {
   SidebarFooter,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { Map, Users, CheckSquare, LayoutDashboard, PlusCircle, ClipboardList, LogOut, MapPin, Home, Palette, Zap, Film, Package } from 'lucide-react';
+import { Map, Users, CheckSquare, LayoutDashboard, PlusCircle, ClipboardList, LogOut, MapPin, Home, Palette, Zap, Film, PawPrint, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const mainAdminItems = [
@@ -22,6 +22,7 @@ const mainAdminItems = [
   { title: '테마 관리', url: '/admin/themes', icon: Palette },
   { title: '관리자 관리', url: '/admin/users', icon: Users },
   { title: '캐릭터 애니메이션', url: '/admin/sprites', icon: Film },
+  { title: '펫·몹 제작', url: '/admin/pets-mobs', icon: PawPrint },
   { title: '생존 아이템', url: '/admin/items', icon: Package },
   { title: '문의함', url: '/admin/support', icon: ClipboardList },
   { title: '승인 관리', url: '/admin/approvals', icon: CheckSquare },

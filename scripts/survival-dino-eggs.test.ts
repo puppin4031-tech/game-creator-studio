@@ -1,19 +1,26 @@
 import { describe, expect, it } from 'bun:test';
-import { eggReady, eggSpawnsNear, eggWalkedM } from '../src/lib/survival/dinoEggs';
+import { advanceEggs, eggReady, eggSpawnsNear, eggWalkedM, petFromRow } from '../src/lib/survival/dinoEggs';
 
 describe('dino eggs', () => {
-  it('needs 300m of walking to hatch', () => {
-    expect(eggReady({ id: 'e', startSteps: 10 }, 24)).toBe(false); // 280m
-    expect(eggReady({ id: 'e', startSteps: 10 }, 25)).toBe(true); // 300m
+  it('legacy eggs need 300m of walking to hatch', () => {
+    expect(eggReady({ id: 'e', startSteps: 10 }, 24)).toBe(false);
+    expect(eggReady({ id: 'e', startSteps: 10 }, 25)).toBe(true);
     expect(eggWalkedM({ id: 'e', startSteps: 10 }, 25)).toBe(300);
   });
   it('hides collected eggs for 24h', () => {
-    const c = { lat: 37.5, lng: 127 };
-    let spawns = eggSpawnsNear(c, {}, 0);
-    for (let k = 0; !spawns.length && k < 50; k++) spawns = eggSpawnsNear({ lat: c.lat + k * 0.003, lng: c.lng }, {}, 0);
+    let spawns = eggSpawnsNear({ lat: 37.5, lng: 127 }, {}, 0);
+    for (let k = 0; !spawns.length && k < 50; k++) spawns = eggSpawnsNear({ lat: 37.5 + k * 0.003, lng: 127 }, {}, 0);
     const egg = spawns[0];
-    const near = { lat: egg.lat, lng: egg.lng };
-    expect(eggSpawnsNear(near, { [egg.id]: 0 }, 23 * 3600_000).some(e => e.id === egg.id)).toBe(false);
-    expect(eggSpawnsNear(near, { [egg.id]: 0 }, 24 * 3600_000).some(e => e.id === egg.id)).toBe(true);
+    expect(eggSpawnsNear(egg, { [egg.id]: 0 }, 23 * 3600_000).some(e => e.id === egg.id)).toBe(false);
+    expect(eggSpawnsNear(egg, { [egg.id]: 0 }, 24 * 3600_000).some(e => e.id === egg.id)).toBe(true);
+  });
+  it('steps mode converts 500 steps to 350m', () => {
+    expect(petFromRow({ pet_id: 'p', name: 'p', hatch_mode: 'steps', hatch_steps: 500, hatch_meters: 0, max_speed_kmh: 8, weight: 1 }).needM).toBe(350);
+  });
+  it('speed limit caps at 13 km/h and skips faster moves', () => {
+    expect(petFromRow({ pet_id: 'p', name: 'p', hatch_mode: 'distance', hatch_steps: 0, hatch_meters: 300, max_speed_kmh: 30, weight: 1 }).maxKmh).toBe(13);
+    const egg = { id: 'e', startSteps: 0, maxKmh: 6, walkedM: 0 };
+    expect(advanceEggs([egg], 20, 10_000)[0].walkedM).toBe(0); // 7.2 km/h > 6
+    expect(advanceEggs([egg], 20, 15_000)[0].walkedM).toBe(20); // 4.8 km/h
   });
 });

@@ -481,6 +481,84 @@ export type Database = {
         }
         Relationships: []
       }
+      survival_custom_mobs: {
+        Row: {
+          atk: number
+          hp: number
+          is_active: boolean
+          mob_id: string
+          name: string
+          spawn_weight: number
+          temper: string
+          updated_at: string
+          updated_by: string | null
+          xp: number
+        }
+        Insert: {
+          atk?: number
+          hp?: number
+          is_active?: boolean
+          mob_id: string
+          name: string
+          spawn_weight?: number
+          temper?: string
+          updated_at?: string
+          updated_by?: string | null
+          xp?: number
+        }
+        Update: {
+          atk?: number
+          hp?: number
+          is_active?: boolean
+          mob_id?: string
+          name?: string
+          spawn_weight?: number
+          temper?: string
+          updated_at?: string
+          updated_by?: string | null
+          xp?: number
+        }
+        Relationships: []
+      }
+      survival_custom_pets: {
+        Row: {
+          hatch_meters: number
+          hatch_mode: string
+          hatch_steps: number
+          is_active: boolean
+          max_speed_kmh: number
+          name: string
+          pet_id: string
+          updated_at: string
+          updated_by: string | null
+          weight: number
+        }
+        Insert: {
+          hatch_meters?: number
+          hatch_mode?: string
+          hatch_steps?: number
+          is_active?: boolean
+          max_speed_kmh?: number
+          name: string
+          pet_id: string
+          updated_at?: string
+          updated_by?: string | null
+          weight?: number
+        }
+        Update: {
+          hatch_meters?: number
+          hatch_mode?: string
+          hatch_steps?: number
+          is_active?: boolean
+          max_speed_kmh?: number
+          name?: string
+          pet_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          weight?: number
+        }
+        Relationships: []
+      }
       survival_invention_credits: {
         Row: {
           bonus: number
