@@ -17,7 +17,10 @@ interface AuthContextType {
   refreshProfile: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Keep one context instance across hot reloads so providers and consumers never diverge.
+const globalAuth = globalThis as { __colonionAuthContext?: React.Context<AuthContextType | undefined> };
+const AuthContext = globalAuth.__colonionAuthContext ?? createContext<AuthContextType | undefined>(undefined);
+globalAuth.__colonionAuthContext = AuthContext;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
