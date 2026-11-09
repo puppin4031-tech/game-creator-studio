@@ -28,7 +28,7 @@ export type BabyDinoId = string;
 let customPets: PetDef[] = [];
 export function registerCustomPets(list: PetDef[]) { customPets = list; }
 export const petPool = (): PetDef[] => [...BABY_DINOS, ...customPets].filter(p => p.weight > 0);
-export const petById = (id: string) => petPool().find(p => p.id === id) ?? [...BABY_DINOS, ...customPets].find(p => p.id === id);
+export const petById = (id: string) => [...BABY_DINOS, ...customPets].find(p => p.id === id);
 
 /** Convert an admin pet row into hatch rules: steps mode uses stride length, speed capped at walking pace. */
 export function petFromRow(r: { pet_id: string; name: string; hatch_mode: string; hatch_steps: number; hatch_meters: number; max_speed_kmh: number; weight: number }): PetDef {
@@ -76,4 +76,6 @@ export function advanceEggs(eggs: CarriedEgg[], meters: number, elapsedMs: numbe
 export const eggNeedM = (egg: CarriedEgg) => egg.needM ?? EGG_HATCH_M;
 export const eggWalkedM = (egg: CarriedEgg, walkSteps: number) => egg.walkedM ?? Math.max(0, walkSteps - egg.startSteps) * WALK_STEP_M;
 export const eggReady = (egg: CarriedEgg, walkSteps: number) => eggWalkedM(egg, walkSteps) >= eggNeedM(egg);
-export const babyFor = (egg: CarriedEgg): PetDef => (egg.petId && petById(egg.petId)) || BABY_DINOS[Math.floor(hash01(egg.id.length, [...egg.id].reduce((a, c) => a + c.charCodeAt(0), 0), SALT) * BABY_DINOS.length)];
+export const babyFor = (egg: CarriedEgg): PetDef => egg.petId
+  ? petById(egg.petId) ?? { id: egg.petId, name: '신비한 펫', custom: true, needM: egg.needM ?? EGG_HATCH_M, maxKmh: egg.maxKmh ?? MAX_WALK_KMH, weight: 0 }
+  : BABY_DINOS[Math.floor(hash01(egg.id.length, [...egg.id].reduce((a, c) => a + c.charCodeAt(0), 0), SALT) * BABY_DINOS.length)];

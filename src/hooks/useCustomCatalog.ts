@@ -17,7 +17,7 @@ export function useCustomCatalog() {
       ]);
       if (pets.error) throw pets.error;
       if (mobs.error) throw mobs.error;
-      registerCustomPets(pets.data.filter(p => p.is_active).map(petFromRow));
+      registerCustomPets(pets.data.map(p => ({ ...petFromRow(p), weight: p.is_active ? p.weight : 0 })));
       registerCustomMobs(mobs.data);
       return { pets: pets.data, mobs: mobs.data };
     },

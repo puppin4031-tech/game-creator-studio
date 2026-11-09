@@ -13,7 +13,7 @@ import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
 import { SURVIVAL_CONFIG as C } from '@/lib/survival/config';
 import { visionBonus, reachRadius, pocketBonusKg } from '@/lib/survival/utilitySkills';
 import { BASE_UPGRADE_MS, EXPEDITION_FOOD_COUNT, EXPEDITION_MS, expeditionRewards, mapFragments, payExpeditionFood, scoutReport, type Expedition, type ScoutTarget, type TimedJob } from '@/lib/survival/homeActivities';
-import { EGG_PICK_RADIUS_M, advanceEggs, babyFor, eggReady, newEgg, type BabyDinoId, type CarriedEgg, type EggSpawn } from '@/lib/survival/dinoEggs';
+import { EGG_PICK_RADIUS_M, advanceEggs, babyFor, eggReady, newEgg, petById, type BabyDinoId, type CarriedEgg, type EggSpawn } from '@/lib/survival/dinoEggs';
 import { ACTIVE_SKILLS, claimResearch, startResearch, atMainBase, atWorkshop, buildStructure, collectCompanionWork, prepareSkill, recruitCompanion, tameWolf, type ActiveSkill, type Companion } from '@/lib/survival/abilities';
 import { advanceSurvivalVitals } from '@/lib/survival/metabolism';
 import { distanceM } from '@/lib/survival/geo';
@@ -34,6 +34,8 @@ import { equipInSlot, resolveLoadout, type Equipped, type GearSlot } from '@/lib
 import { type InventionCredits } from '@/lib/survival/inventionCredits';
 import { payAccessible } from '@/lib/survival/abilities';
 import type { GearInstance, LatLng, Stack, WorldEntity } from '@/lib/survival/types';
+
+import { advancePetDefense, deployPet, fusePets, hatchPet, migratePets, type OwnedPet, type PetDefense, type PetHit } from '@/lib/survival/pets';
 
 const SAVE_KEY = 'survival-world-v1';
 const EXPLORE_STEP_M = 20;
@@ -78,6 +80,8 @@ export interface WorldSave extends WorldProgress {
   /** Carried dino eggs with the walk step count at pickup. */
   dinoEggs?: CarriedEgg[];
   babyDinos?: BabyDinoId[];
+  pets?: OwnedPet[];
+  petDefense?: PetDefense;
   shrines?: ShrineState;
   researching?: TimedJob | null;
   researchJobs?: TimedJob[];
@@ -106,7 +110,7 @@ function load(start: LatLng, saveKey: string): WorldSave {
     const raw = localStorage.getItem(saveKey);
     if (raw) {
       const saved = JSON.parse(raw) as Partial<WorldSave>;
-      return { ...fresh(start), ...saved, base: saved.base ? { ...saved.base, placedAt: saved.base.placedAt ?? Date.now() } : null };
+      return migratePets({ ...fresh(start), ...saved, base: saved.base ? { ...saved.base, placedAt: saved.base.placedAt ?? Date.now() } : null }, id => petById(id)?.name ?? id);
     }
   } catch (e) {
     console.error('[survival] failed to load save', e);
@@ -141,6 +145,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const [pocketMode, setPocketMode] = useState(false);
   const [movingUntil, setMovingUntil] = useState(0);
   const outdoorMovingRef = useRef(0);
+  const [petHits, setPetHits] = useState<PetHit[]>([]);
 
   const ensureStarterCamp = useCallback(() => {
     setS(p => p.base ? p : { ...p, base: { ...p.pos, level: 1, placedAt: Date.now() }, starterCampPending: true });
@@ -167,7 +172,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const local = ref.current;
       if (remote && (remote.lastTickAt ?? 0) > local.lastTickAt) {
         skipNextUploadRef.current = true;
-        setS({ ...fresh(local.pos), ...remote, base: remote.base ? { ...remote.base, placedAt: remote.base.placedAt ?? Date.now() } : null });
+        setS(migratePets({ ...fresh(local.pos), ...remote, base: remote.base ? { ...remote.base, placedAt: remote.base.placedAt ?? Date.now() } : null }, id => petById(id)?.name ?? id));
         toast.success('클라우드에 저장된 생존 진행도를 불러왔습니다.');
       } else {
         const { error: upErr } = await supabase.from('survival_saves').upsert({ user_id: userId, payload: local as unknown as Json, updated_at: new Date().toISOString() });
@@ -190,20 +195,22 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
   // Continuous one-second crew ticks must not postpone the ordinary save debounce forever.
   useEffect(() => {
-    if (!userId || !s.observedExpedition) return;
+    if (!userId || (!s.observedExpedition && !s.pets?.some(p => p.deployed))) return;
     const timer = window.setInterval(() => {
       if (!cloudReadyRef.current) return;
       void supabase.from('survival_saves').upsert({ user_id: userId, payload: ref.current as unknown as Json, updated_at: new Date().toISOString() })
         .then(({ error }) => { if (error) console.error('[survival] expedition save failed', error); });
     }, 15_000);
     return () => window.clearInterval(timer);
-  }, [userId, !!s.observedExpedition]);
+  }, [userId, !!s.observedExpedition, s.pets?.some(p => p.deployed)]);
 
   const isNight = dayPhase(new Date(now)) === 'night';
   const vision = (isNight ? C.visionNightM : C.visionDayM) + visionBonus(s.techs);
   const reach = reachRadius(s.techs);
   const baseDef = s.base ? BASE_LEVELS[s.base.level] : null;
   const [sanctuaries, setSanctuaries] = useState<LatLng[]>([]);
+  const sanctuariesRef = useRef(sanctuaries);
+  sanctuariesRef.current = sanctuaries;
   const inSanctuary = sanctuaries.some((c) => distanceM(s.pos, c) <= SANCTUARY_RADIUS_M);
   const inBase = atWorkshop(s);
   const weight = stackWeight(s.backpack);
@@ -230,6 +237,25 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     center: s.pos, radiusM: vision, now, isNight, depleted: s.depleted, terrainZones: s.terrainZones, parkCells: s.parkCells, sanctuaries,
     safeZone: s.base && baseDef ? { center: s.base, radiusM: baseDef.radiusM + (s.palisade ? 15 : 0) } : null,
   }).filter(e => !(e.kind === 'creature' && s.outpost && distanceM(e, s.outpost) < C.outpostRadiusM + 15)), [s.pos, vision, now, isNight, s.depleted, s.base, baseDef, s.terrainZones, s.parkCells, sanctuaries, s.palisade, s.outpost]);
+
+  // Visible-time boundary defense; never changes player GPS or peer saves.
+  useEffect(() => {
+    if (!s.pets?.length) return;
+    const timer = window.setInterval(() => {
+      const p = ref.current;
+      if (document.hidden || !p.base || (!enabledRef.current && !options.indoor)) return;
+      const radius = BASE_LEVELS[p.base.level].radiusM + (p.palisade ? 15 : 0);
+      if (distanceM(p.pos, p.base) > C.visionDayM) return;
+      const at = Date.now(), night = dayPhase(new Date(at)) === 'night';
+      const nearby = generateWorld({ center: p.base, radiusM: radius + 35, now: at, isNight: night, depleted: p.depleted, terrainZones: p.terrainZones, parkCells: p.parkCells, sanctuaries: sanctuariesRef.current,
+        safeZone: { center: p.base, radiusM: radius } }).filter((e): e is Extract<WorldEntity, { kind: 'creature' }> => e.kind === 'creature');
+      const result = advancePetDefense(p, p.base, radius, nearby, at, night);
+      const changed = result.hits.length || result.state.pets?.some((pet, i) => pet !== p.pets?.[i]) || result.state.petDefense?.day !== p.petDefense?.day;
+      if (changed) setS({ ...result.state, lastTickAt: at });
+      if (result.hits.length) setPetHits(result.hits);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [!!s.pets?.length, options.indoor, setS]);
 
   // Survival tick: hunger drain, starvation, base regen (wild_vitality level boosts rest regen).
   useEffect(() => {
@@ -320,13 +346,16 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const at = Date.now();
       const outdoors = enabledRef.current && at < outdoorMovingRef.current && distanceM(p.pos, crew.pos) <= 40;
       const nearby = generateWorld({ center: crew.pos, radiusM: 30, now: at, isNight: dayPhase(new Date(at)) === 'night', depleted: p.depleted, terrainZones: p.terrainZones, parkCells: p.parkCells });
-      const result = advanceExpedition(crew, nearby, at, outdoors, !!p.expeditionAuto);
+      const result = advanceExpedition(crew, nearby, at, outdoors, !!p.expeditionAuto, Math.random, p.damage);
       let next = { ...p, observedExpedition: result.finished ? null : result.crew };
+      if (result.crew.target?.kind === 'creature') next.damage = { ...p.damage, [result.crew.target.id]: result.crew.damage };
       if (result.completed) {
         const e = result.completed;
         const gathered = { ...p.gathered };
         for (const item of result.rewards) gathered[item.itemId] = (gathered[item.itemId] ?? 0) + item.count;
         next = { ...next, storage: addStacks(p.storage, result.rewards), gathered, depleted: { ...p.depleted, [e.id]: at }, kills: p.kills + (e.kind === 'creature' ? 1 : 0), ...addExperience(p, e.kind === 'node' ? nodeDef(e.type).xp : creatureDef(e.type).xp) };
+        next.damage = { ...next.damage };
+        delete next.damage[e.id];
         const learned = checkInspiration(gathered, next.techs);
         next.techs = [...next.techs, ...learned.map(t => t.id)];
       }
@@ -833,17 +862,42 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const hatchEgg = useCallback((eggId: string) => {
     const p = ref.current;
     const egg = (p.dinoEggs ?? []).find(e => e.id === eggId);
-    if (!egg || !inBase || !eggReady(egg, p.walkSteps ?? 0)) return null;
+    if (!egg || !enabledRef.current || !atMainBase(p) || !eggReady(egg, p.walkSteps ?? 0)) return null;
     const fromPack = removeStacks(p.backpack, [{ itemId: 'dino_egg', count: 1 }]);
     const fromStore = fromPack ? null : removeStacks(p.storage, [{ itemId: 'dino_egg', count: 1 }]);
+    if (!fromPack && !fromStore) return null;
     const baby = babyFor(egg);
-    setS({ ...p, backpack: fromPack ?? p.backpack, storage: fromStore ?? p.storage, dinoEggs: (p.dinoEggs ?? []).filter(e => e.id !== eggId), babyDinos: [...(p.babyDinos ?? []), baby.id] });
+    const pets = p.pets ?? [];
+    setS({ ...p, backpack: fromPack ?? p.backpack, storage: fromStore ?? p.storage, dinoEggs: (p.dinoEggs ?? []).filter(e => e.id !== eggId), pets: [...pets, hatchPet(crypto.randomUUID(), baby.id, baby.name, pets)], babyDinos: [], lastTickAt: Date.now() });
     return baby;
-  }, [setS, inBase]);
+  }, [setS]);
+  const petAccess = () => {
+    const p = ref.current;
+    if (!atMainBase(p) || (!enabledRef.current && !options.indoor)) { toast.warning('거점 안에서 펫을 관리하세요'); return null; }
+    return p;
+  };
+  const mergePets = useCallback((first: string, second: string): boolean => {
+    const p = petAccess(); if (!p) return false;
+    const result = fusePets(p.pets ?? [], first, second, crypto.randomUUID());
+    if (!result) { toast.warning('잠금 해제된 같은 종류·같은 레벨 펫 두 마리가 필요합니다'); return false; }
+    setS({ ...p, pets: result.pets, lastTickAt: Date.now() });
+    toast.success(`${result.pet.name} Lv.${result.pet.level} 합체 성공!`);
+    return true;
+  }, [setS, options.indoor]);
+  const togglePetDeploy = useCallback((uid: string) => {
+    const p = petAccess(); if (!p) return;
+    const pets = deployPet(p.pets ?? [], uid);
+    if (!pets) { toast.warning('수호 펫은 최대 3마리입니다'); return; }
+    setS({ ...p, pets, lastTickAt: Date.now() });
+  }, [setS, options.indoor]);
+  const togglePetLock = useCallback((uid: string) => {
+    const p = petAccess(); if (!p) return;
+    setS({ ...p, pets: (p.pets ?? []).map(pet => pet.uid === uid ? { ...pet, locked: !pet.locked } : pet), lastTickAt: Date.now() });
+  }, [setS, options.indoor]);
   const updateInventionCredits = useCallback((credits: InventionCredits) => setS(p => ({ ...p, inventionCredits: credits, inventionWalkMark: credits.walkMeters === 0 ? p.walkSteps ?? 0 : p.inventionWalkMark })), [setS]);
 
   return { pickEgg, hatchEgg, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
-    recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
+    petHits, mergePets, togglePetDeploy, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,
     quest, questProgress, canClaimQuest, claimQuest, nextLevelXp: xpToNext(s.level),

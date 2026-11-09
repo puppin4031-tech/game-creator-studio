@@ -4,9 +4,21 @@ import { offsetM, distanceM } from '../src/lib/survival/geo';
 import { SURVIVAL_CONFIG } from '../src/lib/survival/config';
 import { splitByCapacity, stackWeight } from '../src/lib/survival/inventory';
 import type { WorldEntity } from '../src/lib/survival/types';
+import { creatureDef } from '../src/lib/survival/entities';
 const home = { lat: 37.748, lng: 126.7496 };
 const node: WorldEntity = { ...home, id: 'test-node', kind: 'node', type: 'flint_rock' };
 describe('Indoor expeditions and outdoor pocket rules', () => {
+  test('shares pet/player damage and never completes an absent defeated target again', () => {
+    const crew = startObservedExpedition(home, offsetM(home, 180, 0), 1000, 'hunt');
+    if (!crew) throw new Error('missing crew');
+    const beast: WorldEntity = { ...home, id: 'shared-beast', kind: 'creature', type: 'raptor' };
+    const result = advanceExpedition(crew, [beast], 2000, false, false, () => 0, { [beast.id]: creatureDef('raptor').hp - 1 });
+    expect(result.completed?.id).toBe(beast.id);
+    expect(result.crew.combatHit?.damage).toBe(1);
+    const repeated = advanceExpedition(result.crew, [], 3000, false, false, () => 0, {});
+    expect(repeated.completed).toBeUndefined();
+    expect(repeated.rewards).toHaveLength(0);
+  });
   test('base backpack is 50% larger than the previous 40kg', () => { expect(SURVIVAL_CONFIG.baseCarryKg).toBe(40 * 1.5); });
   test('crew walks exactly 15m per second', () => { expect(distanceM(home, marchToward(home, offsetM(home, 300, 0), 1000))).toBeCloseTo(15, 3); });
   test('level-one dispatch needs no food or walking progress', () => { expect(startObservedExpedition(home, offsetM(home, 180, 0), 1000)?.hp).toBe(100); });

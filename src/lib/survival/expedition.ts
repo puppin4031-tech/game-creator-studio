@@ -81,7 +81,7 @@ export function expeditionLoot(entity: WorldEntity, outdoor: boolean, random: ()
 }
 
 /** Uses shared combat and geographic entities; does not move the player or grant walking distance. */
-export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEntity[], now: number, outdoor: boolean, repeat: boolean, random: () => number = Math.random) {
+export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEntity[], now: number, outdoor: boolean, repeat: boolean, random: () => number = Math.random, sharedDamage?: Record<string, number>) {
   let crew = { ...previous, lastAt: now };
   const rewards: Stack[] = [];
   let completed: WorldEntity | undefined;
@@ -103,6 +103,7 @@ export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEnt
       const target = crew.target;
       const power = (target.kind === 'node' ? 2 : 12) * (outdoor ? 2 : 1) * (now < crew.moraleUntil ? 1.5 : 1);
       if (target.kind === 'creature') {
+        crew.damage = sharedDamage?.[target.id] ?? crew.damage;
         const hit = resolveCreatureHit(target.type, crew.damage, power, 3, false);
         crew.combatHit = { at: now, target, damage: hit.dealt - crew.damage, counterDamage: hit.counterDamage, killed: hit.dealt >= creatureDef(target.type).hp };
         crew.damage = hit.dealt;

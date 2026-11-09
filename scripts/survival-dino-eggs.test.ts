@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'bun:test';
-import { advanceEggs, eggReady, eggSpawnsNear, eggWalkedM, petFromRow } from '../src/lib/survival/dinoEggs';
+import { advanceEggs, babyFor, eggReady, eggSpawnsNear, eggWalkedM, petFromRow, registerCustomPets, petPool } from '../src/lib/survival/dinoEggs';
 
 describe('dino eggs', () => {
+  it('keeps an owned custom species even if its catalog is unavailable or inactive', () => {
+    registerCustomPets([]);
+    expect(babyFor({ id: 'egg', startSteps: 0, petId: 'custom-pet' }).id).toBe('custom-pet');
+    registerCustomPets([{ id: 'custom-pet', name: 'Custom', weight: 0, needM: 300, maxKmh: 8 }]);
+    expect(babyFor({ id: 'egg', startSteps: 0, petId: 'custom-pet' }).name).toBe('Custom');
+    expect(petPool().some(p => p.id === 'custom-pet')).toBe(false);
+    registerCustomPets([]);
+  });
   it('legacy eggs need 300m of walking to hatch', () => {
     expect(eggReady({ id: 'e', startSteps: 10 }, 24)).toBe(false);
     expect(eggReady({ id: 'e', startSteps: 10 }, 25)).toBe(true);

@@ -70,6 +70,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { TECH_CATEGORIES, TECH_CATEGORY, type TechCategory } from '@/lib/survival/techCategories';
 import { MAX_TECH_LEVEL, techLevel, techUpgradeCost } from '@/lib/survival/techLevels';
+import BasePetsOverlay from '@/components/survival/BasePetsOverlay';
+import PetPanel from '@/components/survival/PetPanel';
+import { atMainBase } from '@/lib/survival/abilities';
 
 const START: LatLng = { lat: 37.748, lng: 126.7496 };
 const spriteUrls = import.meta.glob('../../assets/survival/*.png', { eager: true, import: 'default' }) as Record<string, string>;
@@ -182,7 +185,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     onAuto={() => { g.toggleExpeditionAuto(expeditionDestination, expeditionFocus); setWatchExpedition(true); }} onPocket={g.togglePocket} onMorale={g.rallyExpedition} onReturn={g.recallExpedition} onWatch={() => setWatchExpedition(v => !v)} />;
   const [panel, setPanel] = useState<Panel>('none');
   const [craftCat, setCraftCat] = useState<CraftCat>('all');
-  const [baseTab, setBaseTab] = useState<'lab' | 'craft' | 'storage' | 'expedition'>('lab');
+  const [baseTab, setBaseTab] = useState<'lab' | 'craft' | 'storage' | 'expedition' | 'pets'>('lab');
 
   const onTap = (p: LatLng) => {
     if (auto.job) { auto.stop(); returnToCenter(); }
@@ -316,7 +319,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     if (!readyEgg || !g.inBase || hatched || (realGps && !gps.ready)) return;
     const baby = g.hatchEgg(readyEgg.id);
     if (baby) setHatched(baby);
-  }, [readyEgg?.id, g.inBase, hatched]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [readyEgg?.id, g.inBase, hatched, gps.ready]); // eslint-disable-line react-hooks/exhaustive-deps
   const [beastStrike, setBeastStrike] = useState<{ id: string; at: number } | null>(null);
   const lastBeastStrike = useRef(0);
   useEffect(() => {
@@ -468,6 +471,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         {(project, mpp) => (
           <>
             {crew && <ExpeditionMarker crew={crew} project={project} />}
+            {s.base && g.baseDef && <BasePetsOverlay base={s.base} radius={g.baseDef.radiusM + (s.palisade ? 15 : 0)} pets={s.pets ?? []} hits={g.petHits} project={project} />}
             {eggSpawns.map(egg => { const p = project(egg); return (
               <button key={egg.id} type="button" aria-label="신비한 픽셀 공룡 알" onClick={ev => { ev.stopPropagation(); g.pickEgg(egg); }}
                 className="pointer-events-auto absolute z-10 flex min-h-11 min-w-11 -translate-x-1/2 -translate-y-full items-center justify-center" style={{ left: p.x, top: p.y }}>
@@ -523,7 +527,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               const name = e.kind === 'node' ? nodeDef(e.type).name : creatureDef(e.type).name;
               const engaged = crew?.target?.id === e.id;
               const combatHit = expeditionHit?.target.id === e.id ? expeditionHit : undefined;
-              const dmg = engaged ? crew.damage : s.damage[e.id];
+              const petHit = g.petHits.find(h => h.target.id === e.id && Date.now() - h.at < 1800);
+              const dmg = e.kind === 'creature' ? s.damage[e.id] : engaged ? crew.damage : s.damage[e.id];
               const creature = e.kind === 'creature' ? creatureDef(e.type) : null;
               const remainingHp = creature ? Math.max(0, creature.hp - (dmg ?? 0)) : 0;
               const boss = e.kind === 'creature' && !!creatureDef(e.type).boss;
@@ -549,7 +554,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                     transition={combatHit ? { duration: 0.7, times: [0, 0.25, 0.65, 1] } : aggroIds.has(e.id) && !reducedMotion ? { repeat: Infinity, duration: 1.2 } : dmg ? { duration: 0.35 } : { repeat: reducedMotion ? 0 : Infinity, duration: 0.8 }}>
                     <div className={boss ? 'scale-150 rounded-full ring-2 ring-destructive shadow-[0_0_18px_hsl(var(--destructive))]' : ''}>{e.kind === 'creature'
                       ? <CreatureSprite key={e.type} type={e.type} fallbackUrl={url(sprite)} width={SPRITE_META[sprite].w} height={SPRITE_META[sprite].h}
-                          attacking={!!combatHit?.counterDamage || (beastStrike?.id === e.id && Date.now() - beastStrike.at < 1000)} />
+                          attacking={!!combatHit?.counterDamage || !!petHit?.counterDamage || (beastStrike?.id === e.id && Date.now() - beastStrike.at < 1000)} />
                       : <Sprite k={sprite} />}</div>
                   </motion.div>{combatHit && <CombatImpact stamp={combatHit.at} damage={combatHit.damage} />}</div>
                   {(s.calmUntil?.[e.id] ?? 0) > Date.now() && <span className="bg-primary text-[10px] text-primary-foreground">진정됨</span>}
@@ -724,9 +729,9 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               {panel === 'base' && (!s.base ? <p className="text-sm">아직 거점이 없습니다.</p> : (
                 <>
                   {!g.inBase && <p className="pixel-frame bg-accent p-2 text-sm">거점 반경 안에서만 제작·연구할 수 있어요.</p>}
-                  <div className="sticky top-0 z-10 -mx-3 -mt-3 grid grid-cols-4 gap-1 border-b border-border bg-background p-2">
-                    {([['lab','연구·발명'],['craft','제작'],['storage','창고'],['expedition','원정대']] as const).map(([id, label]) => (
-                      <button key={id} type="button" onClick={() => setBaseTab(id)} className={`pixel-btn min-h-11 px-1 text-xs ${baseTab === id ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>{label}{id === 'expedition' && s.expedition && nowTick >= s.expedition.readyAt ? ' •' : ''}</button>
+                  <div className="sticky top-0 z-10 -mx-3 -mt-3 grid grid-cols-5 gap-1 border-b border-border bg-background p-2">
+                    {([['lab','연구·발명'],['craft','제작'],['storage','창고'],['expedition','원정'],['pets','펫']] as const).map(([id, label]) => (
+                      <Button key={id} type="button" variant={baseTab === id ? 'default' : 'outline'} onClick={() => setBaseTab(id)} className="pixel-btn min-h-11 px-1 text-xs">{label}{id === 'expedition' && s.expedition && nowTick >= s.expedition.readyAt ? ' •' : ''}</Button>
                     ))}
                   </div>
                   {baseTab === 'lab' && <>
@@ -793,6 +798,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   {!!s.packedItems?.length && <Button variant="outline" disabled={!g.inBase || !actionReady} className="h-11 w-full" onClick={g.storePacked}>휴대 재료 모두 창고에 보관</Button>}
                   <div><b className="text-sm">창고</b><div className="mt-1"><Stacks stacks={s.storage} onUse={g.eat} /></div><div className="mt-2 flex flex-wrap gap-1">{s.storage.map(st => <Button key={st.itemId} variant="outline" size="sm" className="min-h-11 text-xs" disabled={!g.inBase || !actionReady} onClick={() => g.withdraw(st.itemId)}>{ITEMS[st.itemId].name} 1개 꺼내기</Button>)}</div></div>
                   </>}
+                  {baseTab === 'pets' && <PetPanel pets={s.pets ?? []} defense={s.petDefense} now={nowTick} ready={atMainBase(s) && (!realGps || gps.ready || !gps.fix)} onFuse={g.mergePets} onDeploy={g.togglePetDeploy} onLock={g.togglePetLock} />}
                   {baseTab === 'expedition' && <>
                   {realGps && expeditionControls}
                   {(!realGps || s.expedition) && <ExpeditionPanel expedition={s.expedition} report={s.scoutReport} now={nowTick} exploredTotal={s.exploredTotal ?? s.explored.length} mark={s.expeditionMark ?? 0}
