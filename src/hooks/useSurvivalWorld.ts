@@ -170,7 +170,12 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       if (error) { console.error('[survival] cloud load failed', error); cloudReadyRef.current = true; return; }
       const remote = data?.payload as Partial<WorldSave> | undefined;
       const local = ref.current;
-      if (remote && (remote.lastTickAt ?? 0) > local.lastTickAt) {
+      // A fresh device save (lower progress) must never overwrite a more advanced cloud save.
+      const progress = (w: Partial<WorldSave>) => (w.level ?? 1) * 1e9 + (w.xp ?? 0);
+      const remoteAhead = remote && (progress(remote) !== progress(local)
+        ? progress(remote) > progress(local)
+        : (remote.lastTickAt ?? 0) > local.lastTickAt);
+      if (remote && remoteAhead) {
         skipNextUploadRef.current = true;
         setS(migratePets({ ...fresh(local.pos), ...remote, base: remote.base ? { ...remote.base, placedAt: remote.base.placedAt ?? Date.now() } : null }, id => petById(id)?.name ?? id));
         toast.success('클라우드에 저장된 생존 진행도를 불러왔습니다.');
