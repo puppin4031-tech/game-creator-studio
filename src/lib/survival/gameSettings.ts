@@ -5,7 +5,7 @@ import hitSfx from '@/assets/sfx/hit.wav.asset.json';
 import mineRock from '@/assets/sfx/mine_rock.wav.asset.json';
 import beastAttack from '@/assets/sfx/beast_attack.m4a.asset.json';
 import beastCall from '@/assets/sfx/beast_call.m4a.asset.json';
-import footstep from '@/assets/sfx/footstep.mp3.asset.json';
+import footstep from '@/assets/sfx/footstep_3_1.m4a.asset.json';
 
 export type VolumeLevel = 'S' | 'M' | 'L';
 export interface GameSettings { bgm: boolean; sfx: boolean; volume: VolumeLevel; haptic: boolean; notify: boolean; winter: boolean }
