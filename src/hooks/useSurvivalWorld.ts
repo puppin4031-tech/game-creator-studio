@@ -13,7 +13,7 @@ import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
 import { SURVIVAL_CONFIG as C } from '@/lib/survival/config';
 import { visionBonus, reachRadius, pocketBonusKg } from '@/lib/survival/utilitySkills';
 import { BASE_UPGRADE_MS, EXPEDITION_FOOD_COUNT, EXPEDITION_MS, expeditionRewards, mapFragments, payExpeditionFood, scoutReport, type Expedition, type ScoutTarget, type TimedJob } from '@/lib/survival/homeActivities';
-import { EGG_PICK_RADIUS_M, advanceEggs, babyFor, eggReady, newEgg, petById, type BabyDinoId, type CarriedEgg, type EggSpawn } from '@/lib/survival/dinoEggs';
+import { EGG_PICK_RADIUS_M, EGG_RESPAWN_MS, advanceEggs, babyFor, eggReady, newEgg, petById, type BabyDinoId, type CarriedEgg, type EggSpawn } from '@/lib/survival/dinoEggs';
 import { ACTIVE_SKILLS, claimResearch, startResearch, atMainBase, atWorkshop, buildStructure, collectCompanionWork, prepareSkill, recruitCompanion, tameWolf, type ActiveSkill, type Companion } from '@/lib/survival/abilities';
 import { advanceSurvivalVitals } from '@/lib/survival/metabolism';
 import { distanceM } from '@/lib/survival/geo';
@@ -856,10 +856,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const pickEgg = useCallback((egg: EggSpawn) => {
     const p = ref.current;
     if (!enabledRef.current) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return false; }
-    if (p.depleted[egg.id]) return false;
+    const now = Date.now();
+    if (now - (p.depleted[egg.id] ?? -Infinity) < EGG_RESPAWN_MS) { toast.info('이 자리의 알은 이미 주웠어요. 내일 다시 와 보세요.'); return false; }
     if (distanceM(p.pos, egg) > EGG_PICK_RADIUS_M) { toast.warning(`${EGG_PICK_RADIUS_M}m 안으로 다가가세요`); return false; }
-    setS({ ...p, backpack: addStacks(p.backpack, [{ itemId: 'dino_egg', count: 1 }]), depleted: { ...p.depleted, [egg.id]: Date.now() },
-      dinoEggs: [...(p.dinoEggs ?? []), newEgg(egg.id, p.walkSteps ?? 0, Math.random())] });
+    setS({ ...p, backpack: addStacks(p.backpack, [{ itemId: 'dino_egg', count: 1 }]), depleted: { ...p.depleted, [egg.id]: now },
+      dinoEggs: [...(p.dinoEggs ?? []), newEgg(`${egg.id}:${now}`, p.walkSteps ?? 0, Math.random())] });
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(200);
     toast.success('신비한 픽셀 공룡 알을 주웠어요!', { description: '정해진 거리만큼 걸은 뒤 거점에 오면 부화해요.' });
     return true;
