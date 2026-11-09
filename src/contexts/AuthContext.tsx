@@ -109,8 +109,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+const SIGNED_OUT: AuthContextType = {
+  user: null, profile: null, isLoading: true, isMainAdmin: false, isSubAdmin: false,
+  signIn: async () => ({ error: '잠시 후 다시 시도해 주세요.' }),
+  signUp: async () => ({ error: '잠시 후 다시 시도해 주세요.' }),
+  signOut: async () => {}, refreshProfile: async () => {},
+};
+
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  if (!ctx) {
+    // A stale hot-reload module can briefly miss the provider; render signed-out instead of blanking.
+    console.warn('useAuth used outside AuthProvider; using signed-out fallback');
+    return SIGNED_OUT;
+  }
   return ctx;
 }
