@@ -19,6 +19,7 @@ export default function BasePetsOverlay({ base, radius, pets, hits, project }: {
   useEffect(() => {
     if (!hits.length || document.hidden) return;
     playSample('strike'); haptic(60);
+    if (hits.some(h => h.counterDamage > 0)) playSample('beastAttack');
     if (hits.some(h => h.killed)) playSfx('notify');
   }, [hits]);
   return <>

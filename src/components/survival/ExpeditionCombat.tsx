@@ -28,9 +28,7 @@ const UNLOCK_EVENTS = ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown
 export function useExpeditionCombatSound(crew?: ObservedExpedition | null, sampleFor?: (e: WorldEntity) => SampleId) {
   const lastAt = useRef(crew?.combatHit?.at ?? 0);
   const lastWorkAt = useRef(crew?.hitAt ?? 0);
-  const lastPosition = useRef(crew?.pos);
-  const lat = crew?.pos.lat;
-  const lng = crew?.pos.lng;
+  useMovementSound(crew?.pos);
   useEffect(() => {
     UNLOCK_EVENTS.forEach(ev => window.addEventListener(ev, unlockSound, { passive: true }));
     return () => UNLOCK_EVENTS.forEach(ev => window.removeEventListener(ev, unlockSound));
@@ -46,26 +44,31 @@ export function useExpeditionCombatSound(crew?: ObservedExpedition | null, sampl
     haptic(20);
   }, [crew?.hitAt]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const previous = lastPosition.current;
-    lastPosition.current = lat === undefined || lng === undefined ? undefined : { lat, lng };
-    if (!previous || lat === undefined || lng === undefined || (lat === previous.lat && lng === previous.lng)) return;
-    const step = () => { if (!document.hidden) playFootstep(); };
-    step();
-    const interval = window.setInterval(step, 360);
-    // Geographic ticks arrive once per second; never keep playing after movement stops.
-    const stop = window.setTimeout(() => window.clearInterval(interval), 1000);
-    return () => { window.clearInterval(interval); window.clearTimeout(stop); };
-  }, [lat, lng]);
-  useEffect(() => {
     const hit = freshCombatHit(crew);
     if (!hit || hit.at === lastAt.current) return;
     lastAt.current = hit.at;
     if (document.hidden) return;
     playSample('strike');
+    if (hit.counterDamage) playSample('beastAttack');
     haptic(hit.counterDamage ? [45, 35, 65] : 40);
     const timer = hit.killed ? window.setTimeout(() => playSfx('notify'), 200) : undefined;
     return () => window.clearTimeout(timer);
   }, [crew?.combatHit?.at]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+export function useMovementSound(pos?: LatLng) {
+  const previousPosition = useRef(pos);
+  const lat = pos?.lat, lng = pos?.lng;
+  useEffect(() => {
+    const previous = previousPosition.current;
+    previousPosition.current = lat === undefined || lng === undefined ? undefined : { lat, lng };
+    if (!previous || lat === undefined || lng === undefined || (lat === previous.lat && lng === previous.lng)) return;
+    const step = () => { if (!document.hidden) playFootstep(); };
+    step();
+    const interval = window.setInterval(step, 480);
+    const stop = window.setTimeout(() => window.clearInterval(interval), 1000);
+    return () => { window.clearInterval(interval); window.clearTimeout(stop); };
+  }, [lat, lng]);
 }
 
 export function CombatImpact({ stamp, damage, defeated = false }: { stamp: number; damage: number; defeated?: boolean }) {

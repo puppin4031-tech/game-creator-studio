@@ -10,7 +10,7 @@ import { EGG_SPAWN_RADIUS_M, eggNeedM, eggReady, eggSpawnsNear, eggWalkedM } fro
 import { useCustomCatalog } from '@/hooks/useCustomCatalog';
 import CreatureSprite from '@/components/survival/CreatureSprite';
 import ExpeditionSystem, { ExpeditionMarker } from '@/components/survival/ExpeditionSystem';
-import { CombatImpact, CREATURE_RING_RADIUS_M, expeditionActorPoint, freshCombatHit, useExpeditionCombatSound } from '@/components/survival/ExpeditionCombat';
+import { CombatImpact, CREATURE_RING_RADIUS_M, expeditionActorPoint, freshCombatHit, useExpeditionCombatSound, useMovementSound } from '@/components/survival/ExpeditionCombat';
 import type { ExpeditionFocus } from '@/lib/survival/expedition';
 import BackpackDiscard from '@/components/survival/BackpackDiscard';
 import { BaseFortressOverlay } from '@/components/survival/BaseFortressOverlay';
@@ -172,11 +172,18 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [watchExpedition, setWatchExpedition] = useState(true);
   const crew = s.observedExpedition;
   useExpeditionCombatSound(crew, e => workKind(e).sample);
+  useMovementSound(s.pos);
   const reducedMotion = useReducedMotion();
   const expeditionHit = freshCombatHit(crew);
   const [expeditionFocus, setExpeditionFocus] = useState<ExpeditionFocus>('materials');
   const observationEntities = crew ? generateWorld({ center: crew.pos, radiusM: g.vision, now: Date.now(), isNight: g.isNight, depleted: s.depleted, terrainZones: s.terrainZones, parkCells: s.parkCells }) : [];
   const visibleEntities = [...new Map([...g.entities, ...observationEntities].map(e => [e.id, e])).values()];
+  const nearbyBeast = visibleEntities.some(e => e.kind === 'creature' && !s.depleted[e.id] && distanceM(crew?.pos ?? s.pos, e) <= 50);
+  useEffect(() => {
+    if (!nearbyBeast) return;
+    const timer = window.setInterval(() => { if (!document.hidden) playSample('beastCall'); }, 12_000);
+    return () => window.clearInterval(timer);
+  }, [nearbyBeast]);
   const expeditionDestination = expeditionTarget ?? offsetM(s.base ?? s.pos, 180, 0);
   const canDispatch = !!s.base && (!realGps || !gps.ready || g.inBase);
   const expeditionControls = <ExpeditionSystem crew={crew} logs={s.expeditionLogs ?? []} target={expeditionTarget} home={s.base} auto={!!s.expeditionAuto} pocket={g.pocketMode} outdoor={g.outdoorMoving && (g.pocketMode || (!!crew && distanceM(s.pos, crew.pos) <= 40))} watching={watchExpedition} gpsReady={gps.ready} canSend={canDispatch}
@@ -306,7 +313,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const { user, signOut } = useAuth();
   const gameSettings = useGameSettings();
   useEffect(() => { setBgmPlaying(gameSettings.bgm); return () => setBgmPlaying(false); }, [gameSettings.bgm]);
-  useEffect(() => { if (hit.n > 0) { playSample('strike'); haptic(120); if (document.hidden) sendNotice('짐승의 공격!', '거점 밖에서 짐승에게 공격받고 있어요', 'beast-hit'); } }, [hit.n]);
+  useEffect(() => { if (hit.n > 0) { playSample('strike'); if (visibleEntities.some(e => e.kind === 'creature' && e.id === auto.job?.id)) playSample('beastAttack'); haptic(120); if (document.hidden) sendNotice('짐승의 공격!', '거점 밖에서 짐승에게 공격받고 있어요', 'beast-hit'); } }, [hit.n]); // eslint-disable-line react-hooks/exhaustive-deps
   // Beasts inside 10m (or chasing after being hit) strike the player first.
   const [aggroIds, setAggroIds] = useState<Set<string>>(() => new Set());
   const winterOn = gameSettings.winter;
@@ -332,6 +339,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       if (!near || near.kind !== 'creature' || t - lastBeastStrike.current < BEAST_STRIKE_INTERVAL_MS) return;
       lastBeastStrike.current = t;
       setBeastStrike({ id: near.id, at: t });
+      if (!document.hidden) playSample('beastAttack');
       const def = creatureDef(near.type);
       w.takeDamage(def.atk);
       toast.error(`${def.name}이(가) 먼저 공격했습니다! 공격하거나 도망치세요`);

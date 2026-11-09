@@ -26,3 +26,4 @@
 - Survival item catalog merges code ITEMS with admin rows in survival_item_catalog (useItemCatalog); passive utility tech numbers live in utilitySkills.ts; why: new code items appear in /admin/items automatically and bonuses stay testable.
 - Vassal tribute settles via server RPCs only; why: no client writes another save.
 - Hatched pets use versioned owned instances and pure pets.ts fusion/defense rules, separate from wolf/NPC companions; shared creature damage/depletion prevents duplicate PvE kills, and base patrol never writes GPS or peer state.
+- Uploaded movement and beast audio reuse gameSettings sample caching, settings and overlap guards; presentation hooks trigger them without changing gameplay or GPS.

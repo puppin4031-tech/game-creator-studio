@@ -3,6 +3,9 @@ import chopWood from '@/assets/sfx/chop_wood.wav.asset.json';
 import gatherSfx from '@/assets/sfx/gather.m4a.asset.json';
 import hitSfx from '@/assets/sfx/hit.wav.asset.json';
 import mineRock from '@/assets/sfx/mine_rock.wav.asset.json';
+import beastAttack from '@/assets/sfx/beast_attack.m4a.asset.json';
+import beastCall from '@/assets/sfx/beast_call.m4a.asset.json';
+import footstep from '@/assets/sfx/footstep.mp3.asset.json';
 
 export type VolumeLevel = 'S' | 'M' | 'L';
 export interface GameSettings { bgm: boolean; sfx: boolean; volume: VolumeLevel; haptic: boolean; notify: boolean; winter: boolean }
@@ -59,33 +62,19 @@ export function unlockSound() {
   } catch { /* unsupported */ }
 }
 
-/** Short filtered ground crunch and a low heel thud, without downloading a sample. */
+/** Uploaded walking sample; shared throttling prevents overlapping footsteps. */
 export function playFootstep() {
-  if (!current.sfx) return;
-  const a = audio(); if (!a || a.state !== 'running') return;
-  const now = a.currentTime;
-  const buffer = a.createBuffer(1, Math.ceil(a.sampleRate * 0.11), a.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (a.sampleRate * 0.025));
-  const source = a.createBufferSource(); source.buffer = buffer;
-  // Phone speakers drop low frequencies, so keep the crunch bright enough to hear.
-  const filter = a.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 2400;
-  const gain = a.createGain(); gain.gain.value = Math.min(1, SAMPLE_GAIN[current.volume] * 1.5);
-  source.connect(filter).connect(gain).connect(a.destination); source.start(now);
-  const heel = a.createOscillator(); const heelGain = a.createGain();
-  heel.frequency.setValueAtTime(220, now); heel.frequency.exponentialRampToValueAtTime(90, now + 0.08);
-  heelGain.gain.setValueAtTime(VOLUME_GAIN[current.volume] * 1.5, now);
-  heelGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
-  heel.connect(heelGain).connect(a.destination); heel.start(now); heel.stop(now + 0.1);
+  playSample('footstep');
 }
 
-export type SampleId = 'chop' | 'mine' | 'gather' | 'strike';
-const SAMPLE_URL: Record<SampleId, string> = { chop: chopWood.url, mine: mineRock.url, gather: gatherSfx.url, strike: hitSfx.url };
+export type SampleId = 'chop' | 'mine' | 'gather' | 'strike' | 'beastAttack' | 'beastCall' | 'footstep';
+const SAMPLE_URL: Record<SampleId, string> = { chop: chopWood.url, mine: mineRock.url, gather: gatherSfx.url, strike: hitSfx.url, beastAttack: beastAttack.url, beastCall: beastCall.url, footstep: footstep.url };
+const activeSamples = new Set<SampleId>();
 const buffers = new Map<SampleId, Promise<AudioBuffer | null>>();
 function loadSample(a: AudioContext, id: SampleId) {
   let p = buffers.get(id);
   if (!p) {
-    p = fetch(SAMPLE_URL[id]).then(r => r.arrayBuffer()).then(b => a.decodeAudioData(b)).catch(() => null);
+    p = fetch(SAMPLE_URL[id]).then(r => { if (!r.ok) throw new Error('Sound unavailable'); return r.arrayBuffer(); }).then(b => a.decodeAudioData(b)).catch(() => { buffers.delete(id); return null; });
     buffers.set(id, p);
   }
   return p;
@@ -94,12 +83,20 @@ function loadSample(a: AudioContext, id: SampleId) {
 export function playSample(id: SampleId) {
   if (!current.sfx) return;
   const a = audio(); if (!a) return;
+  const exclusive = id === 'footstep' || id === 'beastAttack' || id === 'beastCall';
+  if (exclusive && activeSamples.has(id)) return;
+  if (exclusive) activeSamples.add(id);
   void loadSample(a, id).then(buf => {
-    if (!buf) { playSfx('hit'); return; }
+    if (!buf || !current.sfx || document.hidden || a.state !== 'running') {
+      activeSamples.delete(id);
+      if (!buf && !exclusive) playSfx('hit');
+      return;
+    }
     const src = a.createBufferSource(); const g = a.createGain();
     src.buffer = buf; g.gain.value = SAMPLE_GAIN[current.volume];
+    src.onended = () => { activeSamples.delete(id); src.disconnect(); g.disconnect(); };
     src.connect(g).connect(a.destination); src.start();
-  });
+  }).catch(() => { activeSamples.delete(id); });
 }
 
 export type SfxId = 'hit' | 'warn' | 'notify' | 'emote' | 'crack' | 'burst' | 'fanfare';
