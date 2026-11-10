@@ -806,7 +806,9 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   {!!s.packedItems?.length && <Button variant="outline" disabled={!g.inBase || !actionReady} className="h-11 w-full" onClick={g.storePacked}>휴대 재료 모두 창고에 보관</Button>}
                   <div><b className="text-sm">창고</b><div className="mt-1"><Stacks stacks={s.storage} onUse={g.eat} /></div><div className="mt-2 flex flex-wrap gap-1">{s.storage.map(st => <Button key={st.itemId} variant="outline" size="sm" className="min-h-11 text-xs" disabled={!g.inBase || !actionReady} onClick={() => g.withdraw(st.itemId)}>{ITEMS[st.itemId].name} 1개 꺼내기</Button>)}</div></div>
                   </>}
-                  {baseTab === 'pets' && <PetPanel pets={s.pets ?? []} defense={s.petDefense} now={nowTick} ready={atMainBase(s) && (!realGps || gps.ready || !gps.fix)} onFuse={g.mergePets} onDeploy={g.togglePetDeploy} onLock={g.togglePetLock} />}
+                  {baseTab === 'pets' && <PetPanel pets={s.pets ?? []} defense={s.petDefense} now={nowTick} ready={atMainBase(s) && (!realGps || gps.ready || !gps.fix)} onFuse={g.mergePets} onDeploy={g.togglePetDeploy} onLock={g.togglePetLock}
+                    eggs={(s.dinoEggs ?? []).map(e => ({ id: e.id, name: '공룡 알', walked: eggWalkedM(e, s.walkSteps ?? 0), need: eggNeedM(e), ready: eggReady(e, s.walkSteps ?? 0) }))}
+                    onHatch={(id) => { const baby = g.hatchEgg(id); if (baby) setHatched(baby); else toast.warning('거점 안에서 알이 배낭이나 창고에 있어야 부화해요'); }} />}
                   {baseTab === 'expedition' && <>
                   {realGps && expeditionControls}
                   {(!realGps || s.expedition) && <ExpeditionPanel expedition={s.expedition} report={s.scoutReport} now={nowTick} exploredTotal={s.exploredTotal ?? s.explored.length} mark={s.expeditionMark ?? 0}

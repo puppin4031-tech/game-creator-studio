@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Lock, LockOpen, Merge, Shield, House } from 'lucide-react';
+import { Egg, Lock, LockOpen, Merge, Shield, House } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { fusionPartner, PET_DAILY_LOOT_CAP, PET_GUARD_SLOTS, PET_MAX_LEVEL, petDay, petStats, type OwnedPet, type PetDefense } from '@/lib/survival/pets';
@@ -7,7 +7,8 @@ import { petById } from '@/lib/survival/dinoEggs';
 import PetSprite from './PetSprite';
 import { HpBar } from './HitFeedback';
 
-export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, onLock }: {
+export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, onLock, eggs = [], onHatch }: {
+  eggs?: { id: string; name: string; walked: number; need: number; ready: boolean }[]; onHatch?: (id: string) => void;
   pets: OwnedPet[]; defense?: PetDefense; ready: boolean; now: number;
   onFuse: (first: string, second: string) => boolean; onDeploy: (uid: string) => void; onLock: (uid: string) => void;
 }) {
@@ -19,6 +20,15 @@ export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, 
       <b className="flex items-center gap-1 text-sm"><Shield className="!h-4 !w-4" />수호 {pets.filter(p => p.deployed).length}/{PET_GUARD_SLOTS}</b>
       <span>오늘 전리품 {defense?.day === petDay(now) ? defense.claims : 0}/{PET_DAILY_LOOT_CAP}</span>
     </div>
+    {eggs.length > 0 && <div className="space-y-2" aria-label="부화 대기 알">
+      <b className="flex items-center gap-1 text-sm"><Egg className="!h-4 !w-4" />보유한 알 {eggs.length}개</b>
+      {eggs.map(e => <div key={e.id} className="pixel-frame flex items-center gap-2 bg-card p-2 text-xs">
+        <div className="min-w-0 flex-1"><b className="block text-sm">{e.name}</b>
+          <span>{e.ready ? '부화 준비 완료!' : `걸음 ${Math.floor(e.walked)}/${e.need}m`}</span>
+          <div className="mt-1 h-1.5 bg-muted"><div className="h-full bg-primary" style={{ width: `${Math.min(100, (e.walked / e.need) * 100)}%` }} /></div></div>
+        <Button className="min-h-11 shrink-0 text-xs" disabled={!e.ready || !onHatch} onClick={() => onHatch?.(e.id)}><Egg className="!h-4 !w-4" />부화하기</Button>
+      </div>)}
+    </div>}
     {!pets.length && <p className="py-6 text-center text-sm text-muted-foreground">아직 부화한 펫이 없습니다.</p>}
     {pets.map(p => {
       const partner = fusionPartner(pets, p), stats = petStats(p.level);
