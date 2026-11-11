@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ColonionOpening } from "@/components/survival/ColonionOpening";
 import titleArt from "@/assets/colonion_title.jpg.asset.json";
 import { enterGuestSession } from '@/lib/guestEntry';
+import { lovable } from "@/integrations/lovable/index";
 
 function AnimatedSection({
   children,
@@ -93,6 +94,22 @@ export default function LandingPage() {
     } finally { setEntering(false); }
   };
 
+  const guestWorld = async () => {
+    if (entering) return;
+    setEntering(true);
+    try { await enterGuestSession(); navigate('/world'); }
+    catch { toast.error('비회원 입장이 지연돼요. 잠시 후 다시 시도해 주세요.'); }
+    finally { setEntering(false); }
+  };
+
+  const loginGoogle = async () => {
+    try {
+      const back = `${window.location.origin}/login?returnTo=${encodeURIComponent('/world')}`;
+      const r = await lovable.auth.signInWithOAuth('google', { redirect_uri: back });
+      if (r.error) toast.error('Google 로그인에 실패했어요. 다시 시도해 주세요.');
+    } catch { toast.error('Google 로그인에 실패했어요. 연결을 확인해 주세요.'); }
+  };
+
   const enterWorld = (name: string) => {
     if (name) toast.success(`${name} 족장님, 구석기 시대에 오신 것을 환영합니다`);
     if (!user) {
@@ -130,13 +147,22 @@ export default function LandingPage() {
           transition={{ delay: 0.6, duration: 0.6 }}
         >
           <p className="mb-4 text-sm text-colonion-parchment">GPS기반 문명개척 무료게임</p>
-          <Button
-            onClick={startExploration}
-            disabled={isLoading || entering}
-            className="flex h-14 w-full items-center justify-center gap-2 rounded border-2 border-colonion-wood-edge bg-gradient-to-b from-primary to-colonion-ember text-base font-bold text-colonion-night shadow-lg active:translate-y-0.5"
-          >
-            {entering ? '입장 중…' : '바로 문명 개척 시작하기'} <Play className="!h-5 !w-5 fill-current" />
-          </Button>
+          {user ? (
+            <Button
+              onClick={() => navigate('/world')}
+              disabled={isLoading}
+              className="flex h-14 w-full items-center justify-center gap-2 rounded border-2 border-colonion-wood-edge bg-gradient-to-b from-primary to-colonion-ember text-base font-bold text-colonion-night shadow-lg active:translate-y-0.5"
+            >
+              문명 개척 시작하기 <Play className="!h-5 !w-5 fill-current" />
+            </Button>
+          ) : (
+            <div className="pixel-panel space-y-2 p-3">
+              <p className="text-xs text-colonion-parchment">로그인 · 회원가입</p>
+              <Button onClick={loginGoogle} disabled={isLoading || entering} className="h-12 w-full rounded border-2 border-colonion-wood-edge font-bold">Google로 계속하기</Button>
+              <Button onClick={guestWorld} disabled={isLoading || entering} variant="secondary" className="h-12 w-full rounded border-2 border-colonion-wood-edge font-bold">{entering ? '입장 중…' : '비회원으로 바로 입장하기'}</Button>
+              <Button onClick={() => navigate('/login?returnTo=%2Fworld')} variant="outline" className="h-12 w-full rounded border-2 border-colonion-wood-edge font-bold">기존 이메일 계정으로 로그인</Button>
+            </div>
+          )}
         </motion.div>
       </section>
 
