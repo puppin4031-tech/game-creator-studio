@@ -1,3 +1,4 @@
+import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -53,6 +54,16 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function AdminRoutes() {
   const { isMainAdmin, isSubAdmin, isLoading } = useAuth();
   if (isLoading) return null;
+  // Guests (anonymous sessions) and regular players have no admin role: offer an admin sign-in instead of a redirect loop.
+  if (!isMainAdmin && !isSubAdmin) {
+    const toAdminLogin = async () => { await supabase.auth.signOut(); window.location.assign(loginUrlFor('/admin')); };
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-6 text-center">
+        <p className="text-sm text-muted-foreground">관리자 권한이 없는 계정(비회원 등)으로 접속 중이에요.</p>
+        <button className="min-h-11 rounded-md bg-primary px-4 text-primary-foreground" onClick={toAdminLogin}>관리자 계정으로 로그인</button>
+      </div>
+    );
+  }
 
   return (
     <Routes>
