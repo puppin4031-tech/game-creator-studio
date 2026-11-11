@@ -13,7 +13,7 @@ import { SPRITE_ACTIONS, SPRITE_ACTION_LABELS, SPRITE_BUCKET, useSpriteAnimation
 import { CREATURES } from '@/lib/survival/entities';
 import { HERO_TIERS } from '@/lib/survival/heroTier';
 
-const TARGETS = [...[...HERO_TIERS].reverse().map(h => ({ key: h.key, label: h.label })), ...Object.entries(CREATURES).map(([k, c]) => ({ key: `mob:${k}`, label: `몹 · ${c.name}` }))];
+const TARGETS = [...[...HERO_TIERS].reverse().map(h => ({ key: h.key, label: h.label })), { key: 'tribe', label: '부족민' }, ...Object.entries(CREATURES).map(([k, c]) => ({ key: `mob:${k}`, label: `몹 · ${c.name}` }))];
 const MOB_ACTIONS: SpriteAction[] = ['idle', 'attack'];
 
 export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARACTER: string }) {
