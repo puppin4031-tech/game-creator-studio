@@ -60,13 +60,7 @@ export default function ExpeditionJoystick({ crew, candidates, project, onManual
         onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); stick(e); }} onPointerMove={e => e.buttons && stick(e)} onPointerUp={release} onPointerCancel={release}>
         <div className="absolute left-1/2 top-1/2 h-12 w-12 rounded-full border-2 border-foreground bg-primary" style={{ transform: `translate(calc(-50% + ${knob.x}px), calc(-50% + ${knob.y}px))` }} />
       </div>
-      <div className="absolute bottom-28 right-4 flex flex-col gap-3">
-        {(['attack', 'gather'] as const).map(k => <button key={k} type="button" aria-label={k === 'attack' ? '공격 아이콘을 적에게 끌어 놓기' : '채집 아이콘을 자원에 끌어 놓기'} className={iconBtn}
-          onPointerDown={e => { e.preventDefault(); setDrag({ kind: k, ...local(e) }); }}>
-          {k === 'attack' ? <Swords className="!h-7 !w-7" /> : <Pickaxe className="!h-7 !w-7" />}
-        </button>)}
-      </div>
-      <p className="absolute bottom-[4.5rem] left-1/2 -translate-x-1/2 whitespace-nowrap bg-background/80 px-2 text-[11px]">아이콘을 끌어 적·자원에 놓기 · 움직이면 동작 취소</p>
+      <p className="absolute bottom-[4.5rem] left-1/2 -translate-x-1/2 whitespace-nowrap bg-background/80 px-2 text-[11px]">조이스틱으로 이동 · 가까운 맹수 방어와 채집은 자동</p>
     </>}
     {drag && <div className="pointer-events-none absolute flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-primary bg-card/90" style={{ left: drag.x, top: drag.y }}>
       {drag.kind === 'attack' ? <Swords className="!h-6 !w-6 text-destructive" /> : <Pickaxe className="!h-6 !w-6 text-primary" />}

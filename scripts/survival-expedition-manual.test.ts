@@ -15,3 +15,11 @@ test('manual crew without a target stays put', () => {
   const r = advanceExpedition(c, [], 1000, false, false);
   expect(r.crew.pos).toEqual(c.pos);
 });
+
+import { autoPatrolTarget as pickAuto } from '../src/lib/survival/expedition';
+test('auto patrol repels an ambushing raptor before gathering', () => {
+  const crew = { pos: { lat: 0, lng: 0 }, focus: 'materials' } as never;
+  const raptor = { id: 'r', kind: 'creature', type: 'raptor', lat: 0.00003, lng: 0 } as never;
+  const stone = { id: 's', kind: 'node', type: 'stone', lat: 0.00001, lng: 0 } as never;
+  expect((pickAuto(crew, [stone, raptor]) as { id: string }).id).toBe('r');
+});

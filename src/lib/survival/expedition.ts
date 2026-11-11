@@ -92,6 +92,13 @@ export function expeditionLoot(entity: WorldEntity, outdoor: boolean, random: ()
 }
 
 /** Uses shared combat and geographic entities; does not move the player or grant walking distance. */
+/** Auto patrol priority: repel ambushing beasts, then focus matches, then any workable node nearby. */
+export function autoPatrolTarget(crew: ObservedExpedition, nearby: WorldEntity[]): WorldEntity | undefined {
+  const close = nearby.filter(e => distanceM(crew.pos, e) <= EXPEDITION_RADIUS_M).sort((a, b) => distanceM(crew.pos, a) - distanceM(crew.pos, b));
+  return close.find(e => e.kind === 'creature' && !creatureDef(e.type).boss && creatureDef(e.type).temper === 'aggressive')
+    ?? close.find(e => matchesFocus(e, crew.focus))
+    ?? close.find(e => e.kind === 'node' && (matchesFocus(e, 'survival') || matchesFocus(e, 'materials')));
+}
 export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEntity[], now: number, outdoor: boolean, repeat: boolean, random: () => number = Math.random, sharedDamage?: Record<string, number>) {
   let crew = { ...previous, lastAt: now };
   const rewards: Stack[] = [];
@@ -101,8 +108,8 @@ export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEnt
   // No invented offline catches: suspended tabs resume from the last visual position.
   const elapsed = Math.max(0, Math.min(1000, now - previous.lastAt));
   if (crew.target && !nearby.some(e => e.id === crew.target?.id)) crew = { ...crew, target: undefined, damage: 0 };
-  if (!crew.manual && !crew.target && crew.phase === 'outbound') {
-    const target = nearby.find(e => distanceM(crew.pos, e) <= EXPEDITION_RADIUS_M && matchesFocus(e, crew.focus));
+  if (!crew.target && crew.phase === 'outbound') {
+    const target = autoPatrolTarget(crew, nearby);
     if (target) {
       crew.target = target;
       text = target.kind === 'node' ? `원정대가 ${nodeDef(target.type).name} 발견 · 채집 시작` : `${creatureDef(target.type).name}와 교전 시작! (HP ${crew.hp}/${crew.maxHp ?? 100})`;
