@@ -4,7 +4,7 @@ import type { Stack } from './types';
 export interface MercenaryContract { name: string; hiredAt: number; until: number }
 
 export const MERC_CONTRACT_MS = 24 * 60 * 60 * 1000;
-export const MERC_COST: Stack[] = [{ itemId: 'raw_meat', count: 3 }, { itemId: 'fur', count: 1 }, { itemId: 'apple', count: 2 }];
+export const MERC_COST: Stack[] = [{ itemId: 'raw_meat', count: 3 }, { itemId: 'hide', count: 1 }, { itemId: 'apple', count: 2 }];
 const NAMES = ['거친 송곳니', '외눈 바위', '붉은 흉터', '늑대 사냥꾼', '돌주먹'];
 
 export const mercActive = (m: MercenaryContract | null | undefined, now: number) => !!m && now < m.until;
@@ -27,12 +27,12 @@ export interface TribeState { count: number; trainLevel: number; injuredUntil?: 
 const S = (itemId: Stack['itemId'], count: number): Stack => ({ itemId, count });
 /** Cost to recruit member number (current count + 1). */
 export const TRIBE_HIRE_COSTS: Stack[][] = [
-  [S('raw_meat', 3), S('fur', 1), S('apple', 2)],
+  [S('raw_meat', 3), S('hide', 1), S('apple', 2)],
   [S('cooked_meat', 2), S('flint', 5), S('clay', 5)],
   [S('cooked_meat', 4), S('jerky', 2), S('resin', 3), S('spring_water', 3)],
   [S('cooked_meat', 5), S('jerky', 4), S('clay_pot', 2), S('ancient_fang', 1), S('leather', 2)],
   [S('wood_mallet', 1), S('stone_maul', 1), S('frost_shard', 2), S('obsidian', 3), S('log', 5)],
-  [S('jerky', 6), S('flint_hatchet', 1), S('bone_dagger', 1), S('leather', 4), S('fur', 3)],
+  [S('jerky', 6), S('flint_hatchet', 1), S('bone_dagger', 1), S('leather', 4), S('hide', 3)],
   [S('jerky', 8), S('obsidian_axe', 1), S('bark_vest', 1), S('quartz', 3), S('ochre', 3)],
   [S('jerky', 10), S('bone_plate', 1), S('bone_charm', 1), S('prime_pelt', 2), S('tusk', 3)],
   [S('jerky', 12), S('quartz_charm', 1), S('frost_pelt', 3), S('ancient_fang', 2), S('jade', 2)],
