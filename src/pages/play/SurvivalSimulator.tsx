@@ -736,7 +736,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 <>
                   <p className="text-xs text-muted-foreground">음식은 눌러서 먹을 수 있어요.</p>
                   <Stacks stacks={s.backpack} onUse={g.eat} />
-                  {!!s.packedItems?.length && <Button variant="outline" disabled={!g.inBase || !actionReady} className="h-11 w-full" onClick={g.storePacked}>휴대 재료 모두 창고에 보관</Button>}
+                  {!!s.backpack.filter(st => st.itemId !== 'shell').length && <div className="flex flex-wrap gap-1">{s.backpack.filter(st => st.itemId !== 'shell').map(st => <Button key={st.itemId} variant="outline" size="sm" className="min-h-11 text-xs" disabled={!g.inBase || !actionReady} onClick={() => g.storeOne(st.itemId)}>{ITEMS[st.itemId].name} 1개 창고에 넣기</Button>)}</div>}
                   <EquipmentSlots gear={s.gear} loadout={g.loadout} level={s.level} onEquip={g.equip} icon={(x) => <Sprite k={ITEMS[x.itemId].sprite} scale={0.75} />} />
                   <BackpackDiscard backpack={s.backpack} onDrop={g.dropItems} />
                 </>
@@ -811,7 +811,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   )}
                   </>}
                   {baseTab === 'storage' && <>
-                  {!!s.packedItems?.length && <Button variant="outline" disabled={!g.inBase || !actionReady} className="h-11 w-full" onClick={g.storePacked}>휴대 재료 모두 창고에 보관</Button>}
+                  {!!s.backpack.filter(st => st.itemId !== 'shell').length && <div className="flex flex-wrap gap-1">{s.backpack.filter(st => st.itemId !== 'shell').map(st => <Button key={st.itemId} variant="outline" size="sm" className="min-h-11 text-xs" disabled={!g.inBase || !actionReady} onClick={() => g.storeOne(st.itemId)}>{ITEMS[st.itemId].name} 1개 창고에 넣기</Button>)}</div>}
                   <div><b className="text-sm">창고</b><div className="mt-1"><Stacks stacks={s.storage} onUse={g.eat} /></div><div className="mt-2 flex flex-wrap gap-1">{s.storage.map(st => <Button key={st.itemId} variant="outline" size="sm" className="min-h-11 text-xs" disabled={!g.inBase || !actionReady} onClick={() => g.withdraw(st.itemId)}>{ITEMS[st.itemId].name} 1개 꺼내기</Button>)}</div></div>
                   </>}
                   {baseTab === 'pets' && <PetPanel pets={s.pets ?? []} defense={s.petDefense} now={nowTick} ready={atMainBase(s) && (!realGps || gps.ready || !gps.fix)} onFuse={g.mergePets} onDeploy={g.togglePetDeploy} onRole={g.assignPetRole} onLock={g.togglePetLock}

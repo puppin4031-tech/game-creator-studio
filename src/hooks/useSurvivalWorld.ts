@@ -281,12 +281,13 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   // pulled back out of storage) so it can be spent at traders.
   useEffect(() => {
     if (!enabled || !inBase) return;
-    const deposit = s.backpack.filter((x) => x.itemId !== 'shell' && !(s.packedItems ?? []).includes(x.itemId));
+    // Manual storage only: nothing auto-deposits; only shells are pulled back out of storage.
+    const deposit: Stack[] = [];
     const storedShell = s.storage.find((x) => x.itemId === 'shell');
     if (!deposit.length && !storedShell) return;
     if (deposit.length) toast.success(`거점 귀환! ${fmt(deposit)} 창고에 보관`);
     setS((p) => {
-      const dep = p.backpack.filter((x) => x.itemId !== 'shell' && !(p.packedItems ?? []).includes(x.itemId));
+      const dep: Stack[] = [];
       const shells = [...p.backpack, ...p.storage].filter((x) => x.itemId === 'shell').reduce((n, x) => n + x.count, 0);
       return {
         ...p,
@@ -346,10 +347,15 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (dispatchObserved(destination, focus)) setS(p => ({ ...p, expeditionAuto: true }));
   }, [dispatchObserved, setS]);
   const payCost = (p: WorldSave, cost: Stack[]) => {
-    const fromStorage = removeStacks(p.storage, cost);
-    if (fromStorage) return { storage: fromStorage, backpack: p.backpack };
-    const fromPack = removeStacks(p.backpack, cost);
-    return fromPack ? { storage: p.storage, backpack: fromPack } : null;
+    // Storage first, then backpack, per item (mixed sources allowed).
+    let storage = p.storage, backpack = p.backpack;
+    for (const c of cost) {
+      const inStore = storage.find(x => x.itemId === c.itemId)?.count ?? 0;
+      const a = Math.min(inStore, c.count), b = c.count - a;
+      if (a) { const r = removeStacks(storage, [{ itemId: c.itemId, count: a }]); if (!r) return null; storage = r; }
+      if (b) { const r = removeStacks(backpack, [{ itemId: c.itemId, count: b }]); if (!r) return null; backpack = r; }
+    }
+    return { storage, backpack };
   };
   const hireMerc = useCallback(() => {
     const p = ref.current; const now = Date.now();
@@ -849,6 +855,13 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     setS({ ...p, storage, backpack: addStacks(p.backpack, [{ itemId, count: 1 }]), packedItems: [...new Set([...(p.packedItems ?? []), itemId])] });
   }, [capacity, setS]);
 
+  const storeOne = useCallback((itemId: ItemId) => {
+    const p = ref.current;
+    if (!enabledRef.current || !atWorkshop(p)) { toast.warning('거점 안에서만 보관할 수 있습니다'); return; }
+    const backpack = removeStacks(p.backpack, [{ itemId, count: 1 }]);
+    if (!backpack) return;
+    setS({ ...p, backpack, storage: addStacks(p.storage, [{ itemId, count: 1 }]) });
+  }, [setS]);
   const storePacked = useCallback(() => {
     if (!enabledRef.current || !atWorkshop(ref.current)) return;
     setS(p => ({ ...p, packedItems: [] }));
@@ -1021,7 +1034,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS, options.indoor]);
   const updateInventionCredits = useCallback((credits: InventionCredits) => setS(p => ({ ...p, inventionCredits: credits, inventionWalkMark: credits.walkMeters === 0 ? p.walkSteps ?? 0 : p.inventionWalkMark })), [setS]);
 
-  return { crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, toggleEscort, trainTribe, treatTribe, meetShaman, pickEgg, hatchEgg, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
+  return { crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, toggleEscort, trainTribe, treatTribe, meetShaman, pickEgg, hatchEgg, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
     petHits, mergePets, togglePetDeploy, assignPetRole, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,
