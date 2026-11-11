@@ -17,6 +17,7 @@ import MainDashboard from "./pages/admin/MainDashboard";
 import GlobalMapView from "./pages/admin/GlobalMapView";
 import UserManagement from "./pages/admin/UserManagement";
 import SpriteAssets from "./pages/admin/SpriteAssets";
+import ImageLibrary from "./pages/admin/ImageLibrary";
 import PetMobStudio from "./pages/admin/PetMobStudio";
 import ItemCatalog from "./pages/admin/ItemCatalog";
 import SupportInbox from "./pages/admin/SupportInbox";
@@ -73,6 +74,7 @@ function AdminRoutes() {
           <Route path="map" element={<GlobalMapView />} />
           <Route path="users" element={<UserManagement />} />
           <Route path="sprites" element={<SpriteAssets />} />
+          <Route path="images" element={<ImageLibrary />} />
           <Route path="pets-mobs" element={<PetMobStudio />} />
           <Route path="items" element={<ItemCatalog />} />
           <Route path="support" element={<SupportInbox />} />
