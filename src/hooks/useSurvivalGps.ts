@@ -52,3 +52,5 @@ export function useSurvivalGps(enabled: boolean, onPosition: (pos: LatLng) => vo
   const lockMessage = locked ? `급격한 이동 감지 · ${Math.ceil((lockedUntil - now) / 1000)}초 후 활동할 수 있습니다.` : null;
   return { fix, ready, error: error ?? lockMessage ?? (fix && !ready && enabled ? 'GPS 신호가 오래되었습니다. 위치를 다시 확인합니다.' : null), retry };
 }
+// Hook order can change across modules during edits; force a full reload instead of hot patching.
+if (import.meta.hot) import.meta.hot.decline();

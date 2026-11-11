@@ -6,7 +6,7 @@
 - GPS routes allow indoor expeditions without moving player GPS; direct/pocket actions require actual GPS, and simulator saves remain isolated to prevent false walking rewards.
 - Survival resource coordinates derive from the shared geographic seed, not the current camera/player center; GPS signal quality gates all real-world interactions and base actions to prevent remote or stale-location play.
 - Survival GPS progression reuses progression.ts and quests.ts through worldProgress.ts; persist counters and quest index with the world save, and claim rewards only at a GPS-valid base to avoid duplicate rewards or divergent rules.
-- Keep the survival screen's Fast Refresh reset directive: custom world/GPS hook updates can change hook order across modules, so preview refresh must remount from the persisted save rather than reuse stale React hook queues.
+- Survival screen and its world/GPS hooks call import.meta.hot.decline() (plus the refresh reset directive); why: hot patching custom hooks breaks hook queues, so edits must full-reload from the persisted save.
 - Survival terrain colors come from global CSS tokens; visual-only scenery uses a separate geographic seed salt and one canvas beneath fog, so map detail never changes resource positions or intercepts interactions.
 - CharacterSprite renders all characters with private action sheets and a CDN latest-idle fallback; why: guests and failed loads must never show legacy portraits.
 - Real terrain zones (riverside/highland/plains) are sampled from rendered map surfaces and stored per coarse cell in the world save (first sample wins); why: resource ratios must stay stable for a place while still reflecting real geography.

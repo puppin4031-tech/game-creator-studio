@@ -1043,3 +1043,6 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     recipes: RECIPES, NODES, CREATURES,
   };
 }
+
+// Hook order can change across modules during edits; force a full reload instead of hot patching.
+if (import.meta.hot) import.meta.hot.decline();
