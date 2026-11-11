@@ -193,7 +193,9 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     return () => window.clearInterval(timer);
   }, [nearbyBeast]);
   const expeditionDestination = expeditionTarget ?? offsetM(s.base ?? s.pos, 180, 0);
-  const canDispatch = !!s.base && (!realGps || !gps.ready || g.inBase);
+  const hasTribe = (s.tribe?.count ?? 0) > 0;
+  const canDispatch = !!s.base && (!realGps || !gps.ready || g.inBase || hasTribe);
+  const [fieldExp, setFieldExp] = useState(false);
   const expeditionControls = <ExpeditionSystem crew={crew} logs={s.expeditionLogs ?? []} target={expeditionTarget} home={s.base} auto={!!s.expeditionAuto} pocket={g.pocketMode} outdoor={g.outdoorMoving && (g.pocketMode || (!!crew && distanceM(s.pos, crew.pos) <= 40))} watching={watchExpedition} gpsReady={gps.ready} canSend={canDispatch}
     focus={crew?.focus ?? expeditionFocus} onFocus={setExpeditionFocus}
     onSend={() => { if (g.dispatchObserved(expeditionDestination, expeditionFocus)) { setWatchExpedition(true); setPanel('none'); } }}
@@ -482,6 +484,10 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden font-pixel">
+      {realGps && hasTribe && !g.inBase && s.base && <div className="pointer-events-none fixed inset-x-2 z-40 flex flex-col items-start gap-2" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 13rem)' }}>
+        {fieldExp && <div className="pixel-panel pointer-events-auto max-h-[50dvh] w-full max-w-md overflow-y-auto bg-card p-2">{expeditionControls}</div>}
+        <button type="button" onClick={() => setFieldExp(v => !v)} className="pixel-btn pointer-events-auto flex min-h-11 items-center gap-1 bg-primary px-3 text-xs text-primary-foreground"><Compass className="!h-5 !w-5" />{fieldExp ? '원정 닫기' : crew ? '원정 지휘' : '원정 보내기'}</button>
+      </div>}
       <AnimatePresence>{showOpening && <ColonionOpening onEnter={enterWorld} />}</AnimatePresence>
       {<TerrainMap center={watchExpedition && crew ? crew.pos : s.pos} visionM={g.vision} explored={s.explored} onTap={onTap} zone={zone} onSurfaceZone={onSurfaceZone} onSurfacePark={onSurfacePark} onLandmarks={setLandmarks} bearing={compassOn && heading !== null ? heading : 0}>
         {(project, mpp) => (

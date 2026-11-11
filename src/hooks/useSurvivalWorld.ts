@@ -329,7 +329,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const appendLog = (p: WorldSave, text: string, at: number): ExpeditionLog[] => [...(p.expeditionLogs ?? []), { at, text }].slice(-20);
   const dispatchObserved = useCallback((destination: LatLng, focus: ExpeditionFocus = 'materials') => {
     const p = ref.current;
-    if (!p.base || p.observedExpedition || (enabledRef.current && !atMainBase(p))) return false;
+    const hasTribe = (p.tribe?.count ?? 0) > 0 && !tribeInjured(p.tribe, Date.now());
+    if (!p.base || p.observedExpedition || (enabledRef.current && !atMainBase(p) && !hasTribe)) return false;
     const raw = startObservedExpedition(p.base, destination, Date.now(), focus);
     if (!raw) { toast.warning('거점에서 10~1,500m 이내 목표를 선택하세요'); return false; }
     const tribeReady = (p.tribe?.count ?? 0) > 0 && !tribeInjured(p.tribe, Date.now());
