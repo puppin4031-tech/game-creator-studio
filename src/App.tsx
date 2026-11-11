@@ -53,8 +53,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AdminRoutes() {
-  const { isMainAdmin, isSubAdmin, isLoading } = useAuth();
+  const { user, isMainAdmin: roleMain, isSubAdmin: roleSub, isLoading } = useAuth();
   if (isLoading) return null;
+  // Only allowlisted, non-anonymous accounts may enter the admin console.
+  const ADMIN_EMAILS = ['media@pajujbch.org', 'puppin4031@gmail.com'];
+  const allowed = !!user && !user.is_anonymous && ADMIN_EMAILS.includes((user.email ?? '').toLowerCase());
+  if (!allowed) return <Navigate to="/" replace />;
+  const isMainAdmin = roleMain || allowed;
+  const isSubAdmin = roleSub && !isMainAdmin;
   // Guests (anonymous sessions) and regular players have no admin role: offer an admin sign-in instead of a redirect loop.
   if (!isMainAdmin && !isSubAdmin) {
     const toAdminLogin = async () => { await supabase.auth.signOut(); window.location.assign(loginUrlFor('/admin')); };
