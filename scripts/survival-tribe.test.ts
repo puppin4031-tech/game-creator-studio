@@ -14,3 +14,14 @@ test('tribe eats fruit and cooked meat; missing food starves', () => {
   expect(r.storage).toEqual([]); expect(r.starving).toBe(false);
   expect(settleUpkeep([], upkeepDemand(1, 0, 0), 1).starving).toBe(true);
 });
+import { escortAmbushDamage, escortReady } from '../src/lib/survival/mercenaries';
+test('escort blocks ambush on low roll, halves otherwise', () => {
+  expect(escortAmbushDamage(10, 0.1)).toBe(0);
+  expect(escortAmbushDamage(10, 0.9)).toBe(5);
+});
+test('escort not ready while injured or on expedition', () => {
+  const t = { count: 1, trainLevel: 0, escort: true };
+  expect(escortReady(t, 0, false)).toBe(true);
+  expect(escortReady(t, 0, true)).toBe(false);
+  expect(escortReady({ ...t, injuredUntil: 100 }, 0, false)).toBe(false);
+});

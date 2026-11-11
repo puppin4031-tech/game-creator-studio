@@ -27,9 +27,9 @@ const TOUR = [
 const label = (c: Stack[]) => c.map(x => `${ITEMS[x.itemId]?.name ?? x.itemId} ${x.count}`).join(' · ');
 const have = (c: Stack[], a: Stack[], b: Stack[]) => c.every(x => [...a, ...b].filter(y => y.itemId === x.itemId).reduce((n, y) => n + y.count, 0) >= x.count);
 
-interface Props { shamanMet: boolean; tribe: TribeState | undefined; storage: Stack[]; backpack: Stack[]; now: number; onMeet: () => void; onHire: () => boolean; onTrain: () => boolean; onTreat: () => boolean }
+interface Props { shamanMet: boolean; tribe: TribeState | undefined; storage: Stack[]; backpack: Stack[]; now: number; onMeet: () => void; onHire: () => boolean; onTrain: () => boolean; onTreat: () => boolean; onEscort: () => void; expeditionBusy: boolean }
 
-export default function BaseNpcs({ shamanMet, tribe, storage, backpack, now, onMeet, onHire, onTrain, onTreat }: Props) {
+export default function BaseNpcs({ shamanMet, tribe, storage, backpack, now, onMeet, onHire, onTrain, onTreat, onEscort, expeditionBusy }: Props) {
   const [open, setOpen] = useState<'shaman' | 'merc' | null>(shamanMet ? null : 'shaman');
   const [step, setStep] = useState(0);
   const [tour, setTour] = useState<number | null>(null);
@@ -79,6 +79,8 @@ export default function BaseNpcs({ shamanMet, tribe, storage, backpack, now, onM
           <div className="pixel-box space-y-1 bg-background p-2 text-xs"><b>새 부족민 영입</b><p>{hireCost ? label(hireCost) : '가득 찼어요'}</p></div>
           <Button className={pixelBtn} disabled={!hireCost || !have(hireCost, storage, backpack)} onClick={onHire}>{count + 1}번째 부족민 영입</Button>
           {count > 0 && <>
+            <div className="pixel-box space-y-1 bg-background p-2 text-xs"><b>걷기 동행 {tribe?.escort ? '· 켜짐' : ''}</b><p>함께 걸으면 채집 속도 +30%, 맹수 기습 35% 차단·나머지 피해 절반.{expeditionBusy ? ' (원정 중에는 동행 불가)' : ''} 원정은 [원정] 탭에서 보내면 부족민이 대신 다녀와요.</p></div>
+            <Button variant={tribe?.escort ? 'secondary' : 'default'} className={pixelBtn} disabled={injured} onClick={onEscort}>{tribe?.escort ? '동행 멈추기' : '함께 걷기'}</Button>
             <div className="pixel-box space-y-1 bg-background p-2 text-xs"><b>부족민 훈련 {tribe?.trainLevel ?? 0}/5</b><p>{trainCost ? label(trainCost) : '최고 단계'}</p></div>
             <Button variant="outline" className={pixelBtn} disabled={!trainCost || !have(trainCost, storage, backpack)} onClick={onTrain}>훈련하기 (능력 +3%)</Button>
           </>}

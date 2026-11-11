@@ -22,7 +22,7 @@ export const TRIBE_TRAIN_MAX = 5;
 /** Upkeep window: every hour at base, each resident eats from storage. */
 export const UPKEEP_MS = 60 * 60 * 1000;
 
-export interface TribeState { count: number; trainLevel: number; injuredUntil?: number; upkeepAt?: number; starving?: boolean }
+export interface TribeState { count: number; trainLevel: number; injuredUntil?: number; upkeepAt?: number; starving?: boolean; escort?: boolean }
 
 const S = (itemId: Stack['itemId'], count: number): Stack => ({ itemId, count });
 /** Cost to recruit member number (current count + 1). */
@@ -72,3 +72,11 @@ export function settleUpkeep(storage: Stack[], demand: ReturnType<typeof upkeepD
   left = left.filter(s => s.count > 0);
   return { storage: left, starving: short };
 }
+
+/* ---------- Walking escort (real GPS only) ---------- */
+/** A tribe member walking with the player speeds gathering and fends off beast ambushes. */
+export const ESCORT_GATHER_MULT = 1.3;
+export const ESCORT_BLOCK_CHANCE = 0.35;
+export const escortReady = (t: TribeState | null | undefined, now: number, onExpedition: boolean) => !!t?.escort && (t.count ?? 0) > 0 && !tribeInjured(t, now) && !onExpedition;
+/** Ambush damage with an escort: sometimes fully blocked, otherwise halved. */
+export const escortAmbushDamage = (dmg: number, roll: number) => roll < ESCORT_BLOCK_CHANCE ? 0 : Math.ceil(dmg / 2);

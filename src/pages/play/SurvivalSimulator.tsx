@@ -15,6 +15,8 @@ import type { ExpeditionFocus } from '@/lib/survival/expedition';
 import BackpackDiscard from '@/components/survival/BackpackDiscard';
 import { BaseFortressOverlay } from '@/components/survival/BaseFortressOverlay';
 import BaseNpcs from '@/components/survival/BaseNpcs';
+import escortArt from '@/assets/survival/npc-mercenary.png';
+import { escortReady } from '@/lib/survival/mercenaries';
 import { AltarPanel } from '@/components/survival/AltarPanel';
 import { EquipmentSlots } from '@/components/survival/EquipmentSlots';
 import { addStacks, hasAll } from "@/lib/survival/inventory";
@@ -342,7 +344,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       setBeastStrike({ id: near.id, at: t });
       if (!document.hidden) playSample('beastAttack');
       const def = creatureDef(near.type);
-      w.takeDamage(def.atk);
+      w.takeDamage(def.atk, true);
       toast.error(`${def.name}이(가) 먼저 공격했습니다! 공격하거나 도망치세요`);
     }, 500);
     return () => window.clearInterval(id);
@@ -493,7 +495,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 <div className="pointer-events-none absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
                   <div className="rounded-full border-2 border-dashed border-primary/70 bg-primary/10" style={{ width: r * 2, height: r * 2 }} />
                   <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"><BaseFortressOverlay baseLevel={s.base.level} hasPalisade={!!s.palisade} hasAltar={!!s.altar} /></div>
-                  <div className="absolute left-1/2 top-1/2 h-20 w-64 -translate-x-1/2 -translate-y-1/2"><BaseNpcs shamanMet={!!s.shamanMet} tribe={s.tribe} storage={s.storage} backpack={s.backpack} now={Date.now()} onMeet={g.meetShaman} onHire={g.hireMerc} onTrain={g.trainTribe} onTreat={g.treatTribe} /></div>
+                  <div className="absolute left-1/2 top-1/2 h-20 w-64 -translate-x-1/2 -translate-y-1/2"><BaseNpcs shamanMet={!!s.shamanMet} tribe={s.tribe} storage={s.storage} backpack={s.backpack} now={Date.now()} onMeet={g.meetShaman} onHire={g.hireMerc} onTrain={g.trainTribe} onTreat={g.treatTribe} onEscort={g.toggleEscort} expeditionBusy={!!s.observedExpedition?.mercenary} /></div>
                 </div>
               );
             })()}
@@ -616,7 +618,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                             </div>;
                           })()}
                           {bubbles[presence.selfId] && <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbleView(bubbles[presence.selfId])}</span>}
-                          <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined, opacity: crew ? 0.35 : 1, transition: 'opacity 0.3s' }}><CharacterSprite action={action} height={Math.round(SPRITE_META['char-hunter'].h * PLAYER_SCALE)} /></div></HitFlash></div>
+                          <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined, opacity: crew ? 0.35 : 1, transition: 'opacity 0.3s' }}><CharacterSprite action={action} height={Math.round(SPRITE_META['char-hunter'].h * PLAYER_SCALE)} /></div></HitFlash>{escortReady(s.tribe, Date.now(), !!s.observedExpedition?.mercenary) && <img src={escortArt} alt="동행 부족민" className="pixelated pointer-events-none absolute -left-9 bottom-0 h-12 w-auto" style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined }} />}</div>
                         </div>
                       </motion.div>
                     );

@@ -19,7 +19,7 @@ import { ACTIVE_SKILLS, claimResearch, startResearch, atMainBase, atWorkshop, bu
 import { advanceSurvivalVitals } from '@/lib/survival/metabolism';
 import { distanceM } from '@/lib/survival/geo';
 import { generateWorld, isNodeAvailable } from '@/lib/survival/world';
-import { hireMercenary, mercActive, tribeHireCost, tribeTrainCost, tribeRatio, tribeInjured, settleUpkeep, upkeepDemand, TRIBE_INJURY_MS, TRIBE_TREAT_COST, UPKEEP_MS, type MercenaryContract, type TribeState } from '@/lib/survival/mercenaries';
+import { hireMercenary, mercActive, tribeHireCost, tribeTrainCost, tribeRatio, tribeInjured, settleUpkeep, upkeepDemand, escortReady, escortAmbushDamage, ESCORT_GATHER_MULT, TRIBE_INJURY_MS, TRIBE_TREAT_COST, UPKEEP_MS, type MercenaryContract, type TribeState } from '@/lib/survival/mercenaries';
 import { addStacks, hasAll, removeStacks, splitDeathDrop, splitByCapacity, stackWeight } from '@/lib/survival/inventory';
 import { addExperience, dayPhase, xpToNext } from '@/lib/survival/progression';
 import { claimWorldQuest, freshProgress, type WorldProgress } from '@/lib/survival/worldProgress';
@@ -395,6 +395,13 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     setS(q => ({ ...q, storage: r.storage, tribe: { count: 0, trainLevel: 0, ...q.tribe, upkeepAt: since + hours * UPKEEP_MS, starving: r.starving } }));
     if (r.starving) toast.warning('창고 식량이 부족해 부족민과 펫이 굶주려요 (회복 중단·효율 감소)');
   }, [now, setS]);
+  const toggleEscort = useCallback(() => {
+    const p = ref.current;
+    if (!p.tribe?.count) { toast.warning('먼저 부족민을 영입하세요'); return; }
+    const on = !p.tribe.escort;
+    setS({ ...p, tribe: { ...p.tribe, escort: on } });
+    toast(on ? '부족민이 함께 걸어요 · 채집 속도 +30%, 맹수 기습 방어' : '동행을 멈추고 거점에 남겨 두었어요');
+  }, [setS]);
   const meetShaman = useCallback(() => setS(p => ({ ...p, shamanMet: true })), [setS]);
   const rallyExpedition = useCallback(() => {
     const p = ref.current; const crew = p.observedExpedition; const at = Date.now();
@@ -597,6 +604,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         if (!tool) return false;
         power = ITEMS[tool.itemId].tool?.power ?? 1;
       }
+      if (escortReady(p.tribe, Date.now(), !!p.observedExpedition?.mercenary)) power *= ESCORT_GATHER_MULT;
     } else {
       const d = creatureDef(e.type);
       label = d.name; need = d.hp; loot = d.loot;
@@ -849,8 +857,13 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS]);
 
   /** Apply external damage (e.g. another player's attack), reduced by worn armor. */
-  const takeDamage = useCallback((amount: number) => {
+  const takeDamage = useCallback((amount: number, ambush = false) => {
     const p = ref.current;
+    if (ambush && escortReady(p.tribe, Date.now(), !!p.observedExpedition?.mercenary)) {
+      amount = escortAmbushDamage(amount, Math.random());
+      if (amount <= 0) { toast.success('동행 부족민이 기습을 막아냈어요!'); return; }
+      toast.info('동행 부족민이 기습 피해를 절반으로 줄였어요');
+    }
     const armorGear = resolveLoadout(p.gear, p.equipped, p.level).armor;
     const dmg = Math.max(1, Math.round(amount) - (armorGear ? Math.round((ITEMS[armorGear.itemId].armor?.def ?? 0) * gearMult(armorGear)) : 0) - (p.techs.includes('iron_skin') ? ironSkinDef(techLevel(p.techLevels, 'iron_skin')) : 0));
     const hp = p.hp - dmg;
@@ -980,7 +993,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS, options.indoor]);
   const updateInventionCredits = useCallback((credits: InventionCredits) => setS(p => ({ ...p, inventionCredits: credits, inventionWalkMark: credits.walkMeters === 0 ? p.walkSteps ?? 0 : p.inventionWalkMark })), [setS]);
 
-  return { hireMerc, trainTribe, treatTribe, meetShaman, pickEgg, hatchEgg, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
+  return { hireMerc, toggleEscort, trainTribe, treatTribe, meetShaman, pickEgg, hatchEgg, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
     petHits, mergePets, togglePetDeploy, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,
