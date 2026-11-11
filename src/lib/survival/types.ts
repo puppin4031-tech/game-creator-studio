@@ -16,6 +16,8 @@ export interface GearInstance {
   durability: number;
   /** 0 = indestructible. */
   maxDurability: number;
+  /** Altar reinforcement level (0-5). */
+  plus?: number;
 }
 
 export type EquipSlot = 'weapon' | 'armor' | 'trinket';

@@ -1,3 +1,4 @@
+import { gearMult } from './upgrade';
 import { BASE_LEVELS } from './bases';
 import { classDef } from './classes';
 import { SURVIVAL_CONFIG as C, QUALITY_MULT } from './config';
@@ -73,12 +74,12 @@ export function bestTool(s: SurvivalState, kind: 'chop' | 'mine', tier: number):
 export function toolPower(g: GearInstance | null) {
   if (!g) return 1;
   const t = ITEMS[g.itemId].tool;
-  return t ? t.power * QUALITY_MULT[g.quality] : 1;
+  return t ? t.power * QUALITY_MULT[g.quality] * gearMult(g) : 1;
 }
 
 export function weaponAtk(s: SurvivalState) {
   const w = equippedGear(s, 'weapon');
-  const base = w ? (ITEMS[w.itemId].weapon?.atk ?? C.fistAtk) * QUALITY_MULT[w.quality] : C.fistAtk;
+  const base = w ? (ITEMS[w.itemId].weapon?.atk ?? C.fistAtk) * QUALITY_MULT[w.quality] * gearMult(w) : C.fistAtk;
   return Math.max(1, Math.round(base * classDef(s.player.classId).atkMult));
 }
 
@@ -89,13 +90,13 @@ export function isRangedWeapon(s: SurvivalState) {
 
 export function armorDef(s: SurvivalState) {
   const a = equippedGear(s, 'armor');
-  return a ? Math.round((ITEMS[a.itemId].armor?.def ?? 0) * QUALITY_MULT[a.quality]) : 0;
+  return a ? Math.round((ITEMS[a.itemId].armor?.def ?? 0) * QUALITY_MULT[a.quality] * gearMult(a)) : 0;
 }
 
 export function trinketBonus(s: SurvivalState) {
   const t = equippedGear(s, 'trinket');
   const b = t ? ITEMS[t.itemId].trinket : undefined;
-  return { lootBonus: b?.lootBonus ?? 0, xpBonus: b?.xpBonus ?? 0 };
+  return { lootBonus: (b?.lootBonus ?? 0) * gearMult(t), xpBonus: (b?.xpBonus ?? 0) * gearMult(t) };
 }
 
 export const critChance = (s: SurvivalState) => C.critChance + classDef(s.player.classId).critBonus;

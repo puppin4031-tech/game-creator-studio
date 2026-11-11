@@ -41,7 +41,7 @@ export const MATERIAL_PHYSICS: Record<string, MaterialPhysics> = {
 export const CATEGORY_WEIGHTS: Record<InventionCategory, Partial<Record<keyof Omit<MaterialPhysics, 'color'>, number>>> = {
   tool:     { hardness: 0.35, sharpness: 0.25, toughness: 0.2, binding: 0.2 },
   weapon:   { sharpness: 0.35, hardness: 0.25, toughness: 0.2, binding: 0.2 },
-  building: { mass: 0.4, toughness: 0.3, binding: 0.2, hardness: 0.1 },
+  building: { toughness: 0.45, hardness: 0.25, binding: 0.2, mass: 0.1 }, // wearable armor, not houses
   relic:    { mystic: 0.7, hardness: 0.15, toughness: 0.15 },
 };
 

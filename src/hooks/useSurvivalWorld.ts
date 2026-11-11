@@ -1,3 +1,4 @@
+import { gearMult, upgradeCost } from '@/lib/survival/upgrade';
 import { isWalkingPace } from '@/lib/survival/walkPace';
 import { advanceExpedition, expeditionLoot, isPocketMovement, startObservedExpedition, EXPEDITION_RADIUS_M, FOCUS_LABEL, type ExpeditionFocus, type ObservedExpedition, type ExpeditionLog } from '@/lib/survival/expedition';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -536,11 +537,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     } else {
       const d = creatureDef(e.type);
       label = d.name; need = d.hp; loot = d.loot;
-      power = weapon ? ITEMS[weapon.itemId].weapon?.atk ?? C.fistAtk : C.fistAtk;
+      power = weapon ? Math.round((ITEMS[weapon.itemId].weapon?.atk ?? C.fistAtk) * gearMult(weapon)) : C.fistAtk;
       if (p.techs.includes('primal_strike')) power *= primalStrikeMult(techLevel(p.techLevels, 'primal_strike'));
       const ranged = !!(weapon && ITEMS[weapon.itemId].weapon?.ranged) && !p.damage[e.id];
       power += (p.companions ?? []).some(c => c.kind === 'wolf') ? 3 : 0;
-      const defense = (atMainBase(p) && p.palisade ? 3 : 0) + (armor ? ITEMS[armor.itemId].armor?.def ?? 0 : 0) + (p.techs.includes('iron_skin') ? ironSkinDef(techLevel(p.techLevels, 'iron_skin')) : 0);
+      const defense = (atMainBase(p) && p.palisade ? 3 : 0) + (armor ? Math.round((ITEMS[armor.itemId].armor?.def ?? 0) * gearMult(armor)) : 0) + (p.techs.includes('iron_skin') ? ironSkinDef(techLevel(p.techLevels, 'iron_skin')) : 0);
       const exchange = resolveCreatureHit(e.type, p.damage[e.id] ?? 0, power, defense, ranged || (p.calmUntil?.[e.id] ?? 0) > Date.now());
       power = exchange.dealt - (p.damage[e.id] ?? 0);
       hp -= exchange.counterDamage;
@@ -788,7 +789,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const takeDamage = useCallback((amount: number) => {
     const p = ref.current;
     const armorGear = resolveLoadout(p.gear, p.equipped, p.level).armor;
-    const dmg = Math.max(1, Math.round(amount) - (armorGear ? ITEMS[armorGear.itemId].armor?.def ?? 0 : 0) - (p.techs.includes('iron_skin') ? ironSkinDef(techLevel(p.techLevels, 'iron_skin')) : 0));
+    const dmg = Math.max(1, Math.round(amount) - (armorGear ? Math.round((ITEMS[armorGear.itemId].armor?.def ?? 0) * gearMult(armorGear)) : 0) - (p.techs.includes('iron_skin') ? ironSkinDef(techLevel(p.techLevels, 'iron_skin')) : 0));
     const hp = p.hp - dmg;
     setS(hp <= 0 ? die({ ...p, hp }) : { ...p, hp });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -816,7 +817,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     toast.success('제단을 세웠습니다. 이제 발명할 수 있어요');
   }, [setS]);
   /** Consumes the materials and adds one invented item as equipped gear. */
-  const invent = useCallback((input: InventionInput, naming?: { name: string; desc: string; masterwork?: boolean }) => {
+  const invent = useCallback((input: InventionInput, naming?: { name: string; desc: string; masterwork?: boolean; ranged?: boolean }) => {
     const p = ref.current;
     if (!enabledRef.current || !atMainBase(p)) { toast.warning('본거지 연구 시설 앞에서 발명하세요'); return null; }
     const check = checkFacility(input, !!p.altar);
@@ -826,13 +827,27 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (!paid) { toast.error('재료가 부족합니다 (배낭 또는 창고)'); return null; }
     const id = inventionId(check.hash);
     const known = (p.inventions ?? []).find(x => x.id === id);
-    const inv: InventedItem = known ?? { id, hash: check.hash, name: naming?.name ?? id, desc: naming?.desc ?? '', category: input.category, materials: input.materials, heat: input.heat, sacred: input.sacred, masterwork: naming?.masterwork, power: check.power, createdAt: Date.now() };
+    const inv: InventedItem = known ?? { id, hash: check.hash, name: naming?.name ?? id, desc: naming?.desc ?? '', category: input.category, materials: input.materials, heat: input.heat, sacred: input.sacred, masterwork: naming?.masterwork, ranged: naming?.ranged, power: check.power, createdAt: Date.now() };
     const inventions = known ? p.inventions ?? [] : [...(p.inventions ?? []), inv];
     registerInventions(inventions);
     const g: GearInstance = { uid: crypto.randomUUID(), itemId: id as ItemId, quality: naming?.masterwork ? 'MASTERWORK' : 'NORMAL', durability: INVENTED_DURABILITY, maxDurability: INVENTED_DURABILITY };
     setS({ ...paid, inventions, gear: [...paid.gear, g] });
     toast.success(`${inv.name} 완성! 배낭에 담았어요`, { description: known ? '알려진 발명품을 다시 만들었습니다' : '제작 탭에 레시피가 등록되었어요. 배낭에서 착용할 수 있어요' });
     return inv;
+  }, [setS]);
+
+  /** Reinforce one gear piece at the altar (+15% stats per level, max +5). */
+  const upgradeGear = useCallback((uid: string) => {
+    const p = ref.current;
+    if (!enabledRef.current || !atMainBase(p) || !p.altar) { toast.warning('본거지 제단에서 강화하세요'); return; }
+    const g = p.gear.find(x => x.uid === uid);
+    const cost = g && upgradeCost(g);
+    if (!g || !cost) return;
+    const paid = payAccessible(p, cost);
+    if (!paid) { toast.error('강화 재료가 부족합니다 (배낭 또는 창고)'); return; }
+    const plus = (g.plus ?? 0) + 1;
+    setS({ ...paid, gear: paid.gear.map(x => x.uid === uid ? { ...x, plus, durability: x.maxDurability } : x) });
+    toast.success(`${ITEMS[g.itemId].name} +${plus} 강화 성공!`, { description: `능력치 +${Math.round(plus * 15)}% · 내구도 회복` });
   }, [setS]);
 
   /** Re-make a known invention from its recorded materials (no invention credit). */
@@ -902,7 +917,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS, options.indoor]);
   const updateInventionCredits = useCallback((credits: InventionCredits) => setS(p => ({ ...p, inventionCredits: credits, inventionWalkMark: credits.walkMeters === 0 ? p.walkSteps ?? 0 : p.inventionWalkMark })), [setS]);
 
-  return { pickEgg, hatchEgg, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
+  return { pickEgg, hatchEgg, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
     petHits, mergePets, togglePetDeploy, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,

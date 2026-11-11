@@ -15,6 +15,7 @@ export interface InventedItem {
   heat?: boolean;
   sacred?: boolean;
   masterwork?: boolean;
+  ranged?: boolean;
 }
 
 export const ALTAR_COST: Stack[] = [{ itemId: 'flint', count: 8 }, { itemId: 'obsidian', count: 3 }, { itemId: 'quartz', count: 4 }];
@@ -33,9 +34,9 @@ export function inventedItemDef(inv: InventedItem): ItemDef {
   const weight = Math.min(5, Math.round(Object.entries(inv.materials).reduce((s, [id, q]) => s + (ITEMS[id as keyof typeof ITEMS]?.weight ?? 0.5) * q, 0) * 0.3 * 10) / 10);
   const base = { name: inv.name, desc: inv.desc, rarity: 'rare' as const, weight, sprite, durability: INVENTED_DURABILITY };
   switch (inv.category) {
-    case 'weapon': return { ...base, category: 'weapon', weapon: { atk: Math.max(1, Math.round(inv.power)) } };
+    case 'weapon': return { ...base, category: 'weapon', weapon: { atk: Math.max(1, Math.round(inv.power)), ...(inv.ranged ? { ranged: true } : {}) } };
     case 'tool': { const tier = inv.power >= 2 ? 2 : 1; return { ...base, category: 'tool', tool: { chop: tier, mine: tier, power: 1 + inv.power } }; }
-    case 'building': return { ...base, category: 'armor', armor: { def: Math.max(1, Math.min(5, Math.round(inv.power / 8))) } };
+    case 'building': return { ...base, category: 'armor', armor: { def: Math.max(1, Math.round(inv.power / 3)) } };
     case 'relic': return { ...base, category: 'trinket', trinket: { lootBonus: inv.power, xpBonus: inv.power } };
   }
 }
@@ -52,6 +53,6 @@ export function registerInventions(list: InventedItem[] | undefined) {
 export function fallbackInventionName(category: InventionCategory, materials: Record<string, number>): string {
   const primary = Object.entries(materials).sort((a, b) => b[1] - a[1])[0]?.[0];
   const mat = (primary && ITEMS[primary as keyof typeof ITEMS]?.name) || '돌';
-  const noun = { tool: '도구', weapon: '창', building: '갑옷', relic: '부적' }[category];
+  const noun = { tool: '도구', weapon: '창', building: '옷', relic: '부적' }[category];
   return `${mat} ${noun}`;
 }
