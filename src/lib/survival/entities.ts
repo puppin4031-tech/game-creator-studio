@@ -135,12 +135,12 @@ export const CREATURES = {
   },
   boar: {
     name: '멧돼지', sprite: 'mob-boar', hp: 24, atk: 4, temper: 'neutral',
-    loot: [{ itemId: 'raw_meat', min: 2, max: 3 }, { itemId: 'hide', min: 1, max: 2 }, { itemId: 'bone', min: 1, max: 1 }, { itemId: 'tusk', min: 1, max: 1, chance: 0.25 }], xp: 22,
+    loot: [{ itemId: 'raw_meat', min: 2, max: 3 }, { itemId: 'hide', min: 1, max: 2 }, { itemId: 'fur', min: 1, max: 1, chance: 0.3 }, { itemId: 'bone', min: 1, max: 1 }, { itemId: 'tusk', min: 1, max: 1, chance: 0.25 }], xp: 22,
     biomes: { forest: 4, plains: 3, wetland: 4, rocky: 2 }, nightWeight: 0.8,
   },
   wolf: {
     name: '회색 늑대', sprite: 'mob-wolf', hp: 24, atk: 5, temper: 'neutral', nightAggressive: true,
-    loot: [{ itemId: 'hide', min: 2, max: 2 }, { itemId: 'bone', min: 1, max: 2 }, { itemId: 'raw_meat', min: 1, max: 1 }], xp: 26,
+    loot: [{ itemId: 'hide', min: 1, max: 2 }, { itemId: 'fur', min: 1, max: 1, chance: 0.45 }, { itemId: 'bone', min: 1, max: 2 }, { itemId: 'raw_meat', min: 1, max: 1 }], xp: 26,
     biomes: { forest: 3, rocky: 3, plains: 1 }, nightWeight: 2.5,
   },
   raptor: {

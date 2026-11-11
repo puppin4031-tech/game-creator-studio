@@ -7,3 +7,4 @@
 - Dino eggs: spawn/hatch rules live in pure dinoEggs.ts (geographic seed, 24h respawn via depleted); hatch distance counts only WorldSave.walkSteps and hatching needs the base; why: rides walking-pace rules so vehicles can't hatch eggs.
 - Admin pets/mobs live in survival_custom_pets/survival_custom_mobs and register at runtime (dinoEggs.registerCustomPets, customMobs.registerCustomMobs with custom_ prefixed creature keys); sprites reuse survival_sprite_animations keys pet:<id> and mob:<type>; why: admins add content without code changes while built-ins stay untouched.
 - Mercenary contracts live in WorldSave.mercenary via pure mercenaries.ts; a hired mercenary only changes who is shown on observed expeditions, not rewards or GPS.
+- Tribe roster lives in WorldSave.tribe via pure mercenaries.ts (tiered hire costs, training, hourly storage upkeep, injury); tribe expeditions use statMult/maxHp at TRIBE_RATIO; why: walking players must stay stronger than delegated crews.

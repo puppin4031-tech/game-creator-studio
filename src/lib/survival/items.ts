@@ -64,6 +64,7 @@ export const ITEMS = def({
   sacred_essence: { name: '성스러운 정수', desc: '제사로 응결된 신성력. 훗날 신성한 발명의 재료.', category: 'material', rarity: 'epic', weight: 0.25, sprite: 'item-quartz' },
   // ── Processed
   cordage: { name: '노끈', desc: '섬유를 꼬아 만든 튼튼한 끈.', category: 'processed', rarity: 'common', weight: 0.25, sprite: 'item-cordage' },
+  fur: { name: '털가죽', desc: '멧돼지·늑대에게서 드물게 얻는 두툼한 털가죽.', category: 'material', rarity: 'uncommon', weight: 1, sprite: 'item-hide' },
   leather: { name: '가죽', desc: '무두질한 질긴 가죽.', category: 'processed', rarity: 'uncommon', weight: 0.75, sprite: 'item-leather' },
   clay_pot: { name: '토기', desc: '불에 구운 저장 그릇. 동굴 거처 재료.', category: 'processed', rarity: 'uncommon', weight: 1, sprite: 'item-clay-pot' },
   salve: { name: '약초 연고', desc: '체력 +40', category: 'processed', rarity: 'rare', weight: 0.25, sprite: 'item-salve', heal: 40 },

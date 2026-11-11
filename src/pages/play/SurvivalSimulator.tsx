@@ -493,7 +493,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 <div className="pointer-events-none absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
                   <div className="rounded-full border-2 border-dashed border-primary/70 bg-primary/10" style={{ width: r * 2, height: r * 2 }} />
                   <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"><BaseFortressOverlay baseLevel={s.base.level} hasPalisade={!!s.palisade} hasAltar={!!s.altar} /></div>
-                  <div className="absolute left-1/2 top-1/2 h-20 w-64 -translate-x-1/2 -translate-y-1/2"><BaseNpcs shamanMet={!!s.shamanMet} mercenary={s.mercenary} now={Date.now()} onMeet={g.meetShaman} onHire={g.hireMerc} /></div>
+                  <div className="absolute left-1/2 top-1/2 h-20 w-64 -translate-x-1/2 -translate-y-1/2"><BaseNpcs shamanMet={!!s.shamanMet} tribe={s.tribe} storage={s.storage} backpack={s.backpack} now={Date.now()} onMeet={g.meetShaman} onHire={g.hireMerc} onTrain={g.trainTribe} onTreat={g.treatTribe} /></div>
                 </div>
               );
             })()}

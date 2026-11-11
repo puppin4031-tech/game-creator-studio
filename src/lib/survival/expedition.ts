@@ -26,6 +26,11 @@ export interface ObservedExpedition {
   cycle: number;
   /** Hired mercenary name; presentation only. */
   mercenary?: string;
+  /** Tribe member stat ratio (1/6); 1 for the player's own expedition. */
+  statMult?: number;
+  maxHp?: number;
+  /** True when HP hit 0 and the crew was carried home injured. */
+  downed?: boolean;
   focus?: ExpeditionFocus;
   /** Patrol points visited before the destination, so the crew sweeps instead of a straight line. */
   waypoints?: LatLng[];
@@ -96,28 +101,33 @@ export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEnt
     const target = nearby.find(e => distanceM(crew.pos, e) <= EXPEDITION_RADIUS_M && matchesFocus(e, crew.focus));
     if (target) {
       crew.target = target;
-      text = target.kind === 'node' ? `원정대가 ${nodeDef(target.type).name} 발견 · 채집 시작` : `${creatureDef(target.type).name}와 교전 시작! (HP ${crew.hp}/100)`;
+      text = target.kind === 'node' ? `원정대가 ${nodeDef(target.type).name} 발견 · 채집 시작` : `${creatureDef(target.type).name}와 교전 시작! (HP ${crew.hp}/${crew.maxHp ?? 100})`;
     }
   }
   if (crew.target) {
     if (now - crew.hitAt >= (now < crew.moraleUntil ? 500 : 1000)) {
       crew.hitAt = now;
       const target = crew.target;
-      const power = (target.kind === 'node' ? 2 : 12) * (outdoor ? 2 : 1) * (now < crew.moraleUntil ? 1.5 : 1);
+      const max = crew.maxHp ?? 100;
+      const power = (crew.statMult ?? 1) * (target.kind === 'node' ? 2 : 12) * (outdoor ? 2 : 1) * (now < crew.moraleUntil ? 1.5 : 1);
       if (target.kind === 'creature') {
         crew.damage = sharedDamage?.[target.id] ?? crew.damage;
         const hit = resolveCreatureHit(target.type, crew.damage, power, 3, false);
         crew.combatHit = { at: now, target, damage: hit.dealt - crew.damage, counterDamage: hit.counterDamage, killed: hit.dealt >= creatureDef(target.type).hp };
         crew.damage = hit.dealt;
         crew.hp = Math.max(0, crew.hp - hit.counterDamage);
-        text = `${creatureDef(target.type).name} 교전 · HP ${crew.hp}/100`;
+        text = `${creatureDef(target.type).name} 교전 · HP ${crew.hp}/${max}`;
       } else {
         crew.damage += power;
         text = `원정대가 ${nodeDef(target.type).name} 채집 중입니다…`;
       }
-      if (crew.hp <= 25) {
+      if (crew.hp <= 0) {
+        crew = { ...crew, target: undefined, damage: 0, downed: true, pos: crew.home };
+        finished = true;
+        text = '쓰러졌습니다! 긴급 후송 · 거점에서 치료가 필요해요';
+      } else if (crew.hp <= max * 0.25) {
         crew = { ...crew, phase: 'returning', target: undefined, damage: 0 };
-        text = `원정대 위기! HP ${crew.hp}/100 · 안전 귀환 중`;
+        text = `원정대 위기! HP ${crew.hp}/${max} · 안전 귀환 중`;
       } else if (crew.damage >= (target.kind === 'node' ? nodeDef(target.type).hp : creatureDef(target.type).hp)) {
         completed = target;
         rewards.push(...expeditionLoot(target, outdoor, random));
@@ -143,7 +153,7 @@ export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEnt
       if (crew.phase === 'outbound') { crew.phase = 'returning'; text = '목표 타일 도착 · 거점으로 귀환합니다'; }
       else if (repeat) {
         const next = offsetM(crew.home, Math.cos(crew.cycle * 2.4) * 180, Math.sin(crew.cycle * 2.4) * 180);
-        crew = { ...crew, hp: 100, phase: 'outbound', cycle: crew.cycle + 1, destination: next, waypoints: patrolWaypoints(crew.home, next, crew.cycle + 1) };
+        crew = { ...crew, hp: crew.maxHp ?? 100, phase: 'outbound', cycle: crew.cycle + 1, destination: next, waypoints: patrolWaypoints(crew.home, next, crew.cycle + 1) };
         text = '거점 회복 완료 · 다음 자동사냥 출발';
       } else { finished = true; text = '원정대가 거점에 귀환했습니다'; }
     }
