@@ -1,3 +1,4 @@
+// @refresh reset
 import { gearMult, upgradeCost } from '@/lib/survival/upgrade';
 import { isWalkingPace } from '@/lib/survival/walkPace';
 import { advanceExpedition, steerExpedition, pickManualTarget, MANUAL_PICK_M, expeditionLoot, isPocketMovement, startObservedExpedition, EXPEDITION_RADIUS_M, FOCUS_LABEL, type ExpeditionFocus, type ObservedExpedition, type ExpeditionLog } from '@/lib/survival/expedition';
