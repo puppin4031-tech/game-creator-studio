@@ -53,4 +53,4 @@ export function useSurvivalGps(enabled: boolean, onPosition: (pos: LatLng) => vo
   return { fix, ready, error: error ?? lockMessage ?? (fix && !ready && enabled ? 'GPS 신호가 오래되었습니다. 위치를 다시 확인합니다.' : null), retry };
 }
 // Hook order can change across modules during edits; force a full reload instead of hot patching.
-if (import.meta.hot) import.meta.hot.decline();
+if (import.meta.hot) import.meta.hot.accept(() => window.location.reload());

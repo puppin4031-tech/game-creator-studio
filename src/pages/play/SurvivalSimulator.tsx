@@ -972,4 +972,4 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 }
 
 // Hook order can change across modules during edits; force a full reload instead of hot patching.
-if (import.meta.hot) import.meta.hot.decline();
+if (import.meta.hot) import.meta.hot.accept(() => window.location.reload());
