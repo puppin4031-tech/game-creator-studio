@@ -47,11 +47,6 @@ export function ExpeditionMarker({ crew, project, members = 1 }: { crew: Observe
   const pts = [crew.home, ...trail.current].map(project);
   const ahead = [crew.pos, ...(crew.phase === 'outbound' ? [...(crew.waypoints ?? []), crew.destination] : [crew.home])].map(project);
   return <>
-  {crew.mercenary && <svg aria-hidden className="pointer-events-none absolute inset-0 z-[9] h-full w-full overflow-visible">
-    <polyline points={pts.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="hsl(var(--primary))" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" opacity={0.85} />
-    <polyline points={ahead.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="hsl(var(--foreground))" strokeWidth={2} strokeDasharray="4 6" opacity={0.5} />
-    {crew.phase === 'outbound' && (() => { const d = project(crew.destination); return <circle cx={d.x} cy={d.y} r={6} fill="hsl(var(--primary))" stroke="hsl(var(--foreground))" strokeWidth={2} />; })()}
-  </svg>}
   <div data-expedition-marker className={`pointer-events-none absolute z-10 flex w-24 -translate-x-1/2 -translate-y-full flex-col items-center ${target ? '' : 'transition-[left,top] duration-1000 ease-linear motion-reduce:transition-none'}`} style={{ left: pos.x, top: pos.y }}>
     <span className="absolute -top-5 whitespace-nowrap rounded bg-card px-1 text-[10px]">{crew.mercenary ? `부족민 ${crew.mercenary}` : '원정'} · HP {crew.hp}</span>
     <motion.div key={hit?.at ?? 'march'} data-expedition-strike={hit?.at} className="relative" initial={false} animate={striking && !reduced ? { x: [0, dx / length * 28, -dx / length * 7, 0], y: [0, dy / length * 28, -dy / length * 7, 0] } : { x: 0, y: 0 }} transition={{ duration: 0.65, times: [0, 0.23, 0.6, 1] }}>

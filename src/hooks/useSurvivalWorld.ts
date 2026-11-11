@@ -413,6 +413,26 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     setS(p => p.observedExpedition ? { ...p, observedExpedition: { ...p.observedExpedition, target, damage: 0 } } : p);
     return true;
   }, [setS]);
+  const crewAct = useCallback((kind: 'attack' | 'gather') => {
+    const crew = ref.current.observedExpedition; if (!crew) return;
+    const list = crewNearby.filter(c => kind === 'attack' ? c.kind === 'creature' : c.kind === 'node')
+      .sort((a, b) => distanceM(crew.pos, a) - distanceM(crew.pos, b));
+    const target = list.find(t => pickManualTarget(crew, [t], kind));
+    if (!target) { toast.warning(kind === 'attack' ? '근처에 공격할 맹수가 없어요' : '근처에 채집할 자원이 없어요'); return; }
+    setS(p => p.observedExpedition ? { ...p, observedExpedition: { ...p.observedExpedition, manual: true, target, damage: 0 } } : p);
+  }, [crewNearby, setS]);
+  const healCrew = useCallback(() => {
+    const p = ref.current; const crew = p.observedExpedition; if (!crew) return;
+    const max = crew.maxHp ?? 100;
+    if (crew.hp >= max) { toast('체력이 이미 가득해요'); return; }
+    const FOODS: ItemId[] = ['cooked_meat', 'jerky', 'apple', 'pear', 'coconut', 'berry', 'raw_meat'];
+    const id = FOODS.find(f => (p.storage.find(x => x.itemId === f)?.count ?? 0) > 0);
+    if (!id) { toast.warning('창고에 고기나 과일이 없어요'); return; }
+    const storage = removeStacks(p.storage, [{ itemId: id, count: 1 }]); if (!storage) return;
+    const gain = Math.max(10, Math.round(max * 0.3));
+    setS({ ...p, storage, observedExpedition: { ...crew, hp: Math.min(max, crew.hp + gain) } });
+    toast.success(`창고의 ${ITEMS[id]?.name ?? id} 1개로 원정 체력 +${gain}`);
+  }, [setS]);
   const toggleEscort = useCallback(() => {
     const p = ref.current;
     if (!p.tribe?.count) { toast.warning('먼저 부족민을 영입하세요'); return; }
@@ -1035,7 +1055,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS, options.indoor]);
   const updateInventionCredits = useCallback((credits: InventionCredits) => setS(p => ({ ...p, inventionCredits: credits, inventionWalkMark: credits.walkMeters === 0 ? p.walkSteps ?? 0 : p.inventionWalkMark })), [setS]);
 
-  return { crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, toggleEscort, trainTribe, treatTribe, meetShaman, pickEgg, hatchEgg, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
+  return { crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, toggleEscort, trainTribe, treatTribe, meetShaman, pickEgg, hatchEgg, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
     petHits, mergePets, togglePetDeploy, assignPetRole, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,

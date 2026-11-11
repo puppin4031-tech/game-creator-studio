@@ -484,7 +484,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden font-pixel">
-      {realGps && hasTribe && !g.inBase && s.base && <div className="pointer-events-none fixed inset-x-2 z-40 flex flex-col items-start gap-2" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 13rem)' }}>
+      {realGps && hasTribe && !g.inBase && s.base && <div className="pointer-events-none fixed inset-x-2 z-[5] flex flex-col items-start gap-2" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 13rem)' }}>
         {fieldExp && <div className="pixel-panel pointer-events-auto max-h-[50dvh] w-full max-w-md overflow-y-auto bg-card p-2">{expeditionControls}</div>}
         <button type="button" onClick={() => setFieldExp(v => !v)} className="pixel-btn pointer-events-auto flex min-h-11 items-center gap-1 bg-primary px-3 text-xs text-primary-foreground"><Compass className="!h-5 !w-5" />{fieldExp ? '원정 닫기' : crew ? '원정 지휘' : '원정 보내기'}</button>
       </div>}
@@ -493,7 +493,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         {(project, mpp) => (
           <>
             {crew && <ExpeditionMarker crew={crew} project={project} members={s.tribe?.count ?? 1} />}
-            {crew && <ExpeditionJoystick crew={crew} candidates={g.crewNearby} project={project} onManual={g.setCrewManual} onSteer={g.steerCrew} onCommand={g.commandCrew} />}
+            {crew && <ExpeditionJoystick crew={crew} candidates={g.crewNearby} project={project} onManual={g.setCrewManual} onSteer={g.steerCrew} onCommand={g.commandCrew} onAct={g.crewAct} onHeal={g.healCrew} />}
             {s.base && g.baseDef && <BasePetsOverlay base={s.base} radius={g.baseDef.radiusM + (s.palisade ? 15 : 0)} pets={s.pets ?? []} hits={g.petHits} project={project} />}
             {eggSpawns.map(egg => { const p = project(egg); return (
               <button key={egg.id} type="button" aria-label="신비한 픽셀 공룡 알" onClick={ev => { ev.stopPropagation(); g.pickEgg(egg); }}

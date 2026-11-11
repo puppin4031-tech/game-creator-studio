@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
-import { Swords, Pickaxe, Gamepad2, Bot } from 'lucide-react';
+import { Swords, Pickaxe, Gamepad2, Bot, Heart } from 'lucide-react';
 import type { LatLng, WorldEntity } from '@/lib/survival/types';
 import type { ObservedExpedition } from '@/lib/survival/expedition';
 
@@ -10,12 +10,14 @@ interface Props {
   onManual: (on: boolean) => void;
   onSteer: (x: number, y: number) => void;
   onCommand: (e: WorldEntity) => boolean;
+  onAct: (kind: 'attack' | 'gather') => void;
+  onHeal: () => void;
 }
 const STEER_MS = 150;
 const DROP_PX = 48;
 
 /** Manual expedition controls: joystick moves (and cancels actions); drag attack/gather icons onto a target. */
-export default function ExpeditionJoystick({ crew, candidates, project, onManual, onSteer, onCommand }: Props) {
+export default function ExpeditionJoystick({ crew, candidates, project, onManual, onSteer, onCommand, onAct, onHeal }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const vec = useRef({ x: 0, y: 0 });
   const [knob, setKnob] = useState({ x: 0, y: 0 });
@@ -55,6 +57,11 @@ export default function ExpeditionJoystick({ crew, candidates, project, onManual
     <button type="button" aria-pressed={!!crew.manual} onClick={() => onManual(!crew.manual)} className={`${iconBtn} absolute left-3 top-24 h-11 w-auto gap-1 px-2 text-xs font-bold`}>
       {crew.manual ? <><Bot className="!h-4 !w-4" />자동으로</> : <><Gamepad2 className="!h-4 !w-4" />직접 조작</>}
     </button>
+    <div className="pointer-events-auto absolute bottom-28 right-4 flex flex-col gap-2">
+      <button type="button" aria-label="공격" onClick={() => onAct('attack')} className={iconBtn}><Swords className="!h-7 !w-7 text-destructive" /></button>
+      <button type="button" aria-label="채집" onClick={() => onAct('gather')} className={iconBtn}><Pickaxe className="!h-7 !w-7 text-primary" /></button>
+      <button type="button" aria-label="체력 회복" onClick={onHeal} className={iconBtn}><Heart className="!h-7 !w-7 text-destructive" /></button>
+    </div>
     {crew.manual && <>
       <div aria-label="원정 조이스틱" role="application" className="pointer-events-auto absolute bottom-28 left-4 h-28 w-28 touch-none rounded-full border-4 border-foreground/70 bg-background/60"
         onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); stick(e); }} onPointerMove={e => e.buttons && stick(e)} onPointerUp={release} onPointerCancel={release}>
