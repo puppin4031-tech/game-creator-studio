@@ -99,8 +99,8 @@ const STRIKE_NODES = new Set<string>(['flint_rock', 'branch_pile', 'oak_tree', '
 
 function Sprite({ k, scale = 1, className = '' }: { k: SpriteKey; scale?: number; className?: string }) {
   const m = SPRITE_META[k];
-  if (k.startsWith('char-')) return <CharacterSprite height={m.h * scale} className={className} />;
-  return <img src={url(k)} width={m.w * scale} height={m.h * scale} alt="" draggable={false} className={`pixelated select-none ${className}`} />;
+  if (k === 'char-hunter') return <CharacterSprite height={m.h * scale} className={className} />;
+  return <img src={url(k)} height={m.h * scale} style={{ height: m.h * scale, width: 'auto' }} alt="" draggable={false} className={`pixelated select-none ${className}`} />;
 }
 
 function Stacks({ stacks, onUse, have }: { stacks: Stack[]; onUse?: (id: ItemId) => void; have?: Stack[] }) {

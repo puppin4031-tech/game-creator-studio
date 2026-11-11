@@ -13,10 +13,10 @@ export interface Landmark extends LatLng {
 }
 
 export const LANDMARK_INFO: Record<LandmarkKind, { name: string; desc: string; sprite: SpriteKey }> = {
-  shaman: { name: '샤먼의 지하 성소', desc: '제사장이 풍문과 생존 지혜를 들려줍니다.', sprite: 'char-shaman' },
+  shaman: { name: '샤먼의 지하 성소', desc: '제사장이 풍문과 생존 지혜를 들려줍니다.', sprite: 'npc-shaman' },
   spring: { name: '신성한 샘터', desc: '맑은 물과 열매를 길어 올릴 수 있습니다.', sprite: 'item-clay-pot' },
   smokehouse: { name: '훈제 보관소', desc: '말린 고기를 얻을 수 있습니다.', sprite: 'item-cooked-meat' },
-  trader: { name: '떠돌이 만물상', desc: '물건을 조개 화폐로 사고팝니다.', sprite: 'char-gatherer' },
+  trader: { name: '떠돌이 만물상', desc: '물매를 든 꼬마 행상이 물건을 조개 화폐로 사고팝니다.', sprite: 'char-scout' },
 };
 
 /** Shaman sanctuary: creatures never spawn inside, and HP regenerates faster. */

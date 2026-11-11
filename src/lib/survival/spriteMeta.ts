@@ -9,6 +9,7 @@ export const SPRITE_META = {
   'char-hunter': { w: 40, h: 48 },
   'char-scout': { w: 40, h: 48 },
   'char-shaman': { w: 40, h: 48 },
+  'npc-shaman': { w: 32, h: 52 },
   'item-apple': { w: 32, h: 32 },
   'item-pear': { w: 32, h: 32 },
   'item-soil': { w: 32, h: 32 },
