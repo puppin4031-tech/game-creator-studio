@@ -25,7 +25,7 @@ const TOUR = [
   { title: '펫 · 공룡 알', text: '알은 자네 발걸음으로 깨어나고, 같은 짐승 둘을 합치면 더 강해진다네. 과일과 날고기를 먹이게.' },
 ];
 const label = (c: Stack[]) => c.map(x => `${ITEMS[x.itemId]?.name ?? x.itemId} ${x.count}`).join(' · ');
-const have = (c: Stack[], a: Stack[], b: Stack[]) => c.every(x => [...a, ...b].filter(y => y.itemId === x.itemId).reduce((n, y) => n + y.count, 0) >= x.count);
+const have = (c: Stack[], a: Stack[] = [], b: Stack[] = []) => c.every(x => [...(a ?? []), ...(b ?? [])].filter(y => y.itemId === x.itemId).reduce((n, y) => n + y.count, 0) >= x.count);
 
 interface Props { shamanMet: boolean; tribe: TribeState | undefined; storage: Stack[]; backpack: Stack[]; now: number; onMeet: () => void; onHire: () => boolean; onTrain: () => boolean; onTreat: () => boolean; onEscort: () => void; expeditionBusy: boolean }
 
