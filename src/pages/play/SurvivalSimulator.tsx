@@ -15,6 +15,7 @@ import type { ExpeditionFocus } from '@/lib/survival/expedition';
 import BackpackDiscard from '@/components/survival/BackpackDiscard';
 import { BaseFortressOverlay } from '@/components/survival/BaseFortressOverlay';
 import PetSprite from '@/components/survival/PetSprite';
+import ExpeditionJoystick from '@/components/survival/ExpeditionJoystick';
 import BaseNpcs from '@/components/survival/BaseNpcs';
 import escortArt from '@/assets/survival/tribe-idle.png';
 import { escortReady } from '@/lib/survival/mercenaries';
@@ -484,6 +485,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         {(project, mpp) => (
           <>
             {crew && <ExpeditionMarker crew={crew} project={project} />}
+            {crew && <ExpeditionJoystick crew={crew} candidates={g.crewNearby} project={project} onManual={g.setCrewManual} onSteer={g.steerCrew} onCommand={g.commandCrew} />}
             {s.base && g.baseDef && <BasePetsOverlay base={s.base} radius={g.baseDef.radiusM + (s.palisade ? 15 : 0)} pets={s.pets ?? []} hits={g.petHits} project={project} />}
             {eggSpawns.map(egg => { const p = project(egg); return (
               <button key={egg.id} type="button" aria-label="신비한 픽셀 공룡 알" onClick={ev => { ev.stopPropagation(); g.pickEgg(egg); }}

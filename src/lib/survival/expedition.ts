@@ -31,6 +31,8 @@ export interface ObservedExpedition {
   maxHp?: number;
   /** True when HP hit 0 and the crew was carried home injured. */
   downed?: boolean;
+  /** Joystick control: no auto targeting/patrol; crew walks to a dragged target, then strikes. */
+  manual?: boolean;
   focus?: ExpeditionFocus;
   /** Patrol points visited before the destination, so the crew sweeps instead of a straight line. */
   waypoints?: LatLng[];
@@ -97,12 +99,20 @@ export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEnt
   // No invented offline catches: suspended tabs resume from the last visual position.
   const elapsed = Math.max(0, Math.min(1000, now - previous.lastAt));
   if (crew.target && !nearby.some(e => e.id === crew.target?.id)) crew = { ...crew, target: undefined, damage: 0 };
-  if (!crew.target && crew.phase === 'outbound') {
+  if (!crew.manual && !crew.target && crew.phase === 'outbound') {
     const target = nearby.find(e => distanceM(crew.pos, e) <= EXPEDITION_RADIUS_M && matchesFocus(e, crew.focus));
     if (target) {
       crew.target = target;
       text = target.kind === 'node' ? `원정대가 ${nodeDef(target.type).name} 발견 · 채집 시작` : `${creatureDef(target.type).name}와 교전 시작! (HP ${crew.hp}/${crew.maxHp ?? 100})`;
     }
+  }
+  if (crew.manual && (!crew.target || distanceM(crew.pos, crew.target) > EXPEDITION_RADIUS_M)) {
+    if (crew.target) {
+      const before = crew.pos;
+      crew.pos = marchToward(crew.pos, crew.target, elapsed);
+      if (Math.abs(crew.pos.lng - before.lng) > 1e-9) crew.facing = crew.pos.lng < before.lng ? -1 : 1;
+    }
+    return { crew, rewards, completed, text, finished };
   }
   if (crew.target) {
     if (now - crew.hitAt >= (now < crew.moraleUntil ? 500 : 1000)) {
@@ -159,4 +169,21 @@ export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEnt
     }
   }
   return { crew, rewards, completed, text, finished };
+}
+export const MANUAL_STEP_M = 2;
+export const MANUAL_PICK_M = 60;
+/** Joystick step (unit vector x=east, y=north); moving cancels the current action and keeps the crew near home. */
+export function steerExpedition(crew: ObservedExpedition, x: number, y: number, stepM = MANUAL_STEP_M): ObservedExpedition {
+  const len = Math.hypot(x, y);
+  if (!len) return crew;
+  let pos = offsetM(crew.pos, (x / len) * stepM, (y / len) * stepM);
+  if (distanceM(crew.home, pos) > MAX_EXPEDITION_DISTANCE_M) pos = crew.pos;
+  return { ...crew, manual: true, pos, target: undefined, damage: 0, facing: x < 0 ? -1 : x > 0 ? 1 : crew.facing };
+}
+/** Dragged attack/gather icon: pick the nearest matching entity; attack needs a creature, gather a level-one node. */
+export function pickManualTarget(crew: ObservedExpedition, candidates: WorldEntity[], action: 'attack' | 'gather'): WorldEntity | undefined {
+  return candidates
+    .filter(e => action === 'attack' ? e.kind === 'creature' && !creatureDef(e.type).boss : e.kind === 'node' && nodeDef(e.type).requires.tier <= 1)
+    .filter(e => distanceM(crew.pos, e) <= MANUAL_PICK_M)
+    .sort((a, b) => distanceM(crew.pos, a) - distanceM(crew.pos, b))[0];
 }

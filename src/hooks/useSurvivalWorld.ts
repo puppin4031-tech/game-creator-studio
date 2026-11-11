@@ -1,6 +1,6 @@
 import { gearMult, upgradeCost } from '@/lib/survival/upgrade';
 import { isWalkingPace } from '@/lib/survival/walkPace';
-import { advanceExpedition, expeditionLoot, isPocketMovement, startObservedExpedition, EXPEDITION_RADIUS_M, FOCUS_LABEL, type ExpeditionFocus, type ObservedExpedition, type ExpeditionLog } from '@/lib/survival/expedition';
+import { advanceExpedition, steerExpedition, pickManualTarget, MANUAL_PICK_M, expeditionLoot, isPocketMovement, startObservedExpedition, EXPEDITION_RADIUS_M, FOCUS_LABEL, type ExpeditionFocus, type ObservedExpedition, type ExpeditionLog } from '@/lib/survival/expedition';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -395,6 +395,16 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     setS(q => ({ ...q, storage: r.storage, tribe: { count: 0, trainLevel: 0, ...q.tribe, upkeepAt: since + hours * UPKEEP_MS, starving: r.starving } }));
     if (r.starving) toast.warning('창고 식량이 부족해 부족민과 펫이 굶주려요 (회복 중단·효율 감소)');
   }, [now, setS]);
+  const [crewNearby, setCrewNearby] = useState<WorldEntity[]>([]);
+  const setCrewManual = useCallback((on: boolean) => setS(p => p.observedExpedition ? { ...p, expeditionAuto: on ? false : p.expeditionAuto, observedExpedition: { ...p.observedExpedition, manual: on, target: undefined, damage: 0 } } : p), [setS]);
+  const steerCrew = useCallback((x: number, y: number) => setS(p => p.observedExpedition ? { ...p, expeditionAuto: false, observedExpedition: steerExpedition(p.observedExpedition, x, y) } : p), [setS]);
+  const commandCrew = useCallback((target: WorldEntity) => {
+    const crew = ref.current.observedExpedition;
+    if (!crew?.manual) return false;
+    if (!pickManualTarget(crew, [target], target.kind === 'creature' ? 'attack' : 'gather')) { toast.warning(target.kind === 'creature' ? '이 상대는 공격할 수 없어요' : '이 자원은 아직 채집할 수 없어요'); return false; }
+    setS(p => p.observedExpedition ? { ...p, observedExpedition: { ...p.observedExpedition, target, damage: 0 } } : p);
+    return true;
+  }, [setS]);
   const toggleEscort = useCallback(() => {
     const p = ref.current;
     if (!p.tribe?.count) { toast.warning('먼저 부족민을 영입하세요'); return; }
@@ -420,7 +430,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       if (!crew) return;
       const at = Date.now();
       const outdoors = enabledRef.current && at < outdoorMovingRef.current && distanceM(p.pos, crew.pos) <= 40;
-      const nearby = generateWorld({ center: crew.pos, radiusM: 30, now: at, isNight: dayPhase(new Date(at)) === 'night', depleted: p.depleted, terrainZones: p.terrainZones, parkCells: p.parkCells });
+      const nearby = generateWorld({ center: crew.pos, radiusM: crew.manual ? MANUAL_PICK_M : 30, now: at, isNight: dayPhase(new Date(at)) === 'night', depleted: p.depleted, terrainZones: p.terrainZones, parkCells: p.parkCells });
+      if (crew.manual) setCrewNearby(nearby);
       const result = advanceExpedition(crew, nearby, at, outdoors, !!p.expeditionAuto, Math.random, p.damage);
       let next = { ...p, observedExpedition: result.finished ? null : result.crew };
       if (result.crew.downed && p.tribe) { next.tribe = { ...p.tribe, injuredUntil: at + TRIBE_INJURY_MS }; next.expeditionAuto = false; result.rewards = result.rewards.slice(0, Math.ceil(result.rewards.length / 2)); }
@@ -1009,7 +1020,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS, options.indoor]);
   const updateInventionCredits = useCallback((credits: InventionCredits) => setS(p => ({ ...p, inventionCredits: credits, inventionWalkMark: credits.walkMeters === 0 ? p.walkSteps ?? 0 : p.inventionWalkMark })), [setS]);
 
-  return { hireMerc, toggleEscort, trainTribe, treatTribe, meetShaman, pickEgg, hatchEgg, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
+  return { crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, toggleEscort, trainTribe, treatTribe, meetShaman, pickEgg, hatchEgg, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
     petHits, mergePets, togglePetDeploy, assignPetRole, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,
