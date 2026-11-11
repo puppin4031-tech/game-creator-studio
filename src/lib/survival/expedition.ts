@@ -125,7 +125,7 @@ export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEnt
       if (target.kind === 'creature') {
         crew.damage = sharedDamage?.[target.id] ?? crew.damage;
         const hit = resolveCreatureHit(target.type, crew.damage, power, 3, false);
-        const dodged = hit.counterDamage > 0 && random() < EXPEDITION_DODGE_CHANCE;
+        const dodged = hit.counterDamage > 0 && ((Math.floor(now / 1000) * 2654435761) >>> 0) % 1000 < EXPEDITION_DODGE_CHANCE * 1000;
         const counter = dodged ? 0 : hit.counterDamage;
         crew.combatHit = { at: now, target, damage: hit.dealt - crew.damage, counterDamage: counter, killed: hit.dealt >= creatureDef(target.type).hp, dodged };
         crew.damage = hit.dealt;
