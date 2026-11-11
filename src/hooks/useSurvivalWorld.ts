@@ -1,7 +1,7 @@
 // @refresh reset
 import { gearMult, upgradeCost } from '@/lib/survival/upgrade';
 import { isWalkingPace } from '@/lib/survival/walkPace';
-import { advanceExpedition, steerExpedition, pickManualTarget, MANUAL_PICK_M, expeditionLoot, isPocketMovement, startObservedExpedition, EXPEDITION_RADIUS_M, FOCUS_LABEL, type ExpeditionFocus, type ObservedExpedition, type ExpeditionLog } from '@/lib/survival/expedition';
+import { advanceExpedition, steerExpedition, pickManualTarget, MANUAL_PICK_M, expeditionLoot, isPocketMovement, startObservedExpedition, EXPEDITION_RADIUS_M, FOCUS_LABEL, CREW_HEAL_FOODS, crewHealGain, type ExpeditionFocus, type ObservedExpedition, type ExpeditionLog } from '@/lib/survival/expedition';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -425,11 +425,10 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const p = ref.current; const crew = p.observedExpedition; if (!crew) return;
     const max = crew.maxHp ?? 100;
     if (crew.hp >= max) { toast('체력이 이미 가득해요'); return; }
-    const FOODS: ItemId[] = ['cooked_meat', 'jerky', 'apple', 'pear', 'coconut', 'berry', 'raw_meat'];
-    const id = FOODS.find(f => (p.storage.find(x => x.itemId === f)?.count ?? 0) > 0);
+    const id = CREW_HEAL_FOODS.find(f => (p.storage.find(x => x.itemId === f)?.count ?? 0) > 0);
     if (!id) { toast.warning('창고에 고기나 과일이 없어요'); return; }
     const storage = removeStacks(p.storage, [{ itemId: id, count: 1 }]); if (!storage) return;
-    const gain = Math.max(10, Math.round(max * 0.3));
+    const gain = crewHealGain(id, max);
     setS({ ...p, storage, observedExpedition: { ...crew, hp: Math.min(max, crew.hp + gain) } });
     toast.success(`창고의 ${ITEMS[id]?.name ?? id} 1개로 원정 체력 +${gain}`);
   }, [setS]);

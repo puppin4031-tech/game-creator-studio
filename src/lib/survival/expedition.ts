@@ -1,6 +1,7 @@
 import { distanceM, offsetM } from './geo';
 import { nodeDef, creatureDef } from './entities';
 import { resolveCreatureHit, rollLoot } from './combat';
+import type { ItemId } from './items';
 import type { LatLng, Stack, WorldEntity } from './types';
 
 export const EXPEDITION_SPEED_MPS = 15;
@@ -197,4 +198,14 @@ export function pickManualTarget(crew: ObservedExpedition, candidates: WorldEnti
     .filter(e => action === 'attack' ? e.kind === 'creature' && !creatureDef(e.type).boss : e.kind === 'node' && nodeDef(e.type).requires.tier <= 1)
     .filter(e => distanceM(crew.pos, e) <= MANUAL_PICK_M)
     .sort((a, b) => distanceM(crew.pos, a) - distanceM(crew.pos, b))[0];
+}
+
+/** Storage foods the expedition heal button can eat, in priority order. */
+export const CREW_HEAL_FOODS: ItemId[] = ['cooked_meat', 'jerky', 'apple', 'pear', 'coconut', 'berry', 'raw_meat'];
+/** Cooked meat and jerky refill the crew completely; fruit from apple down restores 30%. */
+export const CREW_HEAL_FULL_FOODS: ItemId[] = ['cooked_meat', 'jerky'];
+
+export function crewHealGain(itemId: ItemId, maxHp: number): number {
+  const ratio = CREW_HEAL_FULL_FOODS.includes(itemId) ? 1 : 0.3;
+  return Math.max(10, Math.round(maxHp * ratio));
 }
