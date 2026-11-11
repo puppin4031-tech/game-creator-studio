@@ -16,7 +16,7 @@ import BackpackDiscard from '@/components/survival/BackpackDiscard';
 import { BaseFortressOverlay } from '@/components/survival/BaseFortressOverlay';
 import PetSprite from '@/components/survival/PetSprite';
 import BaseNpcs from '@/components/survival/BaseNpcs';
-import escortArt from '@/assets/survival/npc-mercenary.png';
+import escortArt from '@/assets/survival/tribe-idle.png';
 import { escortReady } from '@/lib/survival/mercenaries';
 import { petRole } from '@/lib/survival/pets';
 import { AltarPanel } from '@/components/survival/AltarPanel';

@@ -4,7 +4,10 @@ import { FOCUS_LABEL, type ExpeditionFocus, type ExpeditionLog, type ObservedExp
 import type { LatLng } from '@/lib/survival/types';
 import { distanceM } from '@/lib/survival/geo';
 import CharacterSprite from './CharacterSprite';
-import mercArt from '@/assets/survival/npc-mercenary.png';
+import tribeIdle from '@/assets/survival/tribe-idle.png';
+import tribeAttack from '@/assets/survival/tribe-attack.png';
+import tribeGather from '@/assets/survival/tribe-gather.png';
+import { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { CombatImpact, expeditionActorPoint, freshCombatHit } from './ExpeditionCombat';
 
@@ -16,14 +19,31 @@ export function ExpeditionMarker({ crew, project }: { crew: ObservedExpedition; 
   const dx = target ? target.x - pos.x : 0, dy = target ? target.y - pos.y : 0;
   const length = Math.hypot(dx, dy) || 1;
   const striking = !!hit;
-  return <div data-expedition-marker className={`pointer-events-none absolute z-10 flex w-24 -translate-x-1/2 -translate-y-full flex-col items-center ${target ? '' : 'transition-[left,top] duration-1000 ease-linear motion-reduce:transition-none'}`} style={{ left: pos.x, top: pos.y }}>
-    <span className="absolute -top-5 whitespace-nowrap rounded bg-card px-1 text-[10px]">{crew.mercenary ? `용병 ${crew.mercenary}` : '원정'} · HP {crew.hp}</span>
+  // Alternate frames for a simple 2-frame action loop.
+  const [frame, setFrame] = useState(0);
+  useEffect(() => { const t = window.setInterval(() => setFrame(f => f ^ 1), crew.target ? 350 : 280); return () => window.clearInterval(t); }, [!!crew.target]);
+  // Recent path (lat/lng) so the trail stays correct while the map moves.
+  const trail = useRef<LatLng[]>([]);
+  const last = trail.current[trail.current.length - 1];
+  if (!last || distanceM(last, crew.pos) > 2) trail.current = [...trail.current, crew.pos].slice(-60);
+  const tribeSrc = crew.target ? (frame ? (crew.target.kind === 'node' ? tribeGather : tribeAttack) : tribeIdle) : hit ? tribeAttack : tribeIdle;
+  const pts = [crew.home, ...trail.current].map(project);
+  const ahead = [crew.pos, ...(crew.phase === 'outbound' ? [...(crew.waypoints ?? []), crew.destination] : [crew.home])].map(project);
+  return <>
+  {crew.mercenary && <svg aria-hidden className="pointer-events-none absolute inset-0 z-[9] h-full w-full overflow-visible">
+    <polyline points={pts.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="hsl(var(--primary))" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" opacity={0.85} />
+    <polyline points={ahead.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="hsl(var(--foreground))" strokeWidth={2} strokeDasharray="4 6" opacity={0.5} />
+    {crew.phase === 'outbound' && (() => { const d = project(crew.destination); return <circle cx={d.x} cy={d.y} r={6} fill="hsl(var(--primary))" stroke="hsl(var(--foreground))" strokeWidth={2} />; })()}
+  </svg>}
+  <div data-expedition-marker className={`pointer-events-none absolute z-10 flex w-24 -translate-x-1/2 -translate-y-full flex-col items-center ${target ? '' : 'transition-[left,top] duration-1000 ease-linear motion-reduce:transition-none'}`} style={{ left: pos.x, top: pos.y }}>
+    <span className="absolute -top-5 whitespace-nowrap rounded bg-card px-1 text-[10px]">{crew.mercenary ? `부족민 ${crew.mercenary}` : '원정'} · HP {crew.hp}</span>
     <motion.div key={hit?.at ?? 'march'} data-expedition-strike={hit?.at} className="relative" initial={false} animate={striking && !reduced ? { x: [0, dx / length * 28, -dx / length * 7, 0], y: [0, dy / length * 28, -dy / length * 7, 0] } : { x: 0, y: 0 }} transition={{ duration: 0.65, times: [0, 0.23, 0.6, 1] }}>
-      <div style={{ transform: (target ? dx < 0 : crew.facing === -1) ? 'scaleX(-1)' : undefined }}>{crew.mercenary ? <img src={mercArt} alt="" className="pixelated h-12 w-auto" style={{ transform: 'scaleX(-1)' }} /> : <CharacterSprite height={48} action={hit ? 'attack' : crew.target ? crew.target.kind === 'node' ? 'chop' : 'attack' : 'walk'} />}</div>
+      <div style={{ transform: (target ? dx < 0 : crew.facing === -1) ? 'scaleX(-1)' : undefined }}>{crew.mercenary ? <motion.img src={tribeSrc} alt={`부족민 ${crew.mercenary}`} className="pixelated h-14 w-auto" animate={!crew.target && !reduced ? { y: frame ? -2 : 0 } : { y: 0 }} transition={{ duration: 0.2 }} /> : <CharacterSprite height={48} action={hit ? 'attack' : crew.target ? crew.target.kind === 'node' ? 'chop' : 'attack' : 'walk'} />}</div>
       {hit && hit.counterDamage > 0 && <CombatImpact stamp={hit.at} damage={hit.counterDamage} />}
     </motion.div>
     {crew.target && <Zap className="absolute right-1 top-6 !h-6 !w-6 animate-pulse text-primary" />}
-  </div>;
+  </div>
+  </>;
 }
 
 interface Props {
