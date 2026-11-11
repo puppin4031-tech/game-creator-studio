@@ -39,12 +39,14 @@ export interface ObservedExpedition {
   /** -1 when last moving west (sprite mirrored), 1 otherwise. */
   facing?: 1 | -1;
   /** Presentation-only record; retains the final strike after the target is removed. */
-  combatHit?: { at: number; target: Extract<WorldEntity, { kind: 'creature' }>; damage: number; counterDamage: number; killed: boolean };
+  combatHit?: { at: number; target: Extract<WorldEntity, { kind: 'creature' }>; damage: number; counterDamage: number; killed: boolean; dodged?: boolean };
 }
 export interface ExpeditionLog { at: number; text: string }
 
 export type ExpeditionFocus = 'survival' | 'materials' | 'hunt';
 export const EXPEDITION_SCAN_M = 30;
+/** Chance a crew sidesteps a beast's counter-attack. */
+export const EXPEDITION_DODGE_CHANCE = 0.2;
 const SURVIVAL_NODES = new Set(['berry_bush', 'apple_tree', 'pear_tree', 'herb_patch']);
 export const FOCUS_LABEL: Record<ExpeditionFocus, string> = { survival: '생존필수품', materials: '재료', hunt: '사냥' };
 
@@ -123,9 +125,11 @@ export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEnt
       if (target.kind === 'creature') {
         crew.damage = sharedDamage?.[target.id] ?? crew.damage;
         const hit = resolveCreatureHit(target.type, crew.damage, power, 3, false);
-        crew.combatHit = { at: now, target, damage: hit.dealt - crew.damage, counterDamage: hit.counterDamage, killed: hit.dealt >= creatureDef(target.type).hp };
+        const dodged = hit.counterDamage > 0 && random() < EXPEDITION_DODGE_CHANCE;
+        const counter = dodged ? 0 : hit.counterDamage;
+        crew.combatHit = { at: now, target, damage: hit.dealt - crew.damage, counterDamage: counter, killed: hit.dealt >= creatureDef(target.type).hp, dodged };
         crew.damage = hit.dealt;
-        crew.hp = Math.max(0, crew.hp - hit.counterDamage);
+        crew.hp = Math.max(0, crew.hp - counter);
         text = `${creatureDef(target.type).name} 교전 · HP ${crew.hp}/${max}`;
       } else {
         crew.damage += power;
