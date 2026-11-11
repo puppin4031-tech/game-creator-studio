@@ -13,11 +13,11 @@ import { heroSpriteKey } from '@/lib/survival/heroTier';
 import SpriteAnimator from './SpriteAnimator';
 
 type Sheet = { url: string; frame_count: number; fps: number };
-const s = (url: string, fps = 8): Sheet => ({ url, frame_count: 4, fps });
+const s = (url: string, fps = 3): Sheet => ({ url, frame_count: 4, fps });
 /** Bundled defaults per tier; admin uploads for the same key override these. */
 const BUNDLED: Record<string, Partial<Record<SpriteAction, Sheet>>> = {
-  'hunter:lv5': { idle: s(lv5Talk.url, 3), walk: s(lv5Walk.url), attack: s(lv5Attack.url), chop: s(lv5Chop.url), gather: s(lv5Chop.url), talk: s(lv5Talk.url, 5) },
-  'hunter:lv8': { idle: s(lv8Idle.url, 4), walk: s(lv8Walk.url), attack: s(lv8Attack.url), chop: s(lv8Chop.url), gather: s(lv8Chop.url), talk: s(lv8Talk.url, 5) },
+  'hunter:lv5': { idle: s(lv5Talk.url), walk: s(lv5Walk.url), attack: s(lv5Attack.url), chop: s(lv5Chop.url), gather: s(lv5Chop.url), talk: s(lv5Talk.url) },
+  'hunter:lv8': { idle: s(lv8Idle.url), walk: s(lv8Walk.url), attack: s(lv8Attack.url), chop: s(lv8Chop.url), gather: s(lv8Chop.url), talk: s(lv8Talk.url) },
 };
 
 /** All character surfaces share this sprite; level picks the appearance tier. */
