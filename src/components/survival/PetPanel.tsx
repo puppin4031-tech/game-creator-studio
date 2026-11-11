@@ -2,15 +2,15 @@ import { useState } from 'react';
 import { Egg, Lock, LockOpen, Merge, Shield, House } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { fusionPartner, PET_DAILY_LOOT_CAP, PET_GUARD_SLOTS, PET_MAX_LEVEL, petDay, petStats, type OwnedPet, type PetDefense } from '@/lib/survival/pets';
+import { fusionPartner, PET_DAILY_LOOT_CAP, PET_GUARD_SLOTS, PET_MAX_LEVEL, petDay, petStats, petRole, PET_ROLE_LABEL, PET_HUNT_MS, type PetRole, type OwnedPet, type PetDefense } from '@/lib/survival/pets';
 import { petById } from '@/lib/survival/dinoEggs';
 import PetSprite from './PetSprite';
 import { HpBar } from './HitFeedback';
 
-export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, onLock, eggs = [], onHatch }: {
+export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, onLock, onRole, eggs = [], onHatch }: {
   eggs?: { id: string; name: string; walked: number; need: number; ready: boolean }[]; onHatch?: (id: string) => void;
   pets: OwnedPet[]; defense?: PetDefense; ready: boolean; now: number;
-  onFuse: (first: string, second: string) => boolean; onDeploy: (uid: string) => void; onLock: (uid: string) => void;
+  onFuse: (first: string, second: string) => boolean; onDeploy: (uid: string) => void; onLock: (uid: string) => void; onRole?: (uid: string, role: PetRole) => void;
 }) {
   const [pair, setPair] = useState<[string, string] | null>(null);
   const first = pets.find(p => p.uid === pair?.[0]), second = pets.find(p => p.uid === pair?.[1]);
@@ -39,15 +39,17 @@ export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, 
           <PetSprite speciesId={p.speciesId} name={name(p)} height={52} />
           <div className="min-w-0 flex-1 text-xs">
             <b className="block break-words text-sm">{name(p)} <span className="text-primary">Lv.{p.level}</span></b>
-            <span>{resting ? `휴식 ${Math.ceil((p.restUntil - now) / 1000)}초` : p.deployed ? '거점 수호 중' : '거점 대기'} · 같은 펫 {same}마리</span>
+            <span>{resting ? `휴식 ${Math.ceil((p.restUntil - now) / 1000)}초` : PET_ROLE_LABEL[petRole(p)]}{petRole(p) === 'hunt' && p.huntAt ? ` · ${Math.max(0, Math.ceil((p.huntAt + PET_HUNT_MS - now) / 60000))}분 뒤 귀환` : ''} · 같은 펫 {same}마리</span>
             <div className="mt-1 flex items-center gap-1"><HpBar value={p.hp} max={stats.maxHp} /><span>{p.hp}/{stats.maxHp}</span></div>
             <span>공격 {stats.attack}{p.level === PET_MAX_LEVEL ? ' · 최고 레벨' : ''}</span>
           </div>
           <Button size="icon" variant="ghost" disabled={!ready} className="h-11 w-11 shrink-0" title={p.locked ? '합체 잠금 해제' : '합체 잠금'} aria-label={`${name(p)} ${p.locked ? '합체 잠금 해제' : '합체 잠금'}`} aria-pressed={p.locked} onClick={() => onLock(p.uid)}>{p.locked ? <Lock /> : <LockOpen />}</Button>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <Button variant={p.deployed ? 'secondary' : 'outline'} className="min-h-11 text-xs" disabled={!ready || (!p.deployed && pets.filter(q => q.deployed).length >= PET_GUARD_SLOTS)} onClick={() => onDeploy(p.uid)}>{p.deployed ? <House className="!h-4 !w-4" /> : <Shield className="!h-4 !w-4" />}{p.deployed ? '대기시키기' : '수호 배치'}</Button>
-          <Button className="min-h-11 text-xs" disabled={!ready || !partner} onClick={() => { if (partner) setPair([p.uid, partner.uid]); }}><Merge className="!h-4 !w-4" />{p.level >= PET_MAX_LEVEL ? '최고 레벨' : `Lv.${p.level + 1} 합체`}</Button>
+          <div className="col-span-2 grid grid-cols-4 gap-1" role="radiogroup" aria-label={`${name(p)} 역할`}>
+            {(['guard', 'hunt', 'follow', 'idle'] as PetRole[]).map(r => <Button key={r} role="radio" aria-checked={petRole(p) === r} variant={petRole(p) === r ? 'default' : 'outline'} className="min-h-11 px-1 text-[11px]" disabled={!ready} onClick={() => onRole ? onRole(p.uid, r) : r === 'guard' || petRole(p) === 'guard' ? onDeploy(p.uid) : undefined}>{PET_ROLE_LABEL[r]}</Button>)}
+          </div>
+          <Button className="col-span-2 min-h-11 text-xs" disabled={!ready || !partner} onClick={() => { if (partner) setPair([p.uid, partner.uid]); }}><Merge className="!h-4 !w-4" />{p.level >= PET_MAX_LEVEL ? '최고 레벨' : `Lv.${p.level + 1} 합체`}</Button>
         </div>
       </article>;
     })}

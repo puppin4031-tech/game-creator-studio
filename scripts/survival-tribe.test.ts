@@ -25,3 +25,15 @@ test('escort not ready while injured or on expedition', () => {
   expect(escortReady(t, 0, true)).toBe(false);
   expect(escortReady({ ...t, injuredUntil: 100 }, 0, false)).toBe(false);
 });
+import { setPetRole, settlePetHunts, PET_HUNT_MS, type OwnedPet } from '../src/lib/survival/pets';
+const pet = (uid: string): OwnedPet => ({ uid, speciesId: 'x', name: 'x', level: 1, hp: 80, deployed: false, locked: false, restUntil: 0 });
+test('follow role limited to 2 pets', () => {
+  let ps: OwnedPet[] = [pet('a'), pet('b'), pet('c')];
+  ps = setPetRole(ps, 'a', 'follow', 0)!; ps = setPetRole(ps, 'b', 'follow', 0)!;
+  expect(setPetRole(ps, 'c', 'follow', 0)).toBeNull();
+});
+test('hunting pet brings meat after one trip', () => {
+  const ps = setPetRole([pet('a')], 'a', 'hunt', 0)!;
+  const r = settlePetHunts(ps, PET_HUNT_MS, () => 0.99);
+  expect(r.trips).toBe(1); expect(r.loot).toEqual([{ itemId: 'raw_meat', count: 1 }]);
+});

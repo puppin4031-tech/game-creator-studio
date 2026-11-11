@@ -14,9 +14,11 @@ import { CombatImpact, CREATURE_RING_RADIUS_M, expeditionActorPoint, freshCombat
 import type { ExpeditionFocus } from '@/lib/survival/expedition';
 import BackpackDiscard from '@/components/survival/BackpackDiscard';
 import { BaseFortressOverlay } from '@/components/survival/BaseFortressOverlay';
+import PetSprite from '@/components/survival/PetSprite';
 import BaseNpcs from '@/components/survival/BaseNpcs';
 import escortArt from '@/assets/survival/npc-mercenary.png';
 import { escortReady } from '@/lib/survival/mercenaries';
+import { petRole } from '@/lib/survival/pets';
 import { AltarPanel } from '@/components/survival/AltarPanel';
 import { EquipmentSlots } from '@/components/survival/EquipmentSlots';
 import { addStacks, hasAll } from "@/lib/survival/inventory";
@@ -618,7 +620,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                             </div>;
                           })()}
                           {bubbles[presence.selfId] && <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbleView(bubbles[presence.selfId])}</span>}
-                          <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined, opacity: crew ? 0.35 : 1, transition: 'opacity 0.3s' }}><CharacterSprite action={action} height={Math.round(SPRITE_META['char-hunter'].h * PLAYER_SCALE)} /></div></HitFlash>{escortReady(s.tribe, Date.now(), !!s.observedExpedition?.mercenary) && <img src={escortArt} alt="동행 부족민" className="pixelated pointer-events-none absolute -left-9 bottom-0 h-12 w-auto" style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined }} />}</div>
+                          <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined, opacity: crew ? 0.35 : 1, transition: 'opacity 0.3s' }}><CharacterSprite action={action} height={Math.round(SPRITE_META['char-hunter'].h * PLAYER_SCALE)} /></div></HitFlash>{escortReady(s.tribe, Date.now(), !!s.observedExpedition?.mercenary) && <img src={escortArt} alt="동행 부족민" className="pixelated pointer-events-none absolute -left-9 bottom-0 h-12 w-auto" style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined }} />}{(s.pets ?? []).filter(x => petRole(x) === 'follow').map((x, i) => <div key={x.uid} className="pointer-events-none absolute bottom-0" style={{ left: 40 + i * 26, transform: dx < -1 ? 'scaleX(-1)' : undefined }}><PetSprite speciesId={x.speciesId} name={x.name} height={30} /></div>)}</div>
                         </div>
                       </motion.div>
                     );
@@ -810,7 +812,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   {!!s.packedItems?.length && <Button variant="outline" disabled={!g.inBase || !actionReady} className="h-11 w-full" onClick={g.storePacked}>휴대 재료 모두 창고에 보관</Button>}
                   <div><b className="text-sm">창고</b><div className="mt-1"><Stacks stacks={s.storage} onUse={g.eat} /></div><div className="mt-2 flex flex-wrap gap-1">{s.storage.map(st => <Button key={st.itemId} variant="outline" size="sm" className="min-h-11 text-xs" disabled={!g.inBase || !actionReady} onClick={() => g.withdraw(st.itemId)}>{ITEMS[st.itemId].name} 1개 꺼내기</Button>)}</div></div>
                   </>}
-                  {baseTab === 'pets' && <PetPanel pets={s.pets ?? []} defense={s.petDefense} now={nowTick} ready={atMainBase(s) && (!realGps || gps.ready || !gps.fix)} onFuse={g.mergePets} onDeploy={g.togglePetDeploy} onLock={g.togglePetLock}
+                  {baseTab === 'pets' && <PetPanel pets={s.pets ?? []} defense={s.petDefense} now={nowTick} ready={atMainBase(s) && (!realGps || gps.ready || !gps.fix)} onFuse={g.mergePets} onDeploy={g.togglePetDeploy} onRole={g.assignPetRole} onLock={g.togglePetLock}
                     eggs={(s.dinoEggs ?? []).map(e => ({ id: e.id, name: '공룡 알', walked: eggWalkedM(e, s.walkSteps ?? 0), need: eggNeedM(e), ready: eggReady(e, s.walkSteps ?? 0) }))}
                     onHatch={(id) => { const baby = g.hatchEgg(id); if (baby) setHatched(baby); else toast.warning('거점 안에서 알이 배낭이나 창고에 있어야 부화해요'); }} />}
                   {baseTab === 'expedition' && <>

@@ -37,7 +37,7 @@ import { type InventionCredits } from '@/lib/survival/inventionCredits';
 import { payAccessible } from '@/lib/survival/abilities';
 import type { GearInstance, LatLng, Stack, WorldEntity } from '@/lib/survival/types';
 
-import { advancePetDefense, deployPet, fusePets, hatchPet, migratePets, type OwnedPet, type PetDefense, type PetHit } from '@/lib/survival/pets';
+import { advancePetDefense, deployPet, setPetRole, settlePetHunts, petRole, PET_GUARD_SLOTS, PET_FOLLOW_SLOTS, PET_FOLLOW_ATK, type PetRole, fusePets, hatchPet, migratePets, type OwnedPet, type PetDefense, type PetHit } from '@/lib/survival/pets';
 
 const SAVE_KEY = 'survival-world-v1';
 const EXPLORE_STEP_M = 20;
@@ -612,6 +612,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       if (p.techs.includes('primal_strike')) power *= primalStrikeMult(techLevel(p.techLevels, 'primal_strike'));
       const ranged = !!(weapon && ITEMS[weapon.itemId].weapon?.ranged) && !p.damage[e.id];
       power += (p.companions ?? []).some(c => c.kind === 'wolf') ? 3 : 0;
+      power += (p.pets ?? []).filter(x => petRole(x) === 'follow' && x.restUntil <= Date.now()).length * PET_FOLLOW_ATK;
       const defense = (atMainBase(p) && p.palisade ? 3 : 0) + (armor ? Math.round((ITEMS[armor.itemId].armor?.def ?? 0) * gearMult(armor)) : 0) + (p.techs.includes('iron_skin') ? ironSkinDef(techLevel(p.techLevels, 'iron_skin')) : 0);
       const exchange = resolveCreatureHit(e.type, p.damage[e.id] ?? 0, power, defense, ranged || (p.calmUntil?.[e.id] ?? 0) > Date.now());
       power = exchange.dealt - (p.damage[e.id] ?? 0);
@@ -987,6 +988,21 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (!pets) { toast.warning('수호 펫은 최대 3마리입니다'); return; }
     setS({ ...p, pets, lastTickAt: Date.now() });
   }, [setS, options.indoor]);
+  const assignPetRole = useCallback((uid: string, role: PetRole) => {
+    const p = petAccess(); if (!p) return;
+    const pets = setPetRole(p.pets ?? [], uid, role, Date.now());
+    if (!pets) { toast.warning(role === 'guard' ? `거점 지키기는 최대 ${PET_GUARD_SLOTS}마리예요` : `따라다니기는 최대 ${PET_FOLLOW_SLOTS}마리예요`); return; }
+    setS({ ...p, pets, lastTickAt: Date.now() });
+  }, [setS, options.indoor]);
+  // Hunting pets bring loot to storage.
+  useEffect(() => {
+    const p = ref.current;
+    if (!p.pets?.some(x => petRole(x) === 'hunt')) return;
+    const r = settlePetHunts(p.pets, Date.now());
+    if (!r.trips && r.pets.every((x, i) => x === p.pets![i])) return;
+    setS(q => ({ ...q, pets: r.pets, storage: addStacks(q.storage, r.loot) }));
+    if (r.trips) toast.success(`사냥 나간 펫이 ${r.trips}번 다녀왔어요 · 창고: ${fmt(r.loot)}`);
+  }, [now, setS]);
   const togglePetLock = useCallback((uid: string) => {
     const p = petAccess(); if (!p) return;
     setS({ ...p, pets: (p.pets ?? []).map(pet => pet.uid === uid ? { ...pet, locked: !pet.locked } : pet), lastTickAt: Date.now() });
@@ -994,7 +1010,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const updateInventionCredits = useCallback((credits: InventionCredits) => setS(p => ({ ...p, inventionCredits: credits, inventionWalkMark: credits.walkMeters === 0 ? p.walkSteps ?? 0 : p.inventionWalkMark })), [setS]);
 
   return { hireMerc, toggleEscort, trainTribe, treatTribe, meetShaman, pickEgg, hatchEgg, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
-    petHits, mergePets, togglePetDeploy, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
+    petHits, mergePets, togglePetDeploy, assignPetRole, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,
     quest, questProgress, canClaimQuest, claimQuest, nextLevelXp: xpToNext(s.level),

@@ -13,6 +13,7 @@ export const PET_BOUNDARY_REACH_M = 20;
 export interface OwnedPet {
   uid: string; speciesId: string; name: string; level: number; hp: number;
   deployed: boolean; locked: boolean; restUntil: number;
+  role?: 'guard' | 'hunt' | 'follow' | 'idle'; huntAt?: number;
 }
 export interface PetDefense {
   day: string; claims: number; lastHitAt: number;
@@ -108,4 +109,41 @@ export function advancePetDefense<T extends PetDefenseSave>(save: T, base: LatLn
   }
   state = { ...state, pets, damage, depleted, storage, petDefense: { ...daily, claims, lastHitAt: now, logs: logs.slice(-12) } };
   return { state, hits };
+}
+/* ---------- Pet roles ---------- */
+export type PetRole = 'guard' | 'hunt' | 'follow' | 'idle';
+export const PET_ROLE_LABEL: Record<PetRole, string> = { guard: '거점 지키기', hunt: '사냥 보내기', follow: '따라다니기', idle: '쉬기' };
+export const PET_FOLLOW_SLOTS = 2;
+export const PET_HUNT_MS = 20 * 60 * 1000;
+/** Each following pet adds attack while walking with the player. */
+export const PET_FOLLOW_ATK = 2;
+export const petRole = (p: OwnedPet): PetRole => p.role ?? (p.deployed ? 'guard' : 'idle');
+
+/** Assign a role; guard and follow have slot limits. `deployed` mirrors guard for existing base defense. */
+export function setPetRole(pets: OwnedPet[], uid: string, role: PetRole, now: number): OwnedPet[] | null {
+  const pet = pets.find(p => p.uid === uid);
+  if (!pet) return null;
+  const others = pets.filter(p => p.uid !== uid);
+  if (role === 'guard' && others.filter(p => petRole(p) === 'guard').length >= PET_GUARD_SLOTS) return null;
+  if (role === 'follow' && others.filter(p => petRole(p) === 'follow').length >= PET_FOLLOW_SLOTS) return null;
+  return pets.map(p => p.uid === uid ? { ...p, role, deployed: role === 'guard', huntAt: role === 'hunt' ? now : p.huntAt } : p);
+}
+
+/** Hunting pets return loot every PET_HUNT_MS (capped at 6 trips per settle); resting/weak pets skip. */
+export function settlePetHunts(pets: OwnedPet[], now: number, random: () => number = Math.random): { pets: OwnedPet[]; loot: Stack[]; trips: number } {
+  let loot: Stack[] = []; let trips = 0;
+  const next = pets.map(p => {
+    if (petRole(p) !== 'hunt' || p.restUntil > now) return p;
+    const since = p.huntAt ?? now;
+    const n = Math.min(6, Math.floor((now - since) / PET_HUNT_MS));
+    if (n < 1) return p.huntAt ? p : { ...p, huntAt: now };
+    for (let i = 0; i < n; i++) {
+      loot = addStacks(loot, [{ itemId: 'raw_meat', count: 1 + (random() < p.level * 0.15 ? 1 : 0) }]);
+      if (random() < 0.5) loot = addStacks(loot, [{ itemId: random() < 0.25 ? 'fur' : 'hide', count: 1 }]);
+      if (random() < 0.3 + p.level * 0.05) loot = addStacks(loot, [{ itemId: 'bone', count: 1 }]);
+    }
+    trips += n;
+    return { ...p, huntAt: since + n * PET_HUNT_MS };
+  });
+  return { pets: next, loot, trips };
 }
