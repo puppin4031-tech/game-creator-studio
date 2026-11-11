@@ -30,6 +30,8 @@ export interface ObservedExpedition {
   /** Tribe member stat ratio (1/6); 1 for the player's own expedition. */
   statMult?: number;
   maxHp?: number;
+  /** Tribe members on this expedition: HP pools, strikes chain and gathering scales per member. */
+  members?: number;
   /** True when HP hit 0 and the crew was carried home injured. */
   downed?: boolean;
   /** Joystick control: no auto targeting/patrol; crew walks to a dragged target, then strikes. */
@@ -132,7 +134,13 @@ export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEnt
       const power = (crew.statMult ?? 1) * (target.kind === 'node' ? 2 : 12) * (outdoor ? 2 : 1) * (now < crew.moraleUntil ? 1.5 : 1);
       if (target.kind === 'creature') {
         crew.damage = sharedDamage?.[target.id] ?? crew.damage;
-        const hit = resolveCreatureHit(target.type, crew.damage, power, 3, false);
+        const members = Math.max(1, crew.members ?? 1);
+        let hit = resolveCreatureHit(target.type, crew.damage, power, 3, false);
+        // Each extra member lands a follow-up strike; the beast retaliates once per exchange.
+        for (let i = 1; i < members && hit.dealt < creatureDef(target.type).hp; i++) {
+          const next = resolveCreatureHit(target.type, hit.dealt, power, 3, false);
+          hit = { ...next, counterDamage: hit.counterDamage };
+        }
         const dodged = hit.counterDamage > 0 && ((Math.floor(now / 1000) * 2654435761) >>> 0) % 1000 < EXPEDITION_DODGE_CHANCE * 1000;
         const counter = dodged ? 0 : hit.counterDamage;
         crew.combatHit = { at: now, target, damage: hit.dealt - crew.damage, counterDamage: counter, killed: hit.dealt >= creatureDef(target.type).hp, dodged };
@@ -140,7 +148,7 @@ export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEnt
         crew.hp = Math.max(0, crew.hp - counter);
         text = `${creatureDef(target.type).name} 교전 · HP ${crew.hp}/${max}`;
       } else {
-        crew.damage += power;
+        crew.damage += power * Math.max(1, crew.members ?? 1);
         text = `원정대가 ${nodeDef(target.type).name} 채집 중입니다…`;
       }
       if (crew.hp <= 0) {

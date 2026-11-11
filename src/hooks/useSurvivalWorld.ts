@@ -336,8 +336,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const tribeReady = (p.tribe?.count ?? 0) > 0 && !tribeInjured(p.tribe, Date.now());
     const merc = tribeReady && mercActive(p.mercenary, Date.now()) ? p.mercenary!.name : undefined;
     const ratio = tribeRatio(p.tribe);
-    const maxHp = Math.max(1, Math.round(maxHpOf(p) * ratio));
-    const crew = merc ? { ...raw, mercenary: merc, statMult: ratio, maxHp, hp: maxHp } : raw;
+    const members = Math.max(1, p.tribe?.count ?? 1);
+    const maxHp = Math.max(1, Math.round(maxHpOf(p) * ratio * members));
+    const crew = merc ? { ...raw, mercenary: merc, statMult: ratio, members, maxHp, hp: maxHp } : raw;
     setS({ ...p, starterCampPending: false, observedExpedition: crew, expeditionLogs: appendLog(p, `${merc ? `용병 ${merc}` : '원정'} 출발 · 목표: ${FOCUS_LABEL[focus]}`, Date.now()) });
     return true;
   }, [setS]);
