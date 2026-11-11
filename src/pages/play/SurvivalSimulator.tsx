@@ -36,7 +36,7 @@ import { toast } from 'sonner';
 import TerrainMap from '@/components/survival/TerrainMap';
 import { useSurvivalWorld } from '@/hooks/useSurvivalWorld';
 import { TERRAIN_ZONE_LABEL, zoneCellKey } from '@/lib/survival/terrainZone';
-import { ITEMS, type ItemId } from '@/lib/survival/items';
+import { gearEffect, ITEMS, type ItemId } from '@/lib/survival/items';
 import { nodeDef, creatureDef } from '@/lib/survival/entities';
 import { SPRITE_META, type SpriteKey } from '@/lib/survival/spriteMeta';
 import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
@@ -779,7 +779,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                         return (
                           <div key={r.id} className="pixel-frame flex items-center gap-2 bg-card p-2">
                             <Sprite k={it.sprite} />
-                            <div className="flex-1 text-xs"><b className="text-sm">{it.name}</b>{r.baseLevel > 1 && ` (거점 ${r.baseLevel}단계)`}{!lvOk && ` · 족장 Lv.${r.minLevel} 필요`}<div className="mt-1"><Stacks stacks={r.ingredients} have={s.storage} /></div></div>
+                            <div className="flex-1 text-xs"><b className="text-sm">{it.name}</b>{r.baseLevel > 1 && ` (거점 ${r.baseLevel}단계)`}{!lvOk && ` · 족장 Lv.${r.minLevel} 필요`}{gearEffect(it) && <p className="text-primary">효과: {gearEffect(it)}</p>}<div className="mt-1"><Stacks stacks={r.ingredients} have={s.storage} /></div></div>
                             <button type="button" disabled={!ok} onClick={() => g.craft(r)} className="pixel-btn h-11 bg-primary px-3 text-primary-foreground disabled:opacity-40">제작</button>
                           </div>
                         );
@@ -794,7 +794,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                         const ok = g.inBase && actionReady && hasAll(addStacks(s.backpack, s.storage), cost);
                         return (
                           <div key={inv.id} className="pixel-frame flex items-center gap-2 bg-card p-2">
-                            <div className="flex-1 text-xs"><b className="text-sm">{inv.name}{inv.masterwork ? ' · 명품' : ''}</b><div className="mt-1"><Stacks stacks={cost} have={addStacks(s.backpack, s.storage)} /></div></div>
+                            <div className="flex-1 text-xs"><b className="text-sm">{inv.name}{inv.masterwork ? ' · 명품' : ''}</b>{gearEffect(ITEMS[inv.id as ItemId]) && <p className="text-primary">효과: {gearEffect(ITEMS[inv.id as ItemId])}</p>}<div className="mt-1"><Stacks stacks={cost} have={addStacks(s.backpack, s.storage)} /></div></div>
                             <button type="button" disabled={!ok} onClick={() => g.craftInvention(inv.id)} className="pixel-btn h-11 bg-primary px-3 text-primary-foreground disabled:opacity-40">제작</button>
                           </div>
                         );

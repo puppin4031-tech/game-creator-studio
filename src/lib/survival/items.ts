@@ -115,3 +115,14 @@ export const GEAR_CATEGORIES: ItemCategory[] = ['tool', 'weapon', 'armor', 'trin
 export const isGearItem = (id: ItemId) => GEAR_CATEGORIES.includes(ITEMS[id].category);
 
 export const RARITY_LABEL: Record<Rarity, string> = { common: '흔함', uncommon: '고급', rare: '희귀', epic: '전설' };
+
+/** Plain-language effect line for gear, shown wherever an item appears. */
+export function gearEffect(d: ItemDef | undefined): string | null {
+  if (!d) return null;
+  const pct = (v: number) => `${Math.round(v * 100)}%`;
+  if (d.weapon) return `공격력 +${d.weapon.atk}${d.weapon.ranged ? ' · 원거리(첫 공격 반격 없음)' : ' · 근접'}`;
+  if (d.armor) return `방어력 +${d.armor.def} (받는 피해 -${d.armor.def})`;
+  if (d.tool) return `채집 속도 +${d.tool.power.toFixed(1)}${d.tool.chop ? ` · 벌목 ${d.tool.chop}단계` : ''}${d.tool.mine ? ` · 채굴 ${d.tool.mine}단계` : ''}`;
+  if (d.trinket) return `전리품 +${pct(d.trinket.lootBonus)} · 경험치 +${pct(d.trinket.xpBonus)}`;
+  return null;
+}

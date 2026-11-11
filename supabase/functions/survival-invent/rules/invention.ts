@@ -37,6 +37,22 @@ export const MATERIAL_PHYSICS: Record<string, MaterialPhysics> = {
   ancient_fang: { hardness: 8, toughness: 6, sharpness: 9, binding: 0, mass: 1, mystic: 7, color: '#fde68a' },
 };
 
+/** Material tier 1-4: higher-tier (rarer, later) materials forge stronger gear. */
+export const MATERIAL_TIER: Record<string, number> = {
+  branch: 1, fiber: 1, soil: 1, clay: 1,
+  flint: 2, bone: 2, hide: 2, cordage: 2, log: 2, resin: 2,
+  leather: 3, clay_pot: 3, frost_pelt: 3, frost_shard: 3, quartz: 3, ochre: 3,
+  obsidian: 4, tusk: 4, prime_pelt: 4, ancient_fang: 4, jade: 4,
+};
+/** T1 x0.85 ... T4 x1.3, by quantity-weighted average tier. */
+export function tierMultiplier(materials: Record<string, number>): number {
+  const e = Object.entries(materials).filter(([, q]) => q > 0);
+  const total = e.reduce((s, [, q]) => s + q, 0);
+  if (!total) return 1;
+  const avg = e.reduce((s, [id, q]) => s + (MATERIAL_TIER[id] ?? 1) * q, 0) / total;
+  return 0.7 + 0.15 * avg;
+}
+
 /** Which physics each category relies on (weights sum to 1). */
 export const CATEGORY_WEIGHTS: Record<InventionCategory, Partial<Record<keyof Omit<MaterialPhysics, 'color'>, number>>> = {
   tool:     { hardness: 0.35, sharpness: 0.25, toughness: 0.2, binding: 0.2 },
@@ -106,7 +122,7 @@ export function checkInvention(input: InventionInput): InventionCheck {
   if (score < MIN_PLAUSIBLE_SCORE) return { ok: false, reason: 'implausible' };
   // Diminishing returns on quantity, then hard cap.
   const qtyFactor = Math.min(1, Math.log2(1 + total) / Math.log2(1 + MAX_QTY_PER_SLOT));
-  const power = Math.min(STAT_CAP[input.category], Math.round(STAT_CAP[input.category] * (score / 10) * (0.5 + 0.5 * qtyFactor) * 100) / 100);
+  const power = Math.min(STAT_CAP[input.category], Math.round(STAT_CAP[input.category] * (score / 10) * (0.5 + 0.5 * qtyFactor) * tierMultiplier(input.materials) * 100) / 100);
   const sorted = [...entries].sort((a, b) => b[1] - a[1]);
   return {
     ok: true,

@@ -1,7 +1,7 @@
 import { ArrowRight } from 'lucide-react';
 import { ITEMS, type ItemId } from '@/lib/survival/items';
 import { BLUEPRINTS } from '@/lib/survival/blueprints';
-import type { InventionCategory } from '@/lib/survival/invention';
+import { checkInvention, type InventionCategory } from '@/lib/survival/invention';
 
 const icons = import.meta.glob('../../assets/survival/item-*.png', { eager: true, import: 'default' }) as Record<string, string>;
 const icon = (id: string) => icons[`../../assets/survival/${ITEMS[id as ItemId]?.sprite}.png`];
@@ -21,9 +21,18 @@ export function WinterRecipeHints({ have, category }: { have: (id: string) => nu
             </div>
           ))}
           <ArrowRight className="!h-4 !w-4 shrink-0 text-muted-foreground" />
-          <div className="text-xs"><b>{h.name}</b><div className="text-muted-foreground">{h.group}</div></div>
+          <div className="text-xs"><b>{h.name}</b><div className="text-muted-foreground">{h.group}</div><div className="text-primary">{hintEffect(h.category, h.materials, h.ranged)}</div></div>
         </div>
       ))}
     </div>
   );
+}
+
+function hintEffect(cat: InventionCategory, materials: Record<string, number>, ranged?: boolean): string {
+  const r = checkInvention({ category: cat, materials });
+  if (!r.ok) return '';
+  if (cat === 'weapon') return `공격력 +${Math.round(r.power)}${ranged ? ' · 원거리' : ''}`;
+  if (cat === 'building') return `방어력 +${Math.max(1, Math.round(r.power / 3))}`;
+  if (cat === 'tool') return `채집 속도 +${(1 + r.power).toFixed(1)}`;
+  return `전리품·경험치 +${Math.round(r.power * 100)}%`;
 }

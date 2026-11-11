@@ -74,3 +74,9 @@ test('timer is 15 seconds and rewards are one or three', () => {
   expect(rewardAmount('invite')).toBe(3);
   expect(rewardAmount('walk')).toBe(3);
 });
+
+import { tierMultiplier as tierMult } from '../src/lib/survival/invention';
+test('higher-tier materials forge stronger gear', () => {
+  expect(tierMult({ fiber: 4 })).toBeCloseTo(0.85);
+  expect(tierMult({ prime_pelt: 4 })).toBeCloseTo(1.3);
+});
