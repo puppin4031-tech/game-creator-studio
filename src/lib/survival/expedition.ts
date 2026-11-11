@@ -24,6 +24,8 @@ export interface ObservedExpedition {
   target?: WorldEntity;
   damage: number;
   cycle: number;
+  /** Hired mercenary name; presentation only. */
+  mercenary?: string;
   focus?: ExpeditionFocus;
   /** Patrol points visited before the destination, so the crew sweeps instead of a straight line. */
   waypoints?: LatLng[];

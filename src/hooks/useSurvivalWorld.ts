@@ -19,6 +19,7 @@ import { ACTIVE_SKILLS, claimResearch, startResearch, atMainBase, atWorkshop, bu
 import { advanceSurvivalVitals } from '@/lib/survival/metabolism';
 import { distanceM } from '@/lib/survival/geo';
 import { generateWorld, isNodeAvailable } from '@/lib/survival/world';
+import { hireMercenary, mercActive, MERC_COST, type MercenaryContract } from '@/lib/survival/mercenaries';
 import { addStacks, hasAll, removeStacks, splitDeathDrop, splitByCapacity, stackWeight } from '@/lib/survival/inventory';
 import { addExperience, dayPhase, xpToNext } from '@/lib/survival/progression';
 import { claimWorldQuest, freshProgress, type WorldProgress } from '@/lib/survival/worldProgress';
@@ -90,6 +91,8 @@ export interface WorldSave extends WorldProgress {
   expedition?: Expedition | null;
   observedExpedition?: ObservedExpedition | null;
   expeditionAuto?: boolean;
+  mercenary?: MercenaryContract | null;
+  shamanMet?: boolean;
   expeditionLogs?: ExpeditionLog[];
   /** Placeholder camps may be anchored once to the first accepted actual GPS fix. */
   starterCampPending?: boolean;
@@ -323,9 +326,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const dispatchObserved = useCallback((destination: LatLng, focus: ExpeditionFocus = 'materials') => {
     const p = ref.current;
     if (!p.base || p.observedExpedition || (enabledRef.current && !atMainBase(p))) return false;
-    const crew = startObservedExpedition(p.base, destination, Date.now(), focus);
-    if (!crew) { toast.warning('거점에서 10~1,500m 이내 목표를 선택하세요'); return false; }
-    setS({ ...p, starterCampPending: false, observedExpedition: crew, expeditionLogs: appendLog(p, `원정대 출발 · 목표: ${FOCUS_LABEL[focus]}`, Date.now()) });
+    const raw = startObservedExpedition(p.base, destination, Date.now(), focus);
+    if (!raw) { toast.warning('거점에서 10~1,500m 이내 목표를 선택하세요'); return false; }
+    const merc = mercActive(p.mercenary, Date.now()) ? p.mercenary!.name : undefined;
+    const crew = { ...raw, mercenary: merc };
+    setS({ ...p, starterCampPending: false, observedExpedition: crew, expeditionLogs: appendLog(p, `${merc ? `용병 ${merc}` : '원정'} 출발 · 목표: ${FOCUS_LABEL[focus]}`, Date.now()) });
     return true;
   }, [setS]);
   const toggleExpeditionAuto = useCallback((destination: LatLng, focus: ExpeditionFocus = 'materials') => {
@@ -334,6 +339,19 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (p.observedExpedition) { setS({ ...p, expeditionAuto: true }); return; }
     if (dispatchObserved(destination, focus)) setS(p => ({ ...p, expeditionAuto: true }));
   }, [dispatchObserved, setS]);
+  const hireMerc = useCallback(() => {
+    const p = ref.current; const now = Date.now();
+    if (!p.base) { toast.warning('거점이 있어야 용병을 고용할 수 있어요'); return false; }
+    if (mercActive(p.mercenary, now)) { toast.info('이미 계약 중인 용병이 있어요'); return false; }
+    const fromStorage = removeStacks(p.storage, MERC_COST);
+    const fromPack = fromStorage ? null : removeStacks(p.backpack, MERC_COST);
+    if (!fromStorage && !fromPack) { toast.warning('날고기 3개와 털가죽 1개가 필요해요'); return false; }
+    const m = hireMercenary(now);
+    setS({ ...p, storage: fromStorage ?? p.storage, backpack: fromPack ?? p.backpack, mercenary: m, expeditionLogs: appendLog(p, `용병 ${m.name} 고용 (24시간)`, now) });
+    toast.success(`용병 ${m.name}이(가) 합류했어요! 이제 원정을 대신 다녀와요`);
+    return true;
+  }, [setS]);
+  const meetShaman = useCallback(() => setS(p => ({ ...p, shamanMet: true })), [setS]);
   const rallyExpedition = useCallback(() => {
     const p = ref.current; const crew = p.observedExpedition; const at = Date.now();
     if (!crew || at < crew.moraleReadyAt) return;
@@ -917,7 +935,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS, options.indoor]);
   const updateInventionCredits = useCallback((credits: InventionCredits) => setS(p => ({ ...p, inventionCredits: credits, inventionWalkMark: credits.walkMeters === 0 ? p.walkSteps ?? 0 : p.inventionWalkMark })), [setS]);
 
-  return { pickEgg, hatchEgg, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
+  return { hireMerc, meetShaman, pickEgg, hatchEgg, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storePacked, adjustStorage,
     petHits, mergePets, togglePetDeploy, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,
