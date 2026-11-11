@@ -120,3 +120,9 @@
 - [x] 공격 스킬 Lv1~5 강화 + 우측 하단 스킬 슬롯
 - [x] 장비 슬롯(무기·도구2·방어구·부적, 레벨 해금) + 배낭 착용/벗기
 - [x] 야영지 탭(연구·발명/제작/창고/원정대) + 발명품 재제작 레시피
+
+## Planned (later): Lv.5 speech unlock + survival chat
+- [ ] At level 5, shaman event: hero says "주술사님." → shaman: "드디어 말을 하게 되었구만, 이제 다른 사람들과도 대화를 할 수가 있네."
+- [ ] Before Lv.5 the chat button is hidden/locked ("아직 말을 못 해요").
+- [ ] Reuse tag-game ChatDrawer (team/global channels, unread badge, ID dedupe) over the existing ~1km presence room: 근처(셀) / 전체 채널.
+- [ ] Guards: login required, rate limit, length cap, report/block; no exact positions in messages.
