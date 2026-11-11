@@ -1,3 +1,4 @@
+import { enterGuestSession } from '@/lib/guestEntry';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ export default function Lobby() {
   useEffect(() => {
     const checkSavedRoom = async () => {
       if (!savedRoomCode) return;
+      try { await enterGuestSession(); } catch { return; }
       const { data } = await supabase
         .from('tag_rooms')
         .select('status')
@@ -48,6 +50,7 @@ export default function Lobby() {
   // Fetch open rooms
   const fetchOpenRooms = async () => {
     setRoomsLoading(true);
+    try { await enterGuestSession(); } catch { /* list stays empty */ }
     const { data: rooms } = await supabase
       .from('tag_rooms')
       .select('*')

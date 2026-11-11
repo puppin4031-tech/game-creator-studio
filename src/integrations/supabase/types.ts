@@ -794,6 +794,7 @@ export type Database = {
           room_id: string
           team: number | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           id?: string
@@ -805,6 +806,7 @@ export type Database = {
           room_id: string
           team?: number | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           id?: string
@@ -816,6 +818,7 @@ export type Database = {
           room_id?: string
           team?: number | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -833,6 +836,7 @@ export type Database = {
           game_mode: string
           host_id: string
           id: string
+          owner_id: string | null
           room_code: string
           started_at: string | null
           status: string
@@ -846,6 +850,7 @@ export type Database = {
           game_mode?: string
           host_id: string
           id?: string
+          owner_id?: string | null
           room_code: string
           started_at?: string | null
           status?: string
@@ -859,6 +864,7 @@ export type Database = {
           game_mode?: string
           host_id?: string
           id?: string
+          owner_id?: string | null
           room_code?: string
           started_at?: string | null
           status?: string
@@ -1151,6 +1157,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_tag_room_owner: { Args: { _room: string }; Returns: boolean }
       pay_survival_tribute: { Args: never; Returns: Json }
       survival_invention_credit_action: {
         Args: { p_action: string; p_token?: string; p_user: string }

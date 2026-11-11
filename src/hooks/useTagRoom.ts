@@ -1,3 +1,4 @@
+import { enterGuestSession } from '@/lib/guestEntry';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -78,6 +79,7 @@ export function useTagRoom(roomCode?: string, playerId?: string) {
 
   // Create room
   const createRoom = useCallback(async (title: string, hostNickname: string, gameMode: string = 'tag') => {
+    await enterGuestSession();
     const code = generateRoomCode();
     const hostId = crypto.randomUUID();
 
@@ -100,6 +102,7 @@ export function useTagRoom(roomCode?: string, playerId?: string) {
 
   // Join room
   const joinRoom = useCallback(async (code: string, nickname: string) => {
+    await enterGuestSession();
     const roomData = await fetchRoom(code);
     if (!roomData) return null;
 
@@ -161,6 +164,7 @@ export function useTagRoom(roomCode?: string, playerId?: string) {
 
   // Rejoin room — find existing player by nickname, or insert new
   const rejoinRoom = useCallback(async (code: string, nick: string) => {
+    await enterGuestSession();
     const roomData = await fetchRoom(code);
     if (!roomData) return null;
 
