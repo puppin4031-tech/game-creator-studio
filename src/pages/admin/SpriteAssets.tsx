@@ -11,8 +11,9 @@ import SpriteAnimator from '@/components/survival/SpriteAnimator';
 import { SPRITE_ACTIONS, SPRITE_ACTION_LABELS, SPRITE_BUCKET, useSpriteAnimations, type SpriteAction } from '@/hooks/useSpriteAnimations';
 
 import { CREATURES } from '@/lib/survival/entities';
+import { HERO_TIERS } from '@/lib/survival/heroTier';
 
-const TARGETS = [{ key: 'hunter', label: '플레이어 캐릭터' }, ...Object.entries(CREATURES).map(([k, c]) => ({ key: `mob:${k}`, label: `몹 · ${c.name}` }))];
+const TARGETS = [...[...HERO_TIERS].reverse().map(h => ({ key: h.key, label: h.label })), ...Object.entries(CREATURES).map(([k, c]) => ({ key: `mob:${k}`, label: `몹 · ${c.name}` }))];
 const MOB_ACTIONS: SpriteAction[] = ['idle', 'attack'];
 
 export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARACTER: string }) {
@@ -76,7 +77,7 @@ export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARAC
         {current && <Button size="icon" variant="ghost" onClick={remove} aria-label="삭제"><Trash2 className="h-4 w-4" /></Button>}
       </div>
       <div className="flex h-28 items-center justify-center rounded bg-muted">
-        {src ? <SpriteAnimator url={src} frames={frames} fps={fps} height={96} /> : <span className="text-sm text-muted-foreground">기본 캐릭터 사용 중</span>}
+        {src ? <SpriteAnimator url={src} frames={frames} fps={fps} height={96} /> : <span className="text-sm text-muted-foreground">기본 그림 사용 중</span>}
       </div>
       <Input type="file" accept="image/png,image/webp,image/gif" onChange={e => setFile(e.target.files?.[0] ?? null)} />
       <div className="space-y-1"><Label>프레임 수: {frames}</Label><Slider min={1} max={16} step={1} value={[frames]} onValueChange={([v]) => setFrames(v)} /></div>
@@ -90,7 +91,7 @@ export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARAC
 
 export default function SpriteAssets() {
   const [target, setTarget] = useState('hunter');
-  const actions = target === 'hunter' ? SPRITE_ACTIONS : MOB_ACTIONS;
+  const actions = target.startsWith('hunter') ? SPRITE_ACTIONS : MOB_ACTIONS;
   return (
     <div className="space-y-4 p-4">
       <div>
