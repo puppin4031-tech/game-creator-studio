@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
-import { Swords, Pickaxe, Gamepad2, Bot, Heart } from 'lucide-react';
+import { Swords, Pickaxe, Gamepad2, Bot, Heart, ChevronRight } from 'lucide-react';
 import type { LatLng, WorldEntity } from '@/lib/survival/types';
 import type { ObservedExpedition } from '@/lib/survival/expedition';
 
@@ -21,6 +21,7 @@ export default function ExpeditionJoystick({ crew, candidates, project, onManual
   const root = useRef<HTMLDivElement>(null);
   const vec = useRef({ x: 0, y: 0 });
   const [knob, setKnob] = useState({ x: 0, y: 0 });
+  const [tools, setTools] = useState(true);
   const [drag, setDrag] = useState<{ kind: 'attack' | 'gather'; x: number; y: number } | null>(null);
 
   useEffect(() => {
@@ -52,15 +53,18 @@ export default function ExpeditionJoystick({ crew, candidates, project, onManual
     if (hit) onCommand(hit.c);
   };
 
-  const iconBtn = 'pointer-events-auto flex h-14 w-14 touch-none items-center justify-center border-2 border-foreground bg-card shadow-[3px_3px_0_0_hsl(var(--foreground)/0.6)]';
+  const iconBtn = 'pointer-events-auto flex h-11 w-11 touch-none items-center justify-center border-2 border-foreground bg-card shadow-[3px_3px_0_0_hsl(var(--foreground)/0.6)]';
   return <div ref={root} className="pointer-events-none absolute inset-0 z-20" onPointerMove={e => drag && setDrag({ ...drag, ...local(e) })} onPointerUp={drop}>
-    <button type="button" aria-pressed={!!crew.manual} onClick={() => onManual(!crew.manual)} className={`${iconBtn} absolute left-3 top-24 h-11 w-auto gap-1 px-2 text-xs font-bold`}>
-      {crew.manual ? <><Bot className="!h-4 !w-4" />자동으로</> : <><Gamepad2 className="!h-4 !w-4" />직접 조작</>}
-    </button>
-    <div className="pointer-events-auto absolute bottom-28 right-4 flex flex-col gap-2">
-      <button type="button" aria-label="공격" onClick={() => onAct('attack')} className={iconBtn}><Swords className="!h-7 !w-7 text-destructive" /></button>
-      <button type="button" aria-label="채집" onClick={() => onAct('gather')} className={iconBtn}><Pickaxe className="!h-7 !w-7 text-primary" /></button>
-      <button type="button" aria-label="체력 회복" onClick={onHeal} className={iconBtn}><Heart className="!h-7 !w-7 text-destructive" /></button>
+    <div className="pointer-events-auto absolute bottom-28 right-3 flex flex-col items-end gap-1.5">
+      <button type="button" aria-label={tools ? '원정 명령 접기' : '원정 명령 펼치기'} onClick={() => setTools(v => !v)} className={`${iconBtn} h-11 w-auto gap-1 px-2 text-[11px] font-bold`}>{tools ? <ChevronRight className="!h-4 !w-4" /> : <><Swords className="!h-4 !w-4" />원정</>}</button>
+      {tools && <>
+        <button type="button" aria-pressed={!!crew.manual} onClick={() => onManual(!crew.manual)} className={`${iconBtn} h-11 w-auto gap-1 px-2 text-[11px] font-bold`}>
+          {crew.manual ? <><Bot className="!h-4 !w-4" />자동</> : <><Gamepad2 className="!h-4 !w-4" />조작</>}
+        </button>
+        <button type="button" aria-label="공격" onClick={() => onAct('attack')} className={iconBtn}><Swords className="!h-5 !w-5 text-destructive" /></button>
+        <button type="button" aria-label="채집" onClick={() => onAct('gather')} className={iconBtn}><Pickaxe className="!h-5 !w-5 text-primary" /></button>
+        <button type="button" aria-label="체력 회복" onClick={onHeal} className={iconBtn}><Heart className="!h-5 !w-5 text-destructive" /></button>
+      </>}
     </div>
     {crew.manual && <>
       <div aria-label="원정 조이스틱" role="application" className="pointer-events-auto absolute bottom-28 left-4 h-28 w-28 touch-none rounded-full border-4 border-foreground/70 bg-background/60"

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Flame, Volume2, Zap } from 'lucide-react';
+import { ChevronDown, ChevronUp, Flame, Volume2, Zap } from 'lucide-react';
 import { ACTIVE_SKILLS, type ActiveSkill } from '@/lib/survival/abilities';
 import { skillCooldownMs, skillLevel } from '@/lib/survival/skillLevels';
 
@@ -8,17 +8,19 @@ const icons = { stone_barrage: Zap, roar: Volume2, ember_scatter: Flame };
 /** Bottom-right thumb slots for learned attack skills with cooldown sweep. */
 export function SkillQuickBar({ known, cooldowns, levels, ready, onUse }: { known: string[]; cooldowns?: Record<string, number>; levels?: Record<string, number>; ready: boolean; onUse: (id: ActiveSkill) => void }) {
   const [now, setNow] = useState(Date.now());
+  const [open, setOpen] = useState(true);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
   const ids = (Object.keys(ACTIVE_SKILLS) as ActiveSkill[]).filter(id => known.includes(id));
   if (!ids.length) return null;
-  return <div className="absolute right-2 top-[58%] z-20 -translate-y-1/2 flex flex-col gap-2">
-    {ids.map(id => {
+  return <div className="absolute right-2 top-[58%] z-20 -translate-y-1/2 flex flex-col items-center gap-1.5">
+    <button type="button" aria-label={open ? '스킬 접기' : '스킬 펼치기'} onClick={() => setOpen(v => !v)} className="pixel-btn flex h-11 w-11 items-center justify-center bg-card text-[10px] font-bold">{open ? <ChevronUp className="!h-4 !w-4" /> : <><Zap className="!h-4 !w-4 text-primary" /><ChevronDown className="!h-3 !w-3" /></>}</button>
+    {open && ids.map(id => {
       const Icon = icons[id]; const lv = skillLevel(levels, id);
       const left = Math.max(0, (cooldowns?.[id] ?? 0) - now);
       const frac = Math.min(1, left / skillCooldownMs(id, lv));
       return <button key={id} type="button" aria-label={`${ACTIVE_SKILLS[id].name} Lv.${lv}`} disabled={!ready || left > 0} onClick={() => onUse(id)}
-        className="pixel-btn relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-card disabled:opacity-80">
-        <Icon className="!h-7 !w-7 text-primary" />
+        className="pixel-btn relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-card disabled:opacity-80">
+        <Icon className="!h-5 !w-5 text-primary" />
         {left > 0 && <div aria-hidden className="absolute inset-0 bg-foreground/50" style={{ clipPath: `inset(${(1 - frac) * 100}% 0 0 0)` }} />}
         {left > 0 && <span className="absolute text-xs font-bold text-background">{Math.ceil(left / 1000)}</span>}
         <span className="absolute bottom-0 right-1 text-[9px] font-bold">Lv{lv}</span>

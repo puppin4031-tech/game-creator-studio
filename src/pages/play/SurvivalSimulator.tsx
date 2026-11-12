@@ -488,7 +488,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden font-pixel">
-      {realGps && hasTribe && !g.inBase && s.base && <div className="pointer-events-none fixed inset-x-2 z-[5] flex flex-col items-start gap-2" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 13rem)' }}>
+      {realGps && hasTribe && s.base && <div className="pointer-events-none fixed inset-x-2 z-[5] flex flex-col items-start gap-2" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 13rem)' }}>
         {fieldExp && <div className="pixel-panel pointer-events-auto max-h-[50dvh] w-full max-w-md overflow-y-auto bg-card p-2">{expeditionControls}</div>}
         <button type="button" onClick={() => setFieldExp(v => !v)} className="pixel-btn pointer-events-auto flex min-h-11 items-center gap-1 bg-primary px-3 text-xs text-primary-foreground"><Compass className="!h-5 !w-5" />{fieldExp ? '원정 닫기' : crew ? '원정 지휘' : '원정 보내기'}</button>
       </div>}
@@ -727,7 +727,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         </div>
       )}
 
-      {!realGps && <SkillQuickBar known={s.techs} cooldowns={s.cooldowns} levels={s.skillLevels} ready={actionReady} onUse={(id) => activateSkill(id)} />}
+      {<SkillQuickBar known={s.techs} cooldowns={s.cooldowns} levels={s.skillLevels} ready={actionReady} onUse={(id) => activateSkill(id)} />}
       {!realGps && s.base && <button type="button" onClick={() => setPanel('quests')} className="pixel-frame absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-2 z-20 flex min-h-11 max-w-[60%] items-center gap-2 bg-card px-2.5 py-1.5 text-left text-xs">
         <ListChecks className="!h-4 !w-4 shrink-0" />
         <span className="min-w-0 truncate">{g.quest?.title ?? '모든 목표 완료'}</span>
