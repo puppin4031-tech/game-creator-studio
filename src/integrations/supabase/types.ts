@@ -1157,6 +1157,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_tag_room_member: { Args: { _room: string }; Returns: boolean }
       is_tag_room_owner: { Args: { _room: string }; Returns: boolean }
       pay_survival_tribute: { Args: never; Returns: Json }
       survival_invention_credit_action: {
