@@ -1006,7 +1006,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const hatchEgg = useCallback((eggId: string) => {
     const p = ref.current;
     const egg = (p.dinoEggs ?? []).find(e => e.id === eggId);
-    if (!egg || !enabledRef.current || !atMainBase(p) || !eggReady(egg, p.walkSteps ?? 0)) return null;
+    if (!egg || !enabledRef.current || !atWorkshop(p) || !eggReady(egg, p.walkSteps ?? 0)) return null;
     const fromPack = removeStacks(p.backpack, [{ itemId: 'dino_egg', count: 1 }]);
     const fromStore = fromPack ? null : removeStacks(p.storage, [{ itemId: 'dino_egg', count: 1 }]);
     if (!fromPack && !fromStore) return null;
@@ -1017,7 +1017,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS]);
   const petAccess = () => {
     const p = ref.current;
-    if (!atMainBase(p) || (!enabledRef.current && !options.indoor)) { toast.warning('거점 안에서 펫을 관리하세요'); return null; }
+    if (!atWorkshop(p) || (!enabledRef.current && !options.indoor)) { toast.warning('거점 안에서 펫을 관리하세요'); return null; }
     return p;
   };
   const mergePets = useCallback((first: string, second: string): boolean => {
