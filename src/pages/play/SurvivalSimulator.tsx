@@ -14,6 +14,7 @@ import ExpeditionSystem, { ExpeditionMarker } from '@/components/survival/Expedi
 import { CombatImpact, CREATURE_RING_RADIUS_M, expeditionActorPoint, freshCombatHit, useExpeditionCombatSound, useMovementSound } from '@/components/survival/ExpeditionCombat';
 import type { ExpeditionFocus } from '@/lib/survival/expedition';
 import BackpackDiscard from '@/components/survival/BackpackDiscard';
+import InventoryMaterials from '@/components/survival/InventoryMaterials';
 import { BaseFortressOverlay } from '@/components/survival/BaseFortressOverlay';
 import PetSprite from '@/components/survival/PetSprite';
 import ExpeditionJoystick from '@/components/survival/ExpeditionJoystick';
@@ -744,9 +745,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               {panel === 'quests' && <SurvivalObjectives state={{ ...s, storedGear: [], stats: { gathered: s.gathered, crafted: s.crafted, kills: s.kills, deposits: s.deposits } }} canClaim={g.inBase && (!realGps || gps.ready)} onClaim={g.claimQuest} />}
               {panel === 'bag' && (
                 <>
-                  <p className="text-xs text-muted-foreground">음식은 눌러서 먹을 수 있어요.</p>
-                  <Stacks stacks={s.backpack} onUse={g.eat} />
-                  {!!s.backpack.filter(st => st.itemId !== 'shell').length && <div className="flex flex-wrap gap-1">{s.backpack.filter(st => st.itemId !== 'shell').map(st => <Button key={st.itemId} variant="outline" size="sm" className="min-h-11 text-xs" disabled={!g.inBase || !actionReady} onClick={() => g.storeOne(st.itemId)}>{ITEMS[st.itemId].name} 1개 창고에 넣기</Button>)}</div>}
+                  <InventoryMaterials stacks={s.backpack} location="backpack" canTransfer={g.inBase} ready={actionReady} onTransfer={g.storeOne} onUse={g.eat} icon={id => <Sprite k={ITEMS[id].sprite} scale={0.75} />} />
                   <EquipmentSlots gear={s.gear} loadout={g.loadout} level={s.level} onEquip={g.equip} icon={(x) => <Sprite k={ITEMS[x.itemId].sprite} scale={0.75} />} />
                   <BackpackDiscard backpack={s.backpack} onDrop={g.dropItems} />
                 </>
@@ -821,8 +820,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   )}
                   </>}
                   {baseTab === 'storage' && <>
-                  {!!s.backpack.filter(st => st.itemId !== 'shell').length && <div className="flex flex-wrap gap-1">{s.backpack.filter(st => st.itemId !== 'shell').map(st => <Button key={st.itemId} variant="outline" size="sm" className="min-h-11 text-xs" disabled={!g.inBase || !actionReady} onClick={() => g.storeOne(st.itemId)}>{ITEMS[st.itemId].name} 1개 창고에 넣기</Button>)}</div>}
-                  <div><b className="text-sm">창고</b><div className="mt-1"><Stacks stacks={s.storage} onUse={g.eat} /></div><div className="mt-2 flex flex-wrap gap-1">{s.storage.map(st => <Button key={st.itemId} variant="outline" size="sm" className="min-h-11 text-xs" disabled={!g.inBase || !actionReady} onClick={() => g.withdraw(st.itemId)}>{ITEMS[st.itemId].name} 1개 꺼내기</Button>)}</div></div>
+                  <div><b className="text-sm">배낭</b><div className="mt-1"><InventoryMaterials stacks={s.backpack} location="backpack" canTransfer={g.inBase} ready={actionReady} onTransfer={g.storeOne} onUse={g.eat} icon={id => <Sprite k={ITEMS[id].sprite} scale={0.75} />} /></div></div>
+                  <div><b className="text-sm">창고</b><div className="mt-1"><InventoryMaterials stacks={s.storage} location="storage" canTransfer={g.inBase} ready={actionReady} onTransfer={g.withdraw} onUse={g.eat} icon={id => <Sprite k={ITEMS[id].sprite} scale={0.75} />} /></div></div>
                   </>}
                   {baseTab === 'pets' && <PetPanel pets={s.pets ?? []} defense={s.petDefense} now={nowTick} ready={atMainBase(s) && (!realGps || gps.ready || !gps.fix)} onFuse={g.mergePets} onDeploy={g.togglePetDeploy} onRole={g.assignPetRole} onFeed={g.feedPet} onLock={g.togglePetLock}
                     eggs={(s.dinoEggs ?? []).map(e => ({ id: e.id, name: '공룡 알', walked: eggWalkedM(e, s.walkSteps ?? 0), need: eggNeedM(e), ready: eggReady(e, s.walkSteps ?? 0) }))}

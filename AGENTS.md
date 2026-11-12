@@ -28,3 +28,4 @@
 - Hatched pets use versioned owned instances and pure pets.ts fusion/defense rules, separate from wolf/NPC companions; shared creature damage/depletion prevents duplicate PvE kills, and base patrol never writes GPS or peer state.
 - Uploaded movement and beast audio reuse gameSettings sample caching, settings and overlap guards; presentation hooks trigger them without changing gameplay or GPS.
 - Built-in pet renames normalize owned names in migratePets using dinoEggs definitions while preserving species IDs and instance state; why: older local saves must not restore retired names over corrected cloud saves.
+- Backpack and storage material actions share InventoryMaterials dialogs and existing world callbacks; why: compact item lists avoid duplicating per-material action rows without changing inventory rules.
