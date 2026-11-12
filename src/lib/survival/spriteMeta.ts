@@ -80,3 +80,6 @@ export const SPRITE_META = {
 } as const;
 
 export type SpriteKey = keyof typeof SPRITE_META;
+
+/** On-map height of any player character: natural sprite size grown 15%. */
+export const PLAYER_SPRITE_HEIGHT = Math.round(SPRITE_META['char-hunter'].h * 1.38);

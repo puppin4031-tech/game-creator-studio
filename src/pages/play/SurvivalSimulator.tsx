@@ -47,7 +47,7 @@ import { useSurvivalWorld } from '@/hooks/useSurvivalWorld';
 import { TERRAIN_ZONE_LABEL, zoneCellKey } from '@/lib/survival/terrainZone';
 import { gearEffect, ITEMS, type ItemId } from '@/lib/survival/items';
 import { nodeDef, creatureDef } from '@/lib/survival/entities';
-import { SPRITE_META, type SpriteKey } from '@/lib/survival/spriteMeta';
+import { PLAYER_SPRITE_HEIGHT, SPRITE_META, type SpriteKey } from '@/lib/survival/spriteMeta';
 import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
 import { SURVIVAL_CONFIG as C } from '@/lib/survival/config';
 import { distanceM, offsetM } from '@/lib/survival/geo';
@@ -87,7 +87,6 @@ const START: LatLng = { lat: 37.748, lng: 126.7496 };
 const spriteUrls = import.meta.glob('../../assets/survival/*.png', { eager: true, import: 'default' }) as Record<string, string>;
 const url = (k: SpriteKey) => spriteUrls[`../../assets/survival/${k}.png`];
 
-const PLAYER_SCALE = 1.38; // base 1.2 grown 15%
 const LANDMARK_FEATURE_SCALE = 1.15;
 // Hard materials (stone, wood, ore) use the strike animation; soft ones use gather.
 /** Per-target work label and sound so gathering, logging, mining and hunting read differently. */
@@ -607,7 +606,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center transition-[left,top] duration-1000 ease-linear"
                   style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}>
                   {bubbles[pr.id] && <span className="whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbleView(bubbles[pr.id])}</span>}
-                  <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><Sprite k="char-hunter" className="opacity-90 hue-rotate-90" /></div>
+                  <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><CharacterSprite height={PLAYER_SPRITE_HEIGHT} className="opacity-90 hue-rotate-90" /></div>
                   <span className={`rounded px-1 text-[10px] ${ally ? 'bg-primary text-primary-foreground' : 'bg-background/80'}`}>{pr.name}</span>
                 </button>
               );
@@ -635,7 +634,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                             </div>;
                           })()}
                           {bubbles[presence.selfId] && <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbleView(bubbles[presence.selfId])}</span>}
-                          <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined, opacity: crew ? 0.35 : 1, transition: 'opacity 0.3s' }}><CharacterSprite action={action} level={s.level} height={Math.round(SPRITE_META['char-hunter'].h * PLAYER_SCALE)} /></div></HitFlash>{escortReady(s.tribe, Date.now(), !!s.observedExpedition?.mercenary) && <>{Array.from({ length: Math.min(5, s.tribe?.count ?? 1) }, (_, k) => <div key={k} aria-label={k ? undefined : "동행 부족민"} className="pointer-events-none absolute bottom-0" style={{ left: dx < -1 ? 36 + k * 22 : -36 - k * 22, bottom: (k % 2) * 6, transform: dx < -1 ? 'scaleX(-1)' : undefined }}><TribeSprite action={action} height={48} /></div>)}</>}{(s.pets ?? []).filter(x => petRole(x) === 'follow').map((x, i) => <div key={x.uid} className="pointer-events-none absolute bottom-0" style={{ left: 40 + i * 26, transform: dx < -1 ? 'scaleX(-1)' : undefined }}><PetSprite speciesId={x.speciesId} name={x.name} height={30} /></div>)}</div>
+                          <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined, opacity: crew ? 0.35 : 1, transition: 'opacity 0.3s' }}><CharacterSprite action={action} level={s.level} height={PLAYER_SPRITE_HEIGHT} /></div></HitFlash>{escortReady(s.tribe, Date.now(), !!s.observedExpedition?.mercenary) && <>{Array.from({ length: Math.min(5, s.tribe?.count ?? 1) }, (_, k) => <div key={k} aria-label={k ? undefined : "동행 부족민"} className="pointer-events-none absolute bottom-0" style={{ left: dx < -1 ? 36 + k * 22 : -36 - k * 22, bottom: (k % 2) * 6, transform: dx < -1 ? 'scaleX(-1)' : undefined }}><TribeSprite action={action} height={48} /></div>)}</>}{(s.pets ?? []).filter(x => petRole(x) === 'follow').map((x, i) => <div key={x.uid} className="pointer-events-none absolute bottom-0" style={{ left: 40 + i * 26, transform: dx < -1 ? 'scaleX(-1)' : undefined }}><PetSprite speciesId={x.speciesId} name={x.name} height={30} /></div>)}</div>
                         </div>
                       </motion.div>
                     );
