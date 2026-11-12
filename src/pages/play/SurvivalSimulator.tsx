@@ -20,9 +20,7 @@ import { BaseFortressOverlay } from '@/components/survival/BaseFortressOverlay';
 import PetSprite from '@/components/survival/PetSprite';
 import ExpeditionJoystick from '@/components/survival/ExpeditionJoystick';
 import BaseNpcs from '@/components/survival/BaseNpcs';
-import escortArt from '@/assets/survival/tribe-idle.png';
-import escortWalk1 from '@/assets/survival/tribe-walk1.png';
-import escortWalk2 from '@/assets/survival/tribe-walk2.png';
+import TribeSprite from '@/components/survival/TribeSprite';
 import { escortReady } from '@/lib/survival/mercenaries';
 import { petRole } from '@/lib/survival/pets';
 import { AltarPanel } from '@/components/survival/AltarPanel';
@@ -83,7 +81,7 @@ import { TECH_CATEGORIES, TECH_CATEGORY, type TechCategory } from '@/lib/surviva
 import { MAX_TECH_LEVEL, techLevel, techUpgradeCost } from '@/lib/survival/techLevels';
 import BasePetsOverlay from '@/components/survival/BasePetsOverlay';
 import PetPanel from '@/components/survival/PetPanel';
-import { atMainBase } from '@/lib/survival/abilities';
+import { atWorkshop } from '@/lib/survival/abilities';
 
 const START: LatLng = { lat: 37.748, lng: 126.7496 };
 const spriteUrls = import.meta.glob('../../assets/survival/*.png', { eager: true, import: 'default' }) as Record<string, string>;
@@ -514,7 +512,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 <div className="pointer-events-none absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
                   <div className="rounded-full border-2 border-dashed border-primary/70 bg-primary/10" style={{ width: r * 2, height: r * 2 }} />
                   <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"><BaseFortressOverlay baseLevel={s.base.level} hasPalisade={!!s.palisade} hasAltar={!!s.altar} /></div>
-                  {!s.tribe?.escort && !s.observedExpedition?.mercenary && Array.from({ length: Math.min(6, s.tribe?.count ?? 0) }, (_, k) => { const a = (k / Math.min(6, s.tribe!.count)) * Math.PI * 2; return <motion.img key={k} src={escortArt} alt="" aria-hidden className="pixelated pointer-events-none absolute left-1/2 top-1/2 h-10 w-auto" style={{ marginLeft: Math.cos(a) * 70 - 14, marginTop: Math.sin(a) * 40 - 20, transform: Math.sin(a) > 0 ? 'scaleX(-1)' : undefined }} animate={reducedMotion ? undefined : { x: [0, k % 2 ? 8 : -8, 0] }} transition={{ repeat: Infinity, duration: 4 + k }} />; })}<div className="absolute left-1/2 top-1/2 h-20 w-64 -translate-x-1/2 -translate-y-1/2"><BaseNpcs shamanMet={!!s.shamanMet} tribe={s.tribe} storage={s.storage} backpack={s.backpack} now={Date.now()} onMeet={g.meetShaman} onHire={g.hireMerc} onTrain={g.trainTribe} onTreat={g.treatTribe} onEscort={g.toggleEscort} expeditionBusy={!!s.observedExpedition?.mercenary} /></div>
+                  {!s.tribe?.escort && !s.observedExpedition?.mercenary && Array.from({ length: Math.min(6, s.tribe?.count ?? 0) }, (_, k) => { const a = (k / Math.min(6, s.tribe?.count ?? 1)) * Math.PI * 2; return <motion.div key={k} className="pointer-events-none absolute left-1/2 top-1/2" style={{ marginLeft: Math.cos(a) * 70 - 14, marginTop: Math.sin(a) * 40 - 20, transform: Math.sin(a) > 0 ? 'scaleX(-1)' : undefined }} animate={reducedMotion ? undefined : { x: [0, k % 2 ? 8 : -8, 0] }} transition={{ repeat: Infinity, duration: 4 + k }}><TribeSprite height={40} /></motion.div>; })}<div className="absolute left-1/2 top-1/2 h-20 w-64 -translate-x-1/2 -translate-y-1/2"><BaseNpcs shamanMet={!!s.shamanMet} tribe={s.tribe} storage={s.storage} backpack={s.backpack} now={Date.now()} onMeet={g.meetShaman} onHire={g.hireMerc} onTrain={g.trainTribe} onTreat={g.treatTribe} onEscort={g.toggleEscort} expeditionBusy={!!s.observedExpedition?.mercenary} /></div>
                 </div>
               );
             })()}
@@ -637,7 +635,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                             </div>;
                           })()}
                           {bubbles[presence.selfId] && <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbleView(bubbles[presence.selfId])}</span>}
-                          <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined, opacity: crew ? 0.35 : 1, transition: 'opacity 0.3s' }}><CharacterSprite action={action} level={s.level} height={Math.round(SPRITE_META['char-hunter'].h * PLAYER_SCALE)} /></div></HitFlash>{escortReady(s.tribe, Date.now(), !!s.observedExpedition?.mercenary) && <>{Array.from({ length: Math.min(5, s.tribe?.count ?? 1) }, (_, k) => <img key={k} src={action === 'walk' ? ((Math.floor(Date.now() / 250) + k) % 2 ? escortWalk2 : escortWalk1) : escortArt} alt={k ? "" : "동행 부족민"} className="pixelated pointer-events-none absolute bottom-0 h-12 w-auto" style={{ left: dx < -1 ? 36 + k * 22 : -36 - k * 22, bottom: (k % 2) * 6, transform: dx < -1 ? 'scaleX(-1)' : undefined }} />)}</>}{(s.pets ?? []).filter(x => petRole(x) === 'follow').map((x, i) => <div key={x.uid} className="pointer-events-none absolute bottom-0" style={{ left: 40 + i * 26, transform: dx < -1 ? 'scaleX(-1)' : undefined }}><PetSprite speciesId={x.speciesId} name={x.name} height={30} /></div>)}</div>
+                          <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined, opacity: crew ? 0.35 : 1, transition: 'opacity 0.3s' }}><CharacterSprite action={action} level={s.level} height={Math.round(SPRITE_META['char-hunter'].h * PLAYER_SCALE)} /></div></HitFlash>{escortReady(s.tribe, Date.now(), !!s.observedExpedition?.mercenary) && <>{Array.from({ length: Math.min(5, s.tribe?.count ?? 1) }, (_, k) => <div key={k} aria-label={k ? undefined : "동행 부족민"} className="pointer-events-none absolute bottom-0" style={{ left: dx < -1 ? 36 + k * 22 : -36 - k * 22, bottom: (k % 2) * 6, transform: dx < -1 ? 'scaleX(-1)' : undefined }}><TribeSprite action={action} height={48} /></div>)}</>}{(s.pets ?? []).filter(x => petRole(x) === 'follow').map((x, i) => <div key={x.uid} className="pointer-events-none absolute bottom-0" style={{ left: 40 + i * 26, transform: dx < -1 ? 'scaleX(-1)' : undefined }}><PetSprite speciesId={x.speciesId} name={x.name} height={30} /></div>)}</div>
                         </div>
                       </motion.div>
                     );
@@ -827,7 +825,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   <div><b className="text-sm">배낭</b><div className="mt-1"><InventoryMaterials stacks={s.backpack} location="backpack" canTransfer={g.inBase} ready={actionReady} onTransfer={g.storeOne} onUse={g.eat} icon={inventoryIcon} /></div></div>
                   <div><b className="text-sm">창고</b><div className="mt-1"><InventoryMaterials stacks={s.storage} location="storage" canTransfer={g.inBase} ready={actionReady} onTransfer={g.withdraw} onUse={g.eat} icon={inventoryIcon} /></div></div>
                   </>}
-                  {baseTab === 'pets' && <PetPanel pets={s.pets ?? []} defense={s.petDefense} now={nowTick} ready={atMainBase(s) && (!realGps || gps.ready || !gps.fix)} onFuse={g.mergePets} onDeploy={g.togglePetDeploy} onRole={g.assignPetRole} onFeed={g.feedPet} onLock={g.togglePetLock}
+                  {baseTab === 'pets' && <PetPanel pets={s.pets ?? []} defense={s.petDefense} now={nowTick} ready={atWorkshop(s) && (!realGps || gps.ready || !gps.fix)} onFuse={g.mergePets} onDeploy={g.togglePetDeploy} onRole={g.assignPetRole} onFeed={g.feedPet} onLock={g.togglePetLock}
                     eggs={(s.dinoEggs ?? []).map(e => ({ id: e.id, name: '공룡 알', walked: eggWalkedM(e, s.walkSteps ?? 0), need: eggNeedM(e), ready: eggReady(e, s.walkSteps ?? 0) }))}
                     onHatch={(id) => { const baby = g.hatchEgg(id); if (baby) setHatched({ ...baby, eggId: id }); else toast.warning('거점 안에서 알이 배낭이나 창고에 있어야 부화해요'); }} />}
                   {baseTab === 'expedition' && <>

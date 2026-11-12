@@ -30,3 +30,5 @@
 - Built-in pet renames normalize owned names in migratePets using dinoEggs definitions while preserving species IDs and instance state; why: older local saves must not restore retired names over corrected cloud saves.
 - Backpack and storage material actions share InventoryMaterials dialogs and existing world callbacks; why: compact item lists avoid duplicating per-material action rows without changing inventory rules.
 - Egg artwork uses a visual-only hash of the existing egg ID in eggArt.ts across map, inventory and hatch views; why: four uploaded designs stay stable without changing saves or pet probabilities.
+- TribeSprite applies admin sheets with a bundled fallback for base, escort and every expedition member; why: all tribe surfaces must honor uploads without blank loading frames.
+- Pet fusion compares explicit legacy/admin species aliases through fusionSpecies, preserving instance IDs and locks; why: renamed dinosaurs can merge across catalog generations without merging unrelated names.

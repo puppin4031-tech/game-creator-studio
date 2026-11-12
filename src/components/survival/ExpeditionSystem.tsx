@@ -4,17 +4,9 @@ import { FOCUS_LABEL, type ExpeditionFocus, type ExpeditionLog, type ObservedExp
 import type { LatLng } from '@/lib/survival/types';
 import { distanceM } from '@/lib/survival/geo';
 import CharacterSprite from './CharacterSprite';
-import tribeIdle from '@/assets/survival/tribe-idle.png';
-import tribeAttack from '@/assets/survival/tribe-attack.png';
-import tribeGather from '@/assets/survival/tribe-gather.png';
-import tribeWalk1 from '@/assets/survival/tribe-walk1.png';
-import tribeWalk2 from '@/assets/survival/tribe-walk2.png';
-import tribeHurt from '@/assets/survival/tribe-hurt.png';
-import tribeDodge from '@/assets/survival/tribe-dodge.png';
+import TribeSprite from './TribeSprite';
 import { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import SpriteAnimator from './SpriteAnimator';
-import { useSpriteAnimations } from '@/hooks/useSpriteAnimations';
 import { CombatImpact, expeditionActorPoint, freshCombatHit } from './ExpeditionCombat';
 
 export function ExpeditionMarker({ crew, project, members = 1 }: { crew: ObservedExpedition; project: (p: LatLng) => { x: number; y: number }; members?: number }) {
@@ -33,24 +25,19 @@ export function ExpeditionMarker({ crew, project, members = 1 }: { crew: Observe
   if (lastPos.current.lat !== crew.pos.lat || lastPos.current.lng !== crew.pos.lng) { lastPos.current = crew.pos; movedAt.current = Date.now(); }
   const moving = Date.now() - movedAt.current < 1200;
   const since = hit ? Date.now() - hit.at : Infinity;
-  const reaction = since >= 220 && since < 750 ? (hit!.counterDamage > 0 ? 'hurt' : hit!.dodged ? 'dodge' : null) : null;
+  const reaction = hit && since >= 220 && since < 750 ? (hit.counterDamage > 0 ? 'hurt' : hit.dodged ? 'dodge' : null) : null;
   // Recent path (lat/lng) so the trail stays correct while the map moves.
   const trail = useRef<LatLng[]>([]);
   const last = trail.current[trail.current.length - 1];
   if (!last || distanceM(last, crew.pos) > 2) trail.current = [...trail.current, crew.pos].slice(-60);
-  const tribeSrc = reaction === 'hurt' ? tribeHurt : reaction === 'dodge' ? tribeDodge : since < 220 ? tribeAttack
-    : crew.target && (!crew.manual || distanceM(crew.pos, crew.target) <= 10) ? (frame ? (crew.target.kind === 'node' ? tribeGather : tribeAttack) : tribeIdle)
-    : moving ? (frame ? tribeWalk2 : tribeWalk1) : tribeIdle;
-  const { data: tribeRemote } = useSpriteAnimations('tribe');
-  const tribeAct = tribeSrc === tribeWalk1 || tribeSrc === tribeWalk2 ? 'walk' : tribeSrc === tribeGather ? 'gather' : tribeSrc === tribeIdle ? 'idle' : 'attack';
-  const tribeSheet = tribeRemote?.[tribeAct];
+  const tribeAct = since < 220 ? 'attack' : crew.target && (!crew.manual || distanceM(crew.pos, crew.target) <= 10) ? (crew.target.kind === 'node' ? 'gather' : 'attack') : moving ? 'walk' : 'idle';
   const pts = [crew.home, ...trail.current].map(project);
   const ahead = [crew.pos, ...(crew.phase === 'outbound' ? [...(crew.waypoints ?? []), crew.destination] : [crew.home])].map(project);
   return <>
   <div data-expedition-marker className={`pointer-events-none absolute z-10 flex w-24 -translate-x-1/2 -translate-y-full flex-col items-center ${target ? '' : 'transition-[left,top] duration-1000 ease-linear motion-reduce:transition-none'}`} style={{ left: pos.x, top: pos.y }}>
     <span className="absolute -top-5 whitespace-nowrap rounded bg-card px-1 text-[10px]">{crew.mercenary ? `부족민 ${crew.mercenary}` : '원정'} · HP {crew.hp}</span>
     <motion.div key={hit?.at ?? 'march'} data-expedition-strike={hit?.at} className="relative" initial={false} animate={striking && !reduced ? { x: [0, dx / length * 28, -dx / length * 7, 0], y: [0, dy / length * 28, -dy / length * 7, 0] } : { x: 0, y: 0 }} transition={{ duration: 0.65, times: [0, 0.23, 0.6, 1] }}>
-      <div style={{ transform: (target ? dx < 0 : crew.facing === -1) ? 'scaleX(-1)' : undefined }}>{crew.mercenary && tribeSheet ? <SpriteAnimator url={tribeSheet.url} frames={tribeSheet.frame_count} fps={tribeSheet.fps} height={56} /> : crew.mercenary ? <motion.img src={tribeSrc} alt={`부족민 ${crew.mercenary}`} className="pixelated h-14 w-auto" animate={reduced ? {} : reaction === 'hurt' ? { x: -10, y: 0, rotate: -8, filter: 'brightness(1.8) saturate(0.4)' } : reaction === 'dodge' ? { x: -18, y: -10, rotate: 0, filter: 'none' } : { x: 0, y: moving && !crew.target ? (frame ? -2 : 0) : 0, rotate: 0, filter: 'none' }} transition={{ duration: 0.15 }} /> : null}{crew.mercenary && Array.from({ length: Math.min(4, members - 1) }, (_, k) => <img key={k} src={tribeSrc} alt="" aria-hidden className="pixelated pointer-events-none absolute bottom-0 h-12 w-auto opacity-90" style={{ left: -22 - k * 20, bottom: (k % 2) * 6 }} />)}{crew.mercenary ? null : <CharacterSprite height={48} action={hit ? 'attack' : crew.target ? crew.target.kind === 'node' ? 'chop' : 'attack' : 'walk'} />}</div>
+      <div style={{ transform: (target ? dx < 0 : crew.facing === -1) ? 'scaleX(-1)' : undefined }}>{crew.mercenary && <TribeSprite action={tribeAct} reaction={reaction} height={56} />}{crew.mercenary && Array.from({ length: Math.min(4, members - 1) }, (_, k) => <div key={k} aria-hidden className="pointer-events-none absolute bottom-0 opacity-90" style={{ left: -22 - k * 20, bottom: (k % 2) * 6 }}><TribeSprite action={tribeAct} reaction={reaction} height={48} /></div>)}{crew.mercenary ? null : <CharacterSprite height={48} action={hit ? 'attack' : crew.target ? crew.target.kind === 'node' ? 'chop' : 'attack' : 'walk'} />}</div>
       {hit && hit.counterDamage > 0 && <CombatImpact stamp={hit.at} damage={hit.counterDamage} />}
     </motion.div>
     {crew.target && <Zap className="absolute right-1 top-6 !h-6 !w-6 animate-pulse text-primary" />}

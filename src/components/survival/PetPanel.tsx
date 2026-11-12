@@ -7,6 +7,7 @@ import { petById } from '@/lib/survival/dinoEggs';
 import PetSprite from './PetSprite';
 import { HpBar } from './HitFeedback';
 import { eggArt } from './eggArt';
+import { fusionSpecies } from '@/lib/survival/pets';
 
 export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, onLock, onRole, onFeed, eggs = [], onHatch }: {
   onFeed?: (uid: string) => void;
@@ -38,7 +39,7 @@ export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, 
     {pets.map(p => {
       const partner = fusionPartner(pets, p), stats = petStats(p.level);
       const resting = p.restUntil > now;
-      const same = pets.filter(q => q.speciesId === p.speciesId && q.level === p.level).length;
+      const same = pets.filter(q => fusionSpecies(q.speciesId) === fusionSpecies(p.speciesId) && q.level === p.level).length;
       return <article key={p.uid} data-pet-uid={p.uid} className="pixel-frame space-y-2 bg-card p-2">
         <div className="flex items-center gap-2">
           <button type="button" className="shrink-0" aria-expanded={open === p.uid} aria-label={`${name(p)} 상세 보기`} onClick={() => setOpen(o => o === p.uid ? null : p.uid)}><PetSprite speciesId={p.speciesId} name={name(p)} height={52} /></button>
@@ -60,6 +61,7 @@ export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, 
             {(['guard', 'hunt', 'follow', 'idle'] as PetRole[]).map(r => <Button key={r} role="radio" aria-checked={petRole(p) === r} variant={petRole(p) === r ? 'default' : 'outline'} className="min-h-11 px-1 text-[11px]" disabled={!ready} onClick={() => onRole ? onRole(p.uid, r) : r === 'guard' || petRole(p) === 'guard' ? onDeploy(p.uid) : undefined}>{PET_ROLE_LABEL[r]}</Button>)}
           </div>
           <Button className="col-span-2 min-h-11 text-xs" disabled={!ready || !partner} onClick={() => { if (partner) setPair([p.uid, partner.uid]); }}><Merge className="!h-4 !w-4" />{p.level >= PET_MAX_LEVEL ? '최고 레벨' : `Lv.${p.level + 1} 합체`}</Button>
+          {p.locked && <p className="col-span-2 text-xs text-muted-foreground">합체 잠금 중 · 자물쇠를 눌러 해제</p>}
         </div>
       </article>;
     })}

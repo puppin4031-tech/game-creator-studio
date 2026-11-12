@@ -46,14 +46,19 @@ export function migratePets<T extends { pets?: OwnedPet[]; babyDinos?: string[] 
   return { ...save, pets, babyDinos: [] };
 }
 
+/** Legacy and admin versions of the three renamed dinosaurs are one fusion species. */
+export function fusionSpecies(id: string): string {
+  return ({ baby_stego: 'stagogon85', baby_raptor: 'terranox01', mini_triceratops: 'keratupsgt' } as Record<string, string>)[id] ?? id;
+}
+
 export function fusionPartner(pets: OwnedPet[], pet: OwnedPet): OwnedPet | undefined {
   if (pet.locked || pet.level >= PET_MAX_LEVEL) return undefined;
-  return pets.find(p => p.uid !== pet.uid && !p.locked && p.speciesId === pet.speciesId && p.level === pet.level);
+  return pets.find(p => p.uid !== pet.uid && !p.locked && fusionSpecies(p.speciesId) === fusionSpecies(pet.speciesId) && p.level === pet.level);
 }
 
 export function fusePets(pets: OwnedPet[], firstId: string, secondId: string, uid: string): { pets: OwnedPet[]; pet: OwnedPet } | null {
   const a = pets.find(p => p.uid === firstId), b = pets.find(p => p.uid === secondId);
-  if (!a || !b || firstId === secondId || pets.some(p => p.uid === uid) || a.locked || b.locked || a.speciesId !== b.speciesId || a.level !== b.level || a.level >= PET_MAX_LEVEL) return null;
+  if (!a || !b || firstId === secondId || pets.some(p => p.uid === uid) || a.locked || b.locked || fusionSpecies(a.speciesId) !== fusionSpecies(b.speciesId) || a.level !== b.level || a.level >= PET_MAX_LEVEL) return null;
   const level = a.level + 1;
   const pet = { ...a, uid, level, hp: petStats(level).maxHp, restUntil: 0, deployed: a.deployed || b.deployed };
   return { pets: [...pets.filter(p => p.uid !== firstId && p.uid !== secondId), pet], pet };
