@@ -36,7 +36,7 @@ export default function InventoryMaterials({ stacks, location, canTransfer, read
       </Button>)}
     </div> : <p className="text-sm text-muted-foreground">비어 있음</p>}
     <Dialog open={!!stack && !!item} onOpenChange={open => { if (!open) setSelected(null); }}>
-      <DialogContent className="pixel-panel max-h-[85dvh] w-[calc(100%-2rem)] max-w-sm overflow-y-auto">
+      <DialogContent className="pixel-panel max-h-[85dvh] w-[calc(100%-2rem)] max-w-sm overflow-y-auto bg-background">
         {stack && item && <>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 pr-6">{icon(stack.itemId)}{item.name}</DialogTitle>
