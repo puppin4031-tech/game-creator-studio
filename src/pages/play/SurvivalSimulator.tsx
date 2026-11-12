@@ -488,9 +488,9 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden font-pixel">
-      {realGps && hasTribe && s.base && <div className="pointer-events-none fixed inset-x-2 z-[5] flex flex-col items-start gap-2" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 13rem)' }}>
+      {realGps && hasTribe && s.base && <div className="pointer-events-none fixed inset-x-2 z-30 flex flex-col items-start gap-0" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 13rem)' }}>
         {fieldExp && <div className="pixel-panel pointer-events-auto max-h-[50dvh] w-full max-w-md overflow-y-auto bg-card p-2">{expeditionControls}</div>}
-        <button type="button" onClick={() => setFieldExp(v => !v)} className="pixel-btn pointer-events-auto flex min-h-11 items-center gap-1 bg-primary px-3 text-xs text-primary-foreground"><Compass className="!h-5 !w-5" />{fieldExp ? '원정 닫기' : crew ? '원정 지휘' : '원정 보내기'}</button>
+        <button type="button" onClick={() => setFieldExp(v => !v)} className="pixel-btn pointer-events-auto flex min-h-9 items-center gap-1 bg-primary px-2.5 text-[10px] text-primary-foreground"><Compass className="!h-4 !w-4" />{fieldExp ? '원정 닫기' : crew ? '원정 지휘' : '원정 보내기'}</button>
       </div>}
       <AnimatePresence>{showOpening && <ColonionOpening onEnter={enterWorld} />}</AnimatePresence>
       {<TerrainMap center={watchExpedition && crew ? crew.pos : s.pos} visionM={g.vision} explored={s.explored} onTap={onTap} zone={zone} onSurfaceZone={onSurfaceZone} onSurfacePark={onSurfacePark} onLandmarks={setLandmarks} bearing={compassOn && heading !== null ? heading : 0}>
@@ -647,7 +647,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       </TerrainMap>}
 
       {winterOn && <WinterThemeOverlay />}
-      {!!s.dinoEggs?.length && <div className="pointer-events-none absolute bottom-[calc(7rem+env(safe-area-inset-bottom))] left-2 z-20 flex items-center gap-1 rounded bg-card/90 px-2 py-1 text-xs" aria-label="공룡 알 부화 진행">
+      {!!s.dinoEggs?.length && <div className="pointer-events-none absolute bottom-[calc(7rem+env(safe-area-inset-bottom))] left-2 z-20 flex origin-bottom-left scale-[0.8] items-center gap-1 rounded bg-card/90 px-2 py-1 text-xs" aria-label="공룡 알 부화 진행">
         <img src={eggArt(s.dinoEggs[0].id)} alt="" className="pixelated h-6 w-6 object-contain" />알 {s.dinoEggs.length}개 · {(() => { const e = [...s.dinoEggs].sort((a, b) => (eggNeedM(a) - eggWalkedM(a, s.walkSteps ?? 0)) - (eggNeedM(b) - eggWalkedM(b, s.walkSteps ?? 0)))[0]; return `${Math.min(eggNeedM(e), eggWalkedM(e, s.walkSteps ?? 0))}/${eggNeedM(e)}m`; })()}
         {readyEgg && !g.inBase && <b className="text-primary"> · 거점으로!</b>}</div>}
       <DinoEggHatchModal baby={hatched} onClose={() => setHatched(null)} />
