@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import egg from '@/assets/survival/dinos/egg.png';
+import { eggArt, EGG_ARTS } from './eggArt';
 import baby_raptor from '@/assets/survival/dinos/baby_raptor.png';
 import mini_triceratops from '@/assets/survival/dinos/mini_triceratops.png';
 import baby_stego from '@/assets/survival/dinos/baby_stego.png';
@@ -11,7 +11,7 @@ import { useSpriteAnimations } from '@/hooks/useSpriteAnimations';
 import { haptic, playSfx } from '@/lib/survival/gameSettings';
 
 export const BABY_ART: Record<string, string> = { baby_raptor, mini_triceratops, baby_stego, baby_ptera };
-export const EGG_ART = egg;
+export const EGG_ART = EGG_ARTS[0];
 
 const BURST_AT = 1.45;
 const PARTICLES = Array.from({ length: 28 }, (_, i) => ({ a: (i / 28) * Math.PI * 2 + (i % 2) * 0.1, d: 60 + (i % 4) * 26, s: i % 3 ? 'h-2 w-2' : 'h-3 w-3' }));
@@ -19,7 +19,8 @@ const SPARKS = Array.from({ length: 10 }, (_, i) => ({ x: ((i * 37) % 160) - 80,
 const SHELLS = [{ x: -60, y: -40, r: -70 }, { x: 62, y: -30, r: 80 }, { x: -40, y: 50, r: -120 }, { x: 46, y: 56, r: 140 }];
 
 /** Hatch celebration: egg shakes with cracks, bursts into pixel particles and reveals the baby with sound and vibration. */
-export default function DinoEggHatchModal({ baby, onClose }: { baby: { id: string; name: string; custom?: boolean } | null; onClose: () => void }) {
+export default function DinoEggHatchModal({ baby, onClose }: { baby: { id: string; name: string; custom?: boolean; eggId?: string } | null; onClose: () => void }) {
+  const egg = eggArt(baby?.eggId ?? baby?.id ?? 'egg');
   const reduced = useReducedMotion();
   const { data: art } = useSpriteAnimations(baby?.custom ? `pet:${baby.id}` : 'none');
   const sheet = baby && !BABY_ART[baby.id] ? art?.idle : undefined;

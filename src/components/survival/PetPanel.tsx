@@ -6,6 +6,7 @@ import { fusionPartner, PET_DAILY_LOOT_CAP, PET_GUARD_SLOTS, PET_MAX_LEVEL, petD
 import { petById } from '@/lib/survival/dinoEggs';
 import PetSprite from './PetSprite';
 import { HpBar } from './HitFeedback';
+import { eggArt } from './eggArt';
 
 export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, onLock, onRole, onFeed, eggs = [], onHatch }: {
   onFeed?: (uid: string) => void;
@@ -26,6 +27,7 @@ export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, 
     {eggs.length > 0 && <div className="space-y-2" aria-label="부화 대기 알">
       <b className="flex items-center gap-1 text-sm"><Egg className="!h-4 !w-4" />보유한 알 {eggs.length}개</b>
       {eggs.map(e => <div key={e.id} className="pixel-frame flex items-center gap-2 bg-card p-2 text-xs">
+        <img src={eggArt(e.id)} alt="공룡 알" className="pixelated h-12 w-12 shrink-0 object-contain" />
         <div className="min-w-0 flex-1"><b className="block text-sm">{e.name}</b>
           <span>{e.ready ? '부화 준비 완료!' : `걸음 ${Math.floor(e.walked)}/${e.need}m`}</span>
           <div className="mt-1 h-1.5 bg-muted"><div className="h-full bg-primary" style={{ width: `${Math.min(100, (e.walked / e.need) * 100)}%` }} /></div></div>

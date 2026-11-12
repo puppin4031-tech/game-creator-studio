@@ -6,7 +6,8 @@ import { SkillControls, ConstructionControls, CompanionControls, SkillEffect } f
 import CharacterSprite from '@/components/survival/CharacterSprite';
 import WinterThemeOverlay from '@/components/WinterThemeOverlay';
 import { Snowflake } from 'lucide-react';
-import DinoEggHatchModal, { EGG_ART } from '@/components/survival/DinoEggHatchModal';
+import DinoEggHatchModal from '@/components/survival/DinoEggHatchModal';
+import { eggArt } from '@/components/survival/eggArt';
 import { EGG_SPAWN_RADIUS_M, eggNeedM, eggReady, eggSpawnsNear, eggWalkedM } from '@/lib/survival/dinoEggs';
 import { useCustomCatalog } from '@/hooks/useCustomCatalog';
 import CreatureSprite from '@/components/survival/CreatureSprite';
@@ -331,14 +332,17 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [aggroIds, setAggroIds] = useState<Set<string>>(() => new Set());
   const winterOn = gameSettings.winter;
   useCustomCatalog();
-  const [hatched, setHatched] = useState<{ id: string; name: string; custom?: boolean } | null>(null);
+  const [hatched, setHatched] = useState<{ id: string; name: string; custom?: boolean; eggId?: string } | null>(null);
+  const inventoryIcon = (id: ItemId) => id === 'dino_egg'
+    ? <img src={eggArt(s.dinoEggs?.[0]?.id ?? 'egg')} alt="" className="pixelated h-6 w-6 object-contain" />
+    : <Sprite k={ITEMS[id].sprite} scale={0.75} />;
   const eggSpawns = useMemo(() => realGps && !g.inBase ? eggSpawnsNear(s.pos, s.depleted, Date.now()).filter(e => distanceM(s.pos, e) <= EGG_SPAWN_RADIUS_M) : [],
     [realGps, g.inBase, s.pos, s.depleted]); // eslint-disable-line react-hooks/exhaustive-deps
   const readyEgg = (s.dinoEggs ?? []).find(e => eggReady(e, s.walkSteps ?? 0));
   useEffect(() => {
     if (!readyEgg || !g.inBase || hatched || (realGps && !gps.ready)) return;
     const baby = g.hatchEgg(readyEgg.id);
-    if (baby) setHatched(baby);
+    if (baby) setHatched({ ...baby, eggId: readyEgg.id });
   }, [readyEgg?.id, g.inBase, hatched, gps.ready]); // eslint-disable-line react-hooks/exhaustive-deps
   const [beastStrike, setBeastStrike] = useState<{ id: string; at: number } | null>(null);
   const lastBeastStrike = useRef(0);
@@ -501,7 +505,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
             {eggSpawns.map(egg => { const p = project(egg); return (
               <button key={egg.id} type="button" aria-label="신비한 픽셀 공룡 알" onClick={ev => { ev.stopPropagation(); g.pickEgg(egg); }}
                 className="pointer-events-auto absolute z-10 flex min-h-11 min-w-11 -translate-x-1/2 -translate-y-full items-center justify-center" style={{ left: p.x, top: p.y }}>
-                <motion.img src={EGG_ART} alt="" className="pixelated h-10 w-10 drop-shadow-[0_0_8px_hsl(var(--accent))]" animate={reducedMotion ? undefined : { y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 1.4 }} />
+                <motion.img src={eggArt(egg.id)} alt="" className="pixelated h-10 w-10 object-contain drop-shadow-[0_0_8px_hsl(var(--accent))]" animate={reducedMotion ? undefined : { y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 1.4 }} />
               </button>); })}
             {expeditionTarget && (() => { const p = project(expeditionTarget); return <div className="pointer-events-none absolute -translate-x-1/2 -translate-y-full rounded bg-primary px-2 py-1 text-xs text-primary-foreground" style={{ left: p.x, top: p.y }}>원정 목표</div>; })()}
             {s.base && g.baseDef && (() => {
@@ -647,7 +651,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
       {winterOn && <WinterThemeOverlay />}
       {!!s.dinoEggs?.length && <div className="pointer-events-none absolute bottom-[calc(7rem+env(safe-area-inset-bottom))] left-2 z-20 flex items-center gap-1 rounded bg-card/90 px-2 py-1 text-xs" aria-label="공룡 알 부화 진행">
-        <img src={EGG_ART} alt="" className="pixelated h-6 w-6" />알 {s.dinoEggs.length}개 · {(() => { const e = [...s.dinoEggs].sort((a, b) => (eggNeedM(a) - eggWalkedM(a, s.walkSteps ?? 0)) - (eggNeedM(b) - eggWalkedM(b, s.walkSteps ?? 0)))[0]; return `${Math.min(eggNeedM(e), eggWalkedM(e, s.walkSteps ?? 0))}/${eggNeedM(e)}m`; })()}
+        <img src={eggArt(s.dinoEggs[0].id)} alt="" className="pixelated h-6 w-6 object-contain" />알 {s.dinoEggs.length}개 · {(() => { const e = [...s.dinoEggs].sort((a, b) => (eggNeedM(a) - eggWalkedM(a, s.walkSteps ?? 0)) - (eggNeedM(b) - eggWalkedM(b, s.walkSteps ?? 0)))[0]; return `${Math.min(eggNeedM(e), eggWalkedM(e, s.walkSteps ?? 0))}/${eggNeedM(e)}m`; })()}
         {readyEgg && !g.inBase && <b className="text-primary"> · 거점으로!</b>}</div>}
       <DinoEggHatchModal baby={hatched} onClose={() => setHatched(null)} />
       {/* Top HUD */}
@@ -745,7 +749,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               {panel === 'quests' && <SurvivalObjectives state={{ ...s, storedGear: [], stats: { gathered: s.gathered, crafted: s.crafted, kills: s.kills, deposits: s.deposits } }} canClaim={g.inBase && (!realGps || gps.ready)} onClaim={g.claimQuest} />}
               {panel === 'bag' && (
                 <>
-                  <InventoryMaterials stacks={s.backpack} location="backpack" canTransfer={g.inBase} ready={actionReady} onTransfer={g.storeOne} onUse={g.eat} icon={id => <Sprite k={ITEMS[id].sprite} scale={0.75} />} />
+                  <InventoryMaterials stacks={s.backpack} location="backpack" canTransfer={g.inBase} ready={actionReady} onTransfer={g.storeOne} onUse={g.eat} icon={inventoryIcon} />
                   <EquipmentSlots gear={s.gear} loadout={g.loadout} level={s.level} onEquip={g.equip} icon={(x) => <Sprite k={ITEMS[x.itemId].sprite} scale={0.75} />} />
                   <BackpackDiscard backpack={s.backpack} onDrop={g.dropItems} />
                 </>
@@ -820,12 +824,12 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   )}
                   </>}
                   {baseTab === 'storage' && <>
-                  <div><b className="text-sm">배낭</b><div className="mt-1"><InventoryMaterials stacks={s.backpack} location="backpack" canTransfer={g.inBase} ready={actionReady} onTransfer={g.storeOne} onUse={g.eat} icon={id => <Sprite k={ITEMS[id].sprite} scale={0.75} />} /></div></div>
-                  <div><b className="text-sm">창고</b><div className="mt-1"><InventoryMaterials stacks={s.storage} location="storage" canTransfer={g.inBase} ready={actionReady} onTransfer={g.withdraw} onUse={g.eat} icon={id => <Sprite k={ITEMS[id].sprite} scale={0.75} />} /></div></div>
+                  <div><b className="text-sm">배낭</b><div className="mt-1"><InventoryMaterials stacks={s.backpack} location="backpack" canTransfer={g.inBase} ready={actionReady} onTransfer={g.storeOne} onUse={g.eat} icon={inventoryIcon} /></div></div>
+                  <div><b className="text-sm">창고</b><div className="mt-1"><InventoryMaterials stacks={s.storage} location="storage" canTransfer={g.inBase} ready={actionReady} onTransfer={g.withdraw} onUse={g.eat} icon={inventoryIcon} /></div></div>
                   </>}
                   {baseTab === 'pets' && <PetPanel pets={s.pets ?? []} defense={s.petDefense} now={nowTick} ready={atMainBase(s) && (!realGps || gps.ready || !gps.fix)} onFuse={g.mergePets} onDeploy={g.togglePetDeploy} onRole={g.assignPetRole} onFeed={g.feedPet} onLock={g.togglePetLock}
                     eggs={(s.dinoEggs ?? []).map(e => ({ id: e.id, name: '공룡 알', walked: eggWalkedM(e, s.walkSteps ?? 0), need: eggNeedM(e), ready: eggReady(e, s.walkSteps ?? 0) }))}
-                    onHatch={(id) => { const baby = g.hatchEgg(id); if (baby) setHatched(baby); else toast.warning('거점 안에서 알이 배낭이나 창고에 있어야 부화해요'); }} />}
+                    onHatch={(id) => { const baby = g.hatchEgg(id); if (baby) setHatched({ ...baby, eggId: id }); else toast.warning('거점 안에서 알이 배낭이나 창고에 있어야 부화해요'); }} />}
                   {baseTab === 'expedition' && <>
                   {realGps && expeditionControls}
                   {(!realGps || s.expedition) && <ExpeditionPanel expedition={s.expedition} report={s.scoutReport} now={nowTick} exploredTotal={s.exploredTotal ?? s.explored.length} mark={s.expeditionMark ?? 0}
