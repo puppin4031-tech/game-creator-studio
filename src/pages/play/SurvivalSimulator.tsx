@@ -87,7 +87,7 @@ const START: LatLng = { lat: 37.748, lng: 126.7496 };
 const spriteUrls = import.meta.glob('../../assets/survival/*.png', { eager: true, import: 'default' }) as Record<string, string>;
 const url = (k: SpriteKey) => spriteUrls[`../../assets/survival/${k}.png`];
 
-const PLAYER_SCALE = 1.2;
+const PLAYER_SCALE = 1.38; // base 1.2 grown 15%
 const LANDMARK_FEATURE_SCALE = 1.15;
 // Hard materials (stone, wood, ore) use the strike animation; soft ones use gather.
 /** Per-target work label and sound so gathering, logging, mining and hunting read differently. */
