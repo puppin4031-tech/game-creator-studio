@@ -654,7 +654,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         const tool = best((g) => ITEMS[g.itemId].tool?.[kind] ?? 0);
         const tier = tool ? ITEMS[tool.itemId].tool?.[kind] ?? 0 : 0;
         if (tier < d.requires.tier) {
-          toast.error(`${d.name}: ${kind === 'chop' ? '도끼' : '곡괭이'}가 필요합니다`, { description: '제작 기술을 먼저 깨우치세요' });
+          const needName = kind === 'mine' ? (d.requires.tier >= 2 ? '흑요석 곡괭이' : '돌곡괭이') : (d.requires.tier >= 2 ? '흑요석 도끼' : '돌도끼');
+          toast.error(`${d.name}: ${needName}(${kind === 'chop' ? '벌목' : '채굴'} ${d.requires.tier}단계)가 필요합니다`, { description: tier ? `지금 가진 도구는 ${tier}단계예요. 거점에서 ${needName}를 만들어 배낭에 넣으세요.` : `거점에서 ${needName}를 만들어 배낭에 넣으세요.` });
           return false;
         }
         if (!tool) return false;
