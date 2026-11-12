@@ -49,3 +49,19 @@ export function activePetAbilities(pets: OwnedPet[]): Record<string, number> {
   for (const [s, lv] of best) for (const a of PET_ABILITIES[s]) out[a.key] = (out[a.key] ?? 0) + abilityValue(a, lv);
   return out;
 }
+
+/** Terranox bleed: with `chancePct` probability adds 30% of the hit power (min 1) as bleed damage. */
+export const BLEED_RATIO = 0.3;
+export function bleedDamage(power: number, chancePct: number, roll: number = Math.random()): number {
+  return chancePct > 0 && roll < chancePct / 100 ? Math.max(1, Math.round(power * BLEED_RATIO)) : 0;
+}
+
+/** Archeron raises (never lowers) the walking-credit speed limit. */
+export const walkLimitKmh = (abilities: Record<string, number>, base: number) => Math.max(base, abilities.walkKmh ?? 0);
+
+/** Stegoron: every 5 s heal `pct`% of max HP (min 1), capped at max. */
+export const REGEN_INTERVAL_MS = 5000;
+export function regenHp(hp: number, maxHp: number, pct: number): number {
+  if (pct <= 0 || hp <= 0 || hp >= maxHp) return hp;
+  return Math.min(maxHp, hp + Math.max(1, Math.round(maxHp * pct / 100)));
+}

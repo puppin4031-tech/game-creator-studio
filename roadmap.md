@@ -130,4 +130,4 @@
 - [ ] Before Lv.5 the chat button is hidden/locked ("아직 말을 못 해요").
 - [ ] Reuse tag-game ChatDrawer (team/global channels, unread badge, ID dedupe) over the existing ~1km presence room: 근처(셀) / 전체 채널.
 - [ ] Guards: login required, rate limit, length cap, report/block; no exact positions in messages.
-- [ ] Wire pet ability values (activePetAbilities) into combat/GPS/backpack effects
+- [ ] Wire remaining pet abilities (bleed, walkKmh, regen done) into combat/GPS/backpack effects

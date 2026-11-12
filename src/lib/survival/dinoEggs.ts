@@ -67,10 +67,10 @@ export function newEgg(id: string, walkSteps: number, roll: number, pool?: PetDe
 }
 
 /** Credit one explored step to eggs whose speed limit the move respected. */
-export function advanceEggs(eggs: CarriedEgg[], meters: number, elapsedMs: number): CarriedEgg[] {
+export function advanceEggs(eggs: CarriedEgg[], meters: number, elapsedMs: number, minLimitKmh = 0): CarriedEgg[] {
   if (elapsedMs <= 0) return eggs;
   const kmh = (meters / (elapsedMs / 1000)) * 3.6;
-  return eggs.map(e => e.walkedM === undefined || kmh > (e.maxKmh ?? MAX_WALK_KMH) ? e : { ...e, walkedM: e.walkedM + WALK_STEP_M });
+  return eggs.map(e => e.walkedM === undefined || kmh > Math.max(minLimitKmh, e.maxKmh ?? MAX_WALK_KMH) ? e : { ...e, walkedM: e.walkedM + WALK_STEP_M });
 }
 
 export const eggNeedM = (egg: CarriedEgg) => egg.needM ?? EGG_HATCH_M;

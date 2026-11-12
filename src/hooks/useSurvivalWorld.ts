@@ -9,6 +9,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { Json } from '@/integrations/supabase/types';
 import { ITEMS, type ItemId } from '@/lib/survival/items';
 import { CREATURES, NODES, creatureDef, nodeDef, type LootRoll } from '@/lib/survival/entities';
+import { activePetAbilities, bleedDamage, walkLimitKmh, regenHp, REGEN_INTERVAL_MS } from '@/lib/survival/petAbilities';
+import { MAX_WALK_KMH } from '@/lib/survival/walkPace';
 import { CREATURE_ATTACK_INTERVAL_MS, resolveCreatureHit, rollLoot } from '@/lib/survival/combat';
 import { RECIPES, type Recipe } from '@/lib/survival/recipes';
 import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
@@ -269,6 +271,20 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return () => window.clearInterval(timer);
   }, [!!s.pets?.length, options.indoor, setS]);
 
+  // Stegoron regen: every 5 s heal player and expedition crew by the ability percentage.
+  const regenPct = activePetAbilities(s.pets ?? []).regen ?? 0;
+  useEffect(() => {
+    if (regenPct <= 0) return;
+    const id = window.setInterval(() => setS((p) => {
+      const hp = regenHp(p.hp, maxHpOf(p), regenPct);
+      const crew = p.observedExpedition;
+      const crewHp = crew ? regenHp(crew.hp, crew.maxHp ?? 100, regenPct) : 0;
+      if (hp === p.hp && (!crew || crewHp === crew.hp)) return p;
+      return { ...p, hp, observedExpedition: crew ? { ...crew, hp: crewHp } : crew };
+    }), REGEN_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [regenPct]);
+
   // Survival tick: hunger drain, starvation, base regen (wild_vitality level boosts rest regen).
   useEffect(() => {
     if (!enabled || now - s.lastTickAt < C.tickMs) return;
@@ -313,7 +329,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const explored = !last || distanceM(last, pos) >= EXPLORE_STEP_M ? [...p.explored, pos].slice(-MAX_EXPLORED) : p.explored;
       const grew = explored !== p.explored;
       // Reward walking only counts new steps taken at <= 13 km/h.
-      const walking = grew && prevAt > 0 && isWalkingPace(distanceM(p.pos, pos), now - prevAt);
+      const walkLimit = walkLimitKmh(activePetAbilities(p.pets ?? []), MAX_WALK_KMH);
+      const walking = grew && prevAt > 0 && isWalkingPace(distanceM(p.pos, pos), now - prevAt, walkLimit);
       if (options.indoor && prevAt > 0 && isPocketMovement(distanceM(p.pos, pos), now - prevAt)) {
         outdoorMovingRef.current = now + 10_000;
         setMovingUntil(now + 10_000);
@@ -322,7 +339,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         setMovingUntil(0);
       }
       const anchor = p.starterCampPending && p.base && !p.observedExpedition;
-      return { ...p, pos, base: anchor ? { ...p.base, ...pos } : p.base, starterCampPending: anchor ? false : p.starterCampPending, explored, exploredTotal: (p.exploredTotal ?? p.explored.length) + (grew ? 1 : 0), walkSteps: (p.walkSteps ?? 0) + (walking ? 1 : 0), dinoEggs: walking && p.dinoEggs?.length ? advanceEggs(p.dinoEggs, distanceM(p.pos, pos), now - prevAt) : p.dinoEggs };
+      return { ...p, pos, base: anchor ? { ...p.base, ...pos } : p.base, starterCampPending: anchor ? false : p.starterCampPending, explored, exploredTotal: (p.exploredTotal ?? p.explored.length) + (grew ? 1 : 0), walkSteps: (p.walkSteps ?? 0) + (walking ? 1 : 0), dinoEggs: walking && p.dinoEggs?.length ? advanceEggs(p.dinoEggs, distanceM(p.pos, pos), now - prevAt, walkLimit) : p.dinoEggs };
     });
   }, [setS, options.indoor]);
 
@@ -653,6 +670,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       power += (p.companions ?? []).some(c => c.kind === 'wolf') ? 3 : 0;
       power += (p.pets ?? []).filter(x => petRole(x) === 'follow' && x.restUntil <= Date.now()).length * PET_FOLLOW_ATK;
       const defense = (atMainBase(p) && p.palisade ? 3 : 0) + (armor ? Math.round((ITEMS[armor.itemId].armor?.def ?? 0) * gearMult(armor)) : 0) + (p.techs.includes('iron_skin') ? ironSkinDef(techLevel(p.techLevels, 'iron_skin')) : 0);
+      const bleed = bleedDamage(power, activePetAbilities(p.pets ?? []).bleed ?? 0);
+      if (bleed) { power += bleed; toast.success(`테라녹스 출혈! 추가 피해 +${bleed}`); }
       const exchange = resolveCreatureHit(e.type, p.damage[e.id] ?? 0, power, defense, ranged || (p.calmUntil?.[e.id] ?? 0) > Date.now());
       power = exchange.dealt - (p.damage[e.id] ?? 0);
       hp -= exchange.counterDamage;
