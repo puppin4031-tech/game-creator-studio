@@ -8,6 +8,7 @@ import PetSprite from './PetSprite';
 import { HpBar } from './HitFeedback';
 import { eggArt } from './eggArt';
 import { fusionSpecies } from '@/lib/survival/pets';
+import { abilitiesFor, abilityText } from '@/lib/survival/petAbilities';
 
 export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, onLock, onRole, onFeed, eggs = [], onHatch }: {
   onFeed?: (uid: string) => void;
@@ -48,12 +49,14 @@ export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, 
             <span>{resting ? `휴식 ${Math.ceil((p.restUntil - now) / 1000)}초` : PET_ROLE_LABEL[petRole(p)]}{petRole(p) === 'hunt' && p.huntAt ? ` · ${Math.max(0, Math.ceil((p.huntAt + PET_HUNT_MS - now) / 60000))}분 뒤 귀환` : ''} · 같은 펫 {same}마리</span>
             <div className="mt-1 flex items-center gap-1"><HpBar value={p.hp} max={stats.maxHp} /><span>{p.hp}/{stats.maxHp}</span></div>
             <span>공격 {stats.attack}{p.level === PET_MAX_LEVEL ? ' · 최고 레벨' : ''}</span>
+            {abilitiesFor(p.speciesId).map(a => <span key={a.key} className="block font-semibold text-primary">{abilityText(a, p.level)}{a.desc ? ` · ${a.desc}` : ''}</span>)}
           </div>
           <Button size="icon" variant="ghost" disabled={!ready} className="h-11 w-11 shrink-0" title={p.locked ? '합체 잠금 해제' : '합체 잠금'} aria-label={`${name(p)} ${p.locked ? '합체 잠금 해제' : '합체 잠금'}`} aria-pressed={p.locked} onClick={() => onLock(p.uid)}>{p.locked ? <Lock /> : <LockOpen />}</Button>
         </div>
         {open === p.uid && <div className="pixel-box space-y-1.5 bg-muted/40 p-2 text-xs">
           <div className="grid grid-cols-2 gap-1"><span>전투력 <b>{Math.round(stats.attack)}</b></span><span>방어력 <b>{PET_DEFENSE}</b></span></div>
           <p>효과: {effect[petRole(p)]}</p>
+          <p className="text-muted-foreground">고유 능력은 같은 공룡 여러 마리여도 가장 높은 레벨 1마리만 적용</p>
           <Button className="min-h-11 w-full text-xs" disabled={!onFeed || p.hp >= stats.maxHp} onClick={() => onFeed?.(p.uid)}><Drumstick className="!h-4 !w-4" />먹이주기 (창고 음식 1개)</Button>
         </div>}
         <div className="grid grid-cols-2 gap-2">
