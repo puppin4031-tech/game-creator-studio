@@ -38,7 +38,7 @@ import { type InventionCredits } from '@/lib/survival/inventionCredits';
 import { payAccessible } from '@/lib/survival/abilities';
 import type { GearInstance, LatLng, Stack, WorldEntity } from '@/lib/survival/types';
 
-import { advancePetDefense, deployPet, setPetRole, settlePetHunts, petRole, PET_GUARD_SLOTS, PET_FOLLOW_SLOTS, PET_FOLLOW_ATK, type PetRole, fusePets, hatchPet, migratePets, type OwnedPet, type PetDefense, type PetHit } from '@/lib/survival/pets';
+import { advancePetDefense, deployPet, setPetRole, settlePetHunts, petRole, PET_GUARD_SLOTS, PET_FOLLOW_SLOTS, PET_FOLLOW_ATK, petStats, type PetRole, fusePets, hatchPet, migratePets, type OwnedPet, type PetDefense, type PetHit } from '@/lib/survival/pets';
 
 const SAVE_KEY = 'survival-world-v1';
 const EXPLORE_STEP_M = 20;
@@ -1040,6 +1040,18 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (!pets) { toast.warning(role === 'guard' ? `거점 지키기는 최대 ${PET_GUARD_SLOTS}마리예요` : `따라다니기는 최대 ${PET_FOLLOW_SLOTS}마리예요`); return; }
     setS({ ...p, pets, lastTickAt: Date.now() });
   }, [setS, options.indoor]);
+  const feedPet = useCallback((uid: string) => {
+    const p = ref.current;
+    const pet = (p.pets ?? []).find(x => x.uid === uid); if (!pet) return;
+    const max = petStats(pet.level).maxHp;
+    if (pet.hp >= max) { toast('체력이 이미 가득해요'); return; }
+    const id = CREW_HEAL_FOODS.find(f => (p.storage.find(x => x.itemId === f)?.count ?? 0) > 0);
+    if (!id) { toast.warning('창고에 고기나 과일이 없어요'); return; }
+    const storage = removeStacks(p.storage, [{ itemId: id, count: 1 }]); if (!storage) return;
+    const gain = crewHealGain(id, max);
+    setS({ ...p, storage, pets: (p.pets ?? []).map(x => x.uid === uid ? { ...x, hp: Math.min(max, x.hp + gain) } : x), lastTickAt: Date.now() });
+    toast.success(`${ITEMS[id]?.name ?? id} 1개를 먹였어요 · 체력 +${gain}`);
+  }, [setS]);
   // Hunting pets bring loot to storage.
   useEffect(() => {
     const p = ref.current;
@@ -1056,7 +1068,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const updateInventionCredits = useCallback((credits: InventionCredits) => setS(p => ({ ...p, inventionCredits: credits, inventionWalkMark: credits.walkMeters === 0 ? p.walkSteps ?? 0 : p.inventionWalkMark })), [setS]);
 
   return { crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, toggleEscort, trainTribe, treatTribe, meetShaman, pickEgg, hatchEgg, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
-    petHits, mergePets, togglePetDeploy, assignPetRole, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
+    petHits, mergePets, togglePetDeploy, assignPetRole, feedPet, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,
     quest, questProgress, canClaimQuest, claimQuest, nextLevelXp: xpToNext(s.level),

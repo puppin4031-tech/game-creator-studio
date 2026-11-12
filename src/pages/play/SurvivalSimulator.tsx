@@ -1,3 +1,4 @@
+import { tribeRatio, tribeInjured } from '@/lib/survival/mercenaries';
 // @refresh reset
 // Custom GPS/world hook changes must remount this screen instead of reusing stale hook queues.
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -199,7 +200,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const expeditionControls = <ExpeditionSystem crew={crew} logs={s.expeditionLogs ?? []} target={expeditionTarget} home={s.base} auto={!!s.expeditionAuto} pocket={g.pocketMode} outdoor={g.outdoorMoving && (g.pocketMode || (!!crew && distanceM(s.pos, crew.pos) <= 40))} watching={watchExpedition} gpsReady={gps.ready} canSend={canDispatch}
     focus={crew?.focus ?? expeditionFocus} onFocus={setExpeditionFocus}
     onSend={() => { if (g.dispatchObserved(expeditionDestination, expeditionFocus)) { setWatchExpedition(true); setPanel('none'); } }}
-    onAuto={() => { g.toggleExpeditionAuto(expeditionDestination, expeditionFocus); setWatchExpedition(true); }} onPocket={g.togglePocket} onMorale={g.rallyExpedition} onReturn={g.recallExpedition} onWatch={() => setWatchExpedition(v => !v)} />;
+    onAuto={() => { g.toggleExpeditionAuto(expeditionDestination, expeditionFocus); setWatchExpedition(true); }} onPocket={g.togglePocket} onMorale={g.rallyExpedition} onReturn={g.recallExpedition} onWatch={() => setWatchExpedition(v => !v)}
+    tribe={s.tribe ? { count: s.tribe.count, trainLevel: s.tribe.trainLevel ?? 0, ratio: tribeRatio(s.tribe), maxHp: Math.max(1, Math.round(g.maxHp * tribeRatio(s.tribe) * s.tribe.count)), injured: tribeInjured(s.tribe, Date.now()), starving: !!s.tribe.starving } : undefined} />;
   const [panel, setPanel] = useState<Panel>('none');
   const [craftCat, setCraftCat] = useState<CraftCat>('all');
   const [baseTab, setBaseTab] = useState<'lab' | 'craft' | 'storage' | 'expedition' | 'pets'>('lab');
@@ -822,7 +824,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   {!!s.backpack.filter(st => st.itemId !== 'shell').length && <div className="flex flex-wrap gap-1">{s.backpack.filter(st => st.itemId !== 'shell').map(st => <Button key={st.itemId} variant="outline" size="sm" className="min-h-11 text-xs" disabled={!g.inBase || !actionReady} onClick={() => g.storeOne(st.itemId)}>{ITEMS[st.itemId].name} 1개 창고에 넣기</Button>)}</div>}
                   <div><b className="text-sm">창고</b><div className="mt-1"><Stacks stacks={s.storage} onUse={g.eat} /></div><div className="mt-2 flex flex-wrap gap-1">{s.storage.map(st => <Button key={st.itemId} variant="outline" size="sm" className="min-h-11 text-xs" disabled={!g.inBase || !actionReady} onClick={() => g.withdraw(st.itemId)}>{ITEMS[st.itemId].name} 1개 꺼내기</Button>)}</div></div>
                   </>}
-                  {baseTab === 'pets' && <PetPanel pets={s.pets ?? []} defense={s.petDefense} now={nowTick} ready={atMainBase(s) && (!realGps || gps.ready || !gps.fix)} onFuse={g.mergePets} onDeploy={g.togglePetDeploy} onRole={g.assignPetRole} onLock={g.togglePetLock}
+                  {baseTab === 'pets' && <PetPanel pets={s.pets ?? []} defense={s.petDefense} now={nowTick} ready={atMainBase(s) && (!realGps || gps.ready || !gps.fix)} onFuse={g.mergePets} onDeploy={g.togglePetDeploy} onRole={g.assignPetRole} onFeed={g.feedPet} onLock={g.togglePetLock}
                     eggs={(s.dinoEggs ?? []).map(e => ({ id: e.id, name: '공룡 알', walked: eggWalkedM(e, s.walkSteps ?? 0), need: eggNeedM(e), ready: eggReady(e, s.walkSteps ?? 0) }))}
                     onHatch={(id) => { const baby = g.hatchEgg(id); if (baby) setHatched(baby); else toast.warning('거점 안에서 알이 배낭이나 창고에 있어야 부화해요'); }} />}
                   {baseTab === 'expedition' && <>

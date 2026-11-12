@@ -24,6 +24,8 @@ export const petStats = (level: number) => {
   const scale = 1 + (Math.min(PET_MAX_LEVEL, Math.max(1, level)) - 1) * 0.25;
   return { maxHp: 80 * scale, attack: 12 * scale };
 };
+/** Flat damage reduction pets get when beasts retaliate. */
+export const PET_DEFENSE = 3;
 export const petDay = (now: number) => new Date(now).toISOString().slice(0, 10);
 export const emptyPetDefense = (): PetDefense => ({ day: '', claims: 0, lastHitAt: 0, logs: [] });
 

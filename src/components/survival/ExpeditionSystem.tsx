@@ -64,12 +64,34 @@ interface Props {
   gpsReady: boolean; canSend: boolean; onSend: () => void; onAuto: () => void;
   focus: ExpeditionFocus; onFocus: (f: ExpeditionFocus) => void;
   onPocket: () => void; onMorale: () => void; onReturn: () => void; onWatch: () => void;
+  tribe?: TribeInfo;
+}
+export interface TribeInfo { count: number; trainLevel: number; ratio: number; maxHp: number; injured: boolean; starving: boolean }
+
+function TribeStats({ t, crew }: { t?: TribeInfo; crew?: ObservedExpedition | null }) {
+  if (!t || t.count <= 0) return <p className="py-4 text-center text-muted-foreground">아직 부족민이 없어요. 거점 주술사에게 영입하세요.</p>;
+  const atk = Math.max(1, Math.round(12 * t.ratio));
+  const hp = crew?.maxHp ?? t.maxHp;
+  const rows: [string, string][] = [
+    ['인원', `${t.count}명 · 훈련 ${t.trainLevel}단계`],
+    ['상태', t.injured ? '부상 치료 중' : t.starving ? '굶주림 (능력 절반)' : '정상'],
+    ['공격력', `1인 ${atk} × ${t.count}연타`],
+    ['체력', crew ? `${crew.hp}/${hp}` : `${hp} (합산)`],
+    ['방어력', '3 · 회피 20%'],
+    ['채집 속도', `×${t.count}`],
+  ];
+  return <dl className="grid grid-cols-2 gap-1.5">{rows.map(([k, v]) => <div key={k} className="pixel-box bg-card p-1.5"><dt className="text-muted-foreground">{k}</dt><dd className="font-bold">{v}</dd></div>)}</dl>;
 }
 export default function ExpeditionSystem(p: Props) {
+  const [tab, setTab] = useState<'exp' | 'tribe'>('exp');
   return <section aria-label="원정대 관찰" className="space-y-2 border-t border-border bg-background/95 p-2 text-xs">
+    <div role="tablist" className="grid grid-cols-2 gap-1">
+      {([['exp', '원정'], ['tribe', '부족민']] as const).map(([k, l]) => <Button key={k} role="tab" aria-selected={tab === k} size="sm" variant={tab === k ? 'default' : 'outline'} className="min-h-11 text-xs" onClick={() => setTab(k)}>{l}</Button>)}
+    </div>
+    {tab === 'tribe' ? <TribeStats t={p.tribe} crew={p.crew} /> : <>
     <div className="flex flex-wrap items-center gap-2">
       <b className="flex items-center gap-1"><Flag className="!h-4 !w-4 text-primary" />1레벨 원정대</b>
-      <span className="ml-auto">{p.crew ? `HP ${p.crew.hp}/100 · ${p.crew.phase === 'returning' ? '귀환' : p.crew.target ? '작업' : '행군'} 중` : '거점 대기 · 기본 100%'}</span>
+      <span className="ml-auto">{p.crew ? `HP ${p.crew.hp}/${p.crew.maxHp ?? 100} · ${p.crew.phase === 'returning' ? '귀환' : p.crew.target ? '작업' : '행군'} 중` : '거점 대기 · 기본 100%'}</span>
     </div>
     <div role="radiogroup" aria-label="원정 목표" className="grid grid-cols-3 gap-1.5">
       {(Object.keys(FOCUS_LABEL) as ExpeditionFocus[]).map(f => <Button key={f} size="sm" role="radio" aria-checked={p.focus === f} variant={p.focus === f ? 'default' : 'outline'} disabled={!!p.crew} className="min-h-11 text-xs" onClick={() => p.onFocus(f)}>{FOCUS_LABEL[f]}</Button>)}
@@ -89,5 +111,6 @@ export default function ExpeditionSystem(p: Props) {
     <ol aria-label="원정대 활동 로그" aria-live="polite" className="h-14 space-y-0.5 overflow-y-auto border-l-2 border-primary pl-2 text-[11px]">
       {p.logs.length ? p.logs.slice(-3).map((log, i) => <li key={`${log.at}-${i}`}>{log.text}</li>) : <li className="text-muted-foreground">모닥불 · 원정대 대기 중</li>}
     </ol>
+    </>}
   </section>;
 }

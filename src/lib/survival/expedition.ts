@@ -209,11 +209,13 @@ export function pickManualTarget(crew: ObservedExpedition, candidates: WorldEnti
 }
 
 /** Storage foods the expedition heal button can eat, in priority order. */
-export const CREW_HEAL_FOODS: ItemId[] = ['cooked_meat', 'jerky', 'apple', 'pear', 'coconut', 'berry', 'raw_meat'];
+export const CREW_HEAL_FOODS: ItemId[] = ['berry', 'raw_meat', 'apple', 'pear', 'coconut', 'jerky', 'cooked_meat'];
+/** Low-value foods restore only 10% and are eaten first so better food is saved. */
+export const CREW_HEAL_TENTH_FOODS: ItemId[] = ['berry', 'raw_meat'];
 /** Cooked meat and jerky refill the crew completely; fruit from apple down restores 30%. */
 export const CREW_HEAL_FULL_FOODS: ItemId[] = ['cooked_meat', 'jerky'];
 
 export function crewHealGain(itemId: ItemId, maxHp: number): number {
-  const ratio = CREW_HEAL_FULL_FOODS.includes(itemId) ? 1 : 0.3;
-  return Math.max(10, Math.round(maxHp * ratio));
+  const ratio = CREW_HEAL_FULL_FOODS.includes(itemId) ? 1 : CREW_HEAL_TENTH_FOODS.includes(itemId) ? 0.1 : 0.3;
+  return Math.max(1, Math.round(maxHp * ratio));
 }

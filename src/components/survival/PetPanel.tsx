@@ -1,18 +1,21 @@
 import { useState } from 'react';
-import { Egg, Lock, LockOpen, Merge, Shield, House } from 'lucide-react';
+import { Egg, Drumstick, Lock, LockOpen, Merge, Shield, House } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { fusionPartner, PET_DAILY_LOOT_CAP, PET_GUARD_SLOTS, PET_MAX_LEVEL, petDay, petStats, petRole, PET_ROLE_LABEL, PET_HUNT_MS, type PetRole, type OwnedPet, type PetDefense } from '@/lib/survival/pets';
+import { fusionPartner, PET_DAILY_LOOT_CAP, PET_GUARD_SLOTS, PET_MAX_LEVEL, petDay, petStats, petRole, PET_ROLE_LABEL, PET_HUNT_MS, PET_DEFENSE, PET_FOLLOW_ATK, type PetRole, type OwnedPet, type PetDefense } from '@/lib/survival/pets';
 import { petById } from '@/lib/survival/dinoEggs';
 import PetSprite from './PetSprite';
 import { HpBar } from './HitFeedback';
 
-export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, onLock, onRole, eggs = [], onHatch }: {
+export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, onLock, onRole, onFeed, eggs = [], onHatch }: {
+  onFeed?: (uid: string) => void;
   eggs?: { id: string; name: string; walked: number; need: number; ready: boolean }[]; onHatch?: (id: string) => void;
   pets: OwnedPet[]; defense?: PetDefense; ready: boolean; now: number;
   onFuse: (first: string, second: string) => boolean; onDeploy: (uid: string) => void; onLock: (uid: string) => void; onRole?: (uid: string, role: PetRole) => void;
 }) {
   const [pair, setPair] = useState<[string, string] | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const effect: Record<PetRole, string> = { guard: '거점에 다가오는 맹수 자동 퇴치 · 전리품 창고로', hunt: `${PET_HUNT_MS / 60000}분마다 사냥 후 전리품 귀환`, follow: `함께 걸으며 공격 +${PET_FOLLOW_ATK}`, idle: '거점에서 휴식' };
   const first = pets.find(p => p.uid === pair?.[0]), second = pets.find(p => p.uid === pair?.[1]);
   const name = (p: OwnedPet) => petById(p.speciesId)?.name ?? p.name;
   return <section className="space-y-3" aria-label="거점 펫">
@@ -36,7 +39,7 @@ export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, 
       const same = pets.filter(q => q.speciesId === p.speciesId && q.level === p.level).length;
       return <article key={p.uid} data-pet-uid={p.uid} className="pixel-frame space-y-2 bg-card p-2">
         <div className="flex items-center gap-2">
-          <PetSprite speciesId={p.speciesId} name={name(p)} height={52} />
+          <button type="button" className="shrink-0" aria-expanded={open === p.uid} aria-label={`${name(p)} 상세 보기`} onClick={() => setOpen(o => o === p.uid ? null : p.uid)}><PetSprite speciesId={p.speciesId} name={name(p)} height={52} /></button>
           <div className="min-w-0 flex-1 text-xs">
             <b className="block break-words text-sm">{name(p)} <span className="text-primary">Lv.{p.level}</span></b>
             <span>{resting ? `휴식 ${Math.ceil((p.restUntil - now) / 1000)}초` : PET_ROLE_LABEL[petRole(p)]}{petRole(p) === 'hunt' && p.huntAt ? ` · ${Math.max(0, Math.ceil((p.huntAt + PET_HUNT_MS - now) / 60000))}분 뒤 귀환` : ''} · 같은 펫 {same}마리</span>
@@ -45,6 +48,11 @@ export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, 
           </div>
           <Button size="icon" variant="ghost" disabled={!ready} className="h-11 w-11 shrink-0" title={p.locked ? '합체 잠금 해제' : '합체 잠금'} aria-label={`${name(p)} ${p.locked ? '합체 잠금 해제' : '합체 잠금'}`} aria-pressed={p.locked} onClick={() => onLock(p.uid)}>{p.locked ? <Lock /> : <LockOpen />}</Button>
         </div>
+        {open === p.uid && <div className="pixel-box space-y-1.5 bg-muted/40 p-2 text-xs">
+          <div className="grid grid-cols-2 gap-1"><span>전투력 <b>{Math.round(stats.attack)}</b></span><span>방어력 <b>{PET_DEFENSE}</b></span></div>
+          <p>효과: {effect[petRole(p)]}</p>
+          <Button className="min-h-11 w-full text-xs" disabled={!onFeed || p.hp >= stats.maxHp} onClick={() => onFeed?.(p.uid)}><Drumstick className="!h-4 !w-4" />먹이주기 (창고 음식 1개)</Button>
+        </div>}
         <div className="grid grid-cols-2 gap-2">
           <div className="col-span-2 grid grid-cols-4 gap-1" role="radiogroup" aria-label={`${name(p)} 역할`}>
             {(['guard', 'hunt', 'follow', 'idle'] as PetRole[]).map(r => <Button key={r} role="radio" aria-checked={petRole(p) === r} variant={petRole(p) === r ? 'default' : 'outline'} className="min-h-11 px-1 text-[11px]" disabled={!ready} onClick={() => onRole ? onRole(p.uid, r) : r === 'guard' || petRole(p) === 'guard' ? onDeploy(p.uid) : undefined}>{PET_ROLE_LABEL[r]}</Button>)}
