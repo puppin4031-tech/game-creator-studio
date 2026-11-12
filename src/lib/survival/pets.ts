@@ -3,6 +3,7 @@ import { resolveCreatureHit, rollLoot } from './combat';
 import { distanceM, offsetM } from './geo';
 import { addStacks } from './inventory';
 import type { LatLng, Stack, WorldCreature } from './types';
+import { BABY_DINOS } from './dinoEggs';
 
 export const PET_MAX_LEVEL = 5;
 export const PET_GUARD_SLOTS = 3;
@@ -35,7 +36,11 @@ export function hatchPet(uid: string, speciesId: string, name: string, pets: Own
 
 /** The presence of pets (including []) marks conversion complete, preventing consumed legacy pets from reappearing. */
 export function migratePets<T extends { pets?: OwnedPet[]; babyDinos?: string[] }>(save: T, nameFor: (id: string) => string): T & { pets: OwnedPet[]; babyDinos: string[] } {
-  if (save.pets !== undefined) return { ...save, pets: save.pets, babyDinos: [] };
+  if (save.pets !== undefined) return { ...save, pets: save.pets.map(p => {
+    const renamed = ['baby_stego', 'baby_raptor', 'mini_triceratops'].includes(p.speciesId)
+      ? BABY_DINOS.find(d => d.id === p.speciesId) : undefined;
+    return renamed ? { ...p, name: renamed.name } : p;
+  }), babyDinos: [] };
   const pets: OwnedPet[] = [];
   for (const [i, id] of (save.babyDinos ?? []).entries()) pets.push(hatchPet(`legacy-pet:${i}:${id}`, id, nameFor(id), pets));
   return { ...save, pets, babyDinos: [] };

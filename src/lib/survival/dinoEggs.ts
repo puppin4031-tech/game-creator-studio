@@ -17,9 +17,9 @@ const SALT = 7717;
 export interface PetDef { id: string; name: string; needM: number; maxKmh: number; weight: number; custom?: boolean; mode?: 'steps' | 'distance'; steps?: number }
 
 export const BABY_DINOS: PetDef[] = [
-  { id: 'baby_raptor', name: '아기 랩터', needM: EGG_HATCH_M, maxKmh: MAX_WALK_KMH, weight: 1 },
-  { id: 'mini_triceratops', name: '미니 트리케라톱스', needM: EGG_HATCH_M, maxKmh: MAX_WALK_KMH, weight: 1 },
-  { id: 'baby_stego', name: '아기 스테고사우루스', needM: EGG_HATCH_M, maxKmh: MAX_WALK_KMH, weight: 1 },
+  { id: 'baby_raptor', name: '테라녹스', needM: EGG_HATCH_M, maxKmh: MAX_WALK_KMH, weight: 1 },
+  { id: 'mini_triceratops', name: '케라톱스', needM: EGG_HATCH_M, maxKmh: MAX_WALK_KMH, weight: 1 },
+  { id: 'baby_stego', name: '스테고론', needM: EGG_HATCH_M, maxKmh: MAX_WALK_KMH, weight: 1 },
   { id: 'baby_ptera', name: '아기 프테라노돈', needM: EGG_HATCH_M, maxKmh: MAX_WALK_KMH, weight: 1 },
 ];
 export type BabyDinoId = string;
