@@ -19,7 +19,9 @@ export default function TribeSprite({ action = 'idle', height = 48, reaction }: 
   }, [action]);
   const src = reaction === 'hurt' ? hurt : reaction === 'dodge' ? dodge : action === 'walk' ? (frame ? walk2 : walk1) : action === 'attack' ? attack : action === 'gather' || action === 'chop' ? gather : idle;
   const fallback = <img src={src} alt="" className="pixelated w-auto object-contain" style={{ height }} />;
-  const sheet = sheets?.[action] ?? sheets?.idle;
+  const key: SpriteAction = action === 'chop' ? 'gather' : action;
+  // Fall back to the bundled art for this action rather than the idle sheet, so walking/gathering never freezes.
+  const sheet = sheets?.[key] ?? (sheets && !['walk', 'gather', 'attack'].includes(key) ? sheets.idle : undefined);
   return <span data-tribe-sprite={reaction ?? action} className="inline-flex shrink-0 items-end">
     {!reaction && sheet ? <SpriteAnimator url={sheet.url} frames={sheet.frame_count} fps={sheet.fps} height={height} fallback={fallback} /> : fallback}
   </span>;

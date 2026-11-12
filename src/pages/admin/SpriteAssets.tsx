@@ -15,6 +15,7 @@ import { HERO_TIERS } from '@/lib/survival/heroTier';
 
 const TARGETS = [...[...HERO_TIERS].reverse().map(h => ({ key: h.key, label: h.label })), { key: 'tribe', label: '부족민' }, ...Object.entries(CREATURES).map(([k, c]) => ({ key: `mob:${k}`, label: `몹 · ${c.name}` }))];
 const MOB_ACTIONS: SpriteAction[] = ['idle', 'attack'];
+const TRIBE_ACTIONS: SpriteAction[] = ['idle', 'walk', 'attack', 'gather'];
 
 export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARACTER: string }) {
   const qc = useQueryClient();
@@ -91,7 +92,7 @@ export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARAC
 
 export default function SpriteAssets() {
   const [target, setTarget] = useState('hunter');
-  const actions = target.startsWith('hunter') ? SPRITE_ACTIONS : MOB_ACTIONS;
+  const actions = target.startsWith('hunter') ? SPRITE_ACTIONS : target === 'tribe' ? TRIBE_ACTIONS : MOB_ACTIONS;
   return (
     <div className="space-y-4 p-4">
       <div>
