@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { hatchPet, migratePets, fusionPartner, fusePets } from '../src/lib/survival/pets';
+import { hatchPet, migratePets, fusionPartner, fusePets, fusionSpecies } from '../src/lib/survival/pets';
 import { petById } from '../src/lib/survival/dinoEggs';
 
 describe('existing dinosaur name corrections', () => {
@@ -20,7 +20,7 @@ describe('existing dinosaur name corrections', () => {
     it(`corrects ${id} without changing ownership or growth`, () => {
       const original = { ...hatchPet('owned', id, oldName, []), level: 3, hp: 42, locked: true, role: 'hunt' as const, huntAt: 123 };
       const result = migratePets({ pets: [original] }, species => petById(species)?.name ?? species);
-      expect(result.pets).toEqual([{ ...original, name }]);
+      expect(result.pets).toEqual([{ ...original, name, speciesId: fusionSpecies(original.speciesId) }]);
       expect(migratePets(result, species => species).pets).toEqual(result.pets);
       expect(migratePets({ babyDinos: [id] }, species => petById(species)?.name ?? species).pets[0].name).toBe(name);
     });

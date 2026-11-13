@@ -13,7 +13,7 @@ import { haptic, playSfx } from '@/lib/survival/gameSettings';
 export const BABY_ART: Record<string, string> = { baby_raptor, mini_triceratops, baby_stego, baby_ptera };
 export const EGG_ART = EGG_ARTS[0];
 
-const BURST_AT = 1.45;
+const BURST_AT = 4;
 const PARTICLES = Array.from({ length: 28 }, (_, i) => ({ a: (i / 28) * Math.PI * 2 + (i % 2) * 0.1, d: 60 + (i % 4) * 26, s: i % 3 ? 'h-2 w-2' : 'h-3 w-3' }));
 const SPARKS = Array.from({ length: 10 }, (_, i) => ({ x: ((i * 37) % 160) - 80, delay: BURST_AT + 0.3 + (i % 5) * 0.15 }));
 const SHELLS = [{ x: -60, y: -40, r: -70 }, { x: 62, y: -30, r: 80 }, { x: -40, y: 50, r: -120 }, { x: 46, y: 56, r: 140 }];
@@ -29,9 +29,9 @@ export default function DinoEggHatchModal({ baby, onClose }: { baby: { id: strin
   useEffect(() => {
     if (!baby) return;
     const timers = [
-      ...[300, 650, 1000].map(t => window.setTimeout(() => { playSfx('crack'); haptic(60); }, reduced ? 0 : t)),
+      ...[400, 1200, 1900, 2500, 3000, 3400, 3700].map(t => window.setTimeout(() => { playSfx('crack'); haptic(60); }, reduced ? 0 : t)),
       window.setTimeout(() => { playSfx('burst'); haptic([200, 80, 200]); }, reduced ? 100 : BURST_AT * 1000),
-      window.setTimeout(() => playSfx('fanfare'), reduced ? 300 : 1700),
+      window.setTimeout(() => playSfx('fanfare'), reduced ? 300 : 4300),
     ];
     return () => timers.forEach(clearTimeout);
   }, [baby?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -49,10 +49,14 @@ export default function DinoEggHatchModal({ baby, onClose }: { baby: { id: strin
                 initial={{ scale: 0, opacity: 0 }} animate={{ scale: [0, 1.6, 1.1], opacity: [0, 1, 0.6] }} transition={{ delay: BURST_AT, duration: 0.9 }} />}
               {/* Flash */}
               {!reduced && <motion.div className="pointer-events-none fixed inset-0 bg-primary-foreground"
-                initial={{ opacity: 0 }} animate={{ opacity: [0, 0.8, 0] }} transition={{ delay: BURST_AT, duration: 0.35 }} />}
+                initial={{ opacity: 0 }} animate={{ opacity: [0, 0.8, 0] }} transition={{ delay: BURST_AT, duration: 0.5 }} />}
               <motion.img src={egg} alt="" className="pixelated absolute h-32 w-32"
-                animate={reduced ? { opacity: 0 } : { rotate: [0, -12, 12, -16, 16, 0], scale: [1, 1, 1, 1.1, 1.2, 0], opacity: [1, 1, 1, 1, 1, 0] }}
-                transition={{ duration: reduced ? 0.2 : 1.6, times: [0, 0.2, 0.4, 0.6, 0.85, 1] }} />
+                animate={reduced ? { opacity: 0 } : { rotate: [0, -4, 4, 0, -8, 8, -6, 0, -14, 14, -18, 18, -20, 20, 0, 0], scale: [1, 1, 1, 1, 1, 1.02, 1, 1, 1.04, 1.04, 1.08, 1.08, 1.12, 1.15, 1.3, 0], opacity: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0], filter: ['brightness(1)', 'brightness(1)', 'brightness(1.1)', 'brightness(1)', 'brightness(1.2)', 'brightness(1.3)', 'brightness(1.2)', 'brightness(1.3)', 'brightness(1.5)', 'brightness(1.6)', 'brightness(1.8)', 'brightness(2)', 'brightness(2.3)', 'brightness(2.6)', 'brightness(3)', 'brightness(3)'] }}
+                transition={{ duration: reduced ? 0.2 : BURST_AT + 0.1, times: [0, 0.08, 0.14, 0.2, 0.32, 0.38, 0.44, 0.5, 0.6, 0.66, 0.72, 0.78, 0.84, 0.9, 0.97, 1] }} />
+              {/* Build-up aura pulsing before the burst */}
+              {!reduced && <motion.div className="pointer-events-none absolute h-36 w-36 rounded-full bg-primary/50 blur-xl"
+                initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: [0, 0.3, 0.1, 0.5, 0.2, 0.8, 1, 0], scale: [0.6, 0.8, 0.7, 1, 0.9, 1.3, 1.7, 2] }}
+                transition={{ duration: BURST_AT + 0.2, times: [0, 0.2, 0.35, 0.5, 0.65, 0.85, 0.97, 1] }} />}
               {/* Shell fragments */}
               {!reduced && SHELLS.map((p, i) => (
                 <motion.img key={`s${i}`} src={egg} alt="" className="pixelated absolute h-8 w-8"
@@ -72,11 +76,11 @@ export default function DinoEggHatchModal({ baby, onClose }: { baby: { id: strin
                   transition={{ delay: p.delay, duration: 1.4, repeat: Infinity, repeatDelay: 0.6 }} />
               ))}
               <motion.div className="absolute" initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1, y: reduced ? 0 : [0, -6, 0] }}
-                transition={{ delay: reduced ? 0.2 : 1.55, type: 'spring', stiffness: 260, damping: 14, y: { delay: 2.2, duration: 1.2, repeat: Infinity } }}>
+                transition={{ delay: reduced ? 0.2 : BURST_AT + 0.15, type: 'spring', stiffness: 260, damping: 14, y: { delay: BURST_AT + 0.8, duration: 1.2, repeat: Infinity } }}>
                 {sheet ? <SpriteAnimator url={sheet.url} frames={sheet.frame_count} fps={sheet.fps} height={144} /> : <img src={babySrc} alt={baby.name} className="pixelated h-36 w-36" />}
               </motion.div>
             </div>
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduced ? 0.3 : 1.8 }} className="space-y-1">
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduced ? 0.3 : BURST_AT + 0.4 }} className="space-y-1">
               <p className="text-xs font-semibold text-primary">새로운 펫</p>
               <p className="text-lg font-bold">{baby.name} 탄생!</p>
               <p className="text-sm text-muted-foreground">함께 걸은 산책이 새 친구를 깨웠어요.</p>

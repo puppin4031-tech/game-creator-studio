@@ -39,7 +39,7 @@ export function migratePets<T extends { pets?: OwnedPet[]; babyDinos?: string[] 
   if (save.pets !== undefined) return { ...save, pets: save.pets.map(p => {
     const renamed = ['baby_stego', 'baby_raptor', 'mini_triceratops'].includes(p.speciesId)
       ? BABY_DINOS.find(d => d.id === p.speciesId) : undefined;
-    return renamed ? { ...p, name: renamed.name } : p;
+    return renamed ? { ...p, name: renamed.name, speciesId: fusionSpecies(p.speciesId) } : p;
   }), babyDinos: [] };
   const pets: OwnedPet[] = [];
   for (const [i, id] of (save.babyDinos ?? []).entries()) pets.push(hatchPet(`legacy-pet:${i}:${id}`, id, nameFor(id), pets));
@@ -60,7 +60,7 @@ export function fusePets(pets: OwnedPet[], firstId: string, secondId: string, ui
   const a = pets.find(p => p.uid === firstId), b = pets.find(p => p.uid === secondId);
   if (!a || !b || firstId === secondId || pets.some(p => p.uid === uid) || a.locked || b.locked || fusionSpecies(a.speciesId) !== fusionSpecies(b.speciesId) || a.level !== b.level || a.level >= PET_MAX_LEVEL) return null;
   const level = a.level + 1;
-  const pet = { ...a, uid, level, hp: petStats(level).maxHp, restUntil: 0, deployed: a.deployed || b.deployed };
+  const pet = { ...a, speciesId: fusionSpecies(a.speciesId), uid, level, hp: petStats(level).maxHp, restUntil: 0, deployed: a.deployed || b.deployed };
   return { pets: [...pets.filter(p => p.uid !== firstId && p.uid !== secondId), pet], pet };
 }
 
