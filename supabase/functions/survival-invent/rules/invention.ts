@@ -195,3 +195,12 @@ export function sageAdvice(cat: InventionCategory, reason: string | null, ok: bo
   const weak = used.filter(id => ['branch', 'fiber', 'soil', 'clay', 'hide'].includes(id)).length ? ' 부드러운 재료(나뭇가지·섬유·흙)만으로는 힘이 약합니다.' : '';
   return `현자의 조언: ${need} 중에서 2~3개를 넣어 보세요.${weak}\n${EXAMPLE[cat]}`;
 }
+
+/** Altar reforging: an existing gear piece plus up to three catalysts becomes a new item. */
+export const REFORGE_SLOTS = 3;
+export const REFORGE_CAP_MULT = 1.25;
+export function reforgePower(category: InventionCategory, basePower: number, catalystPower: number): number {
+  const b = Math.max(0, Number.isFinite(basePower) ? basePower : 0);
+  const next = Math.max(b * 1.1, b + Math.max(0, catalystPower) * 0.5);
+  return Math.min(STAT_CAP[category] * REFORGE_CAP_MULT, Math.round(next * 100) / 100);
+}

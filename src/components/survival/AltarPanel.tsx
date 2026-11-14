@@ -14,6 +14,8 @@ import { usesRemoteInventions } from '@/lib/survival/inventionAccess';
 import { RewardChargeModal } from './RewardChargeModal';
 import { WinterRecipeHints } from './WinterRecipeHints';
 import { GearUpgradeList } from './GearUpgradeList';
+import { ReforgePanel } from './ReforgePanel';
+import { gearBasePower, gearCategory } from '@/lib/survival/inventedItems';
 import { Info } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { matchBlueprint } from '@/lib/survival/blueprints';
@@ -29,8 +31,9 @@ interface Props {
   credits?: InventionCredits; walkedMeters: number; inviteUrl: string; onCredits: (c: InventionCredits) => void;
   onBuild: () => void; onInvent: (input: InventionInput, naming: { name: string; desc: string; masterwork?: boolean; ranged?: boolean }) => InventedItem | null;
   gear?: GearInstance[]; onUpgrade?: (uid: string) => void;
+  onReforge?: (uid: string, catalysts: Record<string, number>, naming: { name: string; desc: string; analysis?: string; masterwork?: boolean }) => InventedItem | null;
 }
-export function AltarPanel({ altar, baseLevel, ready, inBase, owned, inventions, remote: realGps, credits, walkedMeters, inviteUrl, onCredits, onBuild, onInvent, gear = [], onUpgrade }: Props) {
+export function AltarPanel({ altar, baseLevel, ready, inBase, owned, inventions, remote: realGps, credits, walkedMeters, inviteUrl, onCredits, onBuild, onInvent, gear = [], onUpgrade, onReforge }: Props) {
   const { user, isLoading: authLoading } = useAuth();
   const remote = usesRemoteInventions(realGps, user?.id);
   const [cat, setCat] = useState<InventionCategory>('weapon');
@@ -74,6 +77,28 @@ export function AltarPanel({ altar, baseLevel, ready, inBase, owned, inventions,
     } catch (e) { toast.error(e instanceof Error ? e.message : '계시에 실패했습니다. 발명권은 유지됩니다'); }
     finally { setBusy(false); }
   };
+  const reforge = async (uid: string, catalysts: Record<string, number>) => {
+    const g = gear.find(x => x.uid === uid); const def = g && ITEMS[g.itemId]; const category = gearCategory(def);
+    if (!onReforge || !g || !def || !category || busy || !ready || !inBase) return false;
+    if (reward.credits.freeLeft + reward.credits.bonus === 0) { setCharge(true); return false; }
+    setBusy(true);
+    try {
+      const main = Object.entries(catalysts).sort((a, b) => b[1] - a[1])[0]?.[0];
+      let naming: { name: string; desc: string; analysis?: string; masterwork?: boolean } = { name: `${name(main ?? 'stone')} ${def.name}`.slice(0, 16), desc: `${def.name}을(를) 다시 벼린 장비.`, masterwork: Math.random() < masterworkChance(true) };
+      if (remote) {
+        const { data, error } = await supabase.functions.invoke('survival-invent', { body: { action: 'reforge', category, materials: catalysts, baseName: def.name.slice(0, 24), baseDesc: (def.desc ?? '').slice(0, 120), basePower: Math.min(60, gearBasePower(def)) } });
+        if (error) throw error;
+        if (!data?.ok) throw new Error(data?.message ?? '재련 판정 실패');
+        reward.setCredits(data.credits);
+        if (!data.accepted) { toast('현자가 재련을 거절했습니다. 발명권 유지 · 시행착오 파편 +1', { description: data.analysis || data.desc }); return false; }
+        naming = { name: data.name, desc: data.desc, analysis: data.analysis, masterwork: data.masterwork };
+      }
+      const made = onReforge(uid, catalysts, naming);
+      if (made) { if (naming.analysis) toast(`현자의 분석: ${naming.analysis}`); if (!remote) { const next = settleCredits(normalizeCredits(credits), true); if (next) onCredits(next); } }
+      return !!made;
+    } catch (e) { toast.error(e instanceof Error ? e.message : '재련에 실패했습니다. 발명권은 유지됩니다'); return false; }
+    finally { setBusy(false); }
+  };
   const openHint = async () => {
     if (busy || authLoading) return; setBusy(true);
     try {
@@ -94,7 +119,8 @@ export function AltarPanel({ altar, baseLevel, ready, inBase, owned, inventions,
     <Button className="min-h-11 h-auto w-full whitespace-normal py-2" disabled={!ready || !inBase || busy || authLoading || reward.loading || (!signal.result.ok && reward.credits.freeLeft + reward.credits.bonus > 0)} onClick={reward.credits.freeLeft + reward.credits.bonus === 0 ? () => setCharge(true) : run}>{busy ? <Loader2 className="animate-spin" /> : <Sparkles />}{reward.credits.freeLeft + reward.credits.bonus === 0 ? '광고/미션 수행하고 발명권 충전' : '계시를 받아 발명하기'}</Button>
     <Button variant="outline" className="min-h-11 w-full text-xs" disabled={reward.credits.fragments < 3 || busy} onClick={openHint}>시행착오 파편 {reward.credits.fragments}/3 · 레시피 힌트</Button>
     {hint && <p className="text-xs">확정 조합: 부싯돌 3 + 노끈 1 → 기초 도구. 고대 제단: 옥 2 + 수정 1 → 부적.</p>}
-    {!!inventions.length && <div className="space-y-2 border-t border-border pt-2"><b>발명 기록</b>{inventions.map(inv => <div key={inv.id} className="text-xs"><b>{inv.name}{inv.masterwork ? ' · 명품(능력치 상승)' : ''}</b> · {inv.desc}{gearEffect(ITEMS[inv.id as keyof typeof ITEMS]) && <p className="text-primary">효과: {gearEffect(ITEMS[inv.id as keyof typeof ITEMS])}</p>}<p className="text-muted-foreground">{Object.entries(inv.materials).map(([id,q]) => `${name(id)} ${q}`).join(' + ')}</p></div>)}</div>}
+    {!!inventions.length && <div className="space-y-2 border-t border-border pt-2"><b>발명 기록</b>{inventions.map(inv => <div key={inv.id} className="text-xs"><b>{inv.name}{inv.masterwork ? ' · 명품(능력치 상승)' : ''}</b>{inv.reforgedFrom ? ` · ${name(inv.reforgedFrom)} 재련` : ''} · {inv.desc}{inv.analysis && <p className="text-muted-foreground">분석: {inv.analysis}</p>}{gearEffect(ITEMS[inv.id as keyof typeof ITEMS]) && <p className="text-primary">효과: {gearEffect(ITEMS[inv.id as keyof typeof ITEMS])}</p>}<p className="text-muted-foreground">{Object.entries(inv.materials).map(([id,q]) => `${name(id)} ${q}`).join(' + ')}</p></div>)}</div>}
+    {altar && onReforge && <ReforgePanel gear={gear} have={have} busy={busy || !ready || !inBase || authLoading} canPay={reward.credits.freeLeft + reward.credits.bonus > 0} onReforge={reforge} />}
     {altar && onUpgrade && <GearUpgradeList gear={gear} have={have} busy={busy || !ready || !inBase} onUpgrade={onUpgrade} />}
     <RewardChargeModal open={charge} onOpenChange={setCharge} credits={reward.credits} loading={reward.loading} prepare={reward.prepare} claim={reward.claimReward} inviteUrl={inviteUrl} />
   </div>;

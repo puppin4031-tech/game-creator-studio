@@ -1,6 +1,6 @@
 // Turns altar inventions into real item definitions so gear lookups (weapon/tool/armor/trinket) apply them in the world.
 import { ITEMS, type ItemDef } from './items';
-import { checkFacility, type InventionCategory } from './invention';
+import { checkFacility, reforgePower, type InventionCategory } from './invention';
 import type { Stack } from './types';
 import type { SpriteKey } from './spriteMeta';
 
@@ -17,6 +17,12 @@ export interface InventedItem {
   sacred?: boolean;
   masterwork?: boolean;
   ranged?: boolean;
+  /** Reforged items: stat power of the gear that was melted down, and its item id. */
+  basePower?: number;
+  reforgedFrom?: string;
+  analysis?: string;
+  /** Highest chop/mine tier of the reforged tool, so reforging never loses gathering ability. */
+  baseTier?: number;
 }
 
 export const ALTAR_COST: Stack[] = [{ itemId: 'flint', count: 8 }, { itemId: 'obsidian', count: 3 }, { itemId: 'quartz', count: 4 }];
@@ -65,7 +71,7 @@ export function inventedItemDef(inv: InventedItem): ItemDef {
   const base = { name: inv.name, desc: inv.desc, rarity: 'rare' as const, weight, sprite, durability: INVENTED_DURABILITY };
   switch (inv.category) {
     case 'weapon': return { ...base, category: 'weapon', weapon: { atk: Math.max(1, Math.round(inv.power)), ...(inv.ranged ? { ranged: true } : {}) } };
-    case 'tool': { const tier = inv.power >= 2 ? 2 : 1; return { ...base, category: 'tool', tool: { chop: tier, mine: tier, power: 1 + inv.power } }; }
+    case 'tool': { const tier = Math.max(inv.power >= 2 ? 2 : 1, inv.baseTier ?? 0); return { ...base, category: 'tool', tool: { chop: tier, mine: tier, power: 1 + inv.power } }; }
     case 'building': return { ...base, category: 'armor', armor: { def: Math.max(1, Math.round(inv.power / 3)) } };
     case 'relic': return { ...base, category: 'trinket', trinket: { lootBonus: inv.power, xpBonus: inv.power } };
   }
@@ -76,7 +82,9 @@ export function registerInventions(list: InventedItem[] | undefined) {
   const table = ITEMS as Record<string, ItemDef>;
   for (const inv of list ?? []) {
     const check = checkFacility(inv, true);
-    if (check.ok) table[inv.id] = inventedItemDef({ ...inv, power: check.power });
+    if (!check.ok) continue;
+    const power = inv.basePower != null ? reforgePower(inv.category, inv.basePower, check.power) : check.power;
+    table[inv.id] = inventedItemDef({ ...inv, power });
   }
 }
 
@@ -85,4 +93,23 @@ export function fallbackInventionName(category: InventionCategory, materials: Re
   const mat = (primary && ITEMS[primary as keyof typeof ITEMS]?.name) || '돌';
   const noun = { tool: '도구', weapon: '창', building: '옷', relic: '부적' }[category];
   return `${mat} ${noun}`;
+}
+
+/** Category an existing gear item reforges into, or null when it is not gear. */
+export function gearCategory(def: ItemDef | undefined): InventionCategory | null {
+  if (!def) return null;
+  if (def.weapon) return 'weapon';
+  if (def.armor) return 'building';
+  if (def.tool) return 'tool';
+  if (def.trinket) return 'relic';
+  return null;
+}
+/** Converts an item's stats back to invention power units (inverse of inventedItemDef). */
+export function gearBasePower(def: ItemDef | undefined): number {
+  if (!def) return 0;
+  if (def.weapon) return def.weapon.atk;
+  if (def.armor) return def.armor.def * 3;
+  if (def.tool) return Math.max(0, (def.tool.power ?? 1) - 1);
+  if (def.trinket) return def.trinket.lootBonus ?? def.trinket.xpBonus ?? 0;
+  return 0;
 }

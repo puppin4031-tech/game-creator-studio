@@ -33,8 +33,8 @@ import { SANCTUARY_RADIUS_M, SANCTUARY_REGEN_PER_TICK, LANDMARK_INFO, SHAMAN_BLE
 import type { TerrainZone } from '@/lib/survival/terrainZone';
 import { MELCHIZEDEK_FIRST, MELCHIZEDEK_LINK, RITES, blessingGift, canBless, discoverShrine, emptyShrineState, performRite, recordBlessing, type Shrine, type ShrineState } from '@/lib/survival/sanctuaries';
 import { skillCooldownMs, skillDamage, skillLevel, skillUpgradeCost } from '@/lib/survival/skillLevels';
-import { ALTAR_COST, INVENTED_DURABILITY, inventionId, registerInventions, type InventedItem } from '@/lib/survival/inventedItems';
-import { checkFacility, type InventionInput } from '@/lib/survival/invention';
+import { ALTAR_COST, INVENTED_DURABILITY, inventionId, registerInventions, gearCategory, gearBasePower, type InventedItem } from '@/lib/survival/inventedItems';
+import { checkFacility, reforgePower, REFORGE_SLOTS, type InventionInput } from '@/lib/survival/invention';
 import { equipInSlot, resolveLoadout, type Equipped, type GearSlot } from '@/lib/survival/equipment';
 import { type InventionCredits } from '@/lib/survival/inventionCredits';
 import { payAccessible } from '@/lib/survival/abilities';
@@ -985,6 +985,33 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return inv;
   }, [setS]);
 
+  /** Melt one gear piece with catalysts into a new reforged item; keeps uid (equip slot) and plus level. */
+  const reforgeGear = useCallback((uid: string, catalysts: Record<string, number>, naming: { name: string; desc: string; analysis?: string; masterwork?: boolean }) => {
+    const p = ref.current;
+    if (!enabledRef.current || !atMainBase(p) || !p.altar) { toast.warning('본거지 제단에서 재련하세요'); return null; }
+    const g = p.gear.find(x => x.uid === uid);
+    const baseDef = g && ITEMS[g.itemId];
+    const category = gearCategory(baseDef);
+    if (!g || !baseDef || !category) return null;
+    if (Object.keys(catalysts).length > REFORGE_SLOTS) return null;
+    const check = checkFacility({ category, materials: catalysts, heat: true, sacred: true }, true);
+    if (check.ok === false) { toast.error('촉매 조합이 맞지 않습니다'); return null; }
+    const cost = Object.entries(catalysts).filter(([, q]) => q > 0).map(([itemId, count]) => ({ itemId: itemId as ItemId, count }));
+    const paid = payAccessible(p, cost);
+    if (!paid) { toast.error('촉매가 부족합니다 (배낭 또는 창고)'); return null; }
+    const hash = `reforge:${g.itemId}:${check.hash}`;
+    const id = inventionId(hash);
+    const known = (p.inventions ?? []).find(x => x.id === id);
+    const basePower = gearBasePower(baseDef);
+    const inv: InventedItem = known ?? { id, hash, name: naming.name, desc: naming.desc, analysis: naming.analysis, category, materials: catalysts, heat: true, sacred: true, masterwork: naming.masterwork, ranged: baseDef.weapon?.ranged, basePower, baseTier: baseDef.tool ? Math.max(baseDef.tool.chop, baseDef.tool.mine) : undefined, reforgedFrom: g.itemId, power: reforgePower(category, basePower, check.power), createdAt: Date.now() };
+    const inventions = known ? p.inventions ?? [] : [...(p.inventions ?? []), inv];
+    registerInventions(inventions);
+    const quality = naming.masterwork || g.quality === 'MASTERWORK' ? 'MASTERWORK' : g.quality;
+    setS({ ...paid, inventions, gear: paid.gear.map(x => x.uid === uid ? { ...x, itemId: id as ItemId, quality, durability: INVENTED_DURABILITY, maxDurability: INVENTED_DURABILITY } : x) });
+    toast.success(`${baseDef.name} → ${inv.name} 재련 완료!`, { description: g.plus ? `강화 +${g.plus} 단계는 그대로 이어집니다` : '착용 중이었다면 그대로 착용됩니다' });
+    return inv;
+  }, [setS]);
+
   /** Reinforce one gear piece at the altar (+15% stats per level, max +5). */
   const upgradeGear = useCallback((uid: string) => {
     const p = ref.current;
@@ -1093,7 +1120,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS, options.indoor]);
   const updateInventionCredits = useCallback((credits: InventionCredits) => setS(p => ({ ...p, inventionCredits: credits, inventionWalkMark: credits.walkMeters === 0 ? p.walkSteps ?? 0 : p.inventionWalkMark })), [setS]);
 
-  return { crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, toggleEscort, trainTribe, treatTribe, meetShaman, pickEgg, hatchEgg, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
+  return { crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, toggleEscort, trainTribe, treatTribe, meetShaman, pickEgg, hatchEgg, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
     moveOutpost, petHits, mergePets, togglePetDeploy, assignPetRole, feedPet, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,
