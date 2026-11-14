@@ -1,6 +1,6 @@
 // Turns altar inventions into real item definitions so gear lookups (weapon/tool/armor/trinket) apply them in the world.
 import { ITEMS, type ItemDef } from './items';
-import { checkFacility, reforgePower, type InventionCategory } from './invention';
+import { checkFacility, reforgePower, type InventionCategory, type ReforgeGrade } from './invention';
 import type { Stack } from './types';
 import type { SpriteKey } from './spriteMeta';
 
@@ -23,6 +23,8 @@ export interface InventedItem {
   analysis?: string;
   /** Highest chop/mine tier of the reforged tool, so reforging never loses gathering ability. */
   baseTier?: number;
+  /** Reforge outcome grade; multiplies reforged power. */
+  grade?: ReforgeGrade;
 }
 
 export const ALTAR_COST: Stack[] = [{ itemId: 'flint', count: 8 }, { itemId: 'obsidian', count: 3 }, { itemId: 'quartz', count: 4 }];
@@ -68,7 +70,8 @@ export function inventedSprite(inv: Pick<InventedItem, 'category' | 'materials' 
 export function inventedItemDef(inv: InventedItem): ItemDef {
   const sprite = inventedSprite(inv);
   const weight = Math.min(5, Math.round(Object.entries(inv.materials).reduce((s, [id, q]) => s + (ITEMS[id as keyof typeof ITEMS]?.weight ?? 0.5) * q, 0) * 0.3 * 10) / 10);
-  const base = { name: inv.name, desc: inv.desc, rarity: 'rare' as const, weight, sprite, durability: INVENTED_DURABILITY };
+  const prefix = inv.grade === 'legend' ? '[레전드] ' : inv.grade === 'masterwork' ? '[명품] ' : '';
+  const base = { name: prefix + inv.name, desc: inv.desc, rarity: (inv.grade === 'legend' ? 'epic' : 'rare') as 'epic' | 'rare', weight, sprite, durability: INVENTED_DURABILITY };
   switch (inv.category) {
     case 'weapon': return { ...base, category: 'weapon', weapon: { atk: Math.max(1, Math.round(inv.power)), ...(inv.ranged ? { ranged: true } : {}) } };
     case 'tool': { const tier = Math.max(inv.power >= 2 ? 2 : 1, inv.baseTier ?? 0); return { ...base, category: 'tool', tool: { chop: tier, mine: tier, power: 1 + inv.power } }; }
@@ -83,7 +86,7 @@ export function registerInventions(list: InventedItem[] | undefined) {
   for (const inv of list ?? []) {
     const check = checkFacility(inv, true);
     if (!check.ok) continue;
-    const power = inv.basePower != null ? reforgePower(inv.category, inv.basePower, check.power) : check.power;
+    const power = inv.basePower != null ? reforgePower(inv.category, inv.basePower, check.power, inv.grade) : check.power;
     table[inv.id] = inventedItemDef({ ...inv, power });
   }
 }

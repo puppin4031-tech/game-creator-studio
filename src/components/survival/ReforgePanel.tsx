@@ -36,7 +36,7 @@ export function ReforgePanel({ gear, have, busy, canPay, onReforge }: Props) {
   return (
     <div className="space-y-2 border-t border-border pt-2 text-xs">
       <b className="flex items-center gap-1 text-sm"><Anvil className="!h-4 !w-4" />장비 재련 · 새 장비로 다시 만들기</b>
-      <p className="text-muted-foreground">기존 장비 1개 + 촉매 최대 {REFORGE_SLOTS}종을 제단에 올리면, 현자가 경도·탄성·예리함과 쓰임새를 분석해 새 장비로 바꿉니다. 강화 단계와 착용 상태는 그대로 이어집니다.</p>
+      <p className="text-muted-foreground">기존 장비 1개 + 촉매 최대 {REFORGE_SLOTS}종을 제단에 올리면, 현자가 경도·탄성·예리함과 쓰임새를 분석해 새 장비로 바꿉니다. 강화 단계와 착용 상태는 그대로 이어집니다. 10% 확률로 명품(능력치 1.5배), 5% 확률로 레전드(2.5배)가 나옵니다.</p>
       <div className="flex flex-wrap gap-1">{list.map(g => <Button key={g.uid} size="sm" variant={uid === g.uid ? 'default' : 'outline'} className="h-11" disabled={busy} onClick={() => { setUid(g.uid); setMats({}); }}>{ITEMS[g.itemId].name}{g.plus ? ` +${g.plus}` : ''}</Button>)}</div>
       {picked && signal && <>
         <div className="max-h-40 space-y-1 overflow-y-auto overscroll-contain">{usable.map(id => <div key={id} className="flex items-center gap-2"><span className="min-w-0 flex-1">{name(id)} <span className="text-muted-foreground">({have(id)})</span></span><Button aria-label={`${name(id)} 빼기`} size="icon" variant="outline" className="h-11 w-11" disabled={busy || !mats[id]} onClick={() => step(id, -1)}><Minus /></Button><b className="w-6 text-center">{mats[id] ?? 0}</b><Button aria-label={`${name(id)} 올리기`} size="icon" variant="outline" className="h-11 w-11" disabled={busy || (selected.length >= REFORGE_SLOTS && !mats[id]) || mats[id] >= have(id)} onClick={() => step(id, 1)}><Plus /></Button></div>)}</div>

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { reforgePower, STAT_CAP, REFORGE_SLOTS } from '../src/lib/survival/invention';
+import { reforgePower, rollReforgeGrade, STAT_CAP, REFORGE_SLOTS } from '../src/lib/survival/invention';
 import { gearBasePower, gearCategory, inventedItemDef } from '../src/lib/survival/inventedItems';
 import { ITEMS } from '../src/lib/survival/items';
 
@@ -19,5 +19,18 @@ describe('altar reforging', () => {
   test('reforged tools keep their gathering tier', () => {
     const def = inventedItemDef({ id: 'inv_x', hash: 'x', name: 't', desc: '', category: 'tool', materials: { flint: 1 }, power: 0.5, createdAt: 0, baseTier: 3 });
     expect(def.tool?.mine).toBe(3);
+  });
+});
+
+describe('reforge grades', () => {
+  test('5% legend, next 10% masterwork, rest normal', () => {
+    expect(rollReforgeGrade(0.049)).toBe('legend');
+    expect(rollReforgeGrade(0.05)).toBe('masterwork');
+    expect(rollReforgeGrade(0.149)).toBe('masterwork');
+    expect(rollReforgeGrade(0.15)).toBe('normal');
+  });
+  test('legend is x2.5 and masterwork x1.5 of the normal result', () => {
+    expect(reforgePower('weapon', 10, 8, 'legend')).toBe(35);
+    expect(reforgePower('weapon', 10, 8, 'masterwork')).toBe(21);
   });
 });

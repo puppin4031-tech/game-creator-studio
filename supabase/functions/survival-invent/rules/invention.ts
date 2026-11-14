@@ -199,8 +199,18 @@ export function sageAdvice(cat: InventionCategory, reason: string | null, ok: bo
 /** Altar reforging: an existing gear piece plus up to three catalysts becomes a new item. */
 export const REFORGE_SLOTS = 3;
 export const REFORGE_CAP_MULT = 1.25;
-export function reforgePower(category: InventionCategory, basePower: number, catalystPower: number): number {
+export type ReforgeGrade = 'normal' | 'masterwork' | 'legend';
+/** Reforge outcome grades: 5% legend (x2.5), 10% masterwork (x1.5), otherwise normal. */
+export const REFORGE_GRADE_MULT: Record<ReforgeGrade, number> = { normal: 1, masterwork: 1.5, legend: 2.5 };
+export const REFORGE_LEGEND_CHANCE = 0.05;
+export const REFORGE_MASTERWORK_CHANCE = 0.1;
+export function rollReforgeGrade(r: number): ReforgeGrade {
+  if (r < REFORGE_LEGEND_CHANCE) return 'legend';
+  if (r < Math.round((REFORGE_LEGEND_CHANCE + REFORGE_MASTERWORK_CHANCE) * 1e6) / 1e6) return 'masterwork';
+  return 'normal';
+}
+export function reforgePower(category: InventionCategory, basePower: number, catalystPower: number, grade: ReforgeGrade = 'normal'): number {
   const b = Math.max(0, Number.isFinite(basePower) ? basePower : 0);
-  const next = Math.max(b * 1.1, b + Math.max(0, catalystPower) * 0.5);
-  return Math.min(STAT_CAP[category] * REFORGE_CAP_MULT, Math.round(next * 100) / 100);
+  const next = Math.min(STAT_CAP[category] * REFORGE_CAP_MULT, Math.max(b * 1.1, b + Math.max(0, catalystPower) * 0.5));
+  return Math.round(next * (REFORGE_GRADE_MULT[grade] ?? 1) * 100) / 100;
 }

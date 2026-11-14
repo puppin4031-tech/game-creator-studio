@@ -3,7 +3,7 @@ import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { APICallError } from 'npm:ai@6';
 import { z } from 'npm:zod@3';
 import { createResponsesCall } from '../_shared/responses.ts';
-import { checkFacility, physicsSignal, masterworkChance, REFORGE_SLOTS } from './rules/invention.ts';
+import { checkFacility, physicsSignal, masterworkChance, REFORGE_SLOTS, rollReforgeGrade } from './rules/invention.ts';
 import { savedAltar } from './facility-state.ts';
 
 const json = (body: object, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -65,7 +65,8 @@ Deno.serve(async (request) => {
     const r = await act('accept', token);
     if (!r.ok) return json({ ok: false, message: r.message }, 409);
     const masterwork = Math.random() < masterworkChance(altar);
-    return json({ ok: true, accepted: true, name, desc, analysis, masterwork, credits: credits(r) });
+    const grade = body.action === 'reforge' ? rollReforgeGrade(Math.random()) : undefined;
+    return json({ ok: true, accepted: true, name, desc, analysis, masterwork, grade, credits: credits(r) });
   } catch (error) {
     if (token) await act('cancel', token).catch(() => undefined);
     let status = 500; let message = '발명 판정을 하지 못했습니다. 발명권은 차감되지 않았습니다.';

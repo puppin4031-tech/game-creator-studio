@@ -34,7 +34,7 @@ import type { TerrainZone } from '@/lib/survival/terrainZone';
 import { MELCHIZEDEK_FIRST, MELCHIZEDEK_LINK, RITES, blessingGift, canBless, discoverShrine, emptyShrineState, performRite, recordBlessing, type Shrine, type ShrineState } from '@/lib/survival/sanctuaries';
 import { skillCooldownMs, skillDamage, skillLevel, skillUpgradeCost } from '@/lib/survival/skillLevels';
 import { ALTAR_COST, INVENTED_DURABILITY, inventionId, registerInventions, gearCategory, gearBasePower, type InventedItem } from '@/lib/survival/inventedItems';
-import { checkFacility, reforgePower, REFORGE_SLOTS, type InventionInput } from '@/lib/survival/invention';
+import { checkFacility, reforgePower, REFORGE_SLOTS, type InventionInput, type ReforgeGrade } from '@/lib/survival/invention';
 import { equipInSlot, resolveLoadout, type Equipped, type GearSlot } from '@/lib/survival/equipment';
 import { type InventionCredits } from '@/lib/survival/inventionCredits';
 import { payAccessible } from '@/lib/survival/abilities';
@@ -986,7 +986,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS]);
 
   /** Melt one gear piece with catalysts into a new reforged item; keeps uid (equip slot) and plus level. */
-  const reforgeGear = useCallback((uid: string, catalysts: Record<string, number>, naming: { name: string; desc: string; analysis?: string; masterwork?: boolean }) => {
+  const reforgeGear = useCallback((uid: string, catalysts: Record<string, number>, naming: { name: string; desc: string; analysis?: string; grade?: ReforgeGrade }) => {
     const p = ref.current;
     if (!enabledRef.current || !atMainBase(p) || !p.altar) { toast.warning('본거지 제단에서 재련하세요'); return null; }
     const g = p.gear.find(x => x.uid === uid);
@@ -999,16 +999,16 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const cost = Object.entries(catalysts).filter(([, q]) => q > 0).map(([itemId, count]) => ({ itemId: itemId as ItemId, count }));
     const paid = payAccessible(p, cost);
     if (!paid) { toast.error('촉매가 부족합니다 (배낭 또는 창고)'); return null; }
-    const hash = `reforge:${g.itemId}:${check.hash}`;
+    const grade: ReforgeGrade = naming.grade ?? 'normal';
+    const hash = `reforge:${g.itemId}:${check.hash}:${grade}`;
     const id = inventionId(hash);
     const known = (p.inventions ?? []).find(x => x.id === id);
     const basePower = gearBasePower(baseDef);
-    const inv: InventedItem = known ?? { id, hash, name: naming.name, desc: naming.desc, analysis: naming.analysis, category, materials: catalysts, heat: true, sacred: true, masterwork: naming.masterwork, ranged: baseDef.weapon?.ranged, basePower, baseTier: baseDef.tool ? Math.max(baseDef.tool.chop, baseDef.tool.mine) : undefined, reforgedFrom: g.itemId, power: reforgePower(category, basePower, check.power), createdAt: Date.now() };
+    const inv: InventedItem = known ?? { id, hash, name: naming.name, desc: naming.desc, analysis: naming.analysis, category, materials: catalysts, heat: true, sacred: true, grade, ranged: baseDef.weapon?.ranged, basePower, baseTier: baseDef.tool ? Math.max(baseDef.tool.chop, baseDef.tool.mine) : undefined, reforgedFrom: g.itemId, power: reforgePower(category, basePower, check.power, grade), createdAt: Date.now() };
     const inventions = known ? p.inventions ?? [] : [...(p.inventions ?? []), inv];
     registerInventions(inventions);
-    const quality = naming.masterwork || g.quality === 'MASTERWORK' ? 'MASTERWORK' : g.quality;
-    setS({ ...paid, inventions, gear: paid.gear.map(x => x.uid === uid ? { ...x, itemId: id as ItemId, quality, durability: INVENTED_DURABILITY, maxDurability: INVENTED_DURABILITY } : x) });
-    toast.success(`${baseDef.name} → ${inv.name} 재련 완료!`, { description: g.plus ? `강화 +${g.plus} 단계는 그대로 이어집니다` : '착용 중이었다면 그대로 착용됩니다' });
+        setS({ ...paid, inventions, gear: paid.gear.map(x => x.uid === uid ? { ...x, itemId: id as ItemId, quality: 'NORMAL', durability: INVENTED_DURABILITY, maxDurability: INVENTED_DURABILITY } : x) });
+    toast.success(`${grade === 'legend' ? '레전드 등급! ' : grade === 'masterwork' ? '명품 등급! ' : ''}${baseDef.name} → ${inv.name} 재련 완료!`, { description: g.plus ? `강화 +${g.plus} 단계는 그대로 이어집니다` : '착용 중이었다면 그대로 착용됩니다' });
     return inv;
   }, [setS]);
 
