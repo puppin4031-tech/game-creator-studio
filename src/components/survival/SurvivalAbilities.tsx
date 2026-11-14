@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Flame, Volume2, Zap, Hammer, Tent, PawPrint, Users, PackageCheck } from 'lucide-react';
+import { Flame, Volume2, Zap, Hammer, Tent, PawPrint, Users, PackageCheck, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ACTIVE_SKILLS, PALISADE_COST, RECRUIT_COST, RESCUE_COST, TAME_COST, WORK_MS, type ActiveSkill, type Companion } from '@/lib/survival/abilities';
 import { OUTPOST_COST } from '@/lib/survival/bases';
@@ -18,10 +18,12 @@ export function SkillControls({ known, cooldowns, ready, onUse }: { known: strin
     return <Button key={id} variant="outline" disabled={!ready || wait > 0} className="pixel-btn h-11 justify-start" onClick={() => onUse(id)}><Icon className="!h-5 !w-5" />{def.name}{wait > 0 && <span className="ml-auto">{wait}초</span>}</Button>;
   })}</div>;
 }
-export function ConstructionControls({ known, palisade, outpost, ready, onBuild }: { known: string[]; palisade?: boolean; outpost: boolean; ready: boolean; onBuild: (id: 'palisade' | 'outpost') => void }) {
+export function ConstructionControls({ known, palisade, outpost, ready, onBuild, onMoveOutpost }: { known: string[]; palisade?: boolean; outpost: boolean; ready: boolean; onBuild: (id: 'palisade' | 'outpost') => void; onMoveOutpost: () => void }) {
   return <div className="space-y-2">{(['palisade', 'outpost'] as const).filter(id => known.includes(id)).map(id => {
     const built = id === 'palisade' ? palisade : outpost; const Icon = id === 'palisade' ? Hammer : Tent;
-    return <div key={id} className="border-t border-border pt-2 text-xs"><p>{materials(id === 'palisade' ? PALISADE_COST : OUTPOST_COST)}</p><Button variant="outline" className="mt-1 h-11 w-full" disabled={!ready || !!built} onClick={() => onBuild(id)}><Icon />{built ? '설치 완료' : id === 'palisade' ? '본거지에 목책 설치' : '현재 위치에 전진기지 설치'}</Button></div>;
+    return <div key={id} className="border-t border-border pt-2 text-xs"><p>{materials(id === 'palisade' ? PALISADE_COST : OUTPOST_COST)}</p>{id === 'outpost' && built ? <Button variant="outline" className="mt-1 min-h-11 h-auto w-full whitespace-normal py-2" disabled={!ready} onClick={() => {
+      if (window.confirm(`전진기지를 현재 GPS 위치로 옮길까요?\n기존 위치의 전진기지는 사라지고 공용 창고는 유지됩니다.\n이동 재료: ${materials(OUTPOST_COST)}`)) onMoveOutpost();
+    }}><MapPin />현재 위치로 전진기지 옮기기</Button> : <Button variant="outline" className="mt-1 h-11 w-full" disabled={!ready || !!built} onClick={() => onBuild(id)}><Icon />{built ? '설치 완료' : id === 'palisade' ? '본거지에 목책 설치' : '현재 위치에 전진기지 설치'}</Button>}</div>;
   })}</div>;
 }
 export function CompanionControls({ known, companions, ready, rescueTokens, onRecruit, onCollect, wolves, onTame }: { known: string[]; companions: Companion[]; ready: boolean; rescueTokens: number; onRecruit: (id: 'gatherer' | 'rescued') => void; onCollect: () => void; wolves: { id: string; name: string; hp: number }[]; onTame: (id: string) => void }) {

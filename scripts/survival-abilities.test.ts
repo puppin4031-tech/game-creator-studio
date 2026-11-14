@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { ACTIVE_SKILLS, PALISADE_COST, TAME_COST, RECRUIT_COST, RESCUE_COST, buildStructure, collectCompanionWork, payAccessible, prepareSkill, recruitCompanion, researchTechnology, tameWolf, type AbilitySave } from '../src/lib/survival/abilities';
+import { ACTIVE_SKILLS, PALISADE_COST, TAME_COST, RECRUIT_COST, RESCUE_COST, buildStructure, relocateOutpost, collectCompanionWork, payAccessible, prepareSkill, recruitCompanion, researchTechnology, tameWolf, type AbilitySave } from '../src/lib/survival/abilities';
 import { TECHS } from '../src/lib/survival/tech';
 import { OUTPOST_COST } from '../src/lib/survival/bases';
 import { countOf } from '../src/lib/survival/inventory';
@@ -69,6 +69,38 @@ describe('active skill rules', () => {
   });
 });
 describe('building and field inventory', () => {
+  const moving = () => ({ ...fresh(), pos: offset(500), outpost: { ...offset(200), lastShipAt: 1234 }, backpack: OUTPOST_COST, storage: [{ itemId: 'bone', count: 7 }] });
+  test('relocation replaces only the outpost position and consumes one construction cost', () => {
+    const p = moving();
+    const result = relocateOutpost(p, true);
+    if (result.ok === false) throw new Error(result.reason);
+    expect(result.state.outpost).toEqual({ ...p.pos, lastShipAt: 1234 });
+    expect(result.state.base).toEqual(p.base);
+    expect(result.state.storage).toEqual([{ itemId: 'bone', count: 7 }]);
+    expect(result.state.backpack).toEqual([]);
+    expect(p.outpost).toEqual({ ...offset(200), lastShipAt: 1234 });
+  });
+  test('relocation rejects unavailable GPS', () => {
+    expect(relocateOutpost(moving(), false).ok).toBe(false);
+  });
+  test('relocation requires an existing outpost and learned technology', () => {
+    expect(relocateOutpost({ ...moving(), outpost: null }, true).ok).toBe(false);
+    expect(relocateOutpost({ ...moving(), techs: [] }, true).ok).toBe(false);
+  });
+  test('relocation retains the 150m minimum distance from home', () => {
+    expect(relocateOutpost({ ...moving(), pos: offset(149) }, true).ok).toBe(false);
+    expect(relocateOutpost({ ...moving(), pos: offset(151) }, true).ok).toBe(true);
+  });
+  test('relocation requires leaving the old 30m outpost radius', () => {
+    expect(relocateOutpost({ ...moving(), pos: offset(229) }, true).ok).toBe(false);
+    expect(relocateOutpost({ ...moving(), pos: offset(231) }, true).ok).toBe(true);
+  });
+  test('relocation cannot charge remote storage or move without materials', () => {
+    const p = { ...moving(), backpack: [], storage: OUTPOST_COST };
+    expect(relocateOutpost(p, true).ok).toBe(false);
+    expect(p.outpost).toEqual(moving().outpost);
+    expect(p.storage).toEqual(OUTPOST_COST);
+  });
   test('palisade costs 8 logs and 3 cordage and cannot be duplicated', () => {
     expect(PALISADE_COST).toEqual([{ itemId: 'log', count: 8 }, { itemId: 'cordage', count: 3 }]);
     const result = buildStructure({ ...fresh(), storage: PALISADE_COST }, 'palisade', true);

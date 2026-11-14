@@ -119,6 +119,15 @@ export function prepareSkill<T extends AbilitySave>(p: T, id: ActiveSkill, targe
   if (!paid) return { ok: false, reason: '사용 재료가 부족합니다 (배낭 또는 가까운 창고)' };
   return { ok: true, targets: nearby, state: { ...paid, hunger: p.hunger - (id === 'roar' ? 1 : 0), cooldowns: { ...p.cooldowns, [id]: now + ACTIVE_SKILLS[id].cooldownMs }, calmUntil: id === 'roar' ? { ...p.calmUntil, ...Object.fromEntries(nearby.map(e => [e.id, now + 20_000])) } : p.calmUntil } };
 }
+export function relocateOutpost<T extends AbilitySave>(p: T, gpsReady: boolean): ActionResult<T> {
+  if (!gpsReady) return { ok: false, reason: '정확한 GPS 신호가 필요합니다' };
+  if (!p.base || !p.techs.includes('outpost') || !p.outpost) return { ok: false, reason: '본거지와 전진기지·건축 기술이 필요합니다' };
+  if (distanceM(p.pos, p.base) < C.outpostMinDistFromBaseM) return { ok: false, reason: '본거지에서 150m 이상 떨어진 곳으로 옮기세요' };
+  if (distanceM(p.pos, p.outpost) <= C.outpostRadiusM) return { ok: false, reason: '기존 전진기지 반경 30m 밖으로 이동한 뒤 옮기세요' };
+  const paid = payAccessible(p, OUTPOST_COST);
+  if (!paid) return { ok: false, reason: '전진기지 이동에 필요한 건축 재료를 배낭에 챙기세요' };
+  return { ok: true, state: { ...paid, outpost: { ...p.outpost, ...p.pos } } };
+}
 export function buildStructure<T extends AbilitySave>(p: T, kind: 'palisade' | 'outpost', gpsReady: boolean): ActionResult<T> {
   if (!gpsReady) return { ok: false, reason: '정확한 GPS 신호가 필요합니다' };
   if (!p.base || !p.techs.includes(kind)) return { ok: false, reason: '본거지와 건축 기술이 필요합니다' };
