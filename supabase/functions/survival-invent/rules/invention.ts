@@ -160,6 +160,38 @@ export function physicsSignal(input: InventionInput, altar: boolean) {
   const ratio = elasticity ? hardness / elasticity : 0;
   const synergy = result.ok && (result.score >= 6.5 || (ratio >= 1.4 && ratio <= 1.8) || entries.some(([id]) => ['jade','ancient_fang','obsidian'].includes(id)));
   const reason = 'reason' in result ? result.reason : null;
-  const advice = result.ok ? (synergy ? '현자의 조언: 서로의 물성이 조화롭게 맞물립니다.' : '현자의 조언: 형태를 갖출 수 있는 조합입니다.') : reason === 'no_binding' ? '현자의 조언: 부품을 묶을 노끈·송진·가죽이 필요합니다.' : reason === 'too_many_slots' ? `현자의 조언: 이 시설에는 ${altar ? MAX_SLOTS : ANVIL_SLOTS}종의 재료만 올릴 수 있습니다.` : '현자의 조언: 타격력을 낼 수 있는 단단한 재료(돌, 뼈)가 필요합니다.';
+  const advice = sageAdvice(input.category, reason, result.ok, synergy, altar, entries.map(([id]) => id));
   return { result, kind: !result.ok ? 'smoke' as const : synergy ? 'sacred' as const : 'experiment' as const, advice, hardness, elasticity, sharpness, flammability, total };
+}
+
+const CAT_NAME: Record<InventionCategory, string> = { weapon: '무기', tool: '도구', building: '방어구', relic: '부적' };
+/** Concrete material suggestions per missing property, using real in-game item names. */
+const SUGGEST: Record<string, string> = {
+  edge: '부싯돌 · 흑요석 · 뼈 · 고대의 송곳니',
+  hard: '부싯돌 · 뼈 · 엄니 · 석영',
+  tough: '날가죽 · 가죽 · 털가죽 · 혹한의 모피 · 엄니',
+  bind: '노끈 · 송진 · 가죽 · 식물 섬유',
+  mystic: '옥 · 석영 · 황토 안료 · 고대의 송곳니',
+};
+const EXAMPLE: Record<InventionCategory, string> = {
+  weapon: '예) 부싯돌 3 + 나뭇가지 2 + 노끈 1 → 창 / 흑요석 2 + 뼈 2 + 노끈 1 → 날카로운 창',
+  tool: '예) 부싯돌 3 + 노끈 1 → 기초 도구 / 흑요석 2 + 뼈 1 + 노끈 1 → 상급 곡괭이',
+  building: '예) 날가죽 3 + 뼈 2 + 노끈 1 → 가죽 갑옷 / 혹한의 모피 2 + 가죽 2 → 털망토',
+  relic: '예) 옥 2 + 석영 1 → 옥 부적 / 뼈 2 + 황토 안료 2 → 뼈 부적',
+};
+export function sageAdvice(cat: InventionCategory, reason: string | null, ok: boolean, synergy: boolean, altar: boolean, used: string[]): string {
+  const kind = CAT_NAME[cat];
+  if (ok) return synergy
+    ? `현자의 조언: 재료들의 성질이 잘 맞물립니다. 이대로 ${kind}를 만들면 효율이 높아요. 수량을 늘리거나 등급 높은 재료(흑요석·옥·우두머리 털가죽)를 더하면 더 강해집니다.`
+    : `현자의 조언: ${kind}의 모양은 갖출 수 있어요. 더 강하게 만들려면 ${cat === 'relic' ? SUGGEST.mystic : cat === 'building' ? SUGGEST.tough : SUGGEST.edge} 중 하나를 더해 보세요.`;
+  if (!reason || reason === 'empty') return `현자의 조언: 아래 재료 목록에서 + 버튼으로 재료를 올려 주세요.\n${EXAMPLE[cat]}`;
+  if (reason === 'too_many_slots') return `현자의 조언: ${altar ? '제단' : '돌모루'}에는 ${altar ? MAX_SLOTS : ANVIL_SLOTS}종의 재료만 올릴 수 있어요. 종류를 줄이고 수량을 늘려 보세요.${altar ? '' : ' 개인 제단을 지으면 4종까지 가능합니다.'}`;
+  if (reason === 'no_binding') return `현자의 조언: 부품을 하나로 묶을 결합재가 없어요. ${SUGGEST.bind} 중 하나를 1~2개 넣어 주세요.\n${EXAMPLE[cat]}`;
+  if (reason === 'implausible' && !altar && !['tool', 'weapon'].includes(cat)) return '현자의 조언: 돌모루에서는 무기와 도구만 만들 수 있어요. 방어구·부적·고열 제련·신성 부여는 개인 제단이 필요합니다.';
+  const need = cat === 'relic' ? `신비한 힘을 담을 재료가 부족해요. ${SUGGEST.mystic}`
+    : cat === 'building' ? `몸을 지켜 줄 질긴 재료가 부족해요. ${SUGGEST.tough}`
+    : cat === 'tool' ? `단단한 머리 재료가 부족해요. ${SUGGEST.hard}`
+    : `날카로운 날이 될 재료가 부족해요. ${SUGGEST.edge}`;
+  const weak = used.filter(id => ['branch', 'fiber', 'soil', 'clay', 'hide'].includes(id)).length ? ' 부드러운 재료(나뭇가지·섬유·흙)만으로는 힘이 약합니다.' : '';
+  return `현자의 조언: ${need} 중에서 2~3개를 넣어 보세요.${weak}\n${EXAMPLE[cat]}`;
 }

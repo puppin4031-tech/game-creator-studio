@@ -659,7 +659,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
           return false;
         }
         if (!tool) return false;
-        power = ITEMS[tool.itemId].tool?.power ?? 1;
+        power = (ITEMS[tool.itemId].tool?.power ?? 1) * gearMult(tool);
       }
       if (escortReady(p.tribe, Date.now(), !!p.observedExpedition?.mercenary)) power *= ESCORT_GATHER_MULT;
     } else {

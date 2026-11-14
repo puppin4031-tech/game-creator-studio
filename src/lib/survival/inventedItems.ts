@@ -2,6 +2,7 @@
 import { ITEMS, type ItemDef } from './items';
 import { checkFacility, type InventionCategory } from './invention';
 import type { Stack } from './types';
+import type { SpriteKey } from './spriteMeta';
 
 export interface InventedItem {
   id: string;           // inv_<hash digest>
@@ -27,10 +28,39 @@ export function inventionId(hash: string): string {
   return `inv_${(h >>> 0).toString(36)}`;
 }
 
+const has = (m: Record<string, number>, ...ids: string[]) => ids.some(id => (m[id] ?? 0) > 0);
+/** Icon always comes from the gear family of its category, picked by the defining material. */
+export function inventedSprite(inv: Pick<InventedItem, 'category' | 'materials' | 'ranged'>): SpriteKey {
+  const m = inv.materials;
+  switch (inv.category) {
+    case 'weapon':
+      if (inv.ranged) return has(m, 'bone', 'tusk') ? 'item-bone-bow' : 'item-sling';
+      if (has(m, 'obsidian', 'frost_shard', 'ancient_fang')) return 'item-obsidian-spear';
+      if (has(m, 'flint', 'quartz')) return 'item-flint-spear';
+      if (has(m, 'log', 'tusk', 'clay_pot')) return 'item-stone-maul';
+      if (has(m, 'bone')) return 'item-bone-dagger';
+      return 'item-wooden-club';
+    case 'tool':
+      if (has(m, 'obsidian', 'frost_shard')) return 'item-obsidian-pickaxe';
+      if (has(m, 'bone', 'tusk')) return 'item-bone-pick';
+      if (has(m, 'flint', 'quartz')) return 'item-flint-hatchet';
+      if (has(m, 'clay', 'clay_pot', 'soil')) return 'item-digging-stick';
+      return 'item-hand-axe';
+    case 'building':
+      if (has(m, 'frost_pelt', 'prime_pelt')) return 'item-fur-cloak';
+      if (has(m, 'bone', 'tusk', 'jade')) return 'item-bone-plate';
+      if (has(m, 'hide', 'leather')) return 'item-hide-armor';
+      return 'item-bark-vest';
+    case 'relic':
+      if (has(m, 'jade')) return 'item-jade-amulet';
+      if (has(m, 'quartz', 'frost_shard')) return 'item-quartz-charm';
+      return 'item-bone-charm';
+  }
+}
+
 /** Item stats derive only from the shared physics power, never from AI text. */
 export function inventedItemDef(inv: InventedItem): ItemDef {
-  const primary = Object.entries(inv.materials).sort((a, b) => b[1] - a[1])[0]?.[0];
-  const sprite = (primary && ITEMS[primary as keyof typeof ITEMS]?.sprite) || ITEMS.flint.sprite;
+  const sprite = inventedSprite(inv);
   const weight = Math.min(5, Math.round(Object.entries(inv.materials).reduce((s, [id, q]) => s + (ITEMS[id as keyof typeof ITEMS]?.weight ?? 0.5) * q, 0) * 0.3 * 10) / 10);
   const base = { name: inv.name, desc: inv.desc, rarity: 'rare' as const, weight, sprite, durability: INVENTED_DURABILITY };
   switch (inv.category) {
