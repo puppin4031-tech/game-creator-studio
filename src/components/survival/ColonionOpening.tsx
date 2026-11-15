@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Lock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { normalizePioneerName, PIONEER_ERAS, PIONEER_NAME_KEY } from "@/lib/pioneer";
-import titleArt from "@/assets/colonion_title.jpg.asset.json";
+import titleArt from "@/assets/colonion-opening.webp.asset.json";
 import CharacterSprite from "@/components/survival/CharacterSprite";
 
 export { PIONEER_NAME_KEY } from "@/lib/pioneer";
@@ -35,7 +35,7 @@ export function ColonionOpening({ onEnter, onClose }: { onEnter: (name: string) 
       <div className="relative min-h-32 flex-1 overflow-hidden">
         <motion.img
           src={titleArt.url}
-          alt="콜로니온: 문명의 시작 — 구석기 모닥불과 미래 도시를 잇는 GPS 신호"
+          alt="COLONION — 화산과 고대 마을을 바라보는 개척자"
           className="absolute inset-0 h-full w-full object-contain [image-rendering:pixelated]"
           initial={{ scale: 1.12 }}
           animate={{ scale: 1 }}

@@ -112,6 +112,7 @@ const App = () => (
           <AuthProvider>
             <Routes>
               <Route path="/" element={<LandingPage />} />
+              <Route path="/home" element={<LandingPage />} />
               <Route path="/world" element={<ProtectedRoute><SurvivalSimulator realGps /></ProtectedRoute>} />
               <Route path="/exodus" element={<Index />} />
               <Route element={<MobileFrame />}>

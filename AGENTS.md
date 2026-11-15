@@ -33,3 +33,4 @@
 - Egg artwork uses a visual-only hash of the existing egg ID in eggArt.ts across map, inventory and hatch views; why: four uploaded designs stay stable without changing saves or pet probabilities.
 - TribeSprite applies admin sheets with a bundled fallback for base, escort and every expedition member; why: all tribe surfaces must honor uploads without blank loading frames.
 - Pet fusion compares explicit legacy/admin species aliases through fusionSpecies, preserving instance IDs and locks; why: renamed dinosaurs can merge across catalog generations without merging unrelated names.
+- `/home` and `/` render the same landing page and share CDN opening artwork with pioneer selection; why: both entry addresses must display consistent art without duplicate pages or binaries.

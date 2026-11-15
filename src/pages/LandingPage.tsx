@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { EXPLORATION_LOGIN_URL } from "@/lib/authNavigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { ColonionOpening } from "@/components/survival/ColonionOpening";
-import titleArt from "@/assets/colonion_title.jpg.asset.json";
+import titleArt from "@/assets/colonion-opening.webp.asset.json";
 import { enterGuestSession } from '@/lib/guestEntry';
 import { lovable } from "@/integrations/lovable/index";
 
@@ -132,7 +132,7 @@ export default function LandingPage() {
         <div className="relative flex-1">
           <motion.img
             src={titleArt.url}
-            alt="콜로니온: 문명의 시작 — 구석기 모닥불과 미래 도시를 잇는 GPS 신호"
+            alt="COLONION — 화산과 고대 마을을 바라보는 개척자"
             className="absolute inset-0 h-full w-full object-contain [image-rendering:pixelated]"
             initial={{ scale: 1.12, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
