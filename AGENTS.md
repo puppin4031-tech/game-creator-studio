@@ -34,3 +34,4 @@
 - TribeSprite applies admin sheets with a bundled fallback for base, escort and every expedition member; why: all tribe surfaces must honor uploads without blank loading frames.
 - Pet fusion compares explicit legacy/admin species aliases through fusionSpecies, preserving instance IDs and locks; why: renamed dinosaurs can merge across catalog generations without merging unrelated names.
 - `/home` and `/` render the same landing page and share CDN opening artwork with pioneer selection; why: both entry addresses must display consistent art without duplicate pages or binaries.
+- Tag team assignments are guarded by a database trigger: only the room owner may change teams while waiting, and player identity fields are immutable; why: self-update policies must not allow score reassignment.
