@@ -1351,13 +1351,13 @@ export default function BaseVillageView({
                     <img
                       src={shamanImg}
                       alt="떠돌이 주술사"
-                      className="pixelated h-7 w-auto object-contain drop-shadow"
+                      className="pixelated h-8 w-auto object-contain drop-shadow"
                     />
                   ) : ag.kind === 'tribe' || ag.kind === 'extra' ? (
                     <TribeSprite
                       action={ag.moving ? 'walk' : 'idle'}
                       tribeClass={ag.tribeClass}
-                      height={ag.kind === 'extra' ? 22 : 26}
+                      height={ag.kind === 'extra' ? 25 : 30}
                       showBadge={false}
                     />
                   ) : (

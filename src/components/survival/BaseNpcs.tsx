@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import shamanArt from '@/assets/survival/npc-shaman.png';
@@ -56,6 +57,7 @@ const NEW_TUTORIAL_STEPS: DialogueStep[] = [
   },
 ];
 
+const NPC_OFFSET_KEY = 'colonion.baseNpcOffsets.v1';
 const TALK = ['자네가 걸을수록 알 속 생명이 꿈틀대지.', '제단에 좋은 재료를 올리면 내가 쓸 만한 걸 판별해 주겠네.', '부족민과 짐승들은 창고 식량을 먹고 산다네. 창고를 비우지 말게.'];
 /** Shaman's interface tour, one panel per stop. */
 const TOUR = [
@@ -156,15 +158,32 @@ export default function BaseNpcs({
   };
   const npcBtn = 'pointer-events-auto absolute bottom-0 flex min-h-9 min-w-9 flex-col items-center';
   const pixelBtn = 'w-full rounded-none border-2 border-foreground py-1.5 px-2.5 text-xs shadow-[2px_2px_0_0_hsl(var(--foreground)/0.6)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none';
+  const dragged = useRef(false);
+  const [offsets, setOffsets] = useState<Record<string, { x: number; y: number }>>(() => {
+    try { return JSON.parse(localStorage.getItem(NPC_OFFSET_KEY) ?? '{}'); } catch { return {}; }
+  });
+  const saveOffset = (id: string, dx: number, dy: number) => setOffsets(prev => {
+    const cur = prev[id] ?? { x: 0, y: 0 };
+    const next = { ...prev, [id]: { x: Math.round(cur.x + dx), y: Math.round(cur.y + dy) } };
+    try { localStorage.setItem(NPC_OFFSET_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+    return next;
+  });
+  const dragProps = (id: string) => ({
+    drag: true as const, dragMomentum: false, dragSnapToOrigin: false,
+    onDragStart: () => { dragged.current = true; },
+    onDragEnd: (_: unknown, info: { offset: { x: number; y: number } }) => { saveOffset(id, info.offset.x, info.offset.y); setTimeout(() => { dragged.current = false; }, 50); },
+    onPointerDown: (e: React.PointerEvent) => e.stopPropagation(),
+  });
+  const tap = (k: 'shaman' | 'merc') => (e: React.MouseEvent) => { e.stopPropagation(); if (!dragged.current) setOpen(k); };
   return <>
-    <button type="button" aria-label="떠돌이 주술사와 대화" onClick={e => { e.stopPropagation(); setOpen('shaman'); }} className={npcBtn} style={{ left: 58 }}>
+    <motion.button key={`s-${offsets.shaman?.x}-${offsets.shaman?.y}`} type="button" aria-label="떠돌이 주술사와 대화 (끌어서 이동)" {...dragProps('shaman')} onClick={tap('shaman')} className={`${npcBtn} touch-none`} style={{ left: 58 + (offsets.shaman?.x ?? 0), bottom: -(offsets.shaman?.y ?? 0) }}>
       {!shamanMet && <span className="animate-bounce bg-primary px-1 text-[10px] font-bold text-primary-foreground">!</span>}
-      <img src={shamanArt} alt="" className="pixelated h-14 w-auto" style={{ transform: 'scaleX(-1)' }} />
-    </button>
-    <button type="button" aria-label="부족민 영입" onClick={e => { e.stopPropagation(); setOpen('merc'); }} className={npcBtn} style={{ right: 58 }}>
+      <img src={shamanArt} alt="" className="pixelated h-16 w-auto" style={{ transform: 'scaleX(-1)' }} draggable={false} />
+    </motion.button>
+    <motion.button key={`m-${offsets.merc?.x}-${offsets.merc?.y}`} type="button" aria-label="부족민 영입 (끌어서 이동)" {...dragProps('merc')} onClick={tap('merc')} className={`${npcBtn} touch-none`} style={{ right: 58 - (offsets.merc?.x ?? 0), bottom: -(offsets.merc?.y ?? 0) }}>
       <span className={`px-1 text-[10px] ${injured ? 'bg-destructive text-destructive-foreground' : 'bg-accent text-accent-foreground'}`}>{injured ? '부상' : `${activeClass.icon} 부족 ${count}/${TRIBE_MAX}`}</span>
-      <img src={mercArt} alt="" className={`pixelated h-14 w-auto ${injured ? 'opacity-40' : ''}`} />
-    </button>
+      <img src={mercArt} alt="" className={`pixelated h-16 w-auto ${injured ? 'opacity-40' : ''}`} draggable={false} />
+    </motion.button>
     <Dialog open={open !== null} onOpenChange={o => { if (!o) { setOpen(null); setTour(null); } }}>
       <DialogContent className="pixel-panel max-h-[85dvh] max-w-sm overflow-y-auto" onClick={e => e.stopPropagation()}>
         {open === 'shaman' ? <>
