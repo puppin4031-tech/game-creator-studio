@@ -1586,7 +1586,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const startSmokeBatch = useCallback((itemId: ItemId, count: number): boolean => {
     const p = ref.current;
     const n = Math.max(1, Math.min(5, count));
-    const paid = payAccessible(p, [{ itemId, count: n }]);
+    const pc = payCost(p, [{ itemId, count: n }]);
+    const paid = pc ? { ...p, ...pc } : null;
     if (!paid) {
       toast.warning(`${ITEMS[itemId]?.name ?? itemId}이(가) 부족합니다`);
       return false;
@@ -1614,10 +1615,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
   const instantSmoke = useCallback((itemId: ItemId, kind: 'cooked' | 'dried'): boolean => {
     const p = ref.current;
-    const paid = payAccessible(p, [
+    const pc = payCost(p, [
       { itemId, count: 1 },
       { itemId: 'branch', count: 1 },
     ]);
+    const paid = pc ? { ...p, ...pc } : null;
     if (!paid) {
       toast.warning(`${ITEMS[itemId]?.name ?? '식재료'} 1개와 나뭇가지 1개가 필요합니다`);
       return false;
@@ -1673,7 +1675,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const p = ref.current;
     const r = TAVERN_RECIPES.find(x => x.id === recipeId);
     if (!r) return false;
-    const paid = payAccessible(p, r.ingredients);
+    const pc = payCost(p, r.ingredients);
+    const paid = pc ? { ...p, ...pc } : null;
     if (!paid) {
       toast.error(`요리 재료 부족: ${fmt(r.ingredients)}`);
       return false;
