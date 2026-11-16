@@ -16,16 +16,17 @@ interface Props {
 /** Segmented view switcher shown under the top HUD. */
 export default function WorldViewTabs({ view, onView, site, onSite, hasBase, hasOutpost, crewActive }: Props) {
   return (
-    <div className="absolute inset-x-2 top-[calc(max(0.5rem,env(safe-area-inset-top))+4.25rem)] z-20 mr-12 flex flex-col gap-1">
+    <div className="absolute left-2 top-[calc(max(0.5rem,env(safe-area-inset-top))+4.25rem)] z-20 flex w-auto max-w-[210px] flex-col gap-1">
       <div role="tablist" aria-label="시점 전환" className="pixel-frame grid grid-cols-3 bg-card/95 p-0.5">
         {TABS.map(({ id, label, icon: Icon }) => {
           const disabled = id === 'base' && !hasBase;
           const on = view === id;
           return (
             <button key={id} type="button" role="tab" aria-selected={on} disabled={disabled} onClick={() => onView(id)}
-              className={`relative flex items-center justify-center gap-1 py-1.5 px-2.5 text-xs disabled:opacity-40 ${on ? 'bg-primary text-primary-foreground' : ''}`}>
-              <Icon className="!h-4 !w-4" />{label}
-              {id === 'expedition' && crewActive && !on && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-destructive" />}
+              className={`relative flex items-center justify-center gap-0.5 py-1 px-1.5 text-[11px] disabled:opacity-40 ${on ? 'bg-primary text-primary-foreground font-bold' : ''}`}>
+              <Icon className="!h-3.5 !w-3.5 shrink-0" />
+              <span className="truncate">{label}</span>
+              {id === 'expedition' && crewActive && !on && <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-destructive" />}
             </button>
           );
         })}

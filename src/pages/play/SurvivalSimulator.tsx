@@ -38,7 +38,7 @@ import { MAX_SKILL_LEVEL, skillLevel, skillUpgradeCost } from '@/lib/survival/sk
 import { type SpriteAction } from '@/hooks/useSpriteAnimations';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Backpack, Flame, Lightbulb, LocateFixed, X, Lock, ListChecks, Compass, ChevronUp, Star, MapPin, Navigation, Radar } from 'lucide-react';
+import { Backpack, Flame, Lightbulb, LocateFixed, X, Lock, ListChecks, Compass, ChevronUp, Star, MapPin, Navigation, Radar, Map as MapIcon } from 'lucide-react';
 import { bearingDeg, useSurvivalFavorites } from '@/hooks/useSurvivalFavorites';
 import { useDeviceHeading } from '@/hooks/useDeviceHeading';
 import { useSurvivalGps } from '@/hooks/useSurvivalGps';
@@ -958,21 +958,10 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         {!gps.ready && <Button variant="outline" size="sm" className="h-auto shrink-0 py-1.5 px-2.5 text-xs" onClick={gps.retry}>재시도</Button>}
       </div>}
 
-      {/* Compact Radar / Favorites Button on Main HUD */}
-      <button
-        type="button"
-        aria-label="레이더 및 즐겨찾기 열기"
-        onClick={() => setRadarOpen(true)}
-        className="pixel-btn absolute right-2 top-[calc(7.25rem+env(safe-area-inset-top))] z-20 flex items-center gap-1 bg-card py-1.5 px-2.5 text-xs font-bold"
-      >
-        <Radar className="!h-4 !w-4 text-primary" />
-        <span>🗺️ 레이더/즐겨찾기</span>
-      </button>
-
       {favs.tracked && (() => {
         const d = distanceM(s.pos, favs.tracked);
         return (
-          <button type="button" onClick={() => setRadarOpen(true)} className="pixel-frame absolute left-1/2 top-[calc(9.25rem+env(safe-area-inset-top))] z-20 flex max-w-[60%] -translate-x-1/2 items-center gap-1.5 bg-card py-1.5 px-2.5 text-xs">
+          <button type="button" onClick={() => setRadarOpen(true)} className="pixel-frame absolute left-1/2 top-[calc(7.25rem+env(safe-area-inset-top))] z-20 flex max-w-[60%] -translate-x-1/2 items-center gap-1.5 bg-card py-1.5 px-2.5 text-xs">
             <Navigation className="!h-4 !w-4 shrink-0 text-primary" style={{ transform: `rotate(${bearingDeg(s.pos, favs.tracked) - mapBearing}deg)` }} />
             <span className="truncate">{favs.tracked.name}</span><b className="shrink-0">{d >= 1000 ? `${(d / 1000).toFixed(1)}km` : `${Math.round(d)}m`}</b>
           </button>
@@ -1005,7 +994,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex flex-col items-start gap-1">
               <MenuBtn icon={Lightbulb} label="기술" dot={techDone} onClick={() => setPanel('tech')} />
               <MenuBtn icon={ListChecks} label="생존 목표" onClick={() => setPanel('quests')} />
-              <MenuBtn icon={Star} label="레이더·즐겨찾기" onClick={() => setRadarOpen(true)} />
+              <MenuBtn icon={MapIcon} label="맵" onClick={() => setRadarOpen(true)} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -1376,6 +1365,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         discoveredPins={s.discoveredPins ?? []}
         favorites={favs.favorites}
         tracked={favs.tracked}
+        entities={g.entities}
+        landmarks={landmarks}
         onToggleFavorite={favs.toggle}
         onRemoveFavorite={favs.remove}
         onTrack={favs.setTrackedId}
