@@ -991,51 +991,45 @@ export default function BaseVillageView({
         <button
           type="button"
           onClick={() => setActiveModal('workshop')}
-          className="pixel-btn flex items-center justify-center gap-0.5 bg-card py-1.5 px-1 text-[11px] font-bold"
+          className="pixel-btn flex items-center justify-center gap-0.5 bg-amber-500/15 text-amber-900 py-2 px-0.5 text-[10px] tracking-tighter font-bold leading-tight"
         >
-          <span>🪓</span>
-          <span className="truncate">건축공방</span>
+          <span className="whitespace-nowrap">건축공방</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveModal('armory')}
-          className="pixel-btn flex items-center justify-center gap-0.5 bg-card py-1.5 px-1 text-[11px] font-bold"
+          className="pixel-btn flex items-center justify-center gap-0.5 bg-orange-500/15 text-orange-900 py-2 px-0.5 text-[10px] tracking-tighter font-bold leading-tight"
         >
-          <span>🔥</span>
-          <span className="truncate">무기공방</span>
+          <span className="whitespace-nowrap">무기공방</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveModal('smokehouse')}
-          className="pixel-btn relative flex items-center justify-center gap-0.5 bg-card py-1.5 px-1 text-[11px] font-bold"
+          className="pixel-btn relative flex items-center justify-center gap-0.5 bg-yellow-500/15 text-yellow-900 py-2 px-0.5 text-[10px] tracking-tighter font-bold leading-tight"
         >
-          <span>♨️</span>
-          <span className="truncate">훈제보관</span>
+          <span className="whitespace-nowrap">훈제보관</span>
           {spoiledCount > 0 && <span className="h-2 w-2 rounded-full bg-lime-500" />}
         </button>
         <button
           type="button"
           onClick={() => setActiveModal('tavern')}
-          className="pixel-btn flex items-center justify-center gap-0.5 bg-card py-1.5 px-1 text-[11px] font-bold"
+          className="pixel-btn flex items-center justify-center gap-0.5 bg-rose-500/15 text-rose-900 py-2 px-0.5 text-[10px] tracking-tighter font-bold leading-tight"
         >
-          <span>🍖</span>
-          <span className="truncate">원시주막</span>
+          <span className="whitespace-nowrap">원시주막</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveModal('altar')}
-          className="pixel-btn flex items-center justify-center gap-0.5 bg-card py-1.5 px-1 text-[11px] font-bold"
+          className="pixel-btn flex items-center justify-center gap-0.5 bg-violet-500/15 text-violet-900 py-2 px-0.5 text-[10px] tracking-tighter font-bold leading-tight"
         >
-          <span>🔮</span>
-          <span className="truncate">고대제단</span>
+          <span className="whitespace-nowrap">고대제단</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveModal('shaman')}
-          className="pixel-btn relative flex items-center justify-center gap-0.5 bg-card py-1.5 px-1 text-[11px] font-bold"
+          className="pixel-btn relative flex items-center justify-center gap-0.5 bg-emerald-500/15 text-emerald-900 py-2 px-0.5 text-[10px] tracking-tighter font-bold leading-tight"
         >
-          <span>🧙</span>
-          <span className="truncate">주술사</span>
+          <span className="whitespace-nowrap">주술사</span>
           {(canClaimQuest || (playerLevel >= 5 && !languageLearned)) && (
             <span className="h-2 w-2 rounded-full bg-destructive" />
           )}
