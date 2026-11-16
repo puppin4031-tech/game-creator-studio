@@ -18,6 +18,8 @@ import BackpackDiscard from '@/components/survival/BackpackDiscard';
 import InventoryMaterials from '@/components/survival/InventoryMaterials';
 import { BaseFortressOverlay } from '@/components/survival/BaseFortressOverlay';
 import PetSprite from '@/components/survival/PetSprite';
+import WorldViewTabs from '@/components/survival/WorldViewTabs';
+import { viewFocus, type BaseSite, type WorldView } from '@/lib/survival/worldView';
 import ExpeditionJoystick from '@/components/survival/ExpeditionJoystick';
 import BaseNpcs from '@/components/survival/BaseNpcs';
 import TribeSprite from '@/components/survival/TribeSprite';
@@ -178,6 +180,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const { state: s } = g;
   const [expeditionTarget, setExpeditionTarget] = useState<LatLng | null>(null);
   const [watchExpedition, setWatchExpedition] = useState(true);
+  const [view, setView] = useState<WorldView>('user');
+  const [baseSite, setBaseSite] = useState<BaseSite>('main');
   const crew = s.observedExpedition;
   useExpeditionCombatSound(crew, e => workKind(e).sample);
   useMovementSound(s.pos);
@@ -196,10 +200,10 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const hasTribe = (s.tribe?.count ?? 0) > 0;
   const canDispatch = !!s.base && (!realGps || !gps.ready || g.inBase || hasTribe);
   const [fieldExp, setFieldExp] = useState(false);
-  const expeditionControls = <ExpeditionSystem crew={crew} logs={s.expeditionLogs ?? []} target={expeditionTarget} home={s.base} auto={!!s.expeditionAuto} pocket={g.pocketMode} outdoor={g.outdoorMoving && (g.pocketMode || (!!crew && distanceM(s.pos, crew.pos) <= 40))} watching={watchExpedition} gpsReady={gps.ready} canSend={canDispatch}
+  const expeditionControls = <ExpeditionSystem crew={crew} logs={s.expeditionLogs ?? []} target={expeditionTarget} home={s.base} auto={!!s.expeditionAuto} pocket={g.pocketMode} outdoor={g.outdoorMoving && (g.pocketMode || (!!crew && distanceM(s.pos, crew.pos) <= 40))} watching={view === 'expedition'} gpsReady={gps.ready} canSend={canDispatch}
     focus={crew?.focus ?? expeditionFocus} onFocus={setExpeditionFocus}
-    onSend={() => { if (g.dispatchObserved(expeditionDestination, expeditionFocus)) { setWatchExpedition(true); setPanel('none'); } }}
-    onAuto={() => { g.toggleExpeditionAuto(expeditionDestination, expeditionFocus); setWatchExpedition(true); }} onPocket={g.togglePocket} onMorale={g.rallyExpedition} onReturn={g.recallExpedition} onWatch={() => setWatchExpedition(v => !v)}
+    onSend={() => { if (g.dispatchObserved(expeditionDestination, expeditionFocus)) { setWatchExpedition(true); setPanel('none'); setView('expedition'); } }}
+    onAuto={() => { g.toggleExpeditionAuto(expeditionDestination, expeditionFocus); setWatchExpedition(true); }} onPocket={g.togglePocket} onMorale={g.rallyExpedition} onReturn={g.recallExpedition} onWatch={() => setView(v => v === 'expedition' ? 'user' : 'expedition')}
     tribe={s.tribe ? { count: s.tribe.count, trainLevel: s.tribe.trainLevel ?? 0, ratio: tribeRatio(s.tribe), maxHp: Math.max(1, Math.round(g.maxHp * tribeRatio(s.tribe) * s.tribe.count)), injured: tribeInjured(s.tribe, Date.now()), starving: !!s.tribe.starving } : undefined} />;
   const [panel, setPanel] = useState<Panel>('none');
   const [craftCat, setCraftCat] = useState<CraftCat>('all');
@@ -488,18 +492,18 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden font-pixel">
-      {realGps && hasTribe && s.base && <div className="pointer-events-none fixed inset-x-2 z-30 flex flex-col items-start gap-0" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 13rem)' }}>
-        {fieldExp && <div className="pixel-panel pointer-events-auto max-h-[50dvh] w-full max-w-md overflow-y-auto bg-card p-2">{expeditionControls}</div>}
-        <button type="button" onClick={() => setFieldExp(v => !v)} className="pixel-btn pointer-events-auto flex min-h-9 items-center gap-1 bg-primary px-2.5 text-[10px] text-primary-foreground"><Compass className="!h-4 !w-4" />{fieldExp ? '원정 닫기' : crew ? '원정 지휘' : '원정 보내기'}</button>
+      {view === 'expedition' && s.base && <div className="pointer-events-none fixed inset-x-2 z-30 flex flex-col items-start gap-0" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 13rem)' }}>
+        {(fieldExp || !crew) && <div className="pixel-panel pointer-events-auto max-h-[50dvh] w-full max-w-md overflow-y-auto bg-card p-2">{expeditionControls}</div>}
+        <button type="button" onClick={() => setFieldExp(v => !v)} className="pixel-btn pointer-events-auto flex min-h-9 items-center gap-1 bg-primary px-2.5 text-[10px] text-primary-foreground"><Compass className="!h-4 !w-4" />{fieldExp || !crew ? '원정 접기' : crew ? '원정 지휘' : '원정 보내기'}</button>
       </div>}
       <AnimatePresence>{showOpening && <ColonionOpening onEnter={enterWorld} />}</AnimatePresence>
-      {<TerrainMap center={watchExpedition && crew ? crew.pos : s.pos} visionM={g.vision} explored={s.explored} onTap={onTap} zone={zone} onSurfaceZone={onSurfaceZone} onSurfacePark={onSurfacePark} onLandmarks={setLandmarks} bearing={compassOn && heading !== null ? heading : 0}>
+      {<TerrainMap center={viewFocus(view, baseSite, { pos: s.pos, base: s.base, outpost: s.outpost, crew: crew?.pos })} visionM={g.vision} explored={s.explored} onTap={onTap} zone={zone} onSurfaceZone={onSurfaceZone} onSurfacePark={onSurfacePark} onLandmarks={setLandmarks} bearing={compassOn && heading !== null ? heading : 0}>
         {(project, mpp) => (
           <>
             {crew && <ExpeditionMarker crew={crew} project={project} members={s.tribe?.count ?? 1} />}
-            {crew && <ExpeditionJoystick crew={crew} candidates={g.crewNearby} project={project} onManual={g.setCrewManual} onSteer={g.steerCrew} onCommand={g.commandCrew} onAct={g.crewAct} onHeal={g.healCrew} />}
+            {crew && view === 'expedition' && <ExpeditionJoystick crew={crew} candidates={g.crewNearby} project={project} onManual={g.setCrewManual} onSteer={g.steerCrew} onCommand={g.commandCrew} onAct={g.crewAct} onHeal={g.healCrew} />}
             {s.base && g.baseDef && <BasePetsOverlay base={s.base} radius={g.baseDef.radiusM + (s.palisade ? 15 : 0)} pets={s.pets ?? []} hits={g.petHits} project={project} />}
-            {eggSpawns.map(egg => { const p = project(egg); return (
+            {view === 'user' && eggSpawns.map(egg => { const p = project(egg); return (
               <button key={egg.id} type="button" aria-label="신비한 픽셀 공룡 알" onClick={ev => { ev.stopPropagation(); g.pickEgg(egg); }}
                 className="pointer-events-auto absolute z-10 flex min-h-11 min-w-11 -translate-x-1/2 -translate-y-full items-center justify-center" style={{ left: p.x, top: p.y }}>
                 <motion.img src={eggArt(egg.id)} alt="" className="pixelated h-10 w-10 object-contain drop-shadow-[0_0_8px_hsl(var(--accent))]" animate={reducedMotion ? undefined : { y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 1.4 }} />
@@ -511,7 +515,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 <div className="pointer-events-none absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
                   <div className="rounded-full border-2 border-dashed border-primary/70 bg-primary/10" style={{ width: r * 2, height: r * 2 }} />
                   <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"><BaseFortressOverlay baseLevel={s.base.level} hasPalisade={!!s.palisade} hasAltar={!!s.altar} /></div>
-                  {!s.tribe?.escort && !s.observedExpedition?.mercenary && Array.from({ length: Math.min(6, s.tribe?.count ?? 0) }, (_, k) => { const a = (k / Math.min(6, s.tribe?.count ?? 1)) * Math.PI * 2; return <motion.div key={k} className="pointer-events-none absolute left-1/2 top-1/2" style={{ marginLeft: Math.cos(a) * 70 - 14, marginTop: Math.sin(a) * 40 - 20, transform: Math.sin(a) > 0 ? 'scaleX(-1)' : undefined }} animate={reducedMotion ? undefined : { x: [0, k % 2 ? 8 : -8, 0] }} transition={{ repeat: Infinity, duration: 4 + k }}><TribeSprite height={40} /></motion.div>; })}<div className="absolute left-1/2 top-1/2 h-20 w-64 -translate-x-1/2 -translate-y-1/2"><BaseNpcs shamanMet={!!s.shamanMet} tribe={s.tribe} storage={s.storage} backpack={s.backpack} now={Date.now()} onMeet={g.meetShaman} onHire={g.hireMerc} onTrain={g.trainTribe} onTreat={g.treatTribe} onEscort={g.toggleEscort} expeditionBusy={!!s.observedExpedition?.mercenary} /></div>
+                  {!s.tribe?.escort && !s.observedExpedition?.mercenary && Array.from({ length: Math.min(6, s.tribe?.count ?? 0) }, (_, k) => { const a = (k / Math.min(6, s.tribe?.count ?? 1)) * Math.PI * 2; return <motion.div key={k} className="pointer-events-none absolute left-1/2 top-1/2" style={{ marginLeft: Math.cos(a) * 70 - 14, marginTop: Math.sin(a) * 40 - 20, transform: Math.sin(a) > 0 ? 'scaleX(-1)' : undefined }} animate={reducedMotion ? undefined : { x: [0, k % 2 ? 8 : -8, 0] }} transition={{ repeat: Infinity, duration: 4 + k }}><TribeSprite height={40} /></motion.div>; })}{view === 'base' && <div className="absolute left-1/2 top-1/2 h-20 w-64 -translate-x-1/2 -translate-y-1/2"><BaseNpcs shamanMet={!!s.shamanMet} tribe={s.tribe} storage={s.storage} backpack={s.backpack} now={Date.now()} onMeet={g.meetShaman} onHire={g.hireMerc} onTrain={g.trainTribe} onTreat={g.treatTribe} onEscort={g.toggleEscort} expeditionBusy={!!s.observedExpedition?.mercenary} /></div>}
                 </div>
               );
             })()}
@@ -673,7 +677,17 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         <Compass className="!h-6 !w-6" style={{ transform: `rotate(${compassOn && heading !== null ? -heading : 0}deg)` }} />
       </button>
 
-      {realGps && <div className="absolute left-2 right-16 top-[calc(4.5rem+env(safe-area-inset-top))] z-20 flex items-center gap-1.5">
+      <WorldViewTabs view={view} onView={v => { setView(v); if (v !== 'expedition') setFieldExp(false); }} site={baseSite} onSite={setBaseSite} hasBase={!!s.base} hasOutpost={!!s.outpost} crewActive={!!crew} />
+      {view === 'base' && s.base && <div className="pixel-frame absolute inset-x-2 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 flex flex-col gap-1.5 bg-card/95 p-2 text-xs">
+        <div className="flex justify-between"><b>{baseSite === 'outpost' && s.outpost ? '전진기지' : `본진 Lv.${s.base.level}`}</b><span>창고 {s.storage.reduce((n, x) => n + x.count, 0)}개 · 부족민 {s.tribe?.count ?? 0} · 수호 펫 {(s.pets ?? []).filter(x => x.deployed).length}</span></div>
+        <div className="grid grid-cols-3 gap-1.5">
+          <button type="button" className="pixel-btn min-h-11 bg-card" onClick={() => { setBaseTab('storage'); setPanel('base'); }}>창고</button>
+          <button type="button" className="pixel-btn min-h-11 bg-card" onClick={() => { setBaseTab('lab'); setPanel('base'); }}>제단·발명</button>
+          {baseSite === 'outpost' && s.outpost ? <button type="button" disabled={!actionReady || (realGps && !gps.ready)} className="pixel-btn min-h-11 bg-primary text-primary-foreground disabled:opacity-40" onClick={g.moveOutpost}>여기로 이전</button>
+            : <button type="button" className="pixel-btn min-h-11 bg-card" onClick={() => { setBaseTab('pets'); setPanel('base'); }}>펫·방어</button>}
+        </div>
+      </div>}
+      {realGps && <div className="absolute left-2 right-16 top-[calc(7.25rem+env(safe-area-inset-top))] z-20 flex items-center gap-1.5">
         <span className="min-w-0 truncate rounded bg-background/80 px-2 py-1 text-[10px]" role="status">{!gps.ready ? '실내 원정 가능 · 야외 GPS 대기' : `GPS ±${Math.round(gps.fix?.accuracy ?? 0)}m`}</span>
         {!gps.ready && <Button variant="outline" size="sm" className="h-9 shrink-0 px-2 text-xs" onClick={gps.retry}>재시도</Button>}
       </div>}
@@ -681,7 +695,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       {favs.tracked && (() => {
         const d = distanceM(s.pos, favs.tracked);
         return (
-          <button type="button" onClick={() => setPanel('favs')} className="pixel-frame absolute left-1/2 top-[calc(6.75rem+env(safe-area-inset-top))] z-20 flex max-w-[60%] -translate-x-1/2 items-center gap-1.5 bg-card px-2 py-1 text-xs">
+          <button type="button" onClick={() => setPanel('favs')} className="pixel-frame absolute left-1/2 top-[calc(9.25rem+env(safe-area-inset-top))] z-20 flex max-w-[60%] -translate-x-1/2 items-center gap-1.5 bg-card px-2 py-1 text-xs">
             <Navigation className="!h-5 !w-5 shrink-0 text-primary" style={{ transform: `rotate(${bearingDeg(s.pos, favs.tracked) - mapBearing}deg)` }} />
             <span className="truncate">{favs.tracked.name}</span><b className="shrink-0">{d >= 1000 ? `${(d / 1000).toFixed(1)}km` : `${Math.round(d)}m`}</b>
           </button>
@@ -689,7 +703,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       })()}
 
       {/* Right drawer: survival actions */}
-      <div className="absolute right-2 top-[calc(7.5rem+env(safe-area-inset-top))] z-20 flex flex-col items-end gap-2">
+      <div className="absolute right-2 top-[calc(9.5rem+env(safe-area-inset-top))] z-20 flex flex-col items-end gap-2">
         <Button type="button" variant="outline" aria-expanded={rightOpen} aria-label={rightOpen ? '생존 메뉴 접기' : '생존 메뉴 펼치기'} onClick={() => setRightOpen((v) => !v)} className={`pixel-btn relative h-11 w-11 p-0 ${rightOpen ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
           {rightOpen ? <ChevronUp className="!h-6 !w-6" /> : <Backpack className="!h-6 !w-6" />}{!rightOpen && baseDone && <RedDot />}
         </Button>
@@ -705,7 +719,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       </div>
 
       {/* Left drawer: skills & exploration */}
-      <div className="absolute left-2 top-[calc(7.5rem+env(safe-area-inset-top))] z-20 flex flex-col items-start gap-2">
+      <div className="absolute left-2 top-[calc(9.5rem+env(safe-area-inset-top))] z-20 flex flex-col items-start gap-2">
         <Button type="button" variant="outline" aria-expanded={leftOpen} aria-label={leftOpen ? '기술 메뉴 접기' : '기술 메뉴 펼치기'} onClick={() => setLeftOpen((v) => !v)} className={`pixel-btn relative h-11 w-11 p-0 ${leftOpen ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
           {leftOpen ? <ChevronUp className="!h-6 !w-6" /> : <Lightbulb className="!h-6 !w-6" />}{!leftOpen && techDone && <RedDot />}
         </Button>
@@ -727,7 +741,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         </div>
       )}
 
-      {<SkillQuickBar known={s.techs} cooldowns={s.cooldowns} levels={s.skillLevels} ready={actionReady} onUse={(id) => activateSkill(id)} />}
+      {view === 'user' && <SkillQuickBar known={s.techs} cooldowns={s.cooldowns} levels={s.skillLevels} ready={actionReady} onUse={(id) => activateSkill(id)} />}
       {!realGps && s.base && <button type="button" onClick={() => setPanel('quests')} className="pixel-frame absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-2 z-20 flex min-h-11 max-w-[60%] items-center gap-2 bg-card px-2.5 py-1.5 text-left text-xs">
         <ListChecks className="!h-4 !w-4 shrink-0" />
         <span className="min-w-0 truncate">{g.quest?.title ?? '모든 목표 완료'}</span>
