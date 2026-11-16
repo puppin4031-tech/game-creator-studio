@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Egg, Drumstick, Lock, LockOpen, Merge, Shield, House } from 'lucide-react';
+import { Egg, Drumstick, Lock, LockOpen, Merge, Shield, Swords } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { fusionPartner, PET_DAILY_LOOT_CAP, PET_GUARD_SLOTS, PET_MAX_LEVEL, petDay, petStats, petRole, PET_ROLE_LABEL, PET_HUNT_MS, PET_DEFENSE, PET_FOLLOW_ATK, type PetRole, type OwnedPet, type PetDefense } from '@/lib/survival/pets';
@@ -10,8 +10,9 @@ import { eggArt } from './eggArt';
 import { fusionSpecies } from '@/lib/survival/pets';
 import { abilitiesFor, abilityText } from '@/lib/survival/petAbilities';
 
-export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, onLock, onRole, onFeed, eggs = [], onHatch }: {
+export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, onLock, onRole, onFeed, onOpenDinoExpedition, eggs = [], onHatch }: {
   onFeed?: (uid: string) => void;
+  onOpenDinoExpedition?: () => void;
   eggs?: { id: string; name: string; walked: number; need: number; ready: boolean }[]; onHatch?: (id: string) => void;
   pets: OwnedPet[]; defense?: PetDefense; ready: boolean; now: number;
   onFuse: (first: string, second: string) => boolean; onDeploy: (uid: string) => void; onLock: (uid: string) => void; onRole?: (uid: string, role: PetRole) => void;
@@ -22,6 +23,25 @@ export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, 
   const first = pets.find(p => p.uid === pair?.[0]), second = pets.find(p => p.uid === pair?.[1]);
   const name = (p: OwnedPet) => petById(p.speciesId)?.name ?? p.name;
   return <section className="space-y-3" aria-label="거점 펫">
+    {onOpenDinoExpedition && (
+      <div className="pixel-frame flex flex-wrap items-center justify-between gap-2 bg-primary/15 p-2.5 text-xs">
+        <div className="space-y-0.5">
+          <b className="block text-sm text-primary">🦖 공룡 탐험대 (횡스크롤 야생 사냥)</b>
+          <span className="text-[11px] text-muted-foreground">
+            보유 공룡 최대 3마리를 직접 지휘해 숲속 자원·공룡 알·전리품을 획득하세요!
+          </span>
+        </div>
+        <Button
+          type="button"
+          disabled={!pets.length}
+          onClick={onOpenDinoExpedition}
+          className="pixel-btn min-h-10 gap-1.5 bg-primary px-3 text-xs font-extrabold text-primary-foreground"
+        >
+          <Swords className="!h-4 !w-4" />
+          🦖 공룡 사냥 내보내기
+        </Button>
+      </div>
+    )}
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2 text-xs">
       <b className="flex items-center gap-1 text-sm"><Shield className="!h-4 !w-4" />수호 {pets.filter(p => p.deployed).length}/{PET_GUARD_SLOTS}</b>
       <span>오늘 전리품 {defense?.day === petDay(now) ? defense.claims : 0}/{PET_DAILY_LOOT_CAP}</span>

@@ -1,4 +1,5 @@
 import { tribeRatio, tribeInjured } from '@/lib/survival/mercenaries';
+import { DEFAULT_TRIBE_CLASS, getTribeClass } from '@/data/tribeClasses';
 // @refresh reset
 // Custom GPS/world hook changes must remount this screen instead of reusing stale hook queues.
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -8,6 +9,7 @@ import WinterThemeOverlay from '@/components/WinterThemeOverlay';
 import { Snowflake } from 'lucide-react';
 import DinoEggHatchModal from '@/components/survival/DinoEggHatchModal';
 import { eggArt } from '@/components/survival/eggArt';
+import CulinaryDishIcon, { isCustomCulinaryItem } from '@/components/survival/CulinaryDishIcon';
 import { EGG_SPAWN_RADIUS_M, eggNeedM, eggReady, eggSpawnsNear, eggWalkedM } from '@/lib/survival/dinoEggs';
 import { useCustomCatalog } from '@/hooks/useCustomCatalog';
 import CreatureSprite from '@/components/survival/CreatureSprite';
@@ -36,18 +38,19 @@ import { MAX_SKILL_LEVEL, skillLevel, skillUpgradeCost } from '@/lib/survival/sk
 import { type SpriteAction } from '@/hooks/useSpriteAnimations';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Backpack, Flame, Lightbulb, LocateFixed, X, Lock, ListChecks, Compass, ChevronUp, Star, MapPin, Navigation } from 'lucide-react';
+import { Backpack, Flame, Lightbulb, LocateFixed, X, Lock, ListChecks, Compass, ChevronUp, Star, MapPin, Navigation, Radar } from 'lucide-react';
 import { bearingDeg, useSurvivalFavorites } from '@/hooks/useSurvivalFavorites';
 import { useDeviceHeading } from '@/hooks/useDeviceHeading';
 import { useSurvivalGps } from '@/hooks/useSurvivalGps';
 import { Button } from '@/components/ui/button';
 import { ColonionOpening, PIONEER_NAME_KEY } from '@/components/survival/ColonionOpening';
+import { hasSeenStoryTutorial, StoryTutorialModal } from '@/components/survival/StoryTutorial';
 import SurvivalObjectives from '@/components/survival/SurvivalObjectives';
 import { toast } from 'sonner';
 import TerrainMap from '@/components/survival/TerrainMap';
 import { useSurvivalWorld } from '@/hooks/useSurvivalWorld';
 import { TERRAIN_ZONE_LABEL, zoneCellKey } from '@/lib/survival/terrainZone';
-import { gearEffect, ITEMS, type ItemId } from '@/lib/survival/items';
+import { gearEffect, ITEMS, requiredRangedAmmo, type ItemId } from '@/lib/survival/items';
 import { nodeDef, creatureDef } from '@/lib/survival/entities';
 import { PLAYER_SPRITE_HEIGHT, SPRITE_META, type SpriteKey } from '@/lib/survival/spriteMeta';
 import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
@@ -66,7 +69,8 @@ import { SHRINE_AURA_M, emptyShrineState, shrinesNear, type Shrine } from '@/lib
 import ShrineSheet from '@/components/survival/ShrineSheet';
 import dolmenShrine from '@/assets/survival/dolmen-shrine.png';
 import melchizedekImg from '@/assets/survival/melchizedek.png';
-import PeerActionMenu from '@/components/survival/PeerActionMenu';
+import PeerActionMenu, { type PeerChatMessage } from '@/components/survival/PeerActionMenu';
+import { LANGUAGE_QUEST } from '@/lib/survival/quests';
 import { useSurvivalPresence, type PeerEvent, type PeerPlayer } from '@/hooks/useSurvivalPresence';
 import { EMOTES, PVP_BASE_DAMAGE, DUEL_MAX_DISTANCE_M } from '@/lib/survival/presence';
 import { researchJobsOf } from '@/lib/survival/abilities';
@@ -83,6 +87,9 @@ import { TECH_CATEGORIES, TECH_CATEGORY, type TechCategory } from '@/lib/surviva
 import { MAX_TECH_LEVEL, techLevel, techUpgradeCost } from '@/lib/survival/techLevels';
 import BasePetsOverlay from '@/components/survival/BasePetsOverlay';
 import PetPanel from '@/components/survival/PetPanel';
+import BaseVillageView from '@/components/survival/BaseVillageView';
+import RadarMapModal from '@/components/survival/RadarMapModal';
+import DinoExpeditionModal from '@/components/survival/DinoExpeditionModal';
 import { atWorkshop } from '@/lib/survival/abilities';
 
 const START: LatLng = { lat: 37.748, lng: 126.7496 };
@@ -134,8 +141,8 @@ function RedDot() {
 }
 function MenuBtn({ icon: Icon, label, onClick, dot }: { icon: typeof Backpack; label: string; onClick: () => void; dot?: boolean }) {
   return (
-    <Button type="button" variant="outline" onClick={onClick} className="pixel-btn relative flex h-14 min-h-14 w-14 flex-col items-center justify-center gap-0 bg-card px-0 text-[10px]">
-      <Icon className="!h-6 !w-6" />{label}{dot && <RedDot />}
+    <Button type="button" variant="outline" onClick={onClick} className="pixel-btn relative flex h-auto min-h-0 items-center justify-center gap-1 bg-card py-1.5 px-2.5 text-xs">
+      <Icon className="!h-4 !w-4 shrink-0" /><span>{label}</span>{dot && <RedDot />}
     </Button>
   );
 }
@@ -151,8 +158,9 @@ const craftCatOf = (id: ItemId): CraftCat => {
 };
 
 export default function SurvivalSimulator({ realGps = false }: { realGps?: boolean }) {
-  // Opening now lives on the main page ("/"); the world starts immediately.
+  // Opening now lives on the main page ("/"); first-time players see the 5-step story tutorial before entering the world.
   const [showOpening, setShowOpening] = useState(false);
+  const [showStoryTutorial, setShowStoryTutorial] = useState(() => !hasSeenStoryTutorial());
   const [chiefName, setChiefName] = useState(() => localStorage.getItem(PIONEER_NAME_KEY) ?? '');
   const enterWorld = (name: string) => {
     sessionStorage.setItem('colonion.openingSeen', '1');
@@ -198,16 +206,21 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   }, [nearbyBeast]);
   const expeditionDestination = expeditionTarget ?? offsetM(s.base ?? s.pos, 180, 0);
   const hasTribe = (s.tribe?.count ?? 0) > 0;
+  const activeTribeClassId = crew?.tribeClass ?? s.tribe?.classId ?? DEFAULT_TRIBE_CLASS;
+  const activeTribeClass = getTribeClass(activeTribeClassId);
   const canDispatch = !!s.base && (!realGps || !gps.ready || g.inBase || hasTribe);
   const [fieldExp, setFieldExp] = useState(false);
+  const [radarOpen, setRadarOpen] = useState(false);
   const expeditionControls = <ExpeditionSystem crew={crew} logs={s.expeditionLogs ?? []} target={expeditionTarget} home={s.base} auto={!!s.expeditionAuto} pocket={g.pocketMode} outdoor={g.outdoorMoving && (g.pocketMode || (!!crew && distanceM(s.pos, crew.pos) <= 40))} watching={view === 'expedition'} gpsReady={gps.ready} canSend={canDispatch}
     focus={crew?.focus ?? expeditionFocus} onFocus={setExpeditionFocus}
-    onSend={() => { if (g.dispatchObserved(expeditionDestination, expeditionFocus)) { setWatchExpedition(true); setPanel('none'); setView('expedition'); } }}
+    tribeClass={activeTribeClassId} onSelectClass={g.selectTribeClass}
+    expeditionLevel={g.expeditionLevelInfo.level}
+    onSend={() => { if (g.dispatchObserved(expeditionDestination, expeditionFocus, activeTribeClassId)) { setWatchExpedition(true); setPanel('none'); setView('expedition'); } }}
     onAuto={() => { g.toggleExpeditionAuto(expeditionDestination, expeditionFocus); setWatchExpedition(true); }} onPocket={g.togglePocket} onMorale={g.rallyExpedition} onReturn={g.recallExpedition} onWatch={() => setView(v => v === 'expedition' ? 'user' : 'expedition')}
-    tribe={s.tribe ? { count: s.tribe.count, trainLevel: s.tribe.trainLevel ?? 0, ratio: tribeRatio(s.tribe), maxHp: Math.max(1, Math.round(g.maxHp * tribeRatio(s.tribe) * s.tribe.count)), injured: tribeInjured(s.tribe, Date.now()), starving: !!s.tribe.starving } : undefined} />;
+    tribe={s.tribe ? { count: s.tribe.count, trainLevel: s.tribe.trainLevel ?? 0, ratio: tribeRatio(s.tribe), maxHp: Math.max(1, Math.round(g.maxHp * tribeRatio(s.tribe) * s.tribe.count)), injured: tribeInjured(s.tribe, Date.now()), starving: !!s.tribe.starving, classId: s.tribe.classId } : undefined} />;
   const [panel, setPanel] = useState<Panel>('none');
   const [craftCat, setCraftCat] = useState<CraftCat>('all');
-  const [baseTab, setBaseTab] = useState<'lab' | 'craft' | 'storage' | 'expedition' | 'pets'>('lab');
+  const [baseTab, setBaseTab] = useState<'village' | 'lab' | 'craft' | 'storage' | 'expedition' | 'pets'>('village');
 
   const onTap = (p: LatLng) => {
     if (auto.job) { auto.stop(); returnToCenter(); }
@@ -219,11 +232,38 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
   const tapEntity = (e: WorldEntity) => {
     if (realGps && !gps.ready) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return; }
-    if (!realGps && distanceM(s.pos, e) > g.reach) { g.moveTo({ lat: e.lat, lng: e.lng }); return; }
+    const dist = distanceM(s.pos, e);
+    const isRangedWeapon = !!(g.weapon && ITEMS[g.weapon.itemId]?.weapon?.ranged);
+    const effectiveReach = e.kind === 'creature' && isRangedWeapon ? Math.max(g.reach, 35) : g.reach;
+    if (!realGps && dist > effectiveReach) { g.moveTo({ lat: e.lat, lng: e.lng }); return; }
     if (auto.job?.id === e.id) { auto.stop(); toast('작업을 멈췄습니다'); return; }
-    if (distanceM(s.pos, e) > g.reach) { g.interact(e); return; }
-    // Walk beside the object, then repeat the action automatically until done.
-    setActorTarget({ lat: e.lat, lng: e.lng, anchor: s.pos });
+    if (dist > effectiveReach) { g.interact(e); return; }
+    // For ranged weapon shots beyond melee reach, verify backpack ammo first before firing!
+    if (e.kind === 'creature' && isRangedWeapon && dist > g.reach) {
+      const neededAmmo = g.weapon ? requiredRangedAmmo(g.weapon.itemId) : null;
+      if (neededAmmo && countOf(s.backpack, neededAmmo) < 1) {
+        const ammoLabel = neededAmmo === 'arrow' ? '화살(🏹)' : '돌멩이 탄환(🪨)';
+        toast.error(`배낭에 ${ammoLabel}이(가) 없습니다!`, {
+          description: '거점 제작 탭이나 무기 제작소에서 만들어 배낭에 넣어 주세요 (1회 공격 시 1개 소진).',
+        });
+        return;
+      }
+      setRangedProjectile({
+        id: `${e.id}-${Date.now()}`,
+        from: s.pos,
+        to: mobPositions[e.id] ?? { lat: e.lat, lng: e.lng },
+        kind: g.weapon?.itemId === 'sling' ? 'stone' : 'arrow',
+      });
+      setMobPositions(prev => ({
+        ...prev,
+        [e.id]: {
+          lat: (prev[e.id]?.lat ?? e.lat) + (s.pos.lat - (prev[e.id]?.lat ?? e.lat)) * 0.45,
+          lng: (prev[e.id]?.lng ?? e.lng) + (s.pos.lng - (prev[e.id]?.lng ?? e.lng)) * 0.45,
+        },
+      }));
+    } else {
+      setActorTarget({ lat: e.lat, lng: e.lng, anchor: s.pos });
+    }
     window.clearTimeout(returnTimer.current);
     auto.start(e, workKind(e).label);
   };
@@ -231,10 +271,26 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     const w = gRef.current; const p = w.state;
     const alive = w.entities.some(x => x.id === e.id) && (e.kind === 'node' ? isNodeAvailable(e.id, e.type, p.depleted, Date.now()) : !p.depleted[e.id]);
     if (!alive) { window.clearTimeout(returnTimer.current); returnTimer.current = window.setTimeout(returnToCenter, ACTOR_IDLE_RETURN_MS); return 'stop'; }
-    if (distanceM(p.pos, e) > w.reach) { toast('대상과 멀어져 작업을 멈췄습니다'); returnToCenter(); return 'stop'; }
+    const isRangedWeapon = !!(w.weapon && ITEMS[w.weapon.itemId]?.weapon?.ranged);
+    const effectiveReach = e.kind === 'creature' && isRangedWeapon ? Math.max(w.reach, 35) : w.reach;
+    if (distanceM(p.pos, e) > effectiveReach) { toast('대상과 멀어져 작업을 멈췄습니다'); returnToCenter(); return 'stop'; }
     if (e.kind === 'node' && w.weight >= w.capacity) { toast.warning('배낭이 가득 찼습니다'); return 'stop'; }
     const act: SpriteAction = e.kind === 'creature' ? 'attack' : STRIKE_NODES.has(e.type) ? 'chop' : 'gather';
-    if (!w.interact(e)) { setActorTarget(null); return 'stop'; }
+    const liveEntity = e.kind === 'creature' && mobPositionsRef.current[e.id]
+      ? { ...e, lat: mobPositionsRef.current[e.id].lat, lng: mobPositionsRef.current[e.id].lng }
+      : e;
+    if (!w.interact(liveEntity)) { setActorTarget(null); return 'stop'; }
+    if (e.kind === 'creature' && isRangedWeapon) {
+      setRangedProjectile({
+        id: `${e.id}-${Date.now()}`,
+        from: p.pos,
+        to: mobPositionsRef.current[e.id] ?? { lat: e.lat, lng: e.lng },
+        kind: w.weapon?.itemId === 'sling' ? 'stone' : 'arrow',
+      });
+    }
+    if (e.kind === 'creature') {
+      setBeastStrike({ id: e.id, at: Date.now() });
+    }
     playAction(act, 900);
     playSample(workKind(e).sample);
     return 'continue';
@@ -274,18 +330,24 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const autoRef = useRef({ g, ready: actionReady });
   autoRef.current = { g, ready: actionReady };
   const autoOn = hasAutoPickup(s.techs);
+  const gathererActive = (s.tribe?.count ?? 0) > 0 && s.tribe?.classId === 'gatherer';
   useEffect(() => {
-    if (!autoOn) return;
+    if (!autoOn && !gathererActive) return;
     const id = window.setInterval(() => {
       const { g: w, ready } = autoRef.current;
       if (!ready || w.weight >= w.capacity) return;
       const p = w.state;
-      const target = w.entities.find(e => e.kind === 'node' && !STRIKE_NODES.has(e.type)
-        && isNodeAvailable(e.id, e.type, p.depleted, Date.now()) && distanceM(p.pos, e) <= AUTO_PICKUP_RADIUS_M);
+      const radius = gathererActive ? getTribeClass('gatherer').autoGatherRadiusM : AUTO_PICKUP_RADIUS_M;
+      if (gathererActive) {
+        const nearEgg = eggSpawnsNear(p.pos, p.depleted, Date.now()).find(e => distanceM(p.pos, e) <= Math.min(radius, 20));
+        if (nearEgg && w.pickEgg(nearEgg)) return;
+      }
+      const target = w.entities.find(e => e.kind === 'node' && (gathererActive ? nodeDef(e.type).requires.tier <= 1 : !STRIKE_NODES.has(e.type))
+        && isNodeAvailable(e.id, e.type, p.depleted, Date.now()) && distanceM(p.pos, e) <= radius);
       if (target) w.interact(target);
-    }, AUTO_PICKUP_INTERVAL_MS);
+    }, gathererActive ? 2000 : AUTO_PICKUP_INTERVAL_MS);
     return () => window.clearInterval(id);
-  }, [autoOn]);
+  }, [autoOn, gathererActive]);
   const activateSkill = (id: Parameters<typeof g.useSkill>[0]) => { if (g.useSkill(id)) { playAction('attack', 900); playSample('strike'); } };
   const inPark = !!s.parkCells?.[zoneCellKey(s.pos)];
   const [landmarks, setLandmarks] = useState<Landmark[]>([]);
@@ -300,6 +362,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [rightOpen, setRightOpen] = useState(false);
   const mapBearing = compassOn && heading !== null ? heading : 0;
   const [shamanWords, setShamanWords] = useState<string | null>(null);
+  const [dinoExpeditionOpen, setDinoExpeditionOpen] = useState(false);
 
   const hit = useHitPulse(s.hp);
   const [techTab, setTechTab] = useState<TechCategory>('general');
@@ -334,9 +397,14 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const winterOn = gameSettings.winter;
   useCustomCatalog();
   const [hatched, setHatched] = useState<{ id: string; name: string; custom?: boolean; eggId?: string } | null>(null);
-  const inventoryIcon = (id: ItemId) => id === 'dino_egg'
-    ? <img src={eggArt(s.dinoEggs?.[0]?.id ?? 'egg')} alt="" className="pixelated h-6 w-6 object-contain" />
-    : <Sprite k={ITEMS[id].sprite} scale={0.75} />;
+  const inventoryIcon = (id: ItemId) =>
+    id === 'dino_egg' ? (
+      <img src={eggArt(s.dinoEggs?.[0]?.id ?? 'egg')} alt="" className="pixelated h-6 w-6 object-contain" />
+    ) : isCustomCulinaryItem(id) ? (
+      <CulinaryDishIcon itemId={id} size={24} />
+    ) : (
+      <Sprite k={ITEMS[id].sprite} scale={0.75} />
+    );
   const eggSpawns = useMemo(() => realGps && !g.inBase ? eggSpawnsNear(s.pos, s.depleted, Date.now()).filter(e => distanceM(s.pos, e) <= EGG_SPAWN_RADIUS_M) : [],
     [realGps, g.inBase, s.pos, s.depleted]); // eslint-disable-line react-hooks/exhaustive-deps
   const readyEgg = (s.dinoEggs ?? []).find(e => eggReady(e, s.walkSteps ?? 0));
@@ -346,22 +414,63 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     if (baby) setHatched({ ...baby, eggId: readyEgg.id });
   }, [readyEgg?.id, g.inBase, hatched, gps.ready]); // eslint-disable-line react-hooks/exhaustive-deps
   const [beastStrike, setBeastStrike] = useState<{ id: string; at: number } | null>(null);
+  const [rangedProjectile, setRangedProjectile] = useState<{ id: string; from: LatLng; to: LatLng; kind: 'arrow' | 'stone' } | null>(null);
+  const [mobPositions, setMobPositions] = useState<Record<string, LatLng>>({});
+  const mobPositionsRef = useRef<Record<string, LatLng>>({});
+  mobPositionsRef.current = mobPositions;
   const lastBeastStrike = useRef(0);
   useEffect(() => {
     const id = window.setInterval(() => {
       const w = gRef.current; const p = w.state; const t = Date.now();
       if (realGps && !gpsReadyRef.current) return;
-      const hostile = w.entities.filter(e => e.kind === 'creature' && !p.depleted[e.id] && beastAggro(e.type, distanceM(p.pos, e), { isNight: w.isNight, engaged: (p.damage[e.id] ?? 0) > 0, calm: (p.calmUntil?.[e.id] ?? 0) > t || w.inSanctuary }));
+      const curPosMap = mobPositionsRef.current;
+      const nextPosMap: Record<string, LatLng> = {};
+      const hostile: Extract<WorldEntity, { kind: 'creature' }>[] = [];
+
+      for (const e of w.entities) {
+        if (e.kind !== 'creature' || p.depleted[e.id]) continue;
+        const curPos = curPosMap[e.id] ?? { lat: e.lat, lng: e.lng };
+        const engaged = (p.damage[e.id] ?? 0) > 0;
+        const dist = distanceM(p.pos, curPos);
+        const isAggro = beastAggro(e.type, dist, {
+          isNight: w.isNight,
+          engaged,
+          calm: (p.calmUntil?.[e.id] ?? 0) > t || w.inSanctuary,
+        });
+        if (isAggro) {
+          hostile.push(e);
+          // Chase toward player up to ~1.5m melee range (especially fast when hit by ranged bow/sling!)
+          if (dist > 1.5) {
+            const stepM = engaged ? Math.min(dist - 1.4, 3.6) : Math.min(dist - 1.5, 2.0);
+            const ratio = stepM / Math.max(1, dist);
+            nextPosMap[e.id] = {
+              lat: curPos.lat + (p.pos.lat - curPos.lat) * ratio,
+              lng: curPos.lng + (p.pos.lng - curPos.lng) * ratio,
+            };
+          } else {
+            nextPosMap[e.id] = curPos;
+          }
+        } else {
+          // Gentle natural roaming (1~2.5m orbit around spawn point) so mobs never look frozen
+          const seed = e.id.split('').reduce((a, ch) => a + ch.charCodeAt(0), 0);
+          const angle = t / 1800 + seed;
+          nextPosMap[e.id] = offsetM({ lat: e.lat, lng: e.lng }, Math.cos(angle) * 1.8, Math.sin(angle) * 1.8);
+        }
+      }
+      setMobPositions(nextPosMap);
+
       setAggroIds(prev => { const n = new Set(hostile.map(e => e.id)); return n.size === prev.size && [...n].every(x => prev.has(x)) ? prev : n; });
-      const near = hostile.sort((a, b) => distanceM(p.pos, a) - distanceM(p.pos, b))[0];
-      if (!near || near.kind !== 'creature' || t - lastBeastStrike.current < BEAST_STRIKE_INTERVAL_MS) return;
+      const near = hostile
+        .map(e => ({ e, d: distanceM(p.pos, nextPosMap[e.id] ?? e) }))
+        .sort((a, b) => a.d - b.d)[0];
+      if (!near || near.d > Math.max(w.reach, 12) || t - lastBeastStrike.current < BEAST_STRIKE_INTERVAL_MS) return;
       lastBeastStrike.current = t;
-      setBeastStrike({ id: near.id, at: t });
+      setBeastStrike({ id: near.e.id, at: t });
       if (!document.hidden) playSample('beastAttack');
-      const def = creatureDef(near.type);
+      const def = creatureDef(near.e.type);
       w.takeDamage(def.atk, true);
-      toast.error(`${def.name}이(가) 먼저 공격했습니다! 공격하거나 도망치세요`);
-    }, 500);
+      toast.error(`💥 ${def.name}이(가) 회전 돌진 박치기로 공격했습니다! (-${def.atk})`);
+    }, 550);
     return () => window.clearInterval(id);
   }, [realGps]);
   const gRef = useRef(g); gRef.current = g;
@@ -370,6 +479,10 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [vassalLinks, setVassalLinks] = useState<Set<string>>(() => new Set());
   const pendingVassal = useRef(new Set<string>());
   const [vassalOffer, setVassalOffer] = useState<{ id: string; name: string } | null>(null);
+  const [chatOffer, setChatOffer] = useState<{ id: string; name: string } | null>(null);
+  const [chatPartners, setChatPartners] = useState<Set<string>>(() => new Set());
+  const [pendingChat, setPendingChat] = useState<Set<string>>(() => new Set());
+  const [chatLogs, setChatLogs] = useState<Record<string, PeerChatMessage[]>>({});
   const shareAllyLocation = (p: { id: string; name: string; lat: number; lng: number }) => {
     if (!favs.isFav(`ally-${p.id}`)) favs.toggle({ id: `ally-${p.id}`, name: `동료 ${p.name}`, lat: p.lat, lng: p.lng });
   };
@@ -381,6 +494,33 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const onPeerEvent = (e: PeerEvent) => {
     const from = peersRef.current.find(p => p.id === e.from);
     if (e.type === 'emote') { showBubble(e.from, `icon:${e.emote}`); playSfx('emote'); haptic(40); }
+    else if (e.type === 'chat-req') {
+      setChatOffer({ id: e.from, name: e.name });
+      playSfx('notify');
+      haptic([80, 60, 80]);
+      sendNotice('대화 신청', `${e.name}님이 대화를 신청합니다`, 'chat-req');
+    } else if (e.type === 'chat-res') {
+      setPendingChat(prev => { const n = new Set(prev); n.delete(e.from); return n; });
+      playSfx('notify');
+      if (e.accept) {
+        setChatPartners(prev => new Set(prev).add(e.from));
+        setSelPeerId(e.from);
+        toast.success(`${e.name}님이 대화를 수락했습니다! 이제 대화를 나눌 수 있습니다.`);
+      } else {
+        toast(`${e.name}님이 대화 신청을 정중히 거절했습니다`);
+      }
+    } else if (e.type === 'chat-msg') {
+      setChatPartners(prev => new Set(prev).add(e.from));
+      showBubble(e.from, `💬 ${e.text}`);
+      playSfx('emote');
+      setChatLogs(prev => ({
+        ...prev,
+        [e.from]: [
+          ...(prev[e.from] ?? []),
+          { id: `${Date.now()}-${Math.random()}`, senderId: e.from, senderName: e.name, text: e.text, at: Date.now() },
+        ].slice(-30),
+      }));
+    }
     else if (e.type === 'duel') {
       if (allies.some(a => a.id === e.from)) return;
       setDuelWith(e.from); playSfx('warn'); haptic([200, 100, 200]); sendNotice('전투 신청', `${e.name}님이 전투를 걸었습니다`, 'duel');
@@ -492,15 +632,24 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden font-pixel">
-      {view === 'expedition' && s.base && <div className="pointer-events-none fixed inset-x-2 z-30 flex flex-col items-start gap-0" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 13rem)' }}>
-        {fieldExp && <div className="pixel-panel pointer-events-auto max-h-[50dvh] w-full max-w-md overflow-y-auto bg-card p-2">{expeditionControls}</div>}
-        <button type="button" onClick={() => setFieldExp(v => !v)} className="pixel-btn pointer-events-auto flex min-h-9 items-center gap-1 bg-primary px-2.5 text-[10px] text-primary-foreground"><Compass className="!h-4 !w-4" />{fieldExp ? '원정 접기' : crew ? '원정 지휘' : '원정 보내기'}</button>
+      {view === 'expedition' && s.base && <div className="pointer-events-none fixed inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-30 flex flex-col items-center gap-1">
+        {fieldExp && <div className="pixel-panel pointer-events-auto max-h-[44dvh] w-full max-w-md overflow-y-auto bg-card p-1.5">{expeditionControls}</div>}
+        <button type="button" onClick={() => setFieldExp(v => !v)} className="pixel-btn pointer-events-auto flex w-full max-w-md items-center justify-between gap-2 bg-primary py-1.5 px-2.5 text-xs text-primary-foreground">
+          <span className="flex items-center gap-1.5 truncate"><Compass className="!h-4 !w-4 shrink-0" /><b>{fieldExp ? '원정 접기' : crew ? '원정 지휘' : '원정 보내기'}</b></span>
+          <span className="truncate text-[11px] opacity-90">{crew ? `${activeTribeClass.icon} ${activeTribeClass.name} · HP ${crew.hp}/${crew.maxHp ?? 100}` : `${activeTribeClass.icon} ${activeTribeClass.name} 대기 중`}</span>
+        </button>
       </div>}
+      <StoryTutorialModal
+        open={showStoryTutorial}
+        onComplete={() => setShowStoryTutorial(false)}
+        onSkip={() => setShowStoryTutorial(false)}
+        finishLabel="콜로니온 월드 입장하기"
+      />
       <AnimatePresence>{showOpening && <ColonionOpening onEnter={enterWorld} />}</AnimatePresence>
       {<TerrainMap center={viewFocus(view, baseSite, { pos: s.pos, base: s.base, outpost: s.outpost, crew: crew?.pos })} visionM={g.vision} explored={s.explored} onTap={onTap} zone={zone} onSurfaceZone={onSurfaceZone} onSurfacePark={onSurfacePark} onLandmarks={setLandmarks} bearing={compassOn && heading !== null ? heading : 0}>
         {(project, mpp) => (
           <>
-            {crew && <ExpeditionMarker crew={crew} project={project} members={s.tribe?.count ?? 1} />}
+            {crew && <ExpeditionMarker crew={crew} project={project} members={s.tribe?.count ?? 1} tribeClass={activeTribeClassId} />}
             {crew && view === 'expedition' && <ExpeditionJoystick crew={crew} candidates={g.crewNearby} project={project} onManual={g.setCrewManual} onSteer={g.steerCrew} onCommand={g.commandCrew} onAct={g.crewAct} onHeal={g.healCrew} />}
             {s.base && g.baseDef && <BasePetsOverlay base={s.base} radius={g.baseDef.radiusM + (s.palisade ? 15 : 0)} pets={s.pets ?? []} hits={g.petHits} project={project} />}
             {view === 'user' && eggSpawns.map(egg => { const p = project(egg); return (
@@ -509,13 +658,39 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 <motion.img src={eggArt(egg.id)} alt="" className="pixelated h-10 w-10 object-contain drop-shadow-[0_0_8px_hsl(var(--accent))]" animate={reducedMotion ? undefined : { y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 1.4 }} />
               </button>); })}
             {expeditionTarget && (() => { const p = project(expeditionTarget); return <div className="pointer-events-none absolute -translate-x-1/2 -translate-y-full rounded bg-primary px-2 py-1 text-xs text-primary-foreground" style={{ left: p.x, top: p.y }}>원정 목표</div>; })()}
+            {favs.tracked && (() => {
+              const from = project(s.pos);
+              const to = project(favs.tracked);
+              return (
+                <svg className="pointer-events-none absolute inset-0 z-10 h-full w-full" aria-hidden>
+                  <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke="#facc15" strokeWidth="2.5" strokeDasharray="6 4" />
+                  <circle cx={to.x} cy={to.y} r="6" fill="#facc15" stroke="#000" strokeWidth="1.5" />
+                </svg>
+              );
+            })()}
+            {g.expeditionLevelInfo.level >= 2 && (s.discoveredPins ?? []).map(pin => {
+              const p = project(pin);
+              return (
+                <button
+                  key={pin.id}
+                  type="button"
+                  data-discovered-pin={pin.kind}
+                  onClick={ev => { ev.stopPropagation(); setExpeditionTarget({ lat: pin.lat, lng: pin.lng }); setRadarOpen(true); }}
+                  className="pointer-events-auto absolute z-10 flex -translate-x-1/2 -translate-y-full items-center gap-0.5 animate-bounce rounded-full border-2 border-foreground bg-amber-300 px-1.5 py-0.5 text-[10px] font-bold text-black shadow-[0_0_10px_#facc15]"
+                  style={{ left: p.x, top: p.y }}
+                >
+                  <span>✨</span>
+                  <span>{pin.label}</span>
+                </button>
+              );
+            })}
             {s.base && g.baseDef && (() => {
               const p = project(s.base); const r = (g.baseDef.radiusM + (s.palisade ? 15 : 0)) / mpp;
               return (
                 <div className="pointer-events-none absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
                   <div className="rounded-full border-2 border-dashed border-primary/70 bg-primary/10" style={{ width: r * 2, height: r * 2 }} />
                   <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"><BaseFortressOverlay baseLevel={s.base.level} hasPalisade={!!s.palisade} hasAltar={!!s.altar} /></div>
-                  {!s.tribe?.escort && !s.observedExpedition?.mercenary && Array.from({ length: Math.min(6, s.tribe?.count ?? 0) }, (_, k) => { const a = (k / Math.min(6, s.tribe?.count ?? 1)) * Math.PI * 2; return <motion.div key={k} className="pointer-events-none absolute left-1/2 top-1/2" style={{ marginLeft: Math.cos(a) * 70 - 14, marginTop: Math.sin(a) * 40 - 20, transform: Math.sin(a) > 0 ? 'scaleX(-1)' : undefined }} animate={reducedMotion ? undefined : { x: [0, k % 2 ? 8 : -8, 0] }} transition={{ repeat: Infinity, duration: 4 + k }}><TribeSprite height={40} /></motion.div>; })}{view === 'base' && <div className="absolute left-1/2 top-1/2 h-20 w-64 -translate-x-1/2 -translate-y-1/2"><BaseNpcs shamanMet={!!s.shamanMet} tribe={s.tribe} storage={s.storage} backpack={s.backpack} now={Date.now()} onMeet={g.meetShaman} onHire={g.hireMerc} onTrain={g.trainTribe} onTreat={g.treatTribe} onEscort={g.toggleEscort} expeditionBusy={!!s.observedExpedition?.mercenary} /></div>}
+                  {!s.tribe?.escort && !s.observedExpedition?.mercenary && Array.from({ length: Math.min(6, s.tribe?.count ?? 0) }, (_, k) => { const a = (k / Math.min(6, s.tribe?.count ?? 1)) * Math.PI * 2; return <motion.div key={k} className="pointer-events-none absolute left-1/2 top-1/2" style={{ marginLeft: Math.cos(a) * 70 - 14, marginTop: Math.sin(a) * 40 - 20, transform: Math.sin(a) > 0 ? 'scaleX(-1)' : undefined }} animate={reducedMotion ? undefined : { x: [0, k % 2 ? 8 : -8, 0] }} transition={{ repeat: Infinity, duration: 4 + k }}><TribeSprite height={40} tribeClass={s.tribe?.classId} /></motion.div>; })}{view === 'base' && <div className="absolute left-1/2 top-1/2 h-20 w-64 -translate-x-1/2 -translate-y-1/2"><BaseNpcs shamanMet={!!s.shamanMet} tribe={s.tribe} storage={s.storage} backpack={s.backpack} now={Date.now()} onMeet={g.meetShaman} onHire={g.hireMerc} onSelectClass={g.selectTribeClass} onTrain={g.trainTribe} onTreat={g.treatTribe} onEscort={g.toggleEscort} expeditionBusy={!!s.observedExpedition?.mercenary} onGrantBranches={g.grantTutorialBranches} onRecruitAmbacho={g.recruitAmbacho} /></div>}
                 </div>
               );
             })()}
@@ -553,8 +728,25 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 </button>
               );
             })}
+            {rangedProjectile && (() => {
+              const fromPt = project(rangedProjectile.from);
+              const toPt = project(rangedProjectile.to);
+              return (
+                <motion.div
+                  key={rangedProjectile.id}
+                  aria-hidden
+                  className="pointer-events-none absolute z-30 text-sm drop-shadow-[0_0_6px_#facc15]"
+                  initial={{ left: fromPt.x, top: fromPt.y - 16, scale: 0.9, opacity: 1 }}
+                  animate={{ left: toPt.x, top: toPt.y - 16, scale: 1.2, opacity: 0 }}
+                  transition={{ duration: 0.32, ease: 'easeOut' }}
+                >
+                  {rangedProjectile.kind === 'stone' ? '🪨💨' : '🏹✨'}
+                </motion.div>
+              );
+            })()}
             {visibleEntities.map((e) => {
-              const p = project(e);
+              const liveCoord = e.kind === 'creature' && mobPositions[e.id] ? mobPositions[e.id] : e;
+              const p = project(liveCoord);
               const sprite = e.kind === 'node' ? nodeDef(e.type).sprite : creatureDef(e.type).sprite;
               const name = e.kind === 'node' ? nodeDef(e.type).name : creatureDef(e.type).name;
               const engaged = crew?.target?.id === e.id;
@@ -564,33 +756,76 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               const creature = e.kind === 'creature' ? creatureDef(e.type) : null;
               const remainingHp = creature ? Math.max(0, creature.hp - (dmg ?? 0)) : 0;
               const boss = e.kind === 'creature' && !!creatureDef(e.type).boss;
+              const isHeadbutting = e.kind === 'creature' && beastStrike?.id === e.id && Date.now() - beastStrike.at < 950;
+              const mePt = project(s.pos);
+              const faceLeft = e.kind === 'creature' && mePt.x < p.x;
               return (
                 <button key={e.id} type="button" aria-label={name} onClick={(ev) => { ev.stopPropagation(); tapEntity(e); }}
-                  data-resource-id={e.id} data-lat={e.lat} data-lng={e.lng}
-                  className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center"
+                  data-resource-id={e.id} data-lat={liveCoord.lat} data-lng={liveCoord.lng}
+                  className={`pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center ${e.kind === 'creature' ? 'transition-[left,top] duration-500 ease-linear' : ''}`}
                   style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}>
                   <div className="relative">
-                  {creature && (creature.temper !== 'passive' || engaged) && <div data-creature-ring={e.id} aria-hidden className={`pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed ${aggroIds.has(e.id) || engaged ? 'border-destructive bg-destructive/10' : 'border-destructive/40'}`} style={{ width: (CREATURE_RING_RADIUS_M / mpp) * 2, height: (CREATURE_RING_RADIUS_M / mpp) * 2 }} />}
-                  <div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><motion.div key={`${e.id}:${combatHit?.at ?? dmg ?? 0}`} data-creature-strike={combatHit?.at} className={g.isNight ? '' : 'brightness-110 contrast-110 drop-shadow-[0_0_3px_hsl(var(--background))]'}
+                  {creature && (creature.temper !== 'passive' || engaged || (dmg ?? 0) > 0) && <div data-creature-ring={e.id} aria-hidden className={`pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed ${aggroIds.has(e.id) || engaged || (dmg ?? 0) > 0 ? 'border-destructive bg-destructive/10' : 'border-destructive/40'}`} style={{ width: (CREATURE_RING_RADIUS_M / mpp) * 2, height: (CREATURE_RING_RADIUS_M / mpp) * 2 }} />}
+                  <div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><motion.div key={`${e.id}:${combatHit?.at ?? (isHeadbutting ? beastStrike?.at : dmg ?? 0)}`} data-creature-strike={combatHit?.at ?? (isHeadbutting ? beastStrike?.at : undefined)} className={g.isNight ? '' : 'brightness-110 contrast-110 drop-shadow-[0_0_3px_hsl(var(--background))]'}
                     animate={(() => {
-                      if (reducedMotion) return { x: 0, y: 0 };
+                      if (reducedMotion) return { x: 0, y: 0, rotate: 0, scale: 1 };
                       if (combatHit && crew) {
                         const actor = expeditionActorPoint(crew, project);
                         const dx = actor.x - p.x, dy = actor.y - p.y, len = Math.hypot(dx, dy) || 1;
-                        return { x: [0, -dx / len * 8, dx / len * 22, 0], y: [0, -dy / len * 8, dy / len * 22, 0] };
+                        return {
+                          x: [0, (-dx / len) * 10, (dx / len) * 28, 0],
+                          y: [0, (-dy / len) * 10, (dy / len) * 28, 0],
+                          rotate: [0, -18, 360, 0],
+                          scale: [1, 0.92, 1.22, 1],
+                        };
                       }
-                      if (aggroIds.has(e.id)) { const me = project(s.pos); return { x: [0, (me.x - p.x) * 0.35, 0], y: [0, (me.y - p.y) * 0.35, 0] }; }
-                      if (dmg) return { x: [0, -4, 4, -3, 3, 0], y: 0 };
-                      return { x: 0, y: e.kind === 'creature' ? [0, -3, 0] : 0 };
+                      // Spin & headbutt charge toward player then snap back!
+                      if (isHeadbutting) {
+                        const dx = mePt.x - p.x;
+                        const dy = mePt.y - p.y;
+                        const len = Math.hypot(dx, dy) || 1;
+                        const chargeDist = Math.min(48, Math.max(24, len * 0.72));
+                        const windX = (-dx / len) * 10;
+                        const windY = (-dy / len) * 10;
+                        const hitX = (dx / len) * chargeDist;
+                        const hitY = (dy / len) * chargeDist;
+                        const spinDir = dx < 0 ? -360 : 360;
+                        return {
+                          x: [0, windX, hitX, 0],
+                          y: [0, windY - 6, hitY, 0],
+                          rotate: [0, dx < 0 ? 25 : -25, spinDir, 0],
+                          scale: [1, 0.9, 1.26, 1],
+                        };
+                      }
+                      if (aggroIds.has(e.id)) {
+                        const dx = mePt.x - p.x;
+                        const dy = mePt.y - p.y;
+                        const len = Math.hypot(dx, dy) || 1;
+                        const stepX = (dx / len) * Math.min(20, len * 0.45);
+                        const stepY = (dy / len) * Math.min(20, len * 0.45);
+                        return {
+                          x: [0, -stepX * 0.25, stepX, 0],
+                          y: [0, -4, stepY, 0],
+                          rotate: [0, dx < 0 ? 15 : -15, dx < 0 ? -35 : 35, 0],
+                          scale: [1, 1.08, 1.15, 1],
+                        };
+                      }
+                      if (dmg) return { x: [0, -5, 5, -3, 3, 0], y: 0, rotate: [0, -12, 12, 0], scale: 1 };
+                      return { x: e.kind === 'creature' ? [0, 3, -3, 0] : 0, y: e.kind === 'creature' ? [0, -4, 0] : 0, rotate: 0, scale: 1 };
                     })()}
-                    transition={combatHit ? { duration: 0.7, times: [0, 0.25, 0.65, 1] } : aggroIds.has(e.id) && !reducedMotion ? { repeat: Infinity, duration: 1.2 } : dmg ? { duration: 0.35 } : { repeat: reducedMotion ? 0 : Infinity, duration: 0.8 }}>
-                    <div className={boss ? 'scale-150 rounded-full ring-2 ring-destructive shadow-[0_0_18px_hsl(var(--destructive))]' : ''}>{e.kind === 'creature'
+                    transition={combatHit || isHeadbutting ? { duration: 0.68, times: [0, 0.22, 0.58, 1], ease: 'easeInOut' } : aggroIds.has(e.id) && !reducedMotion ? { repeat: Infinity, duration: 1.05 } : dmg ? { duration: 0.35 } : { repeat: reducedMotion ? 0 : Infinity, duration: 1.4 }}>
+                    <div className={boss ? 'scale-150 rounded-full ring-2 ring-destructive shadow-[0_0_18px_hsl(var(--destructive))]' : ''} style={{ transform: faceLeft ? 'scaleX(-1)' : undefined }}>{e.kind === 'creature'
                       ? <CreatureSprite key={e.type} type={e.type} fallbackUrl={url(sprite)} width={SPRITE_META[sprite].w} height={SPRITE_META[sprite].h}
-                          attacking={!!combatHit?.counterDamage || !!petHit?.counterDamage || (beastStrike?.id === e.id && Date.now() - beastStrike.at < 1000)} />
+                          attacking={!!combatHit?.counterDamage || !!petHit?.counterDamage || isHeadbutting} />
                       : <Sprite k={sprite} />}</div>
                   </motion.div>{combatHit && <CombatImpact stamp={combatHit.at} damage={combatHit.damage} />}</div>
                   {(s.calmUntil?.[e.id] ?? 0) > Date.now() && <span className="bg-primary text-[10px] text-primary-foreground">진정됨</span>}
                   {boss ? <span className="mt-2 rounded bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">우두머리</span> : null}
+                  {creature && (aggroIds.has(e.id) || (dmg ?? 0) > 0) && !boss && (
+                    <span className="mt-0.5 rounded bg-destructive/90 px-1 text-[9px] font-bold text-destructive-foreground">
+                      {(dmg ?? 0) > 0 ? '💢 추격 중!' : '⚠️ 선공 접근'}
+                    </span>
+                  )}
                   {creature ? <div className="mt-1 w-20 rounded bg-background/90 px-1 text-center text-[10px]" aria-label={`${name} 체력 ${remainingHp}/${creature.hp}, 공격력 ${creature.atk}`}>
                     <div className="flex items-center gap-1"><HpBar value={remainingHp} max={creature.hp} /></div>
                     <span>{remainingHp}/{creature.hp} · 공격 {creature.atk}</span>
@@ -638,7 +873,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                             </div>;
                           })()}
                           {bubbles[presence.selfId] && <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbleView(bubbles[presence.selfId])}</span>}
-                          <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined, opacity: crew ? 0.35 : 1, transition: 'opacity 0.3s' }}><CharacterSprite action={action} level={s.level} height={PLAYER_SPRITE_HEIGHT} /></div></HitFlash>{escortReady(s.tribe, Date.now(), !!s.observedExpedition?.mercenary) && <>{Array.from({ length: Math.min(5, s.tribe?.count ?? 1) }, (_, k) => <div key={k} aria-label={k ? undefined : "동행 부족민"} className="pointer-events-none absolute bottom-0" style={{ left: dx < -1 ? 36 + k * 22 : -36 - k * 22, bottom: (k % 2) * 6, transform: dx < -1 ? 'scaleX(-1)' : undefined }}><TribeSprite action={action} height={48} /></div>)}</>}{(s.pets ?? []).filter(x => petRole(x) === 'follow').map((x, i) => <div key={x.uid} className="pointer-events-none absolute bottom-0" style={{ left: 40 + i * 26, transform: dx < -1 ? 'scaleX(-1)' : undefined }}><PetSprite speciesId={x.speciesId} name={x.name} height={30} /></div>)}</div>
+                          <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined, opacity: crew ? 0.35 : 1, transition: 'opacity 0.3s' }}><CharacterSprite action={action} level={s.level} height={PLAYER_SPRITE_HEIGHT} /></div></HitFlash>{escortReady(s.tribe, Date.now(), !!s.observedExpedition?.mercenary) && <>{Array.from({ length: Math.min(5, s.tribe?.count ?? 1) }, (_, k) => <div key={k} aria-label={k ? undefined : "동행 부족민"} className="pointer-events-none absolute bottom-0" style={{ left: dx < -1 ? 36 + k * 22 : -36 - k * 22, bottom: (k % 2) * 6, transform: dx < -1 ? 'scaleX(-1)' : undefined }}><TribeSprite action={action} height={48} tribeClass={s.tribe?.classId} /></div>)}</>}{(s.pets ?? []).filter(x => petRole(x) === 'follow').map((x, i) => <div key={x.uid} className="pointer-events-none absolute bottom-0" style={{ left: 40 + i * 26, transform: dx < -1 ? 'scaleX(-1)' : undefined }}><PetSprite speciesId={x.speciesId} name={x.name} height={30} /></div>)}</div>
                         </div>
                       </motion.div>
                     );
@@ -666,52 +901,94 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         <div className="text-right text-[11px] leading-tight">
           <div>{g.isNight ? '밤' : '낮'} · {TERRAIN_ZONE_LABEL[zone]}{inPark ? ' · 공원(짐승 多)' : ''}{g.inSanctuary ? ' · 성소(안전)' : ''} · 시야 {g.vision}m</div>
           <div className="inline-flex items-center gap-0.5 rounded bg-primary/15 px-1 font-bold text-primary"><Snowflake className="!h-3 !w-3" />혹한기 구석기 시즌: 동토의 개척자</div>
-          <div>배낭 {g.weight}/{g.capacity}kg</div>
+          <div>
+            배낭 {g.weight}/{g.capacity}kg
+            {(() => {
+              const ammoId = g.weapon ? requiredRangedAmmo(g.weapon.itemId) : null;
+              if (!ammoId) return null;
+              const cnt = countOf(s.backpack, ammoId);
+              return (
+                <span className={`ml-1.5 rounded px-1 font-bold ${cnt > 0 ? 'bg-accent/30 text-primary' : 'bg-destructive/20 text-destructive'}`}>
+                  {ammoId === 'arrow' ? `🏹 화살 ${cnt}발` : `🪨 돌멩이 ${cnt}개`}
+                </span>
+              );
+            })()}
+          </div>
           <div aria-label="성장 진행도">족장 {presence.name} · Lv.{s.level} · XP {s.xp}/{g.nextLevelXp}</div>
         </div>
       </div>
 
       {/* Compass toggle: north-up vs heading-up */}
       <button type="button" aria-label={compassOn ? '북쪽 고정으로 전환' : '방향 따라가기 켜기'} aria-pressed={compassOn} onClick={toggleCompass}
-        className={`pixel-btn absolute right-2 top-[calc(max(0.5rem,env(safe-area-inset-top))+4.25rem)] z-20 flex h-11 w-11 items-center justify-center ${compassOn ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
-        <Compass className="!h-6 !w-6" style={{ transform: `rotate(${compassOn && heading !== null ? -heading : 0}deg)` }} />
+        className={`pixel-btn absolute right-2 top-[calc(max(0.5rem,env(safe-area-inset-top))+4.25rem)] z-20 flex items-center justify-center py-1.5 px-2.5 text-xs ${compassOn ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
+        <Compass className="!h-4 !w-4" style={{ transform: `rotate(${compassOn && heading !== null ? -heading : 0}deg)` }} />
       </button>
 
-      <WorldViewTabs view={view} onView={v => { setView(v); setFieldExp(v === 'expedition'); }} site={baseSite} onSite={setBaseSite} hasBase={!!s.base} hasOutpost={!!s.outpost} crewActive={!!crew} />
-      {view === 'base' && s.base && <div className="pixel-frame absolute inset-x-2 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 flex flex-col gap-1.5 bg-card/95 p-2 text-xs">
-        <div className="flex justify-between"><b>{baseSite === 'outpost' && s.outpost ? '전진기지' : `본진 Lv.${s.base.level}`}</b><span>창고 {s.storage.reduce((n, x) => n + x.count, 0)}개 · 부족민 {s.tribe?.count ?? 0} · 수호 펫 {(s.pets ?? []).filter(x => x.deployed).length}</span></div>
-        <div className="grid grid-cols-3 gap-1.5">
-          <button type="button" className="pixel-btn min-h-11 bg-card" onClick={() => { setBaseTab('storage'); setPanel('base'); }}>창고</button>
-          <button type="button" className="pixel-btn min-h-11 bg-card" onClick={() => { setBaseTab('lab'); setPanel('base'); }}>제단·발명</button>
-          {baseSite === 'outpost' && s.outpost ? <button type="button" disabled={!actionReady || (realGps && !gps.ready)} className="pixel-btn min-h-11 bg-primary text-primary-foreground disabled:opacity-40" onClick={g.moveOutpost}>여기로 이전</button>
-            : <button type="button" className="pixel-btn min-h-11 bg-card" onClick={() => { setBaseTab('pets'); setPanel('base'); }}>펫·방어</button>}
+      <WorldViewTabs
+        view={view}
+        onView={v => {
+          setView(v);
+          setFieldExp(v === 'expedition');
+          if (v === 'base' && s.base) {
+            setBaseTab('village');
+            setPanel('base');
+          }
+        }}
+        site={baseSite}
+        onSite={setBaseSite}
+        hasBase={!!s.base}
+        hasOutpost={!!s.outpost}
+        crewActive={!!crew}
+      />
+      {view === 'base' && baseSite === 'outpost' && s.outpost && panel === 'none' && (
+        <div className="pixel-frame absolute inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-20 flex items-center justify-between gap-2 bg-card/95 py-1.5 px-2.5 text-xs">
+          <b>전진기지</b>
+          <button
+            type="button"
+            disabled={!actionReady || (realGps && !gps.ready)}
+            className="pixel-btn bg-primary py-1.5 px-2.5 text-xs text-primary-foreground disabled:opacity-40"
+            onClick={g.moveOutpost}
+          >
+            여기로 이전
+          </button>
         </div>
-      </div>}
+      )}
       {realGps && <div className="absolute left-2 right-16 top-[calc(7.25rem+env(safe-area-inset-top))] z-20 flex items-center gap-1.5">
         <span className="min-w-0 truncate rounded bg-background/80 px-2 py-1 text-[10px]" role="status">{!gps.ready ? '실내 원정 가능 · 야외 GPS 대기' : `GPS ±${Math.round(gps.fix?.accuracy ?? 0)}m`}</span>
-        {!gps.ready && <Button variant="outline" size="sm" className="h-9 shrink-0 px-2 text-xs" onClick={gps.retry}>재시도</Button>}
+        {!gps.ready && <Button variant="outline" size="sm" className="h-auto shrink-0 py-1.5 px-2.5 text-xs" onClick={gps.retry}>재시도</Button>}
       </div>}
+
+      {/* Compact Radar / Favorites Button on Main HUD */}
+      <button
+        type="button"
+        aria-label="레이더 및 즐겨찾기 열기"
+        onClick={() => setRadarOpen(true)}
+        className="pixel-btn absolute right-2 top-[calc(7.25rem+env(safe-area-inset-top))] z-20 flex items-center gap-1 bg-card py-1.5 px-2.5 text-xs font-bold"
+      >
+        <Radar className="!h-4 !w-4 text-primary" />
+        <span>🗺️ 레이더/즐겨찾기</span>
+      </button>
 
       {favs.tracked && (() => {
         const d = distanceM(s.pos, favs.tracked);
         return (
-          <button type="button" onClick={() => setPanel('favs')} className="pixel-frame absolute left-1/2 top-[calc(9.25rem+env(safe-area-inset-top))] z-20 flex max-w-[60%] -translate-x-1/2 items-center gap-1.5 bg-card px-2 py-1 text-xs">
-            <Navigation className="!h-5 !w-5 shrink-0 text-primary" style={{ transform: `rotate(${bearingDeg(s.pos, favs.tracked) - mapBearing}deg)` }} />
+          <button type="button" onClick={() => setRadarOpen(true)} className="pixel-frame absolute left-1/2 top-[calc(9.25rem+env(safe-area-inset-top))] z-20 flex max-w-[60%] -translate-x-1/2 items-center gap-1.5 bg-card py-1.5 px-2.5 text-xs">
+            <Navigation className="!h-4 !w-4 shrink-0 text-primary" style={{ transform: `rotate(${bearingDeg(s.pos, favs.tracked) - mapBearing}deg)` }} />
             <span className="truncate">{favs.tracked.name}</span><b className="shrink-0">{d >= 1000 ? `${(d / 1000).toFixed(1)}km` : `${Math.round(d)}m`}</b>
           </button>
         );
       })()}
 
       {/* Right drawer: survival actions */}
-      <div className="absolute right-2 top-[calc(9.5rem+env(safe-area-inset-top))] z-20 flex flex-col items-end gap-2">
-        <Button type="button" variant="outline" aria-expanded={rightOpen} aria-label={rightOpen ? '생존 메뉴 접기' : '생존 메뉴 펼치기'} onClick={() => setRightOpen((v) => !v)} className={`pixel-btn relative h-11 w-11 p-0 ${rightOpen ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
-          {rightOpen ? <ChevronUp className="!h-6 !w-6" /> : <Backpack className="!h-6 !w-6" />}{!rightOpen && baseDone && <RedDot />}
+      <div className="absolute right-2 top-[calc(9.25rem+env(safe-area-inset-top))] z-20 flex flex-col items-end gap-1">
+        <Button type="button" variant="outline" aria-expanded={rightOpen} aria-label={rightOpen ? '생존 메뉴 접기' : '생존 메뉴 펼치기'} onClick={() => setRightOpen((v) => !v)} className={`pixel-btn relative h-auto min-h-0 py-1.5 px-2.5 text-xs ${rightOpen ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
+          {rightOpen ? <ChevronUp className="!h-4 !w-4" /> : <Backpack className="!h-4 !w-4" />}{!rightOpen && baseDone && <RedDot />}
         </Button>
         <AnimatePresence>
           {rightOpen && (
-            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex flex-col gap-2">
+            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex flex-col items-end gap-1">
               <MenuBtn icon={Backpack} label="배낭" onClick={() => setPanel('bag')} />
-              <MenuBtn icon={Flame} label="거점" dot={baseDone} onClick={() => setPanel('base')} />
+              <MenuBtn icon={Flame} label="거점" dot={baseDone} onClick={() => { setBaseTab('village'); setPanel('base'); }} />
               {realGps && <MenuBtn icon={LocateFixed} label="GPS 갱신" onClick={gps.retry} />}
             </motion.div>
           )}
@@ -719,45 +996,85 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       </div>
 
       {/* Left drawer: skills & exploration */}
-      <div className="absolute left-2 top-[calc(9.5rem+env(safe-area-inset-top))] z-20 flex flex-col items-start gap-2">
-        <Button type="button" variant="outline" aria-expanded={leftOpen} aria-label={leftOpen ? '기술 메뉴 접기' : '기술 메뉴 펼치기'} onClick={() => setLeftOpen((v) => !v)} className={`pixel-btn relative h-11 w-11 p-0 ${leftOpen ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
-          {leftOpen ? <ChevronUp className="!h-6 !w-6" /> : <Lightbulb className="!h-6 !w-6" />}{!leftOpen && techDone && <RedDot />}
+      <div className="absolute left-2 top-[calc(9.25rem+env(safe-area-inset-top))] z-20 flex flex-col items-start gap-1">
+        <Button type="button" variant="outline" aria-expanded={leftOpen} aria-label={leftOpen ? '기술 메뉴 접기' : '기술 메뉴 펼치기'} onClick={() => setLeftOpen((v) => !v)} className={`pixel-btn relative h-auto min-h-0 py-1.5 px-2.5 text-xs ${leftOpen ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
+          {leftOpen ? <ChevronUp className="!h-4 !w-4" /> : <Lightbulb className="!h-4 !w-4" />}{!leftOpen && techDone && <RedDot />}
         </Button>
         <AnimatePresence>
           {leftOpen && (
-            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex flex-col gap-2">
+            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex flex-col items-start gap-1">
               <MenuBtn icon={Lightbulb} label="기술" dot={techDone} onClick={() => setPanel('tech')} />
               <MenuBtn icon={ListChecks} label="생존 목표" onClick={() => setPanel('quests')} />
-              <MenuBtn icon={Star} label="즐겨찾기" onClick={() => setPanel('favs')} />
+              <MenuBtn icon={Star} label="레이더·즐겨찾기" onClick={() => setRadarOpen(true)} />
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
       {!s.base && (
-        <div className="absolute inset-x-3 bottom-[max(1rem,env(safe-area-inset-bottom))] z-20 pixel-frame bg-card p-3 text-sm">
+        <div className="absolute inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 pixel-frame bg-card p-2 text-xs">
           나뭇가지 {countOf(s.backpack, 'branch')}/{CAMP_COST[0].count}개를 모아 모닥불 거점을 세우세요.
-          <Button type="button" disabled={realGps && !gps.ready} onClick={g.placeBase} className="pixel-btn mt-2 h-11 w-full">여기에 모닥불 세우기</Button>
+          <Button type="button" disabled={realGps && !gps.ready} onClick={g.placeBase} className="pixel-btn mt-1.5 h-auto min-h-0 w-full py-1.5 px-2.5 text-xs">여기에 모닥불 세우기</Button>
         </div>
       )}
 
       {view === 'user' && <SkillQuickBar known={s.techs} cooldowns={s.cooldowns} levels={s.skillLevels} ready={actionReady} onUse={(id) => activateSkill(id)} />}
-      {!realGps && s.base && <button type="button" onClick={() => setPanel('quests')} className="pixel-frame absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-2 z-20 flex min-h-11 max-w-[60%] items-center gap-2 bg-card px-2.5 py-1.5 text-left text-xs">
-        <ListChecks className="!h-4 !w-4 shrink-0" />
-        <span className="min-w-0 truncate">{g.quest?.title ?? '모든 목표 완료'}</span>
-        <span className="shrink-0 text-primary">{g.canClaimQuest ? '보상!' : g.questProgress ? `${g.questProgress.cur}/${g.questProgress.max}` : '완료'}</span>
+      {!realGps && s.base && <button type="button" onClick={() => setPanel('quests')} className="pixel-frame absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-2 z-20 flex max-w-[60%] items-center gap-1.5 bg-card py-1.5 px-2.5 text-left text-xs">
+        <ListChecks className="!h-4 !w-4 shrink-0 text-primary" />
+        <span className="min-w-0 truncate">
+          {s.level >= 5 && !s.languageLearned ? `🧙 ${LANGUAGE_QUEST.title}` : `🧙 ${g.quest?.title ?? '모든 목표 완료'}`}
+        </span>
+        <span className="shrink-0 text-primary">
+          {s.level >= 5 && !s.languageLearned ? '말 배우기!' : g.canClaimQuest ? '보상!' : g.questProgress ? `${g.questProgress.cur}/${g.questProgress.max}` : '완료'}
+        </span>
       </button>}
 
       <AnimatePresence>
         {panel !== 'none' && (
           <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 26, stiffness: 260 }}
-            className="absolute inset-x-0 bottom-0 z-30 flex max-h-[75dvh] flex-col border-t-4 border-foreground bg-background">
-            <div className="flex items-center justify-between border-b-2 border-foreground px-3 py-2">
-              <b className="text-lg">{panel === 'bag' ? '배낭' : panel === 'base' ? (g.baseDef?.name ?? '거점') : panel === 'quests' ? '생존 목표' : panel === 'favs' ? '즐겨찾기' : '제작 기술'}</b>
-              <button type="button" aria-label="닫기" onClick={() => setPanel('none')} className="flex h-11 w-11 items-center justify-center"><X className="!h-7 !w-7" /></button>
+            className={
+              panel === 'base'
+                ? 'fixed inset-0 z-40 flex flex-col bg-background pt-[max(0.5rem,env(safe-area-inset-top))]'
+                : 'absolute inset-x-0 bottom-0 z-30 flex max-h-[75dvh] flex-col border-t-4 border-foreground bg-background'
+            }>
+            <div className="flex items-center justify-between border-b-2 border-foreground bg-card px-3 py-2">
+              <b className="text-lg">
+                {panel === 'bag'
+                  ? '배낭'
+                  : panel === 'base'
+                    ? `🏕️ ${g.baseDef?.name ?? '거점'} (Lv.${s.base?.level ?? 1}) · 마을 건설`
+                    : panel === 'quests'
+                      ? '🧙 떠돌이 주술사의 생존 목표'
+                      : panel === 'favs'
+                        ? '즐겨찾기'
+                        : '제작 기술'}
+              </b>
+              <button
+                type="button"
+                aria-label="닫기"
+                onClick={() => {
+                  setPanel('none');
+                  if (view === 'base') setView('user');
+                }}
+                className="flex h-10 w-10 items-center justify-center"
+              >
+                <X className="!h-6 !w-6" />
+              </button>
             </div>
             <div className="flex-1 space-y-4 overflow-y-auto p-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
-              {panel === 'quests' && <SurvivalObjectives state={{ ...s, storedGear: [], stats: { gathered: s.gathered, crafted: s.crafted, kills: s.kills, deposits: s.deposits } }} canClaim={g.inBase && (!realGps || gps.ready)} onClaim={g.claimQuest} />}
+              {panel === 'quests' && (
+                <SurvivalObjectives
+                  state={{ ...s, storedGear: [], stats: { gathered: s.gathered, crafted: s.crafted, kills: s.kills, deposits: s.deposits } }}
+                  canClaim={g.inBase && (!realGps || gps.ready)}
+                  onClaim={g.claimQuest}
+                  languageQuestAccepted={!!s.languageQuestAccepted}
+                  languageLearned={!!s.languageLearned}
+                  onAcceptLanguageQuest={g.acceptLanguageQuest}
+                  onClaimLanguageQuest={g.claimLanguageQuest}
+                  shamanQuestAcceptedIndex={s.shamanQuestAcceptedIndex}
+                  onAcceptShamanQuest={g.acceptShamanQuest}
+                />
+              )}
               {panel === 'bag' && (
                 <>
                   <InventoryMaterials stacks={s.backpack} location="backpack" canTransfer={g.inBase} ready={actionReady} onTransfer={g.storeOne} onUse={g.eat} icon={inventoryIcon} />
@@ -769,11 +1086,57 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               {panel === 'base' && (!s.base ? <p className="text-sm">아직 거점이 없습니다.</p> : (
                 <>
                   {!g.inBase && <p className="pixel-frame bg-accent p-2 text-sm">거점 반경 안에서만 제작·연구할 수 있어요.</p>}
-                  <div className="sticky top-0 z-10 -mx-3 -mt-3 grid grid-cols-5 gap-1 border-b border-border bg-background p-2">
-                    {([['lab','연구·발명'],['craft','제작'],['storage','창고'],['expedition','원정'],['pets','펫']] as const).map(([id, label]) => (
-                      <Button key={id} type="button" variant={baseTab === id ? 'default' : 'outline'} onClick={() => setBaseTab(id)} className="pixel-btn min-h-11 px-1 text-xs">{label}{id === 'expedition' && s.expedition && nowTick >= s.expedition.readyAt ? ' •' : ''}</Button>
+                  <div className="sticky top-0 z-10 -mx-3 -mt-3 grid grid-cols-6 gap-1 border-b border-border bg-background p-2">
+                    {([['village','마을'],['lab','연구·발명'],['craft','제작'],['storage','창고'],['expedition','원정'],['pets','펫']] as const).map(([id, label]) => (
+                      <Button key={id} type="button" variant={baseTab === id ? 'default' : 'outline'} onClick={() => setBaseTab(id)} className="pixel-btn h-auto min-h-0 py-1.5 px-1 text-xs">{label}{id === 'expedition' && s.expedition && nowTick >= s.expedition.readyAt ? ' •' : ''}</Button>
                     ))}
                   </div>
+                  {baseTab === 'village' && (
+                    <BaseVillageView
+                      village={s.village}
+                      baseLevel={s.base.level}
+                      playerLevel={s.level}
+                      languageLearned={!!s.languageLearned}
+                      languageQuestAccepted={!!s.languageQuestAccepted}
+                      shamanQuestAcceptedIndex={s.shamanQuestAcceptedIndex}
+                      questState={{ ...s, storedGear: [], stats: { gathered: s.gathered, crafted: s.crafted, kills: s.kills, deposits: s.deposits } }}
+                      canClaimQuest={g.inBase && (!realGps || gps.ready) && g.canClaimQuest}
+                      onClaimQuest={g.claimQuest}
+                      onAcceptShamanQuest={g.acceptShamanQuest}
+                      onAcceptLanguageQuest={g.acceptLanguageQuest}
+                      onClaimLanguageQuest={g.claimLanguageQuest}
+                      hasAltar={!!s.altar}
+                      tribe={s.tribe}
+                      pets={s.pets ?? []}
+                      storage={s.storage}
+                      backpack={s.backpack}
+                      gear={s.gear}
+                      inventions={s.inventions ?? []}
+                      inBase={g.inBase}
+                      ready={actionReady}
+                      onPlace={g.placeVillageTile}
+                      onMove={g.moveVillageTile}
+                      onRemove={g.removeVillageTile}
+                      onResearchBlueprint={g.researchVillageBlueprint}
+                      onTrainShamanSkill={g.trainShamanSkill}
+                      onForgeSignatureWeapon={g.forgeSignatureWeapon}
+                      onCraftAmmoBundle={g.craftAmmoBundle}
+                      onEnhanceWeapon={g.enhanceArmoryWeapon}
+                      onInvent={g.invent}
+                      freshnessPct={g.freshnessPct}
+                      smokeBatches={s.smokeBatches ?? []}
+                      onHarvestBubble={g.harvestVillageBubble}
+                      onHarvestAllBubbles={g.harvestAllVillageBubbles}
+                      onStartSmokeBatch={g.startSmokeBatch}
+                      onInstantSmoke={g.instantSmoke}
+                      onClaimSmokeBatch={g.claimSmokeBatch}
+                      onDiscardSpoiled={g.discardSpoiledFood}
+                      onCookTavernRecipe={g.cookTavernRecipe}
+                      onEatDish={g.eat}
+                      onOpenBaseTab={tab => setBaseTab(tab)}
+                      onOpenObjectives={() => setPanel('quests')}
+                    />
+                  )}
                   {baseTab === 'lab' && <>
                                     {s.baseUpgrade && <JobCard title={`${BASE_LEVELS[Number(s.baseUpgrade.id) as 2 | 3].name} 공사`} job={s.baseUpgrade} now={nowTick} claimLabel="발전 완료" onClaim={g.claimBaseUpgrade} />}
                   <div className="border-y border-border py-3"><b className="text-sm">연구 시설 · 발명</b><div className="mt-2"><AltarPanel altar={!!s.altar} baseLevel={s.base.level} remote={realGps} credits={s.inventionCredits} walkedMeters={Math.min(200, Math.max(0, ((s.walkSteps ?? 0) - Math.min(s.inventionWalkMark ?? 0, s.walkSteps ?? 0)) * 20))} onCredits={g.updateInventionCredits} inviteUrl={`${window.location.origin}/?invite=${encodeURIComponent(user?.id ?? "pioneer")}`} ready={actionReady} inBase={g.inBase} owned={[...s.backpack, ...s.storage]} inventions={s.inventions ?? []} onBuild={g.buildAltar} onInvent={g.invent} gear={s.gear} onUpgrade={g.upgradeGear} onReforge={g.reforgeGear} /></div></div>
@@ -839,6 +1202,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   <div><b className="text-sm">창고</b><div className="mt-1"><InventoryMaterials stacks={s.storage} location="storage" canTransfer={g.inBase} ready={actionReady} onTransfer={g.withdraw} onUse={g.eat} icon={inventoryIcon} /></div></div>
                   </>}
                   {baseTab === 'pets' && <PetPanel pets={s.pets ?? []} defense={s.petDefense} now={nowTick} ready={atWorkshop(s) && (!realGps || gps.ready || !gps.fix)} onFuse={g.mergePets} onDeploy={g.togglePetDeploy} onRole={g.assignPetRole} onFeed={g.feedPet} onLock={g.togglePetLock}
+                    onOpenDinoExpedition={() => setDinoExpeditionOpen(true)}
                     eggs={(s.dinoEggs ?? []).map(e => ({ id: e.id, name: '공룡 알', walked: eggWalkedM(e, s.walkSteps ?? 0), need: eggNeedM(e), ready: eggReady(e, s.walkSteps ?? 0) }))}
                     onHatch={(id) => { const baby = g.hatchEgg(id); if (baby) setHatched({ ...baby, eggId: id }); else toast.warning('거점 안에서 알이 배낭이나 창고에 있어야 부화해요'); }} />}
                   {baseTab === 'expedition' && <>
@@ -956,10 +1320,31 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           isAlly={allies.some(a => a.id === selPeer.id)} onClose={() => setSelPeerId(null)}
           isVassalLink={vassalLinks.has(selPeer.id)} inDuel={duelWith === selPeer.id}
           canVassal={!!user && !selPeer.id.startsWith('g-')}
+          myLevel={s.level}
+          languageLearned={!!s.languageLearned}
+          chatActive={chatPartners.has(selPeer.id)}
+          chatPending={pendingChat.has(selPeer.id)}
+          chatMessages={chatLogs[selPeer.id] ?? []}
           onEmote={(e) => { presence.send({ type: 'emote', to: selPeer.id, emote: e }); showBubble(presence.selfId, `icon:${e}`); playSfx('emote'); playAction('talk', 900); setSelPeerId(null); }}
           onDuel={() => { presence.send({ type: 'duel', to: selPeer.id, name: presence.name }); setDuelWith(selPeer.id); playSfx('warn'); toast.warning(`${selPeer.name}님에게 전투를 걸었습니다! ${DUEL_MAX_DISTANCE_M}m 멀어지면 끝납니다.`); }}
           onVassal={() => { pendingVassal.current.add(selPeer.id); presence.send({ type: 'vassal-req', to: selPeer.id, name: presence.name }); toast('부하 임명을 요청했습니다'); setSelPeerId(null); }}
           onAlly={() => { pendingAlly.current.add(selPeer.id); presence.send({ type: 'ally', to: selPeer.id, name: presence.name }); toast('동맹을 제안했습니다'); setSelPeerId(null); }}
+          onRequestChat={() => {
+            setPendingChat(prev => new Set(prev).add(selPeer.id));
+            presence.send({ type: 'chat-req', to: selPeer.id, name: presence.name });
+            toast.success(`${selPeer.name}님에게 대화를 신청했습니다.`);
+          }}
+          onSendChatMessage={(text) => {
+            presence.send({ type: 'chat-msg', to: selPeer.id, name: presence.name, text });
+            showBubble(presence.selfId, `💬 ${text}`);
+            setChatLogs(prev => ({
+              ...prev,
+              [selPeer.id]: [
+                ...(prev[selPeer.id] ?? []),
+                { id: `${Date.now()}-${Math.random()}`, senderId: presence.selfId, senderName: presence.name, text, at: Date.now() },
+              ].slice(-30),
+            }));
+          }}
           onAttack={attackPeer} />}
       </AnimatePresence>
       <AnimatePresence>
@@ -979,6 +1364,71 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           onClose={() => setSelShrine(null)} />}
       </AnimatePresence>
       <DamageVignette hitKey={hit.n} />
+      <RadarMapModal
+        open={radarOpen}
+        onClose={() => setRadarOpen(false)}
+        pos={s.pos}
+        base={s.base}
+        crewPos={crew?.pos ?? null}
+        expeditionCount={s.expeditionCount ?? 0}
+        totalDistanceM={(s.expeditionDistanceM ?? 0) + (s.walkSteps ?? 0) * 20}
+        depleted={s.depleted}
+        discoveredPins={s.discoveredPins ?? []}
+        favorites={favs.favorites}
+        tracked={favs.tracked}
+        onToggleFavorite={favs.toggle}
+        onRemoveFavorite={favs.remove}
+        onTrack={favs.setTrackedId}
+        onDispatchTo={(target, label) => {
+          setExpeditionTarget(target);
+          if (g.dispatchObserved(target, expeditionFocus, activeTribeClassId)) {
+            setWatchExpedition(true);
+            setView('expedition');
+            toast.success(`🚀 ${label}(으)로 원정대를 즉시 파견했습니다!`);
+          } else {
+            setView('expedition');
+            setFieldExp(true);
+            toast(`📍 원정 목표를 ${label}(으)로 설정했습니다`);
+          }
+        }}
+      />
+      <AlertDialog open={!!chatOffer}>
+        <AlertDialogContent className="font-pixel">
+          <AlertDialogHeader>
+            <AlertDialogTitle>상대가 대화를 신청합니다 ({chatOffer?.name})</AlertDialogTitle>
+            <AlertDialogDescription>
+              {chatOffer?.name}님이 부족의 언어로 대화를 나누고 싶어 합니다. 수락하시겠습니까?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="min-h-11"
+              onClick={() => {
+                if (chatOffer) {
+                  presence.send({ type: 'chat-res', to: chatOffer.id, name: presence.name, accept: false });
+                }
+                setChatOffer(null);
+              }}
+            >
+              거절한다
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="min-h-11"
+              onClick={() => {
+                if (chatOffer) {
+                  setChatPartners(prev => new Set(prev).add(chatOffer.id));
+                  presence.send({ type: 'chat-res', to: chatOffer.id, name: presence.name, accept: true });
+                  setSelPeerId(chatOffer.id);
+                  toast.success(`${chatOffer.name}님과의 대화방이 열렸습니다!`);
+                }
+                setChatOffer(null);
+              }}
+            >
+              대화 수락
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={!!vassalOffer}>
         <AlertDialogContent className="font-pixel">
           <AlertDialogHeader>
@@ -991,6 +1441,17 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <DinoExpeditionModal
+        open={dinoExpeditionOpen}
+        onClose={() => setDinoExpeditionOpen(false)}
+        pets={s.pets ?? []}
+        storage={s.storage}
+        backpack={s.backpack}
+        onPermadeathPet={g.permadeathPet}
+        onUpdatePetHp={g.updatePetHp}
+        onConsumeCookedMeat={g.consumeDinoMeat}
+        onRetreatWithLoot={g.settleDinoExpedition}
+      />
     </div>
   );
 }

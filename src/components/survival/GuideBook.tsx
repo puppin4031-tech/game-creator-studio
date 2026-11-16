@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { BookOpen, ChevronLeft } from 'lucide-react';
+import { BookOpen, ChevronLeft, Play } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { STORY_TUTORIAL_SLIDES, StoryTutorialModal } from './StoryTutorial';
 import { SURVIVAL_CONFIG as C } from '@/lib/survival/config';
 import { AGGRO_RADIUS_M, LEASH_RADIUS_M } from '@/lib/survival/combat';
 import { GPS_MAX_ACCURACY_M } from '@/lib/survival/gps';
@@ -124,37 +126,83 @@ const SECTIONS: Section[] = [
 
 export default function GuideBook({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const [active, setActive] = useState<string | null>(null);
+  const [replayOpen, setReplayOpen] = useState(false);
   const section = SECTIONS.find((s) => s.id === active);
   return (
-    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setActive(null); }}>
-      <DialogContent className="flex max-h-[80dvh] flex-col font-pixel">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            {section ? (
-              <button type="button" aria-label="목차로" onClick={() => setActive(null)} className="pixel-btn flex h-8 w-8 items-center justify-center bg-card"><ChevronLeft className="!h-5 !w-5" /></button>
+    <>
+      <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setActive(null); }}>
+        <DialogContent className="flex max-h-[82dvh] flex-col font-pixel">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {section ? (
+                <button type="button" aria-label="목차로" onClick={() => setActive(null)} className="pixel-btn flex h-8 w-8 items-center justify-center bg-card"><ChevronLeft className="!h-5 !w-5" /></button>
+              ) : (
+                <BookOpen className="!h-5 !w-5" />
+              )}
+              {section ? section.title : '생존 가이드'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            {!section ? (
+              <div className="grid gap-1.5">
+                {SECTIONS.map((s) => (
+                  <button key={s.id} type="button" onClick={() => setActive(s.id)}
+                    className="pixel-btn min-h-11 bg-card px-3 text-left text-sm">{s.title}</button>
+                ))}
+              </div>
             ) : (
-              <BookOpen className="!h-5 !w-5" />
+              <div className="space-y-4 pr-1">
+                <ul className="space-y-3 text-sm leading-relaxed">
+                  {section.body.map((line, i) => (
+                    <li key={i} className="flex gap-2"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" /><span>{line}</span></li>
+                  ))}
+                </ul>
+
+                {section.id === 'intro' && (
+                  <div className="space-y-3 border-t-2 border-border pt-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <b className="text-sm text-primary">🎬 오프닝 스토리 튜토리얼 (가우가와 쿵쿵카 부족)</b>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => setReplayOpen(true)}
+                        className="pixel-btn h-auto min-h-0 gap-1 py-1.5 px-2.5 text-xs font-bold"
+                      >
+                        <Play className="!h-3.5 !w-3.5 fill-current" />
+                        전체화면 스토리 다시 보기
+                      </Button>
+                    </div>
+                    <div className="space-y-3">
+                      {STORY_TUTORIAL_SLIDES.map((sl) => (
+                        <div key={sl.step} className="pixel-frame overflow-hidden bg-card">
+                          <img
+                            src={sl.image}
+                            alt={sl.title}
+                            className="w-full object-cover"
+                          />
+                          <div className="space-y-1 p-2.5 text-xs leading-relaxed">
+                            <b className="block text-primary">{sl.title}</b>
+                            {sl.lines.map((ln, idx) => (
+                              <p key={idx} className="text-muted-foreground">{ln}</p>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
-            {section ? section.title : '생존 가이드'}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          {!section ? (
-            <div className="grid gap-1.5">
-              {SECTIONS.map((s) => (
-                <button key={s.id} type="button" onClick={() => setActive(s.id)}
-                  className="pixel-btn min-h-11 bg-card px-3 text-left text-sm">{s.title}</button>
-              ))}
-            </div>
-          ) : (
-            <ul className="space-y-3 pr-1 text-sm leading-relaxed">
-              {section.body.map((line, i) => (
-                <li key={i} className="flex gap-2"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" /><span>{line}</span></li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <StoryTutorialModal
+        open={replayOpen}
+        onComplete={() => setReplayOpen(false)}
+        onSkip={() => setReplayOpen(false)}
+        finishLabel="가이드로 돌아가기"
+      />
+    </>
   );
 }

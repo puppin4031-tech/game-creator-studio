@@ -11,7 +11,8 @@ export type VolumeLevel = 'S' | 'M' | 'L';
 export interface GameSettings { bgm: boolean; sfx: boolean; volume: VolumeLevel; haptic: boolean; notify: boolean; winter: boolean }
 
 const KEY = 'survival-settings-v1';
-export const DEFAULT_SETTINGS: GameSettings = { bgm: false, sfx: true, volume: 'M', haptic: true, notify: false, winter: true };
+const BGM_DEFAULT_MIGRATED_KEY = 'survival-bgm-default-on-v2';
+export const DEFAULT_SETTINGS: GameSettings = { bgm: true, sfx: true, volume: 'M', haptic: true, notify: false, winter: true };
 /** All sound is 30% quieter than the original mix. */
 export const SOUND_REDUCTION = 0.7;
 export const VOLUME_GAIN: Record<VolumeLevel, number> = { S: 0.08 * SOUND_REDUCTION, M: 0.18 * SOUND_REDUCTION, L: 0.32 * SOUND_REDUCTION };
@@ -19,7 +20,19 @@ export const VOLUME_GAIN: Record<VolumeLevel, number> = { S: 0.08 * SOUND_REDUCT
 const SAMPLE_GAIN: Record<VolumeLevel, number> = { S: 0.35 * SOUND_REDUCTION, M: 0.6 * SOUND_REDUCTION, L: 0.9 * SOUND_REDUCTION };
 
 export function loadSettings(): GameSettings {
-  try { return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(KEY) ?? '{}') }; } catch { return DEFAULT_SETTINGS; }
+  try {
+    const raw = JSON.parse(localStorage.getItem(KEY) ?? '{}');
+    const merged: GameSettings = { ...DEFAULT_SETTINGS, ...raw };
+    // Migrate existing saves once so BGM starts ON by default for storytelling immersion
+    if (typeof window !== 'undefined' && localStorage.getItem(BGM_DEFAULT_MIGRATED_KEY) !== '1') {
+      merged.bgm = true;
+      localStorage.setItem(BGM_DEFAULT_MIGRATED_KEY, '1');
+      localStorage.setItem(KEY, JSON.stringify(merged));
+    }
+    return merged;
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
 }
 
 const listeners = new Set<(s: GameSettings) => void>();
@@ -135,9 +148,13 @@ listeners.add(syncBgmVolume);
 function tryPlay() {
   if (!bgmEl || !bgmWanted) return;
   bgmEl.play().catch(() => {
-    // Autoplay blocked: start on the next user gesture.
-    const resume = () => { window.removeEventListener('pointerdown', resume); tryPlay(); };
-    window.addEventListener('pointerdown', resume, { once: true });
+    // Autoplay blocked: start on the next user gesture (pointerdown, click, touchend, keydown).
+    const events = ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'] as const;
+    const resume = () => {
+      events.forEach(ev => window.removeEventListener(ev, resume));
+      tryPlay();
+    };
+    events.forEach(ev => window.addEventListener(ev, resume, { once: true, passive: true }));
   });
 }
 export function setBgmPlaying(on: boolean) {

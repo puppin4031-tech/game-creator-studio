@@ -23,7 +23,7 @@ export default function WorldViewTabs({ view, onView, site, onSite, hasBase, has
           const on = view === id;
           return (
             <button key={id} type="button" role="tab" aria-selected={on} disabled={disabled} onClick={() => onView(id)}
-              className={`relative flex min-h-9 items-center justify-center gap-1 text-xs disabled:opacity-40 ${on ? 'bg-primary text-primary-foreground' : ''}`}>
+              className={`relative flex items-center justify-center gap-1 py-1.5 px-2.5 text-xs disabled:opacity-40 ${on ? 'bg-primary text-primary-foreground' : ''}`}>
               <Icon className="!h-4 !w-4" />{label}
               {id === 'expedition' && crewActive && !on && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-destructive" />}
             </button>

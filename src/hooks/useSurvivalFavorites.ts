@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import type { LatLng } from '@/lib/survival/types';
+import { MAX_FAVORITE_SPOTS } from '@/lib/survival/radar';
 
-export interface Favorite extends LatLng { id: string; name: string }
+export interface Favorite extends LatLng { id: string; name: string; tag?: string }
 
 const KEY = 'survival-favorites-v1';
 
@@ -15,13 +17,20 @@ export function bearingDeg(a: LatLng, b: LatLng): number {
 
 export function useSurvivalFavorites() {
   const [favorites, setFavorites] = useState<Favorite[]>(() => {
-    try { return JSON.parse(localStorage.getItem(KEY) ?? '[]'); } catch { return []; }
+    try { return (JSON.parse(localStorage.getItem(KEY) ?? '[]') as Favorite[]).slice(0, MAX_FAVORITE_SPOTS); } catch { return []; }
   });
   const [trackedId, setTrackedId] = useState<string | null>(null);
   useEffect(() => { localStorage.setItem(KEY, JSON.stringify(favorites)); }, [favorites]);
   const isFav = (id: string) => favorites.some((f) => f.id === id);
-  const toggle = (f: Favorite) => setFavorites((list) => list.some((x) => x.id === f.id) ? list.filter((x) => x.id !== f.id) : [...list, f]);
+  const toggle = (f: Favorite) => setFavorites((list) => {
+    if (list.some((x) => x.id === f.id)) return list.filter((x) => x.id !== f.id);
+    if (list.length >= MAX_FAVORITE_SPOTS) {
+      toast.warning(`즐겨찾기는 최대 ${MAX_FAVORITE_SPOTS}개까지 저장할 수 있어요`);
+      return list;
+    }
+    return [...list, f];
+  });
   const remove = (id: string) => { setFavorites((l) => l.filter((x) => x.id !== id)); if (trackedId === id) setTrackedId(null); };
   const tracked = favorites.find((f) => f.id === trackedId) ?? null;
-  return { favorites, isFav, toggle, remove, tracked, setTrackedId };
+  return { favorites, isFav, toggle, remove, tracked, setTrackedId, maxCount: MAX_FAVORITE_SPOTS };
 }

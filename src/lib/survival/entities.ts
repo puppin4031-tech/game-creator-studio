@@ -55,17 +55,17 @@ export const NODES = {
   },
   berry_bush: {
     name: '산딸기 덤불', sprite: 'node-bush', hp: 2, requires: { kind: 'none', tier: 0 },
-    loot: [{ itemId: 'berry', min: 2, max: 4 }, { itemId: 'fiber', min: 1, max: 2 }], xp: 3, respawnMin: 20,
+    loot: [{ itemId: 'berry', min: 2, max: 4 }, { itemId: 'fiber', min: 1, max: 2 }, { itemId: 'pepper_berry', min: 0, max: 1, chance: 0.35 }], xp: 3, respawnMin: 20,
     biomes: { plains: 3, forest: 2, wetland: 2 },
   },
   herb_patch: {
     name: '약초 군락', sprite: 'node-herb', hp: 2, requires: { kind: 'none', tier: 0 },
-    loot: [{ itemId: 'herb', min: 1, max: 2 }, { itemId: 'fiber', min: 0, max: 1 }], xp: 4, respawnMin: 25,
+    loot: [{ itemId: 'herb', min: 1, max: 2 }, { itemId: 'fiber', min: 0, max: 1 }, { itemId: 'wild_spice', min: 1, max: 2, chance: 0.6 }], xp: 4, respawnMin: 25,
     biomes: { forest: 2, wetland: 3, plains: 1 },
   },
   flint_rock: {
     name: '부싯돌 바위', sprite: 'node-flint', hp: 3, requires: { kind: 'none', tier: 0 },
-    loot: [{ itemId: 'flint', min: 1, max: 2 }], xp: 4, respawnMin: 20,
+    loot: [{ itemId: 'flint', min: 1, max: 2 }, { itemId: 'rock_salt', min: 0, max: 1, chance: 0.45 }], xp: 4, respawnMin: 20,
     biomes: { rocky: 4, plains: 2, forest: 1 },
   },
   clay_pit: {

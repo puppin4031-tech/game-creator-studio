@@ -1,5 +1,5 @@
 // @refresh reset
-import { gearMult, upgradeCost } from '@/lib/survival/upgrade';
+import { armorySuccessChance, armoryUpgradeCost, gearMult, upgradeCost, weaponAtkWithPlus, weaponAuraForPlus } from '@/lib/survival/upgrade';
 import { isWalkingPace } from '@/lib/survival/walkPace';
 import { advanceExpedition, steerExpedition, pickManualTarget, MANUAL_PICK_M, expeditionLoot, isPocketMovement, startObservedExpedition, EXPEDITION_RADIUS_M, FOCUS_LABEL, CREW_HEAL_FOODS, crewHealGain, type ExpeditionFocus, type ObservedExpedition, type ExpeditionLog } from '@/lib/survival/expedition';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Json } from '@/integrations/supabase/types';
-import { ITEMS, type ItemId } from '@/lib/survival/items';
+import { ITEMS, requiredRangedAmmo, type ItemId } from '@/lib/survival/items';
 import { CREATURES, NODES, creatureDef, nodeDef, type LootRoll } from '@/lib/survival/entities';
 import { activePetAbilities, bleedDamage, walkLimitKmh, regenHp, REGEN_INTERVAL_MS } from '@/lib/survival/petAbilities';
 import { MAX_WALK_KMH } from '@/lib/survival/walkPace';
@@ -22,11 +22,16 @@ import { ACTIVE_SKILLS, claimResearch, startResearch, atMainBase, atWorkshop, bu
 import { advanceSurvivalVitals } from '@/lib/survival/metabolism';
 import { distanceM } from '@/lib/survival/geo';
 import { generateWorld, isNodeAvailable } from '@/lib/survival/world';
+import { getCustomMobVersion } from '@/lib/survival/customMobs';
 import { hireMercenary, mercActive, tribeHireCost, tribeTrainCost, tribeRatio, tribeInjured, settleUpkeep, upkeepDemand, escortReady, escortAmbushDamage, ESCORT_GATHER_MULT, TRIBE_INJURY_MS, TRIBE_TREAT_COST, UPKEEP_MS, type MercenaryContract, type TribeState } from '@/lib/survival/mercenaries';
+import { applyTribeWallDefense, DEFAULT_TRIBE_CLASS, getTribeClass, tribeCarryBonusKg, type TribeClassId } from '@/data/tribeClasses';
+import { blueprintResearchCost, canPlaceVillageBuilding, computeBuildingHarvestBubble, computeVillageBonuses, ensureVillageState, isArtisanUnlocked, isBlueprintResearched, moveVillageBuilding, placeVillageBuilding, removeVillageBuilding, SHAMAN_SKILL_DEFS, shamanSkillLevel, VILLAGE_BUILDINGS, type ShamanSkillId, type VillageBuildingId, type VillageState } from '@/lib/survival/village';
+import { settleFoodSpoilage, SMOKE_CURING_MS, TAVERN_RECIPES, type SmokehouseBatch } from '@/lib/survival/culinary';
+import { computeExpeditionLevel, detectExpeditionPins, type RadarPin } from '@/lib/survival/radar';
 import { addStacks, hasAll, removeStacks, splitDeathDrop, splitByCapacity, stackWeight } from '@/lib/survival/inventory';
 import { addExperience, dayPhase, xpToNext } from '@/lib/survival/progression';
 import { claimWorldQuest, freshProgress, type WorldProgress } from '@/lib/survival/worldProgress';
-import { currentQuest, questReady, type QuestState } from '@/lib/survival/quests';
+import { currentQuest, LANGUAGE_QUEST, languageQuestProgress, questReady, type QuestState } from '@/lib/survival/quests';
 import { checkInspiration, isRecipeUnlocked, prerequisitesMet, readSkillBook, techById, type TechDef } from '@/lib/survival/tech';
 import { giantHeartHpBonus, ironSkinDef, primalStrikeMult, techLevel, wildVitalityRegenBonus } from '@/lib/survival/techLevels';
 import { SANCTUARY_RADIUS_M, SANCTUARY_REGEN_PER_TICK, LANDMARK_INFO, SHAMAN_BLESS_XP, SHAMAN_RUMORS, SHAMAN_TIPS, TRADER_STOCK, canClaimLandmark, landmarkReward, recordLandmarkClaim, sellPrice, type Landmark, type LandmarkClaims } from '@/lib/survival/landmarks';
@@ -97,6 +102,15 @@ export interface WorldSave extends WorldProgress {
   mercenary?: MercenaryContract | null;
   shamanMet?: boolean;
   tribe?: TribeState;
+  village?: VillageState;
+  expeditionCount?: number;
+  expeditionDistanceM?: number;
+  discoveredPins?: RadarPin[];
+  languageQuestAccepted?: boolean;
+  languageLearned?: boolean;
+  shamanQuestAcceptedIndex?: number;
+  smokeBatches?: SmokehouseBatch[];
+  lastFreshnessCheckAt?: number;
   shamanTourDone?: boolean;
   expeditionLogs?: ExpeditionLog[];
   /** Placeholder camps may be anchored once to the first accepted actual GPS fix. */
@@ -219,7 +233,36 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [userId, !!s.observedExpedition, s.pets?.some(p => p.deployed)]);
 
   const isNight = dayPhase(new Date(now)) === 'night';
-  const vision = (isNight ? C.visionNightM : C.visionDayM) + visionBonus(s.techs);
+  const villageBonuses = useMemo(() => computeVillageBonuses(s.village), [s.village]);
+  const freshnessInfo = useMemo(
+    () => settleFoodSpoilage(s.backpack, s.storage, s.lastFreshnessCheckAt, now),
+    [s.backpack, s.storage, s.lastFreshnessCheckAt, now]
+  );
+  useEffect(() => {
+    if (freshnessInfo.spoiledCount <= 0) return;
+    setS(p => {
+      const settled = settleFoodSpoilage(p.backpack, p.storage, p.lastFreshnessCheckAt, Date.now());
+      if (settled.spoiledCount <= 0) return p;
+      toast.warning(`🤢 보관하지 않은 생식량 ${settled.spoiledCount}개가 초록색 곰팡이가 피며 상했습니다!`, {
+        description: '원시 훈제소에서 훈연 보관하거나 상한 음식을 폐기하세요.',
+      });
+      return {
+        ...p,
+        backpack: settled.backpack,
+        storage: settled.storage,
+        lastFreshnessCheckAt: settled.nextCheckAt,
+      };
+    });
+  }, [freshnessInfo.spoiledCount, setS]);
+  const expeditionLevelInfo = useMemo(
+    () =>
+      computeExpeditionLevel(
+        s.expeditionCount ?? 0,
+        (s.expeditionDistanceM ?? 0) + (s.walkSteps ?? 0) * 20
+      ),
+    [s.expeditionCount, s.expeditionDistanceM, s.walkSteps]
+  );
+  const vision = (isNight ? C.visionNightM + villageBonuses.nightVisionBonusM : C.visionDayM) + visionBonus(s.techs);
   const reach = reachRadius(s.techs);
   const baseDef = s.base ? BASE_LEVELS[s.base.level] : null;
   const [sanctuaries, setSanctuaries] = useState<LatLng[]>([]);
@@ -228,7 +271,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const inSanctuary = sanctuaries.some((c) => distanceM(s.pos, c) <= SANCTUARY_RADIUS_M);
   const inBase = atWorkshop(s);
   const weight = stackWeight(s.backpack);
-  const capacity = C.baseCarryKg + (s.level - 1) * C.carryPerLevelKg + ((s.base?.level ?? 0) >= 2 ? 10 : 0) + pocketBonusKg(s.techs);
+  const baseCapacity = C.baseCarryKg + (s.level - 1) * C.carryPerLevelKg + ((s.base?.level ?? 0) >= 2 ? 10 : 0) + pocketBonusKg(s.techs) + villageBonuses.carryBonusKg;
+  const capacity = baseCapacity + tribeCarryBonusKg(baseCapacity, s.tribe?.count ?? 0, s.tribe?.classId);
   const questState: QuestState = { ...s, storedGear: [], stats: { gathered: s.gathered, crafted: s.crafted, kills: s.kills, deposits: s.deposits } };
   const quest = currentQuest(questState);
   const questProgress = quest?.progress(questState) ?? null;
@@ -236,8 +280,18 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
   const gainXp = (p: WorldSave, amount: number): WorldSave => {
     const progress = addExperience(p, amount);
-    if (progress.level > p.level) toast.success(`레벨 ${progress.level} 달성!`, { description: `배낭 용량 ${C.baseCarryKg + (progress.level - 1) * C.carryPerLevelKg}kg` });
-    return { ...p, ...progress };
+    let nextState: WorldSave = { ...p, ...progress };
+    if (progress.level > p.level) {
+      toast.success(`레벨 ${progress.level} 달성!`, { description: `배낭 용량 ${C.baseCarryKg + (progress.level - 1) * C.carryPerLevelKg}kg` });
+      if (progress.level >= 5 && p.level < 5 && !p.languageLearned) {
+        nextState = { ...nextState, languageQuestAccepted: true };
+        toast.info('🧙 떠돌이 주술사의 부름!', {
+          description: `"${LANGUAGE_QUEST.shamanQuote}" (생존 목표에 등록되었습니다)`,
+          duration: 6000,
+        });
+      }
+    }
+    return nextState;
   };
 
   // Only gear worn in an unlocked slot counts.
@@ -247,10 +301,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const weapon = loadout.weapon;
   const armor = loadout.armor;
 
+  const customMobVer = getCustomMobVersion();
   const entities: WorldEntity[] = useMemo(() => generateWorld({
     center: s.pos, radiusM: vision, now, isNight, depleted: s.depleted, terrainZones: s.terrainZones, parkCells: s.parkCells, sanctuaries,
     safeZone: s.base && baseDef ? { center: s.base, radiusM: baseDef.radiusM + (s.palisade ? 15 : 0) } : null,
-  }).filter(e => !(e.kind === 'creature' && s.outpost && distanceM(e, s.outpost) < C.outpostRadiusM + 15)), [s.pos, vision, now, isNight, s.depleted, s.base, baseDef, s.terrainZones, s.parkCells, sanctuaries, s.palisade, s.outpost]);
+  }).filter(e => !(e.kind === 'creature' && s.outpost && distanceM(e, s.outpost) < C.outpostRadiusM + 15)), [s.pos, vision, now, isNight, s.depleted, s.base, baseDef, s.terrainZones, s.parkCells, sanctuaries, s.palisade, s.outpost, customMobVer]);
 
   // Visible-time boundary defense; never changes player GPS or peer saves.
   useEffect(() => {
@@ -271,27 +326,35 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return () => window.clearInterval(timer);
   }, [!!s.pets?.length, options.indoor, setS]);
 
-  // Stegoron regen: every 5 s heal player and expedition crew by the ability percentage.
+  // Stegoron regen + tribe_shelter 2x recovery bonus for crew & pets.
   const regenPct = activePetAbilities(s.pets ?? []).regen ?? 0;
+  const shelterMult = villageBonuses.regenSpeedMult;
   useEffect(() => {
-    if (regenPct <= 0) return;
+    if (regenPct <= 0 && shelterMult <= 1) return;
     const id = window.setInterval(() => setS((p) => {
-      const hp = regenHp(p.hp, maxHpOf(p), regenPct);
+      const hp = regenPct > 0 ? regenHp(p.hp, maxHpOf(p), regenPct) : p.hp;
       const crew = p.observedExpedition;
-      const crewHp = crew ? regenHp(crew.hp, crew.maxHp ?? 100, regenPct) : 0;
-      if (hp === p.hp && (!crew || crewHp === crew.hp)) return p;
-      return { ...p, hp, observedExpedition: crew ? { ...crew, hp: crewHp } : crew };
+      const crewPct = (regenPct > 0 ? regenPct : 0.02) * shelterMult;
+      const crewHp = crew ? regenHp(crew.hp, crew.maxHp ?? 100, crewPct) : 0;
+      const pets = shelterMult > 1 && p.pets?.length
+        ? p.pets.map(pt => {
+            const max = petStats(pt.level).maxHp;
+            return pt.hp < max ? { ...pt, hp: Math.min(max, pt.hp + 2) } : pt;
+          })
+        : p.pets;
+      if (hp === p.hp && (!crew || crewHp === crew.hp) && pets === p.pets) return p;
+      return { ...p, hp, pets, observedExpedition: crew ? { ...crew, hp: crewHp } : crew };
     }), REGEN_INTERVAL_MS);
     return () => window.clearInterval(id);
-  }, [regenPct]);
+  }, [regenPct, shelterMult]);
 
-  // Survival tick: hunger drain, starvation, base regen (wild_vitality level boosts rest regen).
+  // Survival tick: hunger drain, starvation, base regen (wild_vitality level & tribe_shelter boost rest regen).
   useEffect(() => {
     if (!enabled || now - s.lastTickAt < C.tickMs) return;
-    const locationRegen = inBase && baseDef ? baseDef.regenPerTick : inSanctuary ? SANCTUARY_REGEN_PER_TICK : 0;
+    const locationRegen = inBase && baseDef ? baseDef.regenPerTick * villageBonuses.regenSpeedMult : inSanctuary ? SANCTUARY_REGEN_PER_TICK : 0;
     const regen = locationRegen > 0 && s.techs.includes('wild_vitality') ? locationRegen + wildVitalityRegenBonus(techLevel(s.techLevels, 'wild_vitality')) : locationRegen;
     setS((p) => advanceSurvivalVitals(p, now, regen, maxHpOf(p)));
-  }, [now, s.lastTickAt, inBase, inSanctuary, baseDef, enabled, setS, s.techs, s.techLevels]);
+  }, [now, s.lastTickAt, inBase, inSanctuary, baseDef, enabled, setS, s.techs, s.techLevels, villageBonuses.regenSpeedMult]);
 
   // Auto deposit on entering base. Shell currency stays in the backpack (and is
   // pulled back out of storage) so it can be spent at traders.
@@ -344,7 +407,14 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS, options.indoor]);
 
   const appendLog = (p: WorldSave, text: string, at: number): ExpeditionLog[] => [...(p.expeditionLogs ?? []), { at, text }].slice(-20);
-  const dispatchObserved = useCallback((destination: LatLng, focus: ExpeditionFocus = 'materials') => {
+  const selectTribeClass = useCallback((classId: TribeClassId) => {
+    setS(p => ({
+      ...p,
+      tribe: { count: 0, trainLevel: 0, ...p.tribe, classId },
+      observedExpedition: p.observedExpedition?.mercenary ? { ...p.observedExpedition, tribeClass: classId } : p.observedExpedition,
+    }));
+  }, [setS]);
+  const dispatchObserved = useCallback((destination: LatLng, focus: ExpeditionFocus = 'materials', classId?: TribeClassId) => {
     const p = ref.current;
     const hasTribe = (p.tribe?.count ?? 0) > 0 && !tribeInjured(p.tribe, Date.now());
     if (!p.base || p.observedExpedition || (enabledRef.current && !atMainBase(p) && !hasTribe)) return false;
@@ -352,11 +422,13 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (!raw) { toast.warning('거점에서 10~1,500m 이내 목표를 선택하세요'); return false; }
     const tribeReady = (p.tribe?.count ?? 0) > 0 && !tribeInjured(p.tribe, Date.now());
     const merc = tribeReady && mercActive(p.mercenary, Date.now()) ? p.mercenary!.name : undefined;
+    const chosenClass = classId ?? p.tribe?.classId ?? DEFAULT_TRIBE_CLASS;
+    const cls = getTribeClass(chosenClass);
     const ratio = tribeRatio(p.tribe);
     const members = Math.max(1, p.tribe?.count ?? 1);
-    const maxHp = Math.max(1, Math.round(maxHpOf(p) * ratio * members));
-    const crew = merc ? { ...raw, mercenary: merc, statMult: ratio, members, maxHp, hp: maxHp } : raw;
-    setS({ ...p, starterCampPending: false, observedExpedition: crew, expeditionLogs: appendLog(p, `${merc ? `용병 ${merc}` : '원정'} 출발 · 목표: ${FOCUS_LABEL[focus]}`, Date.now()) });
+    const maxHp = Math.max(1, Math.round(maxHpOf(p) * ratio * members * cls.hpMult));
+    const crew = merc ? { ...raw, mercenary: merc, tribeClass: chosenClass, statMult: ratio, members, maxHp, hp: maxHp } : { ...raw, tribeClass: chosenClass };
+    setS({ ...p, starterCampPending: false, expeditionCount: (p.expeditionCount ?? 0) + 1, tribe: p.tribe ? { ...p.tribe, classId: chosenClass } : p.tribe, observedExpedition: crew, expeditionLogs: appendLog(p, `${merc ? `${cls.icon} ${cls.name}(${merc})` : '원정'} 출발 · 목표: ${FOCUS_LABEL[focus]}`, Date.now()) });
     return true;
   }, [setS]);
   const toggleExpeditionAuto = useCallback((destination: LatLng, focus: ExpeditionFocus = 'materials') => {
@@ -376,7 +448,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     }
     return { storage, backpack };
   };
-  const hireMerc = useCallback(() => {
+  const hireMerc = useCallback((classId?: TribeClassId) => {
     const p = ref.current; const now = Date.now();
     if (!p.base) { toast.warning('거점이 있어야 부족민을 영입할 수 있어요'); return false; }
     const count = p.tribe?.count ?? 0;
@@ -384,9 +456,25 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (!cost) { toast.info('부족민이 가득 찼어요 (10/10)'); return false; }
     const paid = payCost(p, cost);
     if (!paid) { toast.warning(`재료가 부족해요: ${fmt(cost)}`); return false; }
-    const m = p.mercenary && mercActive(p.mercenary, now) ? p.mercenary : { ...hireMercenary(now), until: now + 3650 * 86400000 };
-    setS({ ...p, ...paid, mercenary: m, tribe: { trainLevel: 0, ...p.tribe, count: count + 1, upkeepAt: p.tribe?.upkeepAt ?? now }, expeditionLogs: appendLog(p, `부족민 영입 · ${count + 1}/10명`, now) });
-    toast.success(`부족민이 ${count + 1}명이 되었어요!`);
+    const chosenClass = classId ?? p.tribe?.classId ?? DEFAULT_TRIBE_CLASS;
+    const cls = getTribeClass(chosenClass);
+    const m = p.mercenary && mercActive(p.mercenary, now) ? p.mercenary : { ...hireMercenary(now), classId: chosenClass, until: now + 3650 * 86400000 };
+    const prevCounts = p.tribe?.classCounts ?? {};
+    setS({
+      ...p,
+      ...paid,
+      mercenary: m,
+      tribe: {
+        trainLevel: 0,
+        ...p.tribe,
+        count: count + 1,
+        classId: chosenClass,
+        classCounts: { ...prevCounts, [chosenClass]: (prevCounts[chosenClass] ?? 0) + 1 },
+        upkeepAt: p.tribe?.upkeepAt ?? now,
+      },
+      expeditionLogs: appendLog(p, `${cls.icon} ${cls.name} 영입 · ${count + 1}/10명`, now),
+    });
+    toast.success(`${cls.icon} ${cls.name} 영입 완료! (총 ${count + 1}명)`);
     return true;
   }, [setS]);
   const trainTribe = useCallback(() => {
@@ -457,6 +545,50 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     setS({ ...p, tribe: { ...p.tribe, escort: on } });
     toast(on ? '부족민이 함께 걸어요 · 채집 속도 +30%, 맹수 기습 방어' : '동행을 멈추고 거점에 남겨 두었어요');
   }, [setS]);
+  const grantTutorialBranches = useCallback(() => {
+    const p = ref.current;
+    const branchesInPack = countOf(p.backpack, 'branch');
+    const branchesInStorage = countOf(p.storage, 'branch');
+    if (branchesInPack + branchesInStorage >= 3) return;
+    const needed = Math.max(1, 3 - (branchesInPack + branchesInStorage));
+    setS({
+      ...p,
+      backpack: addStacks(p.backpack, [{ itemId: 'branch', count: needed }]),
+      lastTickAt: Date.now(),
+    });
+    toast.success(`🌿 떠돌이 주술사가 나뭇가지 ${needed}개를 건네주었습니다! (배낭 보관)`);
+  }, [setS]);
+
+  const recruitAmbacho = useCallback(() => {
+    const p = ref.current;
+    if (p.tribe?.count && (p.tribe.classCounts?.gatherer ?? 0) > 0) return;
+    const now = Date.now();
+    const prevCounts = p.tribe?.classCounts ?? {};
+    const curCount = p.tribe?.count ?? 0;
+    const m = {
+      name: '암바초',
+      hiredAt: now,
+      until: now + 3650 * 86400000,
+      classId: 'gatherer' as TribeClassId,
+    };
+    setS({
+      ...p,
+      mercenary: m,
+      tribe: {
+        trainLevel: 0,
+        ...p.tribe,
+        count: Math.max(1, curCount + 1),
+        classId: 'gatherer',
+        classCounts: { ...prevCounts, gatherer: (prevCounts.gatherer ?? 0) + 1 },
+        upkeepAt: p.tribe?.upkeepAt ?? now,
+      },
+      lastTickAt: now,
+    });
+    toast.success('🎒 든든한 파밍 부족민 「암바초」가 부족에 영구 합류했습니다!', {
+      description: '거점 주변의 나무·광석을 대신 채집하고 창고로 운반합니다.',
+    });
+  }, [setS]);
+
   const meetShaman = useCallback(() => setS(p => ({ ...p, shamanMet: true })), [setS]);
   const rallyExpedition = useCallback(() => {
     const p = ref.current; const crew = p.observedExpedition; const at = Date.now();
@@ -478,7 +610,16 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const nearby = generateWorld({ center: crew.pos, radiusM: crew.manual ? MANUAL_PICK_M : 30, now: at, isNight: dayPhase(new Date(at)) === 'night', depleted: p.depleted, terrainZones: p.terrainZones, parkCells: p.parkCells });
       if (crew.manual) setCrewNearby(nearby);
       const result = advanceExpedition(crew, nearby, at, outdoors, !!p.expeditionAuto, Math.random, p.damage);
-      let next = { ...p, observedExpedition: result.finished ? null : result.crew };
+      const stepDist = Math.round(distanceM(crew.pos, result.crew.pos));
+      const nextDistM = (p.expeditionDistanceM ?? 0) + stepDist;
+      const expLv = computeExpeditionLevel(p.expeditionCount ?? 0, nextDistM + (p.walkSteps ?? 0) * 20).level;
+      const nextPins = detectExpeditionPins(result.crew.pos, nearby, p.depleted, at, expLv, p.discoveredPins ?? []);
+      let next: WorldSave = {
+        ...p,
+        expeditionDistanceM: nextDistM,
+        discoveredPins: nextPins,
+        observedExpedition: result.finished ? null : result.crew,
+      };
       if (result.crew.downed && p.tribe) { next.tribe = { ...p.tribe, injuredUntil: at + TRIBE_INJURY_MS }; next.expeditionAuto = false; result.rewards = result.rewards.slice(0, Math.ceil(result.rewards.length / 2)); }
       if (result.crew.target?.kind === 'creature') next.damage = { ...p.damage, [result.crew.target.id]: result.crew.damage };
       if (result.completed) {
@@ -633,7 +774,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (!enabledRef.current) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return false; }
     const p = ref.current;
     if (e.kind === 'node' ? !isNodeAvailable(e.id, e.type, p.depleted, Date.now()) : !!p.depleted[e.id]) return false;
-    const r = reachRadius(p.techs);
+    const isRangedWeapon = e.kind === 'creature' && !!(weapon && ITEMS[weapon.itemId]?.weapon?.ranged);
+    const r = isRangedWeapon ? Math.max(reachRadius(p.techs), 35) : reachRadius(p.techs);
     if (distanceM(p.pos, e) > r) { toast.warning(`${r}m 안으로 다가가세요`); return false; }
     if (e.kind === 'creature') {
       const at = Date.now();
@@ -665,20 +807,36 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     } else {
       const d = creatureDef(e.type);
       label = d.name; need = d.hp; loot = d.loot;
+      // Ranged weapons (bow / sling) require 1 matching ammo in the backpack per shot
+      const neededAmmo = weapon ? requiredRangedAmmo(weapon.itemId) : null;
+      if (neededAmmo) {
+        const afterAmmo = removeStacks(p.backpack, [{ itemId: neededAmmo, count: 1 }]);
+        if (!afterAmmo) {
+          const ammoLabel = neededAmmo === 'arrow' ? '화살(🏹)' : '돌멩이 탄환(🪨)';
+          toast.error(`배낭에 ${ammoLabel}이(가) 없습니다!`, {
+            description: '거점 제작 탭이나 무기 제작소에서 만들어 배낭에 넣어 주세요 (1회 공격 시 1개 소진).',
+          });
+          return false;
+        }
+        next.backpack = afterAmmo;
+      }
       power = weapon ? Math.round((ITEMS[weapon.itemId].weapon?.atk ?? C.fistAtk) * gearMult(weapon)) : C.fistAtk;
       if (p.techs.includes('primal_strike')) power *= primalStrikeMult(techLevel(p.techLevels, 'primal_strike'));
-      const ranged = !!(weapon && ITEMS[weapon.itemId].weapon?.ranged) && !p.damage[e.id];
+      const rangedFirstShot = isRangedWeapon && !p.damage[e.id];
       power += (p.companions ?? []).some(c => c.kind === 'wolf') ? 3 : 0;
       power += (p.pets ?? []).filter(x => petRole(x) === 'follow' && x.restUntil <= Date.now()).length * PET_FOLLOW_ATK;
-      const defense = (atMainBase(p) && p.palisade ? 3 : 0) + (armor ? Math.round((ITEMS[armor.itemId].armor?.def ?? 0) * gearMult(armor)) : 0) + (p.techs.includes('iron_skin') ? ironSkinDef(techLevel(p.techLevels, 'iron_skin')) : 0);
+      const wallBonus = atMainBase(p) && p.palisade ? 3 + (p.tribe?.count && p.tribe.classId === 'tank' ? 4 : 0) : 0;
+      const defense = wallBonus + (armor ? Math.round((ITEMS[armor.itemId].armor?.def ?? 0) * gearMult(armor)) : 0) + (p.techs.includes('iron_skin') ? ironSkinDef(techLevel(p.techLevels, 'iron_skin')) : 0);
       const bleed = bleedDamage(power, activePetAbilities(p.pets ?? []).bleed ?? 0);
       if (bleed) { power += bleed; toast.success(`테라녹스 출혈! 추가 피해 +${bleed}`); }
-      const exchange = resolveCreatureHit(e.type, p.damage[e.id] ?? 0, power, defense, ranged || (p.calmUntil?.[e.id] ?? 0) > Date.now());
+      const exchange = resolveCreatureHit(e.type, p.damage[e.id] ?? 0, power, defense, rangedFirstShot || (p.calmUntil?.[e.id] ?? 0) > Date.now());
       power = exchange.dealt - (p.damage[e.id] ?? 0);
-      hp -= exchange.counterDamage;
-      if (exchange.counterDamage) toast.error(`${d.name} 반격! 체력 -${exchange.counterDamage}`);
+      const reducedCounter = atMainBase(p) ? applyTribeWallDefense(exchange.counterDamage, !!p.palisade, p.tribe?.count ?? 0, p.tribe?.classId) : exchange.counterDamage;
+      hp -= reducedCounter;
+      if (reducedCounter) toast.error(`${d.name} 돌진 박치기 반격! 체력 -${reducedCounter}`);
+      else if (rangedFirstShot && !exchange.defeated) toast.warning(`🏹 원거리 선제 타격! ${d.name}이(가) 분노하여 달려옵니다!`);
       if (hp <= 0) { setS(die({ ...next, hp })); return false; }
-      if (!exchange.defeated && d.temper === 'passive' && Math.random() < (d.escapeChance ?? 0)) {
+      if (!exchange.defeated && !isRangedWeapon && d.temper === 'passive' && Math.random() < (d.escapeChance ?? 0)) {
         toast(`${d.name}이(가) 달아났습니다`);
         delete next.damage[e.id];
         setS({ ...next, hp, depleted: { ...p.depleted, [e.id]: Date.now() } });
@@ -695,9 +853,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     }
     delete next.damage[e.id];
     const got = options.indoor && Date.now() < outdoorMovingRef.current ? expeditionLoot(e, true) : rollLoot(loot);
-    const free = capacity - stackWeight(p.backpack);
+    const free = capacity - stackWeight(next.backpack);
     const fits = stackWeight(got) <= free;
-    next.backpack = fits ? addStacks(p.backpack, got) : p.backpack;
+    next.backpack = fits ? addStacks(next.backpack, got) : next.backpack;
     next.depleted = { ...p.depleted, [e.id]: Date.now() };
     const gathered = { ...p.gathered };
     if (fits) got.forEach((g) => { gathered[g.itemId] = (gathered[g.itemId] ?? 0) + g.count; });
@@ -806,10 +964,12 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (it.durability !== undefined) {
       const g: GearInstance = { uid: crypto.randomUUID(), itemId: r.result, quality: 'NORMAL', durability: it.durability, maxDurability: it.durability };
       setS({ ...next, storage: left, gear: [...p.gear, g] });
+    } else if (r.result === 'arrow' || r.result === 'sling_stone') {
+      setS({ ...next, storage: left, backpack: addStacks(p.backpack, [{ itemId: r.result, count: r.count }]) });
     } else {
       setS({ ...next, storage: addStacks(left, [{ itemId: r.result, count: r.count }]) });
     }
-    toast.success(`${it.name} 제작 완료!`, { description: it.durability !== undefined ? '배낭에 담았어요' : '창고에 넣었어요' });
+    toast.success(`${it.name} 제작 완료!`, { description: it.durability !== undefined || r.result === 'arrow' || r.result === 'sling_stone' ? '배낭에 담았어요' : '창고에 넣었어요' });
   }, []);
 
   const claimQuest = useCallback(() => {
@@ -933,9 +1093,12 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const takeDamage = useCallback((amount: number, ambush = false) => {
     const p = ref.current;
     if (ambush && escortReady(p.tribe, Date.now(), !!p.observedExpedition?.mercenary)) {
-      amount = escortAmbushDamage(amount, Math.random());
+      amount = escortAmbushDamage(amount, Math.random(), p.tribe?.classId);
       if (amount <= 0) { toast.success('동행 부족민이 기습을 막아냈어요!'); return; }
-      toast.info('동행 부족민이 기습 피해를 절반으로 줄였어요');
+      toast.info('동행 부족민이 기습 피해를 줄였어요');
+    }
+    if (atMainBase(p) && p.palisade) {
+      amount = applyTribeWallDefense(amount, true, p.tribe?.count ?? 0, p.tribe?.classId);
     }
     const armorGear = resolveLoadout(p.gear, p.equipped, p.level).armor;
     const dmg = Math.max(1, Math.round(amount) - (armorGear ? Math.round((ITEMS[armorGear.itemId].armor?.def ?? 0) * gearMult(armorGear)) : 0) - (p.techs.includes('iron_skin') ? ironSkinDef(techLevel(p.techLevels, 'iron_skin')) : 0));
@@ -1118,9 +1281,420 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const p = petAccess(); if (!p) return;
     setS({ ...p, pets: (p.pets ?? []).map(pet => pet.uid === uid ? { ...pet, locked: !pet.locked } : pet), lastTickAt: Date.now() });
   }, [setS, options.indoor]);
+
+  const permadeathPet = useCallback((uid: string) => {
+    const p = ref.current;
+    const target = (p.pets ?? []).find(pt => pt.uid === uid);
+    if (!target) return;
+    const pName = petById(target.speciesId)?.name ?? target.name;
+    setS({
+      ...p,
+      pets: (p.pets ?? []).filter(pt => pt.uid !== uid),
+      lastTickAt: Date.now(),
+    });
+    toast.error(`💀 ${pName} (Lv.${target.level})이(가) 체력 0이 되어 영구 소멸했습니다!`);
+  }, [setS]);
+
+  const updatePetHp = useCallback((uid: string, hp: number) => {
+    setS(p => ({
+      ...p,
+      pets: (p.pets ?? []).map(pt =>
+        pt.uid === uid ? { ...pt, hp: Math.max(0, Math.min(petStats(pt.level).maxHp, hp)) } : pt
+      ),
+      lastTickAt: Date.now(),
+    }));
+  }, [setS]);
+
+  const consumeDinoMeat = useCallback((): boolean => {
+    const p = ref.current;
+    const paid = payAccessible(p, [{ itemId: 'cooked_meat', count: 1 }]);
+    if (!paid) {
+      toast.warning('보유한 구운 고기가 없습니다 (배낭 또는 창고)');
+      return false;
+    }
+    setS({ ...paid, lastTickAt: Date.now() });
+    return true;
+  }, [setS]);
+
+  const settleDinoExpedition = useCallback((loot: Stack[], distanceM: number) => {
+    const p = ref.current;
+    const nowAt = Date.now();
+    let nextEggs = p.dinoEggs ?? [];
+    for (const st of loot) {
+      if (st.itemId === 'dino_egg') {
+        for (let i = 0; i < st.count; i++) {
+          nextEggs = [...nextEggs, newEgg(`dino-exp:${nowAt}:${i}`, p.walkSteps ?? 0, Math.random())];
+        }
+      }
+    }
+    const gathered = { ...p.gathered };
+    for (const st of loot) gathered[st.itemId] = (gathered[st.itemId] ?? 0) + st.count;
+    const xpGain = Math.max(5, Math.round(distanceM * 0.4));
+    const next = gainXp(
+      {
+        ...p,
+        storage: addStacks(p.storage, loot),
+        dinoEggs: nextEggs,
+        gathered,
+        expeditionCount: (p.expeditionCount ?? 0) + 1,
+        expeditionDistanceM: (p.expeditionDistanceM ?? 0) + distanceM,
+        lastTickAt: nowAt,
+      },
+      xpGain
+    );
+    setS(next);
+    if (loot.length) {
+      toast.success(`🏳️ 공룡 탐험대 무사 귀환! (${distanceM}m · 창고: ${fmt(loot)})`);
+    } else {
+      toast('🏳️ 공룡 탐험대가 거점으로 무사히 후퇴했습니다.');
+    }
+  }, [setS]);
   const updateInventionCredits = useCallback((credits: InventionCredits) => setS(p => ({ ...p, inventionCredits: credits, inventionWalkMark: credits.walkMeters === 0 ? p.walkSteps ?? 0 : p.inventionWalkMark })), [setS]);
 
-  return { crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, toggleEscort, trainTribe, treatTribe, meetShaman, pickEgg, hatchEgg, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
+  const placeVillageTile = useCallback((buildingId: VillageBuildingId, x: number, y: number): boolean => {
+    const p = ref.current;
+    if (!p.base) { toast.warning('먼저 거점을 세우세요'); return false; }
+    if (!atWorkshop(p) && !options.indoor) { toast.warning('거점 반경 안에서 건설할 수 있어요'); return false; }
+    const v = ensureVillageState(p.village, !!p.altar);
+    const check = canPlaceVillageBuilding(v, buildingId, x, y, p.base.level);
+    if (check.ok === false) { toast.warning(check.reason); return false; }
+    const def = VILLAGE_BUILDINGS[buildingId];
+    const paid = payAccessible(p, def.cost);
+    if (!paid) { toast.error(`재료가 부족해요: ${fmt(def.cost)}`); return false; }
+    const nextV = placeVillageBuilding(v, buildingId, x, y, crypto.randomUUID());
+    const hasPal = nextV.buildings.some(b => VILLAGE_BUILDINGS[b.buildingId].category === 'wall');
+    const hasAlt = p.altar || buildingId === 'ancient_altar';
+    setS({ ...paid, village: nextV, palisade: p.palisade || hasPal, altar: hasAlt, lastTickAt: Date.now() });
+    toast.success(`${def.icon} ${def.name} 배치 완료!`);
+    return true;
+  }, [setS, options.indoor]);
+
+  const moveVillageTile = useCallback((uid: string, toX: number, toY: number): boolean => {
+    const p = ref.current;
+    if (!p.base) return false;
+    const v = ensureVillageState(p.village, !!p.altar);
+    const res = moveVillageBuilding(v, uid, toX, toY);
+    if (res.ok === false) { toast.warning(res.reason); return false; }
+    setS({ ...p, village: res.state, lastTickAt: Date.now() });
+    toast.success('시설 위치를 옮겼습니다');
+    return true;
+  }, [setS]);
+
+  const removeVillageTile = useCallback((uid: string) => {
+    const p = ref.current;
+    if (!p.base) return;
+    const v = ensureVillageState(p.village, !!p.altar);
+    const nextV = removeVillageBuilding(v, uid);
+    if (nextV === v) { toast.warning('중심 모닥불은 최소 1개 남겨야 합니다'); return; }
+    setS({ ...p, village: nextV, lastTickAt: Date.now() });
+    toast('시설을 철거했습니다');
+  }, [setS]);
+
+  const researchVillageBlueprint = useCallback((buildingId: VillageBuildingId): boolean => {
+    const p = ref.current;
+    if (!p.base) return false;
+    const v = ensureVillageState(p.village, !!p.altar);
+    if (!isArtisanUnlocked(v.shamanSkills, buildingId)) {
+      toast.warning('주술사 천막에서 필요한 장인 등급을 먼저 수련하세요');
+      return false;
+    }
+    if (isBlueprintResearched(v, buildingId)) return true;
+    const cost = blueprintResearchCost(buildingId);
+    const paid = payAccessible(p, cost);
+    if (!paid) { toast.error(`설계도 연구 재료 부족: ${fmt(cost)}`); return false; }
+    const def = VILLAGE_BUILDINGS[buildingId];
+    const nextV: VillageState = {
+      ...v,
+      researchedBlueprints: [...new Set([...(v.researchedBlueprints ?? []), buildingId])],
+    };
+    setS({ ...paid, village: nextV, lastTickAt: Date.now() });
+    toast.success(`📜 ${def.name} 설계도 연구 완료!`);
+    return true;
+  }, [setS]);
+
+  const trainShamanSkill = useCallback((skillId: ShamanSkillId): boolean => {
+    const p = ref.current;
+    if (!p.base) return false;
+    const v = ensureVillageState(p.village, !!p.altar);
+    const def = SHAMAN_SKILL_DEFS.find(s => s.id === skillId);
+    if (!def) return false;
+    const curLv = shamanSkillLevel(v.shamanSkills, skillId);
+    if (curLv >= def.maxLevel) { toast('이미 최고 단계입니다'); return false; }
+    const nextLv = curLv + 1;
+    const cost = def.costForLevel(nextLv);
+    const paid = payAccessible(p, cost);
+    if (!paid) { toast.error(`수련 재료 부족: ${fmt(cost)}`); return false; }
+    const nextV: VillageState = {
+      ...v,
+      shamanSkills: { ...(v.shamanSkills ?? {}), [skillId]: nextLv },
+    };
+    const nextTechs = [...new Set([...paid.techs, ...def.grantsTechIds])];
+    setS({ ...paid, techs: nextTechs, village: nextV, lastTickAt: Date.now() });
+    toast.success(`${def.icon} ${def.name} Lv.${nextLv} 달성!`);
+    return true;
+  }, [setS]);
+
+  const forgeSignatureWeapon = useCallback((itemId: ItemId, cost: Stack[]): boolean => {
+    const p = ref.current;
+    const def = ITEMS[itemId];
+    if (!def) return false;
+    const paid = payAccessible(p, cost);
+    if (!paid) { toast.error(`무기 제작 재료 부족: ${fmt(cost)}`); return false; }
+    const dur = def.durability ?? 40;
+    const g: GearInstance = { uid: crypto.randomUUID(), itemId, quality: 'NORMAL', durability: dur, maxDurability: dur };
+    setS({ ...paid, gear: [...paid.gear, g], lastTickAt: Date.now() });
+    toast.success(`🔥 ${def.name} 제작 완료! 아래 [무기 강화]에서 +1~+10강을 시도해 보세요`);
+    return true;
+  }, [setS]);
+
+  const craftAmmoBundle = useCallback((itemId: 'arrow' | 'sling_stone', count: number, cost: Stack[]): boolean => {
+    const p = ref.current;
+    const paid = payAccessible(p, cost);
+    if (!paid) {
+      toast.error(`탄약 제작 재료 부족: ${fmt(cost)}`);
+      return false;
+    }
+    const crafted = { ...paid.crafted, [itemId]: (paid.crafted[itemId] ?? 0) + count };
+    setS({
+      ...paid,
+      backpack: addStacks(paid.backpack, [{ itemId, count }]),
+      crafted,
+      lastTickAt: Date.now(),
+    });
+    toast.success(`🏹 ${ITEMS[itemId].name} ×${count} 제조 완료! (배낭에 즉시 구비됨)`);
+    return true;
+  }, [setS]);
+
+  const enhanceArmoryWeapon = useCallback((uid: string): { ok: boolean; plus: number } => {
+    const p = ref.current;
+    const g = p.gear.find(x => x.uid === uid);
+    if (!g) return { ok: false, plus: 0 };
+    const cost = armoryUpgradeCost(g);
+    if (!cost) { toast('이미 최고 강화(+10강) 상태입니다'); return { ok: false, plus: g.plus ?? 0 }; }
+    const paid = payAccessible(p, cost);
+    if (!paid) { toast.error(`강화 재료 부족: ${fmt(cost)}`); return { ok: false, plus: g.plus ?? 0 }; }
+    const curPlus = g.plus ?? 0;
+    const chance = armorySuccessChance(curPlus);
+    const success = Math.random() < chance;
+    if (!success) {
+      setS({ ...paid, lastTickAt: Date.now() });
+      toast.warning(`${ITEMS[g.itemId]?.name ?? '무기'} +${curPlus + 1}강 연마 실패… (무기는 보존됨)`);
+      return { ok: false, plus: curPlus };
+    }
+    const nextPlus = curPlus + 1;
+    const def = ITEMS[g.itemId];
+    const baseAtk = def?.weapon?.atk ?? Math.round((def?.tool?.power ?? 1) * 4);
+    const nextAtk = weaponAtkWithPlus(baseAtk, nextPlus);
+    const aura = weaponAuraForPlus(nextPlus);
+    setS({
+      ...paid,
+      gear: paid.gear.map(x => (x.uid === uid ? { ...x, plus: nextPlus, durability: x.maxDurability } : x)),
+      lastTickAt: Date.now(),
+    });
+    toast.success(`⚡ ${def?.name ?? '무기'} +${nextPlus}강 성공! (공격력 ${nextAtk} · ${aura.tierName})`);
+    return { ok: true, plus: nextPlus };
+  }, [setS]);
+
+  const acceptShamanQuest = useCallback(() => {
+    setS(p => ({ ...p, shamanQuestAcceptedIndex: p.questIndex }));
+    const q = QUESTS_REF();
+    toast.success('🧙 떠돌이 주술사의 생존 목표가 등록되었습니다!', {
+      description: q ? `목표: ${q.title}` : undefined,
+    });
+  }, [setS]);
+
+  const QUESTS_REF = () => currentQuest({ ...ref.current, storedGear: [], stats: { gathered: ref.current.gathered, crafted: ref.current.crafted, kills: ref.current.kills, deposits: ref.current.deposits } });
+
+  const acceptLanguageQuest = useCallback(() => {
+    const p = ref.current;
+    if (p.level < 5) {
+      toast.warning('족장 레벨 5가 되면 언어를 배울 수 있습니다');
+      return;
+    }
+    setS({ ...p, languageQuestAccepted: true });
+    toast.success('🧙 떠돌이 주술사의 「고대 언어 학습」 퀘스트가 생존 목표에 등록되었습니다!', {
+      description: '"이제 자네도 말을 좀 배워야 될것같네."',
+    });
+  }, [setS]);
+
+  const claimLanguageQuest = useCallback(() => {
+    const p = ref.current;
+    if (p.languageLearned) return;
+    const prog = languageQuestProgress(p);
+    if (!prog.ready) {
+      toast.warning('족장 Lv.5 및 기초 재료를 준비해 주세요');
+      return;
+    }
+    const next = gainXp({ ...p, languageQuestAccepted: true, languageLearned: true }, LANGUAGE_QUEST.rewardXp);
+    setS(next);
+    toast.success('🗣️ 말문이 트였습니다! 이제 말을 조금씩 할 수 있으며 다른 생존자 유저와 대화가 가능합니다!');
+  }, [setS]);
+
+  const harvestVillageBubble = useCallback((uid: string): Stack | null => {
+    const p = ref.current;
+    const v = ensureVillageState(p.village, !!p.altar);
+    const target = v.buildings.find(b => b.uid === uid);
+    if (!target) return null;
+    const nowAt = Date.now();
+    const workerBonus = (p.tribe?.count ?? 0) + (p.pets?.filter(pt => pt.deployed).length ?? 0);
+    const bubble = computeBuildingHarvestBubble(target, nowAt, workerBonus);
+    if (!bubble) return null;
+    const stack: Stack = { itemId: bubble.itemId, count: bubble.count };
+    const nextV: VillageState = {
+      ...v,
+      buildings: v.buildings.map(b => (b.uid === uid ? { ...b, lastHarvestAt: nowAt } : b)),
+    };
+    const gathered = { ...p.gathered, [bubble.itemId]: (p.gathered[bubble.itemId] ?? 0) + bubble.count };
+    setS({
+      ...p,
+      village: nextV,
+      storage: addStacks(p.storage, [stack]),
+      gathered,
+      lastTickAt: nowAt,
+    });
+    toast.success(`${bubble.icon} ${ITEMS[bubble.itemId]?.name ?? bubble.label} +${bubble.count} 수확! (창고 보관)`);
+    return stack;
+  }, [setS]);
+
+  const harvestAllVillageBubbles = useCallback((): Stack[] => {
+    const p = ref.current;
+    const v = ensureVillageState(p.village, !!p.altar);
+    const nowAt = Date.now();
+    const workerBonus = (p.tribe?.count ?? 0) + (p.pets?.filter(pt => pt.deployed).length ?? 0);
+    const collected: Stack[] = [];
+    const nextBuildings = v.buildings.map(b => {
+      const bubble = computeBuildingHarvestBubble(b, nowAt, workerBonus);
+      if (!bubble) return b;
+      collected.push({ itemId: bubble.itemId, count: bubble.count });
+      return { ...b, lastHarvestAt: nowAt };
+    });
+    if (!collected.length) return [];
+    const merged = addStacks([], collected);
+    const gathered = { ...p.gathered };
+    for (const st of merged) gathered[st.itemId] = (gathered[st.itemId] ?? 0) + st.count;
+    setS({
+      ...p,
+      village: { ...v, buildings: nextBuildings },
+      storage: addStacks(p.storage, merged),
+      gathered,
+      lastTickAt: nowAt,
+    });
+    toast.success(`✨ 마을 방치 보상 일괄 수확! (${fmt(merged)})`);
+    return merged;
+  }, [setS]);
+
+  const startSmokeBatch = useCallback((itemId: ItemId, count: number): boolean => {
+    const p = ref.current;
+    const n = Math.max(1, Math.min(5, count));
+    const paid = payAccessible(p, [{ itemId, count: n }]);
+    if (!paid) {
+      toast.warning(`${ITEMS[itemId]?.name ?? itemId}이(가) 부족합니다`);
+      return false;
+    }
+    const nowAt = Date.now();
+    const outItem: 'jerky' | 'dried_fruit' = itemId === 'raw_meat' ? 'jerky' : 'dried_fruit';
+    const batch: SmokehouseBatch = {
+      id: crypto.randomUUID(),
+      inputItemId: itemId,
+      inputCount: n,
+      outputItemId: outItem,
+      outputCount: n,
+      startedAt: nowAt,
+      readyAt: nowAt + SMOKE_CURING_MS,
+    };
+    setS({
+      ...paid,
+      smokeBatches: [...(paid.smokeBatches ?? []), batch],
+      lastFreshnessCheckAt: nowAt,
+      lastTickAt: nowAt,
+    });
+    toast.success(`♨️ ${ITEMS[itemId].name} ×${n} 훈연 보관 시작! (부패 방지)`);
+    return true;
+  }, [setS]);
+
+  const instantSmoke = useCallback((itemId: ItemId, kind: 'cooked' | 'dried'): boolean => {
+    const p = ref.current;
+    const paid = payAccessible(p, [
+      { itemId, count: 1 },
+      { itemId: 'branch', count: 1 },
+    ]);
+    if (!paid) {
+      toast.warning(`${ITEMS[itemId]?.name ?? '식재료'} 1개와 나뭇가지 1개가 필요합니다`);
+      return false;
+    }
+    const outId: ItemId =
+      kind === 'cooked' ? 'cooked_meat' : itemId === 'raw_meat' ? 'jerky' : 'dried_fruit';
+    const crafted = { ...paid.crafted, [outId]: (paid.crafted[outId] ?? 0) + 1 };
+    setS({
+      ...paid,
+      storage: addStacks(paid.storage, [{ itemId: outId, count: 1 }]),
+      crafted,
+      lastFreshnessCheckAt: Date.now(),
+      lastTickAt: Date.now(),
+    });
+    toast.success(`🔥 ${ITEMS[outId].name} ×1 즉시 가공 완료! (창고 보관)`);
+    return true;
+  }, [setS]);
+
+  const claimSmokeBatch = useCallback((batchId: string): boolean => {
+    const p = ref.current;
+    const batch = (p.smokeBatches ?? []).find(b => b.id === batchId);
+    if (!batch || Date.now() < batch.readyAt) return false;
+    const crafted = {
+      ...p.crafted,
+      [batch.outputItemId]: (p.crafted[batch.outputItemId] ?? 0) + batch.outputCount,
+    };
+    setS({
+      ...p,
+      storage: addStacks(p.storage, [{ itemId: batch.outputItemId, count: batch.outputCount }]),
+      crafted,
+      smokeBatches: (p.smokeBatches ?? []).filter(b => b.id !== batchId),
+      lastTickAt: Date.now(),
+    });
+    toast.success(`🥩 훈연 완료! ${ITEMS[batch.outputItemId].name} ×${batch.outputCount} 창고 입고!`);
+    return true;
+  }, [setS]);
+
+  const discardSpoiledFood = useCallback(() => {
+    const p = ref.current;
+    const nextBag = p.backpack.filter(s => s.itemId !== 'spoiled_food');
+    const nextStore = p.storage.filter(s => s.itemId !== 'spoiled_food');
+    setS({
+      ...p,
+      backpack: nextBag,
+      storage: nextStore,
+      lastFreshnessCheckAt: Date.now(),
+      lastTickAt: Date.now(),
+    });
+    toast.success('🗑️ 초록 곰팡이가 핀 상한 음식을 모두 안전하게 폐기했습니다.');
+  }, [setS]);
+
+  const cookTavernRecipe = useCallback((recipeId: string): boolean => {
+    const p = ref.current;
+    const r = TAVERN_RECIPES.find(x => x.id === recipeId);
+    if (!r) return false;
+    const paid = payAccessible(p, r.ingredients);
+    if (!paid) {
+      toast.error(`요리 재료 부족: ${fmt(r.ingredients)}`);
+      return false;
+    }
+    const crafted = { ...paid.crafted, [r.result]: (paid.crafted[r.result] ?? 0) + 1 };
+    const next = gainXp(
+      {
+        ...paid,
+        storage: addStacks(paid.storage, [{ itemId: r.result, count: 1 }]),
+        crafted,
+        lastFreshnessCheckAt: Date.now(),
+        lastTickAt: Date.now(),
+      },
+      r.xp
+    );
+    setS(next);
+    toast.success(`🍲 주막 특선 「${r.name}」 완성! (경험치 +${r.xp} · 창고 보관)`);
+    return true;
+  }, [setS]);
+
+  return { craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
     moveOutpost, petHits, mergePets, togglePetDeploy, assignPetRole, feedPet, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,

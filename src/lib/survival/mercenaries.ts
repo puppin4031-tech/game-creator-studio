@@ -1,7 +1,8 @@
 import type { Stack } from './types';
+import { DEFAULT_TRIBE_CLASS, getTribeClass, type TribeClassId } from '../../data/tribeClasses';
 
 /** Mercenary contract rules (pure). A hired mercenary runs observed expeditions instead of the player. */
-export interface MercenaryContract { name: string; hiredAt: number; until: number }
+export interface MercenaryContract { name: string; hiredAt: number; until: number; classId?: TribeClassId }
 
 export const MERC_CONTRACT_MS = 24 * 60 * 60 * 1000;
 export const MERC_COST: Stack[] = [{ itemId: 'raw_meat', count: 3 }, { itemId: 'hide', count: 1 }, { itemId: 'apple', count: 2 }];
@@ -22,7 +23,8 @@ export const TRIBE_TRAIN_MAX = 5;
 /** Upkeep window: every hour at base, each resident eats from storage. */
 export const UPKEEP_MS = 60 * 60 * 1000;
 
-export interface TribeState { count: number; trainLevel: number; injuredUntil?: number; upkeepAt?: number; starving?: boolean; escort?: boolean }
+export interface TribeState { count: number; trainLevel: number; injuredUntil?: number; upkeepAt?: number; starving?: boolean; escort?: boolean; classId?: TribeClassId; classCounts?: Partial<Record<TribeClassId, number>> }
+export { DEFAULT_TRIBE_CLASS, getTribeClass, type TribeClassId };
 
 const S = (itemId: Stack['itemId'], count: number): Stack => ({ itemId, count });
 /** Cost to recruit member number (current count + 1). */
@@ -78,5 +80,8 @@ export function settleUpkeep(storage: Stack[], demand: ReturnType<typeof upkeepD
 export const ESCORT_GATHER_MULT = 1.3;
 export const ESCORT_BLOCK_CHANCE = 0.35;
 export const escortReady = (t: TribeState | null | undefined, now: number, onExpedition: boolean) => !!t?.escort && (t.count ?? 0) > 0 && !tribeInjured(t, now) && !onExpedition;
-/** Ambush damage with an escort: sometimes fully blocked, otherwise halved. */
-export const escortAmbushDamage = (dmg: number, roll: number) => roll < ESCORT_BLOCK_CHANCE ? 0 : Math.ceil(dmg / 2);
+/** Ambush damage with an escort: sometimes fully blocked, otherwise halved (tank tribe boosts block & reduction). */
+export const escortAmbushDamage = (dmg: number, roll: number, classId?: TribeClassId) => {
+  if (classId === 'tank') return roll < 0.6 ? 0 : Math.ceil(dmg * 0.35);
+  return roll < ESCORT_BLOCK_CHANCE ? 0 : Math.ceil(dmg / 2);
+};

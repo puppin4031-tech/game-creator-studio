@@ -53,25 +53,25 @@ export default function ExpeditionJoystick({ crew, candidates, project, onManual
     if (hit) onCommand(hit.c);
   };
 
-  const iconBtn = 'pointer-events-auto flex h-11 w-11 touch-none items-center justify-center border-2 border-foreground bg-card shadow-[3px_3px_0_0_hsl(var(--foreground)/0.6)]';
+  const iconBtn = 'pointer-events-auto flex touch-none items-center justify-center gap-1 border-2 border-foreground bg-card py-1.5 px-2.5 text-xs font-bold shadow-[2px_2px_0_0_hsl(var(--foreground)/0.6)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none';
   return <div ref={root} className="pointer-events-none absolute inset-0 z-20" onPointerMove={e => drag && setDrag({ ...drag, ...local(e) })} onPointerUp={drop}>
-    <div className="pointer-events-auto absolute bottom-28 right-3 flex flex-col items-end gap-1.5">
-      <button type="button" aria-label={tools ? '원정 명령 접기' : '원정 명령 펼치기'} onClick={() => setTools(v => !v)} className={`${iconBtn} h-11 w-auto gap-1 px-2 text-[11px] font-bold`}>{tools ? <ChevronRight className="!h-4 !w-4" /> : <><Swords className="!h-4 !w-4" />원정</>}</button>
+    <div className="pointer-events-auto absolute bottom-24 right-2 flex flex-col items-end gap-1">
+      <button type="button" aria-label={tools ? '원정 명령 접기' : '원정 명령 펼치기'} onClick={() => setTools(v => !v)} className={iconBtn}>{tools ? <ChevronRight className="!h-4 !w-4" /> : <><Swords className="!h-4 !w-4" />원정</>}</button>
       {tools && <>
-        <button type="button" aria-pressed={!!crew.manual} onClick={() => onManual(!crew.manual)} className={`${iconBtn} h-11 w-auto gap-1 px-2 text-[11px] font-bold`}>
+        <button type="button" aria-pressed={!!crew.manual} onClick={() => onManual(!crew.manual)} className={iconBtn}>
           {crew.manual ? <><Bot className="!h-4 !w-4" />자동</> : <><Gamepad2 className="!h-4 !w-4" />조작</>}
         </button>
-        <button type="button" aria-label="공격" onClick={() => onAct('attack')} className={iconBtn}><Swords className="!h-5 !w-5 text-destructive" /></button>
-        <button type="button" aria-label="채집" onClick={() => onAct('gather')} className={iconBtn}><Pickaxe className="!h-5 !w-5 text-primary" /></button>
-        <button type="button" aria-label="체력 회복" onClick={onHeal} className={iconBtn}><Heart className="!h-5 !w-5 text-destructive" /></button>
+        <button type="button" aria-label="공격" onClick={() => onAct('attack')} className={iconBtn}><Swords className="!h-4 !w-4 text-destructive" /></button>
+        <button type="button" aria-label="채집" onClick={() => onAct('gather')} className={iconBtn}><Pickaxe className="!h-4 !w-4 text-primary" /></button>
+        <button type="button" aria-label="체력 회복" onClick={onHeal} className={iconBtn}><Heart className="!h-4 !w-4 text-destructive" /></button>
       </>}
     </div>
     {crew.manual && <>
-      <div aria-label="원정 조이스틱" role="application" className="pointer-events-auto absolute bottom-28 left-4 h-28 w-28 touch-none rounded-full border-4 border-foreground/70 bg-background/60"
+      <div aria-label="원정 조이스틱" role="application" className="pointer-events-auto absolute bottom-24 left-3 h-24 w-24 touch-none rounded-full border-4 border-foreground/70 bg-background/60"
         onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); stick(e); }} onPointerMove={e => e.buttons && stick(e)} onPointerUp={release} onPointerCancel={release}>
-        <div className="absolute left-1/2 top-1/2 h-12 w-12 rounded-full border-2 border-foreground bg-primary" style={{ transform: `translate(calc(-50% + ${knob.x}px), calc(-50% + ${knob.y}px))` }} />
+        <div className="absolute left-1/2 top-1/2 h-10 w-10 rounded-full border-2 border-foreground bg-primary" style={{ transform: `translate(calc(-50% + ${knob.x}px), calc(-50% + ${knob.y}px))` }} />
       </div>
-      <p className="absolute bottom-[4.5rem] left-1/2 -translate-x-1/2 whitespace-nowrap bg-background/80 px-2 text-[11px]">조이스틱으로 이동 · 가까운 맹수 방어와 채집은 자동</p>
+      <p className="absolute bottom-14 left-1/2 -translate-x-1/2 whitespace-nowrap bg-background/80 px-2 py-0.5 text-[10px]">조이스틱으로 이동 · 가까운 맹수 방어와 채집은 자동</p>
     </>}
     {drag && <div className="pointer-events-none absolute flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-primary bg-card/90" style={{ left: drag.x, top: drag.y }}>
       {drag.kind === 'attack' ? <Swords className="!h-6 !w-6 text-destructive" /> : <Pickaxe className="!h-6 !w-6 text-primary" />}

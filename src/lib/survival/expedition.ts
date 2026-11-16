@@ -3,6 +3,7 @@ import { nodeDef, creatureDef } from './entities';
 import { resolveCreatureHit, rollLoot } from './combat';
 import type { ItemId } from './items';
 import type { LatLng, Stack, WorldEntity } from './types';
+import { getTribeClass, type TribeClassId } from '../../data/tribeClasses';
 
 export const EXPEDITION_SPEED_MPS = 15;
 export const POCKET_MAX_KMH = 20;
@@ -27,6 +28,8 @@ export interface ObservedExpedition {
   cycle: number;
   /** Hired mercenary name; presentation only. */
   mercenary?: string;
+  /** Selected specialized tribe class (tank, gatherer, ranged, assassin). */
+  tribeClass?: TribeClassId;
   /** Tribe member stat ratio (1/6); 1 for the player's own expedition. */
   statMult?: number;
   maxHp?: number;
@@ -42,7 +45,7 @@ export interface ObservedExpedition {
   /** -1 when last moving west (sprite mirrored), 1 otherwise. */
   facing?: 1 | -1;
   /** Presentation-only record; retains the final strike after the target is removed. */
-  combatHit?: { at: number; target: Extract<WorldEntity, { kind: 'creature' }>; damage: number; counterDamage: number; killed: boolean; dodged?: boolean };
+  combatHit?: { at: number; target: Extract<WorldEntity, { kind: 'creature' }>; damage: number; counterDamage: number; killed: boolean; dodged?: boolean; crit?: boolean; ranged?: boolean };
 }
 export interface ExpeditionLog { at: number; text: string }
 
@@ -80,10 +83,10 @@ export function startObservedExpedition(home: LatLng, destination: LatLng, now: 
   if (distance < 10 || distance > MAX_EXPEDITION_DISTANCE_M) return null;
   return { home, destination, pos: home, hp: 100, phase: 'outbound', lastAt: now, hitAt: 0, moraleUntil: 0, moraleReadyAt: 0, damage: 0, cycle: 0, focus, waypoints: patrolWaypoints(home, destination), facing: 1 };
 }
-export function marchToward(pos: LatLng, destination: LatLng, elapsedMs: number): LatLng {
+export function marchToward(pos: LatLng, destination: LatLng, elapsedMs: number, speedMult = 1): LatLng {
   const distance = distanceM(pos, destination);
   if (distance === 0) return destination;
-  const ratio = Math.min(1, EXPEDITION_SPEED_MPS * Math.max(0, elapsedMs) / 1000 / distance);
+  const ratio = Math.min(1, EXPEDITION_SPEED_MPS * speedMult * Math.max(0, elapsedMs) / 1000 / distance);
   return { lat: pos.lat + (destination.lat - pos.lat) * ratio, lng: pos.lng + (destination.lng - pos.lng) * ratio };
 }
 export function expeditionLoot(entity: WorldEntity, outdoor: boolean, random: () => number = Math.random): Stack[] {
@@ -97,13 +100,24 @@ export function expeditionLoot(entity: WorldEntity, outdoor: boolean, random: ()
 /** Uses shared combat and geographic entities; does not move the player or grant walking distance. */
 /** Auto patrol priority: repel ambushing beasts, then focus matches, then any workable node nearby. */
 export function autoPatrolTarget(crew: ObservedExpedition, nearby: WorldEntity[]): WorldEntity | undefined {
-  const close = nearby.filter(e => distanceM(crew.pos, e) <= EXPEDITION_RADIUS_M).sort((a, b) => distanceM(crew.pos, a) - distanceM(crew.pos, b));
-  return close.find(e => e.kind === 'creature' && !creatureDef(e.type).boss && creatureDef(e.type).temper === 'aggressive')
-    ?? close.find(e => matchesFocus(e, crew.focus))
+  const cls = crew.tribeClass ? getTribeClass(crew.tribeClass) : null;
+  const aggroRange = cls ? Math.max(EXPEDITION_RADIUS_M, cls.aggroRadiusM) : EXPEDITION_RADIUS_M;
+  const reachRange = cls ? Math.max(EXPEDITION_RADIUS_M, cls.attackRangeM) : EXPEDITION_RADIUS_M;
+  const sorted = [...nearby].sort((a, b) => distanceM(crew.pos, a) - distanceM(crew.pos, b));
+  const close = sorted.filter(e => distanceM(crew.pos, e) <= EXPEDITION_RADIUS_M);
+  const aggroBeast = sorted.find(e => e.kind === 'creature' && !creatureDef(e.type).boss && creatureDef(e.type).temper === 'aggressive' && distanceM(crew.pos, e) <= aggroRange);
+  if (aggroBeast) return aggroBeast;
+  if (cls?.id === 'ranged' && crew.focus === 'hunt') {
+    const rangedTarget = sorted.find(e => e.kind === 'creature' && !creatureDef(e.type).boss && distanceM(crew.pos, e) <= reachRange);
+    if (rangedTarget) return rangedTarget;
+  }
+  return close.find(e => matchesFocus(e, crew.focus))
     ?? close.find(e => e.kind === 'node' && (matchesFocus(e, 'survival') || matchesFocus(e, 'materials')));
 }
 export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEntity[], now: number, outdoor: boolean, repeat: boolean, random: () => number = Math.random, sharedDamage?: Record<string, number>) {
   let crew = { ...previous, lastAt: now };
+  const cls = crew.tribeClass ? getTribeClass(crew.tribeClass) : null;
+  const speedMult = cls ? cls.speedMult : 1;
   const rewards: Stack[] = [];
   let completed: WorldEntity | undefined;
   let text = '';
@@ -118,35 +132,43 @@ export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEnt
       text = target.kind === 'node' ? `원정대가 ${nodeDef(target.type).name} 발견 · 채집 시작` : `${creatureDef(target.type).name}와 교전 시작! (HP ${crew.hp}/${crew.maxHp ?? 100})`;
     }
   }
-  if (crew.manual && (!crew.target || distanceM(crew.pos, crew.target) > EXPEDITION_RADIUS_M)) {
+  const activeReachM = crew.target?.kind === 'creature' && cls ? Math.max(EXPEDITION_RADIUS_M, cls.attackRangeM) : EXPEDITION_RADIUS_M;
+  if (crew.manual && (!crew.target || distanceM(crew.pos, crew.target) > activeReachM)) {
     if (crew.target) {
       const before = crew.pos;
-      crew.pos = marchToward(crew.pos, crew.target, elapsed);
+      crew.pos = marchToward(crew.pos, crew.target, elapsed, speedMult);
       if (Math.abs(crew.pos.lng - before.lng) > 1e-9) crew.facing = crew.pos.lng < before.lng ? -1 : 1;
     }
     return { crew, rewards, completed, text, finished };
   }
   if (crew.target) {
-    if (now - crew.hitAt >= (now < crew.moraleUntil ? 500 : 1000)) {
+    const intervalMs = Math.round((now < crew.moraleUntil ? 500 : 1000) * (cls ? cls.attackIntervalMult : 1));
+    if (now - crew.hitAt >= intervalMs) {
       crew.hitAt = now;
       const target = crew.target;
       const max = crew.maxHp ?? 100;
-      const power = (crew.statMult ?? 1) * (target.kind === 'node' ? 2 : 12) * (outdoor ? 2 : 1) * (now < crew.moraleUntil ? 1.5 : 1);
+      const roleMult = cls ? (target.kind === 'node' ? cls.gatherMult : cls.atkMult) : 1;
+      const isCrit = !!(cls && target.kind === 'creature' && cls.critChance > 0 && random() < cls.critChance);
+      const critMult = isCrit && cls ? cls.critMult : 1;
+      const power = (crew.statMult ?? 1) * (target.kind === 'node' ? 2 : 12) * roleMult * critMult * (outdoor ? 2 : 1) * (now < crew.moraleUntil ? 1.5 : 1);
       if (target.kind === 'creature') {
         crew.damage = sharedDamage?.[target.id] ?? crew.damage;
         const members = Math.max(1, crew.members ?? 1);
-        let hit = resolveCreatureHit(target.type, crew.damage, power, 3, false);
+        const def = 3 + (cls ? cls.defBonus : 0);
+        const isRangedOpening = !!(cls?.firstStrikeSafe && (crew.damage === 0 || distanceM(crew.pos, target) > EXPEDITION_RADIUS_M));
+        let hit = resolveCreatureHit(target.type, crew.damage, power, def, isRangedOpening);
         // Each extra member lands a follow-up strike; the beast retaliates once per exchange.
         for (let i = 1; i < members && hit.dealt < creatureDef(target.type).hp; i++) {
-          const next = resolveCreatureHit(target.type, hit.dealt, power, 3, false);
+          const next = resolveCreatureHit(target.type, hit.dealt, power, def, isRangedOpening);
           hit = { ...next, counterDamage: hit.counterDamage };
         }
         const dodged = hit.counterDamage > 0 && ((Math.floor(now / 1000) * 2654435761) >>> 0) % 1000 < EXPEDITION_DODGE_CHANCE * 1000;
-        const counter = dodged ? 0 : hit.counterDamage;
-        crew.combatHit = { at: now, target, damage: hit.dealt - crew.damage, counterDamage: counter, killed: hit.dealt >= creatureDef(target.type).hp, dodged };
+        const rawCounter = dodged ? 0 : hit.counterDamage;
+        const counter = cls && rawCounter > 0 ? Math.max(0, Math.floor(rawCounter * cls.counterDamageMult)) : rawCounter;
+        crew.combatHit = { at: now, target, damage: hit.dealt - crew.damage, counterDamage: counter, killed: hit.dealt >= creatureDef(target.type).hp, dodged, crit: isCrit, ranged: isRangedOpening };
         crew.damage = hit.dealt;
         crew.hp = Math.max(0, crew.hp - counter);
-        text = `${creatureDef(target.type).name} 교전 · HP ${crew.hp}/${max}`;
+        text = `${creatureDef(target.type).name} ${isRangedOpening ? '원거리 사격' : isCrit ? '치명타 연타' : '교전'} · HP ${crew.hp}/${max}`;
       } else {
         crew.damage += power * Math.max(1, crew.members ?? 1);
         text = `원정대가 ${nodeDef(target.type).name} 채집 중입니다…`;
@@ -173,8 +195,17 @@ export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEnt
       .sort((a, b) => distanceM(crew.pos, a) - distanceM(crew.pos, b))[0] : undefined;
     const destination = spotted ?? waypoint ?? (crew.phase === 'returning' ? crew.home : crew.destination);
     const before = crew.pos;
-    crew.pos = marchToward(crew.pos, destination, elapsed);
+    crew.pos = marchToward(crew.pos, destination, elapsed, speedMult);
     if (Math.abs(crew.pos.lng - before.lng) > 1e-9) crew.facing = crew.pos.lng < before.lng ? -1 : 1;
+    // Gatherer class auto-sweeps nearby wood/ore/fruit nodes within autoGatherRadiusM while marching.
+    if (cls && cls.autoGatherRadiusM > 0) {
+      const autoNode = nearby.find((e): e is Extract<WorldEntity, { kind: 'node' }> => e.kind === 'node' && nodeDef(e.type).requires.tier <= 1 && distanceM(crew.pos, e) <= cls.autoGatherRadiusM);
+      if (autoNode && !completed) {
+        completed = autoNode;
+        rewards.push(...expeditionLoot(autoNode, outdoor, random));
+        text = `파밍 부족 경로 자동 수거 · ${nodeDef(autoNode.type).name}`;
+      }
+    }
     if (spotted) {
       if (!previous.target && distanceM(before, spotted) > EXPEDITION_RADIUS_M && !text) text = `${FOCUS_LABEL[crew.focus ?? 'materials']} 단서 포착 · ${spotted.kind === 'node' ? nodeDef(spotted.type).name : creatureDef(spotted.type).name} 쪽으로 이동`;
     } else if (waypoint && distanceM(crew.pos, waypoint) < 1) {

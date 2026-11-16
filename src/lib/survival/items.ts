@@ -56,7 +56,17 @@ export const ITEMS = def({
   cooked_meat: { name: '구운 고기', desc: '허기 +35 · 체력 +10', category: 'food', rarity: 'uncommon', weight: 0.75, sprite: 'item-cooked-meat', food: { hunger: 35, hp: 10 } },
   spring_water: { name: '샘물', desc: '허기 +4 · 체력 +8', category: 'food', rarity: 'common', weight: 0.5, sprite: 'item-clay-pot', food: { hunger: 4, hp: 8 } },
   coconut: { name: '야자 열매', desc: '허기 +14 · 체력 +6', category: 'food', rarity: 'uncommon', weight: 0.5, sprite: 'item-apple', food: { hunger: 14, hp: 6 } },
-  jerky: { name: '말린 고기', desc: '허기 +28 · 체력 +5', category: 'food', rarity: 'uncommon', weight: 0.25, sprite: 'item-cooked-meat', food: { hunger: 28, hp: 5 } },
+  jerky: { name: '말린 고기', desc: '허기 +28 · 체력 +5 (훈연 보존 · 썩지 않음)', category: 'food', rarity: 'uncommon', weight: 0.25, sprite: 'item-cooked-meat', food: { hunger: 28, hp: 5 } },
+  dried_fruit: { name: '말린 과일', desc: '허기 +22 · 체력 +10 (훈연 건조 · 썩지 않음)', category: 'food', rarity: 'uncommon', weight: 0.2, sprite: 'item-apple', food: { hunger: 22, hp: 10 } },
+  spoiled_food: { name: '상한 음식 (초록 곰팡이)', desc: '시간이 지나 부패한 식량. 먹으면 배탈(체력 -12)이 나니 훈제소나 주막에서 폐기하세요.', category: 'food', rarity: 'common', weight: 0.25, sprite: 'item-herb', food: { hunger: 2, hp: -12 } },
+  // ── Spices & Tavern Dishes (향신료 & 주막 요리)
+  wild_spice: { name: '야생 향신초', desc: '숲과 약초 군락에서 얻는 향긋한 향신료. 원시 주막 요리의 핵심 재료.', category: 'material', rarity: 'uncommon', weight: 0.15, sprite: 'item-herb' },
+  rock_salt: { name: '암염 결정', desc: '바위 틈에서 긁어낸 천연 소금 결정. 고기 요리와 훈연 보존의 풍미를 높인다.', category: 'material', rarity: 'uncommon', weight: 0.2, sprite: 'item-quartz' },
+  pepper_berry: { name: '매운 후추열매', desc: '입안이 얼얼해지는 붉은 향신 열매. 추위를 이기는 특제 요리에 쓰인다.', category: 'material', rarity: 'rare', weight: 0.15, sprite: 'item-berry' },
+  bone_stew: { name: '진한 뼈 고기 스튜', desc: '주막 특선 스튜. 허기 +55 · 체력 +30 (썩지 않음)', category: 'food', rarity: 'rare', weight: 0.5, sprite: 'item-clay-pot', food: { hunger: 55, hp: 30 } },
+  spice_roast: { name: '향신료 통고기 구이', desc: '암염과 향신초를 발라 구운 일품 고기요리. 허기 +65 · 체력 +35', category: 'food', rarity: 'rare', weight: 0.6, sprite: 'item-cooked-meat', food: { hunger: 65, hp: 35 } },
+  sweet_fruit_skewers: { name: '달콤 과일 구이 꼬치', desc: '사과·돌배·산딸기를 향신료와 함께 구운 별미. 허기 +45 · 체력 +25', category: 'food', rarity: 'uncommon', weight: 0.35, sprite: 'item-apple', food: { hunger: 45, hp: 25 } },
+  dino_tail_steak: { name: '우두머리 스테이크 정식', desc: '매운 후추열매와 암염으로 구운 최고급 주막 요리. 허기 +90 · 체력 +60', category: 'food', rarity: 'epic', weight: 0.75, sprite: 'item-cooked-meat', food: { hunger: 90, hp: 60 } },
   shell: { name: '조개 화폐', desc: '만물상에서 물건을 사고팔 때 쓰는 화폐.', category: 'material', rarity: 'common', weight: 0, sprite: 'item-quartz' },
   // ── Sanctuary gifts
   sacred_bread: { name: '생명의 떡', desc: '성소의 축복. 허기 +50 · 체력 +40', category: 'food', rarity: 'rare', weight: 0.25, sprite: 'item-cooked-meat', food: { hunger: 50, hp: 40 } },
@@ -94,8 +104,10 @@ export const ITEMS = def({
   stone_maul: { name: '돌 망치', desc: '공격력 13', category: 'weapon', rarity: 'uncommon', weight: 2.5, sprite: 'item-stone-maul', weapon: { atk: 13 }, durability: 60 },
   wooden_club: { name: '나무 몽둥이', desc: '공격력 6', category: 'weapon', rarity: 'common', weight: 1.5, sprite: 'item-wooden-club', weapon: { atk: 6 }, durability: 30 },
   flint_spear: { name: '부싯돌 창', desc: '공격력 10', category: 'weapon', rarity: 'uncommon', weight: 1.5, sprite: 'item-flint-spear', weapon: { atk: 10 }, durability: 45 },
-  sling: { name: '투석구', desc: '공격력 7 · 원거리 (첫 공격 반격 없음)', category: 'weapon', rarity: 'uncommon', weight: 0.5, sprite: 'item-sling', weapon: { atk: 7, ranged: true }, durability: 60 },
-  bone_bow: { name: '뼈 활', desc: '공격력 12 · 원거리 (첫 공격 반격 없음)', category: 'weapon', rarity: 'rare', weight: 1, sprite: 'item-bone-bow', weapon: { atk: 12, ranged: true }, durability: 70 },
+  sling: { name: '새총·물매', desc: '공격력 7 · 원거리 (배낭의 돌멩이 1개 소모 · 첫 공격 반격 없음)', category: 'weapon', rarity: 'uncommon', weight: 0.5, sprite: 'item-sling', weapon: { atk: 7, ranged: true }, durability: 60 },
+  bone_bow: { name: '뼈 활', desc: '공격력 12 · 원거리 (배낭의 화살 1개 소모 · 첫 공격 반격 없음)', category: 'weapon', rarity: 'rare', weight: 1, sprite: 'item-bone-bow', weapon: { atk: 12, ranged: true }, durability: 70 },
+  arrow: { name: '화살', desc: '활로 사냥할 때 쓰는 날카로운 화살. 배낭에 있어야 활을 쏠 수 있다 (1회 공격 시 1개 소모).', category: 'processed', rarity: 'common', weight: 0.05, sprite: 'item-flint-spear' },
+  sling_stone: { name: '돌멩이 (탄환)', desc: '새총이나 물매로 던지는 둥근 돌멩이. 배낭에 있어야 물매를 쏠 수 있다 (1회 공격 시 1개 소모).', category: 'processed', rarity: 'common', weight: 0.05, sprite: 'item-flint' },
   obsidian_spear: { name: '흑요석 창', desc: '공격력 18', category: 'weapon', rarity: 'rare', weight: 1.5, sprite: 'item-obsidian-spear', weapon: { atk: 18 }, durability: 80 },
   // ── Armor & trinkets
   bark_vest: { name: '나무껍질 조끼', desc: '방어력 1', category: 'armor', rarity: 'common', weight: 1.5, sprite: 'item-bark-vest', armor: { def: 1 }, durability: 40 },
@@ -117,11 +129,20 @@ export const isGearItem = (id: ItemId) => GEAR_CATEGORIES.includes(ITEMS[id].cat
 
 export const RARITY_LABEL: Record<Rarity, string> = { common: '흔함', uncommon: '고급', rare: '희귀', epic: '전설' };
 
+/** Returns required ammo item ID in backpack for a ranged weapon (`arrow` for bows, `sling_stone` for slings). */
+export function requiredRangedAmmo(weaponId: ItemId | string | undefined): 'arrow' | 'sling_stone' | null {
+  if (!weaponId) return null;
+  const def = ITEMS[weaponId as ItemId];
+  if (!def?.weapon?.ranged) return null;
+  if (weaponId === 'sling' || weaponId.includes('sling')) return 'sling_stone';
+  return 'arrow';
+}
+
 /** Plain-language effect line for gear, shown wherever an item appears. */
 export function gearEffect(d: ItemDef | undefined): string | null {
   if (!d) return null;
   const pct = (v: number) => `${Math.round(v * 100)}%`;
-  if (d.weapon) return `공격력 +${d.weapon.atk}${d.weapon.ranged ? ' · 원거리(첫 공격 반격 없음)' : ' · 근접'}`;
+  if (d.weapon) return `공격력 +${d.weapon.atk}${d.weapon.ranged ? ' · 원거리(배낭 화살/돌멩이 1개 소모)' : ' · 근접'}`;
   if (d.armor) return `방어력 +${d.armor.def} (받는 피해 -${d.armor.def})`;
   if (d.tool) return `채집 속도 +${d.tool.power.toFixed(1)}${d.tool.chop ? ` · 벌목 ${d.tool.chop}단계` : ''}${d.tool.mine ? ` · 채굴 ${d.tool.mine}단계` : ''}`;
   if (d.trinket) return `전리품 +${pct(d.trinket.lootBonus)} · 경험치 +${pct(d.trinket.xpBonus)}`;

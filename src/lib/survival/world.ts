@@ -6,11 +6,13 @@ import type { LatLng, WorldCreature, WorldEntity, WorldNode } from './types';
 
 export const NODE_CELL_M = 24;
 export const NODE_DENSITY = 0.75;
-export const CREATURE_CELL_M = 90;
+export const CREATURE_CELL_M = 36;
 /** Creatures re-roll their position every epoch, so herds appear to roam. */
 export const CREATURE_EPOCH_MS = 8 * 60_000;
-export const CREATURE_DENSITY_DAY = 0.3;
-export const CREATURE_DENSITY_NIGHT = 0.38;
+export const CREATURE_DENSITY_DAY = 0.65;
+export const CREATURE_DENSITY_NIGHT = 0.78;
+/** Chance that a spawned creature is accompanied by 1~2 packmates 1~2m away. */
+export const PACK_CLUSTER_CHANCE = 0.45;
 /** Creatures never spawn this close to the base edge (safe zone). */
 export const SAFE_MARGIN_M = 15;
 /** Chance a park creature cell hosts a boss this epoch. */
@@ -98,8 +100,25 @@ export function generateCreatures(q: WorldQuery): WorldCreature[] {
         : pickWeighted(weights, hash01(cx, cy, epoch, 10));
       if (!type) continue;
       const id = `c:${cx}:${cy}:${epoch}`;
-      if (q.depleted[id]) continue;
-      out.push({ id, kind: 'creature', type, lat: pos.lat, lng: pos.lng });
+      if (!q.depleted[id]) {
+        out.push({ id, kind: 'creature', type, lat: pos.lat, lng: pos.lng });
+      }
+      // Pack / herd clustering: spawn 1~2 close companions within 1.2m ~ 2.2m so mobs roam in tight groups
+      const isBoss = (BOSS_TYPES as readonly string[]).includes(type);
+      const packRoll = hash01(cx, cy, epoch, 12);
+      if (!isBoss && packRoll < PACK_CLUSTER_CHANCE) {
+        const packCount = packRoll < PACK_CLUSTER_CHANCE * 0.4 ? 2 : 1;
+        for (let pIdx = 1; pIdx <= packCount; pIdx++) {
+          const pid = `c:${cx}:${cy}:${epoch}:p${pIdx}`;
+          if (q.depleted[pid]) continue;
+          const angle = hash01(cx, cy, epoch, 13 + pIdx) * Math.PI * 2;
+          const distM = 1.2 + hash01(cx, cy, epoch, 16 + pIdx) * 1.0; // 1.2m ~ 2.2m apart
+          const pPos = fromGrid(gx + Math.cos(angle) * distM, gy + Math.sin(angle) * distM);
+          if (distanceM(pPos, q.center) <= r) {
+            out.push({ id: pid, kind: 'creature', type, lat: pPos.lat, lng: pPos.lng });
+          }
+        }
+      }
     }
   }
   return out;

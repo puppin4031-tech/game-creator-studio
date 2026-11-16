@@ -13,7 +13,10 @@ export type PeerEvent =
   | { type: 'duel'; from: string; to: string; name: string }
   | { type: 'duel-end'; from: string; to: string }
   | { type: 'vassal-req'; from: string; to: string; name: string }
-  | { type: 'vassal-res'; from: string; to: string; name: string; accept: boolean };
+  | { type: 'vassal-res'; from: string; to: string; name: string; accept: boolean }
+  | { type: 'chat-req'; from: string; to: string; name: string }
+  | { type: 'chat-res'; from: string; to: string; name: string; accept: boolean }
+  | { type: 'chat-msg'; from: string; to: string; name: string; text: string };
 
 function guestId() {
   let id = sessionStorage.getItem('survival-guest-id');

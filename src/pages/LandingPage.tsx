@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { EXPLORATION_LOGIN_URL } from "@/lib/authNavigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { ColonionOpening } from "@/components/survival/ColonionOpening";
+import { hasSeenStoryTutorial, StoryTutorialModal } from "@/components/survival/StoryTutorial";
+import { getSettings, setBgmPlaying } from "@/lib/survival/gameSettings";
 import titleArt from "@/assets/colonion-opening.webp.asset.json";
 import { enterGuestSession } from '@/lib/guestEntry';
 import { lovable } from "@/integrations/lovable/index";
@@ -72,6 +74,26 @@ export default function LandingPage() {
   const [params, setParams] = useSearchParams();
   const [showSetup, setShowSetup] = useState(false);
   const [entering, setEntering] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => Promise<void> | void) | null>(null);
+
+  const runWithTutorialFirst = (action: () => Promise<void> | void) => {
+    if (getSettings().bgm) {
+      setBgmPlaying(true);
+    }
+    if (!hasSeenStoryTutorial()) {
+      setPendingAction(() => action);
+      setTutorialOpen(true);
+      return;
+    }
+    void action();
+  };
+
+  useEffect(() => {
+    if (getSettings().bgm) {
+      setBgmPlaying(true);
+    }
+  }, []);
 
   // Step 2 opens automatically after login (or guest entry) returns to "/?start=1".
   useEffect(() => {
@@ -125,6 +147,23 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+      <StoryTutorialModal
+        open={tutorialOpen}
+        onComplete={() => {
+          setTutorialOpen(false);
+          const next = pendingAction;
+          setPendingAction(null);
+          if (next) void next();
+          else navigate('/world');
+        }}
+        onSkip={() => {
+          setTutorialOpen(false);
+          const next = pendingAction;
+          setPendingAction(null);
+          if (next) void next();
+          else navigate('/world');
+        }}
+      />
       <AnimatePresence>{showSetup && <ColonionOpening onEnter={enterWorld} onClose={() => setShowSetup(false)} />}</AnimatePresence>
 
       {/* Colonion opening hero */}
@@ -149,7 +188,7 @@ export default function LandingPage() {
           <p className="mb-4 text-sm text-colonion-parchment">GPS기반 문명개척 무료게임</p>
           {user ? (
             <Button
-              onClick={() => navigate('/world')}
+              onClick={() => runWithTutorialFirst(() => navigate('/world'))}
               disabled={isLoading}
               className="flex h-14 w-full items-center justify-center gap-2 rounded border-2 border-colonion-wood-edge bg-gradient-to-b from-primary to-colonion-ember text-base font-bold text-colonion-night shadow-lg active:translate-y-0.5"
             >
@@ -158,9 +197,9 @@ export default function LandingPage() {
           ) : (
             <div className="pixel-panel space-y-2 p-3">
               <p className="text-xs text-colonion-parchment">로그인 · 회원가입</p>
-              <Button onClick={loginGoogle} disabled={isLoading || entering} className="h-12 w-full rounded border-2 border-colonion-wood-edge font-bold">Google로 계속하기</Button>
-              <Button onClick={guestWorld} disabled={isLoading || entering} variant="secondary" className="h-12 w-full rounded border-2 border-colonion-wood-edge font-bold">{entering ? '입장 중…' : '비회원으로 바로 입장하기'}</Button>
-              <Button onClick={() => navigate('/login?returnTo=%2Fworld')} variant="outline" className="h-12 w-full rounded border-2 border-colonion-wood-edge font-bold">기존 이메일 계정으로 로그인</Button>
+              <Button onClick={() => runWithTutorialFirst(loginGoogle)} disabled={isLoading || entering} className="h-12 w-full rounded border-2 border-colonion-wood-edge font-bold">Google로 계속하기</Button>
+              <Button onClick={() => runWithTutorialFirst(guestWorld)} disabled={isLoading || entering} variant="secondary" className="h-12 w-full rounded border-2 border-colonion-wood-edge font-bold">{entering ? '입장 중…' : '비회원으로 바로 입장하기'}</Button>
+              <Button onClick={() => runWithTutorialFirst(() => navigate('/login?returnTo=%2Fworld'))} variant="outline" className="h-12 w-full rounded border-2 border-colonion-wood-edge font-bold">기존 이메일 계정으로 로그인</Button>
             </div>
           )}
         </motion.div>

@@ -24,6 +24,8 @@ export interface Recipe {
 
 export const RECIPES: Recipe[] = [
   // Level 1 — campfire
+  { id: 'sling_stone', result: 'sling_stone', count: 10, ingredients: [{ itemId: 'flint', count: 1 }], minigame: 'knap', difficulty: 1, baseLevel: 1, processSec: 0 },
+  { id: 'arrow', result: 'arrow', count: 8, ingredients: [{ itemId: 'branch', count: 1 }, { itemId: 'flint', count: 1 }], minigame: 'knap', difficulty: 1, baseLevel: 1, processSec: 0 },
   { id: 'jerky', result: 'jerky', count: 1, ingredients: [{ itemId: 'raw_meat', count: 2 }, { itemId: 'branch', count: 1 }], minigame: 'fire', difficulty: 1, baseLevel: 1, processSec: 0 },
   { id: 'cordage', result: 'cordage', count: 2, ingredients: [{ itemId: 'fiber', count: 3 }], minigame: 'bind', difficulty: 1, baseLevel: 1, processSec: 0 },
   { id: 'hand_axe', result: 'hand_axe', count: 1, ingredients: [{ itemId: 'flint', count: 3 }, { itemId: 'branch', count: 1 }], minigame: 'knap', difficulty: 1, baseLevel: 1, processSec: 0 },
