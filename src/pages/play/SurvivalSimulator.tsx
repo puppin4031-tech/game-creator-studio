@@ -6,7 +6,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { SkillControls, ConstructionControls, CompanionControls, SkillEffect } from '@/components/survival/SurvivalAbilities';
 import CharacterSprite from '@/components/survival/CharacterSprite';
 import WinterThemeOverlay from '@/components/WinterThemeOverlay';
-import { Snowflake } from 'lucide-react';
 import DinoEggHatchModal from '@/components/survival/DinoEggHatchModal';
 import { eggArt } from '@/components/survival/eggArt';
 import CulinaryDishIcon, { isCustomCulinaryItem } from '@/components/survival/CulinaryDishIcon';
@@ -49,7 +48,7 @@ import SurvivalObjectives from '@/components/survival/SurvivalObjectives';
 import { toast } from 'sonner';
 import TerrainMap from '@/components/survival/TerrainMap';
 import { useSurvivalWorld } from '@/hooks/useSurvivalWorld';
-import { TERRAIN_ZONE_LABEL, zoneCellKey } from '@/lib/survival/terrainZone';
+import { zoneCellKey } from '@/lib/survival/terrainZone';
 import { gearEffect, ITEMS, requiredRangedAmmo, type ItemId } from '@/lib/survival/items';
 import { nodeDef, creatureDef } from '@/lib/survival/entities';
 import { PLAYER_SPRITE_HEIGHT, SPRITE_META, type SpriteKey } from '@/lib/survival/spriteMeta';
@@ -899,8 +898,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           <div className="flex items-center gap-1">허기<div className="h-2.5 flex-1 border border-foreground bg-muted"><div className="h-full bg-primary" style={{ width: `${s.hunger}%` }} /></div>{s.hunger}</div>
         </div>
         <div className="text-right text-[11px] leading-tight">
-          <div>{g.isNight ? '밤' : '낮'} · {TERRAIN_ZONE_LABEL[zone]}{inPark ? ' · 공원(짐승 多)' : ''}{g.inSanctuary ? ' · 성소(안전)' : ''} · 시야 {g.vision}m</div>
-          <div className="inline-flex items-center gap-0.5 rounded bg-primary/15 px-1 font-bold text-primary"><Snowflake className="!h-3 !w-3" />혹한기 구석기 시즌: 동토의 개척자</div>
+          {(inPark || g.inSanctuary) && <div className="font-bold text-primary">{g.inSanctuary ? '성소(안전)' : '공원(짐승 多)'}</div>}
           <div>
             배낭 {g.weight}/{g.capacity}kg
             {(() => {
