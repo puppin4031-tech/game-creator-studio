@@ -28,7 +28,7 @@ import { applyTribeWallDefense, DEFAULT_TRIBE_CLASS, getTribeClass, tribeCarryBo
 import { blueprintResearchCost, canPlaceVillageBuilding, computeBuildingHarvestBubble, computeVillageBonuses, ensureVillageState, isArtisanUnlocked, isBlueprintResearched, moveVillageBuilding, placeVillageBuilding, removeVillageBuilding, SHAMAN_SKILL_DEFS, shamanSkillLevel, VILLAGE_BUILDINGS, type ShamanSkillId, type VillageBuildingId, type VillageState } from '@/lib/survival/village';
 import { settleFoodSpoilage, SMOKE_CURING_MS, TAVERN_RECIPES, type SmokehouseBatch } from '@/lib/survival/culinary';
 import { computeExpeditionLevel, detectExpeditionPins, type RadarPin } from '@/lib/survival/radar';
-import { addStacks, hasAll, removeStacks, splitDeathDrop, splitByCapacity, stackWeight } from '@/lib/survival/inventory';
+import { addStacks, countOf, hasAll, removeStacks, splitDeathDrop, splitByCapacity, stackWeight } from '@/lib/survival/inventory';
 import { addExperience, dayPhase, xpToNext } from '@/lib/survival/progression';
 import { claimWorldQuest, freshProgress, type WorldProgress } from '@/lib/survival/worldProgress';
 import { currentQuest, LANGUAGE_QUEST, languageQuestProgress, questReady, type QuestState } from '@/lib/survival/quests';
