@@ -804,10 +804,13 @@ export function computeBuildingHarvestBubble(
   };
 }
 
-/** Computes total visual village population capacity (combat mercenaries + ambient villagers) from base level & placed buildings. */
+/** Computes total visual village population capacity (combat mercenaries + ambient villagers) from player level, base level & placed buildings.
+ * Rule: Village ambient population scales with player level (1 person per player level).
+ */
 export function computeVillagePopulationCapacity(
   state: VillageState | undefined,
-  baseLevel: 1 | 2 | 3
+  baseLevel: 1 | 2 | 3,
+  playerLevel: number = 1
 ): {
   maxTribeCapacity: number;
   ambientExtraCount: number;
@@ -819,7 +822,8 @@ export function computeVillagePopulationCapacity(
     0
   );
   const maxTribeCapacity = Math.min(12, 2 + baseLevel * 2 + Math.floor(facilityBonus / 2));
-  const ambientExtraCount = Math.min(6, Math.max(2, Math.floor(list.length / 2) + baseLevel));
+  // User level defines the natural ambient village population (1 person per level, min 1, max 20)
+  const ambientExtraCount = Math.max(1, Math.min(20, playerLevel));
   return {
     maxTribeCapacity,
     ambientExtraCount,

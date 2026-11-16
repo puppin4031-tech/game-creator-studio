@@ -11,14 +11,18 @@ interface Props {
   view: WorldView; onView: (v: WorldView) => void;
   site: BaseSite; onSite: (s: BaseSite) => void;
   hasBase: boolean; hasOutpost: boolean; crewActive: boolean;
+  hasExpeditionUnlocked?: boolean;
 }
 
 /** Segmented view switcher shown under the top HUD. */
-export default function WorldViewTabs({ view, onView, site, onSite, hasBase, hasOutpost, crewActive }: Props) {
+export default function WorldViewTabs({ view, onView, site, onSite, hasBase, hasOutpost, crewActive, hasExpeditionUnlocked = true }: Props) {
+  const visibleTabs = TABS.filter(tab => tab.id !== 'expedition' || hasExpeditionUnlocked);
+  const gridColsClass = visibleTabs.length === 2 ? 'grid-cols-2' : 'grid-cols-3';
+
   return (
     <div className="absolute left-2 top-[calc(max(0.5rem,env(safe-area-inset-top))+4.25rem)] z-20 flex w-auto max-w-[210px] flex-col gap-1">
-      <div role="tablist" aria-label="시점 전환" className="pixel-frame grid grid-cols-3 bg-card/95 p-0.5">
-        {TABS.map(({ id, label, icon: Icon }) => {
+      <div role="tablist" aria-label="시점 전환" className={`pixel-frame grid ${gridColsClass} bg-card/95 p-0.5`}>
+        {visibleTabs.map(({ id, label, icon: Icon }) => {
           const disabled = id === 'base' && !hasBase;
           const on = view === id;
           return (

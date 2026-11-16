@@ -939,6 +939,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         hasBase={!!s.base}
         hasOutpost={!!s.outpost}
         crewActive={!!crew}
+        hasExpeditionUnlocked={hasTribe || !!crew || !!s.expedition}
       />
       {view === 'base' && baseSite === 'outpost' && s.outpost && panel === 'none' && (
         <div className="pixel-frame absolute inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-20 flex items-center justify-between gap-2 bg-card/95 py-1.5 px-2.5 text-xs">

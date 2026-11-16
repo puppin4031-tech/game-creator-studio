@@ -409,8 +409,8 @@ export default function BaseVillageView({
   const vState = useMemo(() => ensureVillageState(village, hasAltar), [village, hasAltar]);
   const bonuses = useMemo(() => computeVillageBonuses(vState), [vState]);
   const popCap = useMemo(
-    () => computeVillagePopulationCapacity(vState, baseLevel),
-    [vState, baseLevel]
+    () => computeVillagePopulationCapacity(vState, baseLevel, playerLevel),
+    [vState, baseLevel, playerLevel]
   );
   const ownedPool = useMemo(() => addStacks(storage, backpack), [storage, backpack]);
   const spoiledCount = useMemo(
@@ -517,7 +517,8 @@ export default function BaseVillageView({
       },
     ];
     const rawTribeCount = tribe?.count ?? 0;
-    const tribeCount = Math.min(popCap.maxTribeCapacity, Math.max(2, rawTribeCount));
+    // Only display mercenaries that have actually been hired / recruited.
+    const tribeCount = Math.min(popCap.maxTribeCapacity, rawTribeCount);
     const activeClass = tribe?.classId ?? DEFAULT_TRIBE_CLASS;
     const classPool: TribeClassId[] = [];
     if (tribe?.classCounts) {
@@ -530,7 +531,7 @@ export default function BaseVillageView({
     for (let i = 0; i < tribeCount; i++) {
       const cid = classPool[i] ?? (i === 0 ? activeClass : fallbackClasses[i % fallbackClasses.length]);
       const cls = getTribeClass(cid);
-      const isAmbacho = i === 0 || cid === 'gatherer';
+      const isAmbacho = i === 0 && cid === 'gatherer';
       const role: AgentRole =
         cid === 'tank' || cid === 'ranged'
           ? 'wall_patrol'
@@ -1383,7 +1384,7 @@ export default function BaseVillageView({
         {/* Legend overlay */}
         <div className="pointer-events-none absolute bottom-1.5 right-2 flex items-center gap-1.5 rounded bg-background/85 px-1.5 py-0.5 text-[10px]">
           <span>
-            전투용병 {Math.max(2, Math.min(popCap.maxTribeCapacity, tribe?.count ?? 0))}명
+            전투용병 {Math.min(popCap.maxTribeCapacity, tribe?.count ?? 0)}명
           </span>
           <span>·</span>
           <span>일꾼주민 {popCap.ambientExtraCount}명</span>
