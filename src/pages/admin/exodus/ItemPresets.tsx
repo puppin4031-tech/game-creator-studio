@@ -149,7 +149,7 @@ export default function ItemPresets() {
 
                 <div className="flex-1 flex items-center justify-center relative z-10 p-2">
                   <img src={item.image} alt={item.name}
-                    className="max-h-[60px] sm:max-h-[80px] object-contain group-hover:scale-110 transition-transform duration-300 drop-shadow-lg" />
+                    className="pixelated max-h-[60px] sm:max-h-[80px] object-contain group-hover:scale-110 transition-transform duration-300 drop-shadow-lg" />
                 </div>
 
                 <div className="px-2 pb-2 relative z-10">

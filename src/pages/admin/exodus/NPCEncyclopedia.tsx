@@ -154,7 +154,7 @@ export default function NPCEncyclopedia() {
               <button onClick={() => handleSelect(npc)}
                 className="group rounded-lg bg-card border border-border hover:border-accent/40 overflow-hidden transition-all hover:shadow-lg hover:shadow-accent/10 text-left w-full">
                 <div className="aspect-[3/4] relative overflow-hidden bg-gradient-to-b from-muted to-card max-h-[120px] sm:max-h-[150px]">
-                  <img src={npc.image} alt={npc.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <img src={npc.image} alt={npc.name} className="pixelated w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                   <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-card to-transparent h-1/3" />
                 </div>
                 <div className="p-2">
@@ -190,7 +190,7 @@ export default function NPCEncyclopedia() {
                 </SheetTitle>
               </SheetHeader>
               <div className="my-4 rounded-xl overflow-hidden bg-gradient-to-b from-muted to-card aspect-[4/3]">
-                <img src={selectedNPC.image} alt={selectedNPC.name} className="w-full h-full object-cover" />
+                <img src={selectedNPC.image} alt={selectedNPC.name} className="pixelated w-full h-full object-cover" />
               </div>
               <p className="text-[14px] text-muted-foreground mb-4">{selectedNPC.role}</p>
               <div className="flex-1">
@@ -198,7 +198,7 @@ export default function NPCEncyclopedia() {
                 <div className="rounded-xl bg-muted border border-border p-4 min-h-[100px]">
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-accent/30">
-                      <img src={selectedNPC.image} alt="" className="w-full h-full object-cover" />
+                      <img src={selectedNPC.image} alt="" className="pixelated w-full h-full object-cover" />
                     </div>
                     <div className="flex-1">
                       <span className="text-[12px] font-medium" style={{ color: selectedNPC.color }}>{selectedNPC.name}</span>

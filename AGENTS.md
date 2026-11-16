@@ -35,3 +35,4 @@
 - Pet fusion compares explicit legacy/admin species aliases through fusionSpecies, preserving instance IDs and locks; why: renamed dinosaurs can merge across catalog generations without merging unrelated names.
 - `/home` and `/` render the same landing page and share CDN opening artwork with pioneer selection; why: both entry addresses must display consistent art without duplicate pages or binaries.
 - Tag team assignments are guarded by a database trigger: only the room owner may change teams while waiting, and player identity fields are immutable; why: self-update policies must not allow score reassignment.
+- New or oversized art goes through scripts/pixelate-asset.py (alpha trim, nearest pixel grid, limited palette) and is shown with the pixelated class; why: keeps sprites crisp and tiny for many concurrent players.
