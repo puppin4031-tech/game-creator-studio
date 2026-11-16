@@ -493,8 +493,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden font-pixel">
       {view === 'expedition' && s.base && <div className="pointer-events-none fixed inset-x-2 z-30 flex flex-col items-start gap-0" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 13rem)' }}>
-        {(fieldExp || !crew) && <div className="pixel-panel pointer-events-auto max-h-[50dvh] w-full max-w-md overflow-y-auto bg-card p-2">{expeditionControls}</div>}
-        <button type="button" onClick={() => setFieldExp(v => !v)} className="pixel-btn pointer-events-auto flex min-h-9 items-center gap-1 bg-primary px-2.5 text-[10px] text-primary-foreground"><Compass className="!h-4 !w-4" />{fieldExp || !crew ? '원정 접기' : crew ? '원정 지휘' : '원정 보내기'}</button>
+        {fieldExp && <div className="pixel-panel pointer-events-auto max-h-[50dvh] w-full max-w-md overflow-y-auto bg-card p-2">{expeditionControls}</div>}
+        <button type="button" onClick={() => setFieldExp(v => !v)} className="pixel-btn pointer-events-auto flex min-h-9 items-center gap-1 bg-primary px-2.5 text-[10px] text-primary-foreground"><Compass className="!h-4 !w-4" />{fieldExp ? '원정 접기' : crew ? '원정 지휘' : '원정 보내기'}</button>
       </div>}
       <AnimatePresence>{showOpening && <ColonionOpening onEnter={enterWorld} />}</AnimatePresence>
       {<TerrainMap center={viewFocus(view, baseSite, { pos: s.pos, base: s.base, outpost: s.outpost, crew: crew?.pos })} visionM={g.vision} explored={s.explored} onTap={onTap} zone={zone} onSurfaceZone={onSurfaceZone} onSurfacePark={onSurfacePark} onLandmarks={setLandmarks} bearing={compassOn && heading !== null ? heading : 0}>
@@ -677,7 +677,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         <Compass className="!h-6 !w-6" style={{ transform: `rotate(${compassOn && heading !== null ? -heading : 0}deg)` }} />
       </button>
 
-      <WorldViewTabs view={view} onView={v => { setView(v); if (v !== 'expedition') setFieldExp(false); }} site={baseSite} onSite={setBaseSite} hasBase={!!s.base} hasOutpost={!!s.outpost} crewActive={!!crew} />
+      <WorldViewTabs view={view} onView={v => { setView(v); setFieldExp(v === 'expedition'); }} site={baseSite} onSite={setBaseSite} hasBase={!!s.base} hasOutpost={!!s.outpost} crewActive={!!crew} />
       {view === 'base' && s.base && <div className="pixel-frame absolute inset-x-2 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 flex flex-col gap-1.5 bg-card/95 p-2 text-xs">
         <div className="flex justify-between"><b>{baseSite === 'outpost' && s.outpost ? '전진기지' : `본진 Lv.${s.base.level}`}</b><span>창고 {s.storage.reduce((n, x) => n + x.count, 0)}개 · 부족민 {s.tribe?.count ?? 0} · 수호 펫 {(s.pets ?? []).filter(x => x.deployed).length}</span></div>
         <div className="grid grid-cols-3 gap-1.5">
