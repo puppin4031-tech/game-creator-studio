@@ -475,10 +475,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
             nextPosMap[e.id] = curPos;
           }
         } else {
-          // Gentle natural roaming (1~2.5m orbit around spawn point) so mobs never look frozen
-          const seed = e.id.split('').reduce((a, ch) => a + ch.charCodeAt(0), 0);
-          const angle = t / 1800 + seed;
-          nextPosMap[e.id] = offsetM({ lat: e.lat, lng: e.lng }, Math.cos(angle) * 1.8, Math.sin(angle) * 1.8);
+          // Keep mobs firmly anchored at their original spawn coordinates on the map so they don't drift or wander
+          nextPosMap[e.id] = { lat: e.lat, lng: e.lng };
         }
       }
       setMobPositions(nextPosMap);
@@ -808,7 +806,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               return (
                 <button key={e.id} type="button" aria-label={name} onClick={(ev) => { ev.stopPropagation(); tapEntity(e); }}
                   data-resource-id={e.id} data-lat={liveCoord.lat} data-lng={liveCoord.lng}
-                  className={`pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center ${e.kind === 'creature' ? 'transition-[left,top] duration-500 ease-linear' : ''}`}
+                  className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center"
                   style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}>
                   <div className="relative">
                   {creature && (creature.temper !== 'passive' || engaged || (dmg ?? 0) > 0) && <div data-creature-ring={e.id} aria-hidden className={`pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed ${aggroIds.has(e.id) || engaged || (dmg ?? 0) > 0 ? 'border-destructive bg-destructive/10' : 'border-destructive/40'}`} style={{ width: (CREATURE_RING_RADIUS_M / mpp) * 2, height: (CREATURE_RING_RADIUS_M / mpp) * 2 }} />}
@@ -888,7 +886,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               const ally = allies.some(a => a.id === pr.id);
               return (
                 <button key={pr.id} type="button" aria-label={`${pr.name} 상호작용`} onClick={(ev) => { ev.stopPropagation(); setSelPeerId(pr.id); }}
-                  className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center transition-[left,top] duration-1000 ease-linear"
+                  className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center"
                   style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}>
                   {bubbles[pr.id] && <span className="whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbleView(bubbles[pr.id])}</span>}
                   <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><CharacterSprite height={PLAYER_SPRITE_HEIGHT} className="opacity-90 hue-rotate-90" /></div>
@@ -904,12 +902,16 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   {(s.companions ?? []).some(c => c.kind === 'wolf') && <div className="absolute left-1/2 top-1/2 translate-x-5"><Sprite k="mob-wolf" scale={0.7} /></div>}
                   <div className="rounded-full border border-primary/60" style={{ width: r * 2, height: r * 2 }} />
                   {(() => {
-                    // Visual-only offset: stop slightly short of the object so the sprite stands beside it.
+                    // Visual-only reach offset: subtle step towards target so character strikes without flying wildly
                     const t = actorTarget ? project(actorTarget) : p;
-                    const dx = (t.x - p.x) * 0.85, dy = (t.y - p.y) * 0.85;
-                    const isFacingLeft = actorTarget ? dx < -1 : playerFacing === 'left';
+                    const rawDx = (t.x - p.x) * 0.7, rawDy = (t.y - p.y) * 0.7;
+                    const len = Math.hypot(rawDx, rawDy) || 1;
+                    const maxReach = 28;
+                    const dx = actorTarget ? (len > maxReach ? (rawDx / len) * maxReach : rawDx) : 0;
+                    const dy = actorTarget ? (len > maxReach ? (rawDy / len) * maxReach : rawDy) : 0;
+                    const isFacingLeft = actorTarget ? rawDx < -1 : playerFacing === 'left';
                     return (
-                      <motion.div className="absolute left-1/2 top-1/2" initial={false} animate={{ x: dx, y: dy }} transition={{ duration: actorTarget ? 0.25 : 0.5, ease: 'easeOut' }}>
+                      <div className="absolute left-1/2 top-1/2">
                         <div className="-translate-x-1/2 -translate-y-[85%]">
                           {auto.job && (() => {
                             const tgt = g.entities.find(x => x.id === auto.job!.id);
@@ -922,11 +924,15 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                           {bubbles[presence.selfId] && <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbleView(bubbles[presence.selfId])}</span>}
                           <div className="relative">
                             <div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" />
-                            <HitFlash hit={hit}>
-                              <div style={{ transform: isFacingLeft ? 'scaleX(-1)' : undefined, opacity: crew ? 0.35 : 1, transition: 'opacity 0.3s' }}>
-                                <CharacterSprite action={action} level={s.level} height={PLAYER_SPRITE_HEIGHT} />
-                              </div>
-                            </HitFlash>
+                            {/* Animated Player Character: strikes/steps forward towards target while staying rooted */}
+                            <motion.div initial={false} animate={{ x: dx, y: dy }} transition={{ duration: actorTarget ? 0.22 : 0.38, ease: 'easeOut' }}>
+                              <HitFlash hit={hit}>
+                                <div style={{ transform: isFacingLeft ? 'scaleX(-1)' : undefined, opacity: crew ? 0.35 : 1, transition: 'opacity 0.3s' }}>
+                                  <CharacterSprite action={action} level={s.level} height={PLAYER_SPRITE_HEIGHT} />
+                                </div>
+                              </HitFlash>
+                            </motion.div>
+                            {/* Escort tribes: remain stably anchored alongside player instead of being dragged */}
                             {escortReady(s.tribe, Date.now(), !!s.observedExpedition?.mercenary) && (
                               <>
                                 {Array.from({ length: Math.min(5, s.tribe?.count ?? 1) }, (_, k) => (
@@ -945,6 +951,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                                 ))}
                               </>
                             )}
+                            {/* Companion pets: remain stably anchored alongside player */}
                             {(s.pets ?? []).filter(x => petRole(x) === 'follow').map((x, i) => (
                               <div
                                 key={x.uid}
@@ -959,7 +966,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                             ))}
                           </div>
                         </div>
-                      </motion.div>
+                      </div>
                     );
                   })()}
                 </div>

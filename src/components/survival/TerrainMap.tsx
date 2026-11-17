@@ -141,7 +141,7 @@ export default function TerrainMap({ center, visionM, explored, onTap, zone = 'p
     const map = mapRef.current;
     if (!map) return;
     const zoom = zoomTarget.current ?? map.getZoom();
-    map.easeTo({ center: [center.lng, center.lat], zoom, duration: 600 });
+    map.easeTo({ center: [center.lng, center.lat], zoom, duration: 280 });
   }, [center.lat, center.lng]);
   // Heading-up rotation: bearing is already smoothed by the heading hook, so jump without easing.
   useEffect(() => {
