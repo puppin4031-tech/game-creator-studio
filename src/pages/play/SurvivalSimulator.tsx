@@ -49,7 +49,7 @@ import TerrainMap from '@/components/survival/TerrainMap';
 import { useSurvivalWorld } from '@/hooks/useSurvivalWorld';
 import { zoneCellKey } from '@/lib/survival/terrainZone';
 import { gearEffect, ITEMS, requiredRangedAmmo, type ItemId } from '@/lib/survival/items';
-import { nodeDef, creatureDef } from '@/lib/survival/entities';
+import { nodeDef, creatureDef, BOSS_TYPES } from '@/lib/survival/entities';
 import { PLAYER_SPRITE_HEIGHT, SPRITE_META, type SpriteKey } from '@/lib/survival/spriteMeta';
 import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
 import { SURVIVAL_CONFIG as C } from '@/lib/survival/config';
@@ -275,12 +275,22 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const autoStep = (e: WorldEntity): 'continue' | 'stop' => {
     const w = gRef.current; const p = w.state;
     const alive = w.entities.some(x => x.id === e.id) && (e.kind === 'node' ? isNodeAvailable(e.id, e.type, p.depleted, Date.now()) : !p.depleted[e.id]);
-    if (!alive) { window.clearTimeout(returnTimer.current); returnTimer.current = window.setTimeout(returnToCenter, ACTOR_IDLE_RETURN_MS); return 'stop'; }
+    if (!alive) {
+      window.clearTimeout(returnTimer.current);
+      returnTimer.current = window.setTimeout(returnToCenter, ACTOR_IDLE_RETURN_MS);
+      // 7. 신난다: 우두머리 처치나 희귀 광석 채취 완료 시
+      const isRare = e.kind === 'node' && ['obsidian', 'jade', 'hematite', 'quartz', 'flint'].includes(e.type);
+      const isBoss = e.kind === 'creature' && (BOSS_TYPES as readonly string[]).includes(e.type);
+      if (isRare || isBoss) {
+        playAction('celebrate', 2500);
+      }
+      return 'stop';
+    }
     const isRangedWeapon = !!(w.weapon && ITEMS[w.weapon.itemId]?.weapon?.ranged);
     const effectiveReach = e.kind === 'creature' && isRangedWeapon ? Math.max(w.reach, 35) : w.reach;
     if (distanceM(p.pos, e) > effectiveReach) { toast('대상과 멀어져 작업을 멈췄습니다'); returnToCenter(); return 'stop'; }
     if (e.kind === 'node' && w.weight >= w.capacity) { toast.warning('배낭이 가득 찼습니다'); return 'stop'; }
-    const act: SpriteAction = e.kind === 'creature' ? 'attack' : STRIKE_NODES.has(e.type) ? 'chop' : 'gather';
+    const act: SpriteAction = e.kind === 'creature' ? 'attack' : 'gather';
     const liveEntity = e.kind === 'creature' && mobPositionsRef.current[e.id]
       ? { ...e, lat: mobPositionsRef.current[e.id].lat, lng: mobPositionsRef.current[e.id].lng }
       : e;
@@ -326,12 +336,74 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     }
     if (lastPos.current.lat !== s.pos.lat || lastPos.current.lng !== s.pos.lng) {
       lastPos.current = s.pos;
-      setAction(a => (a === 'idle' ? 'walk' : a));
+      setAction(a => (a === 'idle' || a === 'pick_nose' || a === 'poop' ? 'walk' : a));
       window.clearTimeout(actionTimer.current);
-      actionTimer.current = window.setTimeout(() => setAction('idle'), 1500);
+      actionTimer.current = window.setTimeout(() => {
+        // 6. 코파기: 걷다 멈췄을 때 20% 확률로 등장
+        if (Math.random() < 0.20) {
+          setAction('pick_nose');
+          actionTimer.current = window.setTimeout(() => setAction('idle'), 2500);
+        } else {
+          setAction('idle');
+        }
+      }, 1500);
     }
   }, [s.pos]);
   useEffect(() => () => { window.clearTimeout(actionTimer.current); window.clearTimeout(returnTimer.current); }, []);
+
+  // 5. 똥싸기 & 6. 코파기 대기 모션 제어
+  const lastPoopAt = useRef<number>(0);
+  useEffect(() => {
+    if (action !== 'idle') return;
+    const interval = window.setInterval(() => {
+      setAction(current => {
+        if (current !== 'idle') return current;
+        const now = Date.now();
+        const lastAte = s.lastAteAt ?? 0;
+        const twoHours = 2 * 60 * 60 * 1000;
+
+        // 5. 똥싸기: 음식 먹고 2시간 후에 대기할 때 가끔 (2시간 경과, 최근 배변 후 15분 이상, 40% 확률)
+        if (lastAte > 0 && now - lastAte >= twoHours && now - lastPoopAt.current > 15 * 60 * 1000) {
+          if (Math.random() < 0.4) {
+            lastPoopAt.current = now;
+            window.clearTimeout(actionTimer.current);
+            actionTimer.current = window.setTimeout(() => setAction('idle'), 3500);
+            toast('💩 속이 더부룩하여 볼일을 봅니다...', { duration: 3000 });
+            return 'poop';
+          }
+        }
+
+        // 6. 코파기: 대기할 때 20% 확률로 등장
+        if (Math.random() < 0.20) {
+          window.clearTimeout(actionTimer.current);
+          actionTimer.current = window.setTimeout(() => setAction('idle'), 2500);
+          return 'pick_nose';
+        }
+
+        return current;
+      });
+    }, 12000);
+
+    return () => window.clearInterval(interval);
+  }, [action, s.lastAteAt]);
+
+  // 7. 신난다: 레벨업 시
+  const prevLevel = useRef(s.level);
+  useEffect(() => {
+    if (s.level > prevLevel.current) {
+      prevLevel.current = s.level;
+      playAction('celebrate', 2500);
+    }
+  }, [s.level]);
+
+  // 8. 피격: 타격 데미지 입을 때
+  const hit = useHitPulse(s.hp);
+  useEffect(() => {
+    if (hit) {
+      playAction('hurt', 500);
+    }
+  }, [hit]);
+
   // Return sprite to GPS center when the player really walks or the object leaves the radius.
   useEffect(() => {
     if (actorTarget && shouldReturnToCenter(s.pos, actorTarget, g.reach)) returnToCenter();
@@ -386,7 +458,6 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [shamanWords, setShamanWords] = useState<string | null>(null);
   const [dinoExpeditionOpen, setDinoExpeditionOpen] = useState(false);
 
-  const hit = useHitPulse(s.hp);
   const [techTab, setTechTab] = useState<TechCategory>('general');
   const [nowTick, setNowTick] = useState(() => Date.now());
   useEffect(() => { const t = setInterval(() => setNowTick(Date.now()), 15_000); return () => clearInterval(t); }, []);

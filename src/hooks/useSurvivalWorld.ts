@@ -119,6 +119,7 @@ export interface WorldSave extends WorldProgress {
   /** Lifetime explored steps; explored[] itself is capped. */
   exploredTotal?: number;
   scoutReport?: ScoutTarget[];
+  lastAteAt?: number;
   lastTickAt: number;
 }
 
@@ -917,7 +918,13 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const left = removeStacks(p[from], [{ itemId, count: 1 }]);
     if (!left) return;
     const hpGain = it.food?.hp ?? it.heal ?? 0;
-    setS({ ...p, [from]: left, hunger: Math.min(100, p.hunger + (it.food?.hunger ?? 0)), hp: Math.max(1, Math.min(maxHpOf(p), p.hp + hpGain)) });
+    setS({
+      ...p,
+      [from]: left,
+      hunger: Math.min(100, p.hunger + (it.food?.hunger ?? 0)),
+      hp: Math.max(1, Math.min(maxHpOf(p), p.hp + hpGain)),
+      lastAteAt: Date.now(),
+    });
     toast(`${it.name} 사용`);
   }, []);
 

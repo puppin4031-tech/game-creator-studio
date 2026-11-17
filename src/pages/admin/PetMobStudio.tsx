@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CUSTOM_CATALOG_KEY, useCustomCatalog } from '@/hooks/useCustomCatalog';
 import { STRIDE_M } from '@/lib/survival/dinoEggs';
-import { ActionCard } from './SpriteAssets';
+import { ActionCard, ScaleControl } from './SpriteAssets';
 
 const slug = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 32);
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : typeof e === 'object' && e && 'message' in e ? String((e as { message: unknown }).message) : '알 수 없는 오류');
@@ -83,7 +83,7 @@ function MobForm() {
   );
 }
 
-function Row({ title, desc, active, onToggle, onDelete, sprites }: { title: string; desc: string; active: boolean; onToggle: (v: boolean) => void; onDelete: () => void; sprites: React.ReactNode }) {
+function Row({ title, desc, active, onToggle, onDelete, target, sprites }: { title: string; desc: string; active: boolean; onToggle: (v: boolean) => void; onDelete: () => void; target: string; sprites: React.ReactNode }) {
   return (
     <div className="space-y-3 rounded-lg border p-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -91,6 +91,7 @@ function Row({ title, desc, active, onToggle, onDelete, sprites }: { title: stri
         <Label className="flex items-center gap-2">사용<Switch checked={active} onCheckedChange={onToggle} /></Label>
         <Button size="icon" variant="ghost" className="h-11 w-11" aria-label="삭제" onClick={onDelete}><Trash2 className="h-4 w-4" /></Button>
       </div>
+      <ScaleControl target={target} />
       <div className="grid gap-3 sm:grid-cols-2">{sprites}</div>
     </div>
   );
@@ -112,7 +113,7 @@ export default function PetMobStudio() {
           <PetForm />
           {isLoading && <Loader2 className="h-5 w-5 animate-spin" />}
           {data?.pets.map(p => (
-            <Row key={p.pet_id} title={p.name} active={p.is_active}
+            <Row key={p.pet_id} title={p.name} active={p.is_active} target={`pet:${p.pet_id}`}
               desc={`${p.hatch_mode === 'steps' ? `${p.hatch_steps}걸음` : `${p.hatch_meters}m`} · 시속 ${p.max_speed_kmh}km 이하 · 비중 ${p.weight}`}
               onToggle={v => run(() => supabase.from('survival_custom_pets').update({ is_active: v }).eq('pet_id', p.pet_id), '변경했어요.')}
               onDelete={() => run(() => supabase.from('survival_custom_pets').delete().eq('pet_id', p.pet_id), '삭제했어요.')}
@@ -122,7 +123,8 @@ export default function PetMobStudio() {
         <TabsContent value="mobs" className="space-y-4">
           <MobForm />
           {data?.mobs.map(m => (
-            <Row key={m.mob_id} title={m.name} active={m.is_active} desc={`체력 ${m.hp} · 공격 ${m.atk} · 경험치 ${m.xp} · 비중 ${m.spawn_weight}`}
+            <Row key={m.mob_id} title={m.name} active={m.is_active} target={`mob:custom_${m.mob_id}`}
+              desc={`체력 ${m.hp} · 공격 ${m.atk} · 경험치 ${m.xp} · 비중 ${m.spawn_weight}`}
               onToggle={v => run(() => supabase.from('survival_custom_mobs').update({ is_active: v }).eq('mob_id', m.mob_id), '변경했어요.')}
               onDelete={() => run(() => supabase.from('survival_custom_mobs').delete().eq('mob_id', m.mob_id), '삭제했어요.')}
               sprites={<><ActionCard action="idle" CHARACTER={`mob:custom_${m.mob_id}`} /><ActionCard action="attack" CHARACTER={`mob:custom_${m.mob_id}`} /></>} />
