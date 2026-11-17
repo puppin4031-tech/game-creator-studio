@@ -221,6 +221,18 @@ export default function RadarMapModal({
     return { xPct, yPct };
   };
 
+  /** Inverses percentage coordinates on the radar map canvas back to LatLng */
+  const fromMapPct = (xPct: number, yPct: number): LatLng => {
+    const mLat = 111_320;
+    const mLng = 111_320 * Math.cos((center.lat * Math.PI) / 180);
+    const dxM = ((xPct - 50) / 44) * currentScanRadius + panM.x;
+    const dyM = ((50 - yPct) / 44) * currentScanRadius + panM.y;
+    return {
+      lat: center.lat + dyM / mLat,
+      lng: center.lng + dxM / mLng,
+    };
+  };
+
   const toggleFilter = (k: RadarFilterKind) =>
     setFilters(prev => ({ ...prev, [k]: !prev[k] }));
 
@@ -310,7 +322,28 @@ export default function RadarMapModal({
     }
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStateRef.current.hasDragged && e.changedTouches.length === 1) {
+      const targetEl = e.target as HTMLElement;
+      if (targetEl && (targetEl.tagName === 'DIV' || targetEl.tagName === 'svg' || targetEl.tagName === 'line' || targetEl.tagName === 'circle')) {
+        const touch = e.changedTouches[0];
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (rect) {
+          const xPct = ((touch.clientX - rect.left) / rect.width) * 100;
+          const yPct = ((touch.clientY - rect.top) / rect.height) * 100;
+          const coord = fromMapPct(xPct, yPct);
+          const dist = Math.round(distanceM(center, coord));
+          setSelectedSpot({
+            id: `coord-${Date.now()}`,
+            name: `지정 좌표 (${dist >= 1000 ? `${(dist / 1000).toFixed(1)}km` : `${dist}m`})`,
+            lat: coord.lat,
+            lng: coord.lng,
+            kindLabel: '📍 지도 지정 좌표',
+            distanceM: dist,
+          });
+        }
+      }
+    }
     touchStateRef.current.mode = 'none';
   };
 
@@ -340,6 +373,26 @@ export default function RadarMapModal({
 
   const handleMouseUp = () => {
     isMouseDraggingRef.current = false;
+  };
+
+  const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (touchStateRef.current.hasDragged || hasMouseDraggedRef.current) return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const xPx = e.clientX - rect.left;
+    const yPx = e.clientY - rect.top;
+    const xPct = (xPx / rect.width) * 100;
+    const yPct = (yPx / rect.height) * 100;
+    const coord = fromMapPct(xPct, yPct);
+    const dist = Math.round(distanceM(center, coord));
+    setSelectedSpot({
+      id: `coord-${Date.now()}`,
+      name: `지정 좌표 (${dist >= 1000 ? `${(dist / 1000).toFixed(1)}km` : `${dist}m`})`,
+      lat: coord.lat,
+      lng: coord.lng,
+      kindLabel: '📍 지도 지정 좌표',
+      distanceM: dist,
+    });
   };
 
   const handleWheel = (e: React.WheelEvent) => {
@@ -507,6 +560,7 @@ export default function RadarMapModal({
       <div
         ref={containerRef}
         data-radar-canvas
+        onClick={handleCanvasClick}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -631,7 +685,8 @@ export default function RadarMapModal({
             <button
               key={e.id}
               type="button"
-              onClick={() => {
+              onClick={(ev) => {
+                ev.stopPropagation();
                 if (touchStateRef.current.hasDragged || hasMouseDraggedRef.current) return;
                 setSelectedSpot({
                   id: e.id,
@@ -643,13 +698,13 @@ export default function RadarMapModal({
                   distanceM: Math.round(distanceM(center, e)),
                 });
               }}
-              className="absolute z-30 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center animate-bounce cursor-pointer"
+              className="absolute z-30 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center cursor-pointer transition-transform hover:scale-125"
               style={{ left: `${xPct}%`, top: `${yPct}%` }}
             >
-              <span className="rounded-full bg-yellow-400 border-2 border-black p-1 text-sm shadow-[0_0_12px_#facc15]">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/90 border-2 border-emerald-300 text-xs shadow-[0_0_8px_rgba(52,211,153,0.8)]">
                 {icon}
               </span>
-              <span className="rounded border border-black/80 bg-black/90 px-1.5 py-0.5 text-[9px] font-bold text-yellow-300 whitespace-nowrap shadow-md mt-0.5">
+              <span className="rounded border border-emerald-700 bg-[#0d1911]/90 px-1 py-0.2 text-[8px] font-bold text-emerald-200 whitespace-nowrap mt-0.5 shadow">
                 {name}
               </span>
             </button>
@@ -664,7 +719,8 @@ export default function RadarMapModal({
             <button
               key={lm.id}
               type="button"
-              onClick={() => {
+              onClick={(ev) => {
+                ev.stopPropagation();
                 if (touchStateRef.current.hasDragged || hasMouseDraggedRef.current) return;
                 setSelectedSpot({
                   id: lm.id,
@@ -685,33 +741,20 @@ export default function RadarMapModal({
           );
         })}
 
-        {/* Discovered Sparkling Pins (Expedition Scout Drops) */}
-        {discoveredPins.map(pin => {
-          const { xPct, yPct } = toMapPct(pin);
+        {/* Active Coordinate Reticle */}
+        {selectedSpot && (() => {
+          const { xPct, yPct } = toMapPct(selectedSpot);
           if (xPct < -5 || xPct > 105 || yPct < -5 || yPct > 105) return null;
           return (
-            <button
-              key={pin.id}
-              type="button"
-              onClick={() => {
-                if (touchStateRef.current.hasDragged || hasMouseDraggedRef.current) return;
-                setSelectedSpot({
-                  id: pin.id,
-                  name: pin.label,
-                  lat: pin.lat,
-                  lng: pin.lng,
-                  kindLabel: '✨ 원정대 실측 발견 좌표',
-                  probabilityPct: 100,
-                  distanceM: Math.round(distanceM(center, pin)),
-                });
-              }}
-              className="absolute z-30 -translate-x-1/2 -translate-y-1/2 animate-bounce rounded-full border border-black bg-yellow-400 px-2 py-0.5 text-[9px] font-black text-black shadow-[0_0_12px_#facc15]"
+            <div
+              className="pointer-events-none absolute z-40 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
               style={{ left: `${xPct}%`, top: `${yPct}%` }}
             >
-              ✨{pin.label}
-            </button>
+              <div className="h-9 w-9 rounded-full border-2 border-dashed border-emerald-400 animate-spin [animation-duration:8s]" />
+              <div className="absolute h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399]" />
+            </div>
           );
-        })}
+        })()}
 
         {/* Saved Favorites Markers */}
         {favorites.map((fav, idx) => {

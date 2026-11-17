@@ -223,9 +223,17 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
   const onTap = (p: LatLng) => {
     if (auto.job) { auto.stop(); returnToCenter(); }
-    if (realGps) { setExpeditionTarget(p); return; }
     const d = distanceM(s.pos, p);
-    if (d > g.vision * 1.2) { toast('안개 속으로는 한 걸음씩 나아가세요'); return; }
+    if (realGps) {
+      setExpeditionTarget(p);
+      toast.success(`📍 목표 좌표 설정 (${d >= 1000 ? `${(d / 1000).toFixed(1)}km` : `${Math.round(d)}m`})`);
+      return;
+    }
+    if (d > g.vision * 1.2) {
+      setExpeditionTarget(p);
+      toast.success(`📍 목표 좌표 설정 (${d >= 1000 ? `${(d / 1000).toFixed(1)}km` : `${Math.round(d)}m`})`);
+      return;
+    }
     g.moveTo(p);
   };
 
@@ -357,6 +365,11 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   useEffect(() => { setSanctuaries([...landmarks.filter((l) => l.kind === 'shaman'), ...nearShrines].map((l) => ({ lat: l.lat, lng: l.lng }))); }, [landmarks, nearShrines, setSanctuaries]);
   const [selLandmark, setSelLandmark] = useState<Landmark | null>(null);
   const favs = useSurvivalFavorites();
+  const activeTarget = favs.tracked
+    ? { lat: favs.tracked.lat, lng: favs.tracked.lng, name: favs.tracked.name, isFav: true, id: favs.tracked.id }
+    : expeditionTarget
+    ? { lat: expeditionTarget.lat, lng: expeditionTarget.lng, name: '지정 목표 좌표', isFav: false, id: null }
+    : null;
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
   const mapBearing = compassOn && heading !== null ? heading : 0;
@@ -656,33 +669,55 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 className="pointer-events-auto absolute z-10 flex min-h-11 min-w-11 -translate-x-1/2 -translate-y-full items-center justify-center" style={{ left: p.x, top: p.y }}>
                 <motion.img src={eggArt(egg.id)} alt="" className="pixelated h-10 w-10 object-contain drop-shadow-[0_0_8px_hsl(var(--accent))]" animate={reducedMotion ? undefined : { y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 1.4 }} />
               </button>); })}
-            {expeditionTarget && (() => { const p = project(expeditionTarget); return <div className="pointer-events-none absolute -translate-x-1/2 -translate-y-full rounded bg-primary px-2 py-1 text-xs text-primary-foreground" style={{ left: p.x, top: p.y }}>원정 목표</div>; })()}
-            {favs.tracked && (() => {
+            {activeTarget && (() => {
               const from = project(s.pos);
-              const to = project(favs.tracked);
+              const to = project(activeTarget);
+              const d = distanceM(s.pos, activeTarget);
+              const distStr = d >= 1000 ? `${(d / 1000).toFixed(1)}km` : `${Math.round(d)}m`;
               return (
-                <svg className="pointer-events-none absolute inset-0 z-10 h-full w-full" aria-hidden>
-                  <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke="#facc15" strokeWidth="2.5" strokeDasharray="6 4" />
-                  <circle cx={to.x} cy={to.y} r="6" fill="#facc15" stroke="#000" strokeWidth="1.5" />
-                </svg>
+                <>
+                  <svg className="pointer-events-none absolute inset-0 z-10 h-full w-full" aria-hidden>
+                    <line
+                      x1={from.x}
+                      y1={from.y}
+                      x2={to.x}
+                      y2={to.y}
+                      stroke="#34d399"
+                      strokeWidth="2.5"
+                      strokeDasharray="6 4"
+                    />
+                    <circle cx={to.x} cy={to.y} r="8" fill="#10b981" fillOpacity="0.25" stroke="#34d399" strokeWidth="2" />
+                    <circle cx={to.x} cy={to.y} r="4" fill="#34d399" stroke="#064e3b" strokeWidth="1.5" />
+                  </svg>
+                  <div
+                    className="pointer-events-auto absolute z-20 flex -translate-x-1/2 -translate-y-full flex-col items-center pb-1"
+                    style={{ left: to.x, top: to.y }}
+                  >
+                    <div className="flex items-center gap-1.5 rounded border border-emerald-400 bg-[#0d1911]/95 px-2 py-1 text-white shadow-[0_4px_12px_rgba(16,185,129,0.4)] font-pixel text-xs">
+                      <span>📍</span>
+                      <span className="font-bold text-emerald-200 max-w-[120px] truncate">{activeTarget.name}</span>
+                      <span className="rounded bg-emerald-900/80 px-1 text-[10px] text-emerald-300 font-mono font-bold">
+                        {distStr}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="목표 좌표 안내 해제"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (activeTarget.isFav && activeTarget.id) favs.setTrackedId(null);
+                          setExpeditionTarget(null);
+                          toast('목표 좌표 안내를 해제했습니다');
+                        }}
+                        className="ml-0.5 flex h-4 w-4 items-center justify-center rounded hover:bg-emerald-800 text-emerald-300 hover:text-white"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="h-0 w-0 border-x-4 border-x-transparent border-t-4 border-t-emerald-400" />
+                  </div>
+                </>
               );
             })()}
-            {g.expeditionLevelInfo.level >= 2 && (s.discoveredPins ?? []).map(pin => {
-              const p = project(pin);
-              return (
-                <button
-                  key={pin.id}
-                  type="button"
-                  data-discovered-pin={pin.kind}
-                  onClick={ev => { ev.stopPropagation(); setExpeditionTarget({ lat: pin.lat, lng: pin.lng }); setRadarOpen(true); }}
-                  className="pointer-events-auto absolute z-10 flex -translate-x-1/2 -translate-y-full items-center gap-0.5 animate-bounce rounded-full border-2 border-foreground bg-amber-300 px-1.5 py-0.5 text-[10px] font-bold text-black shadow-[0_0_10px_#facc15]"
-                  style={{ left: p.x, top: p.y }}
-                >
-                  <span>✨</span>
-                  <span>{pin.label}</span>
-                </button>
-              );
-            })}
             {s.base && g.baseDef && (() => {
               const p = project(s.base); const r = (g.baseDef.radiusM + (s.palisade ? 15 : 0)) / mpp;
               return (
@@ -957,12 +992,17 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         {!gps.ready && <Button variant="outline" size="sm" className="h-auto shrink-0 py-1.5 px-2.5 text-xs" onClick={gps.retry}>재시도</Button>}
       </div>}
 
-      {favs.tracked && (() => {
-        const d = distanceM(s.pos, favs.tracked);
+      {activeTarget && (() => {
+        const d = distanceM(s.pos, activeTarget);
         return (
-          <button type="button" onClick={() => setRadarOpen(true)} className="pixel-frame absolute left-1/2 top-[calc(7.25rem+env(safe-area-inset-top))] z-20 flex max-w-[60%] -translate-x-1/2 items-center gap-1.5 bg-card py-1.5 px-2.5 text-xs">
-            <Navigation className="!h-4 !w-4 shrink-0 text-primary" style={{ transform: `rotate(${bearingDeg(s.pos, favs.tracked) - mapBearing}deg)` }} />
-            <span className="truncate">{favs.tracked.name}</span><b className="shrink-0">{d >= 1000 ? `${(d / 1000).toFixed(1)}km` : `${Math.round(d)}m`}</b>
+          <button
+            type="button"
+            onClick={() => setRadarOpen(true)}
+            className="pixel-frame absolute left-1/2 top-[calc(7.25rem+env(safe-area-inset-top))] z-20 flex max-w-[65%] -translate-x-1/2 items-center gap-1.5 rounded border border-emerald-500 bg-[#0d1911]/95 text-white py-1 px-2.5 text-xs shadow-lg"
+          >
+            <Navigation className="!h-3.5 !w-3.5 shrink-0 text-emerald-400" style={{ transform: `rotate(${bearingDeg(s.pos, activeTarget) - mapBearing}deg)` }} />
+            <span className="truncate text-emerald-100">{activeTarget.name}</span>
+            <b className="shrink-0 text-emerald-300 font-mono">{d >= 1000 ? `${(d / 1000).toFixed(1)}km` : `${Math.round(d)}m`}</b>
           </button>
         );
       })()}
