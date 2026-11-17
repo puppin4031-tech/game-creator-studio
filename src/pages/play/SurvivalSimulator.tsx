@@ -767,10 +767,10 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               const p = project(l); const info = LANDMARK_INFO[l.kind];
               return (
                 <button key={l.id} type="button" aria-label={info.name} data-landmark={l.kind} onClick={(ev) => { ev.stopPropagation(); setShamanWords(null); setSelLandmark(l); }}
-                  className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center"
+                  className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center opacity-40 hover:opacity-100 transition-opacity"
                   style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}>
                   <div className="rounded-full bg-primary/30 p-0.5 shadow-[0_0_12px_hsl(var(--primary))]"><Sprite k={info.sprite} scale={l.kind === 'shaman' || l.kind === 'trader' ? LANDMARK_FEATURE_SCALE : 1} /></div>
-                  <span className="whitespace-nowrap rounded bg-primary px-1 text-[10px] text-primary-foreground">{info.name}</span>
+                  <span className="whitespace-nowrap rounded bg-primary/80 px-1 text-[10px] text-primary-foreground">{l.origin ?? info.name}</span>
                 </button>
               );
             })}
@@ -1456,6 +1456,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         tracked={favs.tracked}
         entities={g.entities}
         landmarks={landmarks}
+        explored={s.explored}
         onToggleFavorite={favs.toggle}
         onRemoveFavorite={favs.remove}
         onTrack={favs.setTrackedId}

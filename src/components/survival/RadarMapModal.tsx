@@ -89,6 +89,7 @@ interface Props {
   tracked: Favorite | null;
   entities?: WorldEntity[];
   landmarks?: Landmark[];
+  explored?: LatLng[];
   onToggleFavorite: (fav: Favorite) => void;
   onRemoveFavorite: (id: string) => void;
   onTrack: (id: string | null) => void;
@@ -109,6 +110,7 @@ export default function RadarMapModal({
   tracked,
   entities = [],
   landmarks = [],
+  explored = [],
   onToggleFavorite,
   onRemoveFavorite,
   onTrack,
@@ -617,6 +619,22 @@ export default function RadarMapModal({
               />
             );
           })()}
+
+          {/* User Explored Path on Tactical Radar */}
+          {explored && explored.map((pt, i) => {
+            const ptPct = toMapPct(pt);
+            if (ptPct.xPct < -5 || ptPct.xPct > 105 || ptPct.yPct < -5 || ptPct.yPct > 105) return null;
+            return (
+              <circle
+                key={`exp-${i}`}
+                cx={ptPct.xPct}
+                cy={ptPct.yPct}
+                r="2.6"
+                fill="#34d399"
+                fillOpacity="0.25"
+              />
+            );
+          })}
         </svg>
 
         {/* Visible Hotspot Areas (Ore, Egg, Boss) */}
@@ -732,7 +750,7 @@ export default function RadarMapModal({
                   distanceM: Math.round(distanceM(center, lm)),
                 });
               }}
-              className="absolute z-20 -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 rounded bg-[#2a170b] border-2 border-amber-400 px-1.5 py-0.5 text-[10px] text-amber-200 font-bold shadow-lg"
+              className="absolute z-20 -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 rounded bg-[#2a170b]/60 border border-amber-400/50 px-1.5 py-0.5 text-[10px] text-amber-200/90 font-bold shadow-md opacity-40 hover:opacity-100 transition-opacity"
               style={{ left: `${xPct}%`, top: `${yPct}%` }}
             >
               <span>🏛️</span>

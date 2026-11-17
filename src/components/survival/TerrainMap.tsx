@@ -272,9 +272,9 @@ export default function TerrainMap({ center, visionM, explored, onTap, zone = 'p
     const mpp = metersPerPx(map);
     const { center: c, visionM: v, explored: ex } = fogData.current;
     ctx.globalCompositeOperation = 'destination-out';
-    // Remembered terrain: dimly revealed.
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    const memR = (v * 0.7) / mpp;
+    // Remembered terrain: clearly revealed for explored areas where the user walked!
+    ctx.fillStyle = 'rgba(0,0,0,0.88)';
+    const memR = (v * 0.95) / mpp;
     for (const p of ex) {
       const pt = map.project([p.lng, p.lat]);
       if (pt.x < -memR || pt.y < -memR || pt.x > w + memR || pt.y > h + memR) continue;
@@ -282,8 +282,8 @@ export default function TerrainMap({ center, visionM, explored, onTap, zone = 'p
     }
     // Live vision: fully clear with soft edge.
     const me = map.project([c.lng, c.lat]);
-    const r = v / mpp;
-    const g = ctx.createRadialGradient(me.x, me.y, r * 0.7, me.x, me.y, r);
+    const r = (v * 1.05) / mpp;
+    const g = ctx.createRadialGradient(me.x, me.y, r * 0.75, me.x, me.y, r);
     g.addColorStop(0, 'rgba(0,0,0,1)');
     g.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = g;
