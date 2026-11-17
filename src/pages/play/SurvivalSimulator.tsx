@@ -22,7 +22,6 @@ import PetSprite from '@/components/survival/PetSprite';
 import WorldViewTabs from '@/components/survival/WorldViewTabs';
 import { viewFocus, type BaseSite, type WorldView } from '@/lib/survival/worldView';
 import ExpeditionJoystick from '@/components/survival/ExpeditionJoystick';
-import BaseNpcs from '@/components/survival/BaseNpcs';
 import TribeSprite from '@/components/survival/TribeSprite';
 import { escortReady } from '@/lib/survival/mercenaries';
 import { petRole } from '@/lib/survival/pets';
@@ -84,7 +83,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { TECH_CATEGORIES, TECH_CATEGORY, type TechCategory } from '@/lib/survival/techCategories';
 import { MAX_TECH_LEVEL, techLevel, techUpgradeCost } from '@/lib/survival/techLevels';
-import BasePetsOverlay from '@/components/survival/BasePetsOverlay';
 import PetPanel from '@/components/survival/PetPanel';
 import BaseVillageView from '@/components/survival/BaseVillageView';
 import RadarMapModal from '@/components/survival/RadarMapModal';
@@ -673,7 +671,6 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           <>
             {crew && <ExpeditionMarker crew={crew} project={project} members={s.tribe?.count ?? 1} tribeClass={activeTribeClassId} />}
             {crew && view === 'expedition' && <ExpeditionJoystick crew={crew} candidates={g.crewNearby} project={project} onManual={g.setCrewManual} onSteer={g.steerCrew} onCommand={g.commandCrew} onAct={g.crewAct} onHeal={g.healCrew} />}
-            {s.base && g.baseDef && <BasePetsOverlay base={s.base} radius={g.baseDef.radiusM + (s.palisade ? 15 : 0)} pets={s.pets ?? []} hits={g.petHits} project={project} />}
             {view === 'user' && eggSpawns.map(egg => { const p = project(egg); return (
               <button key={egg.id} type="button" aria-label="신비한 픽셀 공룡 알" onClick={ev => { ev.stopPropagation(); g.pickEgg(egg); }}
                 className="pointer-events-auto absolute z-10 flex min-h-11 min-w-11 -translate-x-1/2 -translate-y-full items-center justify-center" style={{ left: p.x, top: p.y }}>
@@ -729,12 +726,22 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               );
             })()}
             {s.base && g.baseDef && (() => {
-              const p = project(s.base); const r = (g.baseDef.radiusM + (s.palisade ? 15 : 0)) / mpp;
+              const p = project(s.base); const r = 10 / mpp;
               return (
                 <div className="pointer-events-none absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
-                  <div className="rounded-full border-2 border-dashed border-primary/70 bg-primary/10" style={{ width: r * 2, height: r * 2 }} />
-                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"><BaseFortressOverlay baseLevel={s.base.level} hasPalisade={!!s.palisade} hasAltar={!!s.altar} /></div>
-                  {!s.tribe?.escort && !s.observedExpedition?.mercenary && Array.from({ length: Math.min(6, s.tribe?.count ?? 0) }, (_, k) => { const a = (k / Math.min(6, s.tribe?.count ?? 1)) * Math.PI * 2; return <motion.div key={k} className="pointer-events-none absolute left-1/2 top-1/2" style={{ marginLeft: Math.cos(a) * 70 - 14, marginTop: Math.sin(a) * 40 - 20, transform: Math.sin(a) > 0 ? 'scaleX(-1)' : undefined }} animate={reducedMotion ? undefined : { x: [0, k % 2 ? 8 : -8, 0] }} transition={{ repeat: Infinity, duration: 4 + k }}><TribeSprite height={40} tribeClass={s.tribe?.classId} /></motion.div>; })}{<div className="absolute left-1/2 top-1/2 h-20 w-64 -translate-x-1/2 -translate-y-1/2"><BaseNpcs shamanMet={!!s.shamanMet} tribe={s.tribe} storage={s.storage} backpack={s.backpack} now={Date.now()} onMeet={g.meetShaman} onHire={g.hireMerc} onSelectClass={g.selectTribeClass} onTrain={g.trainTribe} onTreat={g.treatTribe} onEscort={g.toggleEscort} expeditionBusy={!!s.observedExpedition?.mercenary} onGrantBranches={g.grantTutorialBranches} onRecruitAmbacho={g.recruitAmbacho} /></div>}
+                  <div className="rounded-full border-2 border-dashed border-primary/70 bg-primary/10 shadow-[0_0_12px_hsl(var(--primary)/0.2)]" style={{ width: r * 2, height: r * 2 }} />
+                  <button
+                    type="button"
+                    aria-label="거점 마을 들어가기"
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      setBaseTab('village');
+                      setPanel('base');
+                    }}
+                    className="pointer-events-auto absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-105 active:scale-95"
+                  >
+                    <BaseFortressOverlay baseLevel={s.base.level} hasPalisade={!!s.palisade} hasAltar={!!s.altar} />
+                  </button>
                 </div>
               );
             })()}

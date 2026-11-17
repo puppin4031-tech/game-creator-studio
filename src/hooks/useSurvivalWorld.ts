@@ -352,27 +352,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const customMobVer = getCustomMobVersion();
   const entities: WorldEntity[] = useMemo(() => generateWorld({
     center: s.pos, radiusM: vision, now, isNight, depleted: s.depleted, terrainZones: s.terrainZones, parkCells: s.parkCells, sanctuaries,
-    safeZone: s.base && baseDef ? { center: s.base, radiusM: baseDef.radiusM + (s.palisade ? 15 : 0) } : null,
-  }).filter(e => !(e.kind === 'creature' && s.outpost && distanceM(e, s.outpost) < C.outpostRadiusM + 15)), [s.pos, vision, now, isNight, s.depleted, s.base, baseDef, s.terrainZones, s.parkCells, sanctuaries, s.palisade, s.outpost, customMobVer]);
+    safeZone: null,
+  }).filter(e => !(e.kind === 'creature' && s.outpost && distanceM(e, s.outpost) < C.outpostRadiusM + 15)), [s.pos, vision, now, isNight, s.depleted, s.terrainZones, s.parkCells, sanctuaries, s.outpost, customMobVer]);
 
-  // Visible-time boundary defense; never changes player GPS or peer saves.
-  useEffect(() => {
-    if (!s.pets?.length) return;
-    const timer = window.setInterval(() => {
-      const p = ref.current;
-      if (document.hidden || !p.base || (!enabledRef.current && !options.indoor)) return;
-      const radius = BASE_LEVELS[p.base.level].radiusM + (p.palisade ? 15 : 0);
-      if (distanceM(p.pos, p.base) > C.visionDayM) return;
-      const at = Date.now(), night = dayPhase(new Date(at)) === 'night';
-      const nearby = generateWorld({ center: p.base, radiusM: radius + 35, now: at, isNight: night, depleted: p.depleted, terrainZones: p.terrainZones, parkCells: p.parkCells, sanctuaries: sanctuariesRef.current,
-        safeZone: { center: p.base, radiusM: radius } }).filter((e): e is Extract<WorldEntity, { kind: 'creature' }> => e.kind === 'creature');
-      const result = advancePetDefense(p, p.base, radius, nearby, at, night);
-      const changed = result.hits.length || result.state.pets?.some((pet, i) => pet !== p.pets?.[i]) || result.state.petDefense?.day !== p.petDefense?.day;
-      if (changed) setS({ ...result.state, lastTickAt: at });
-      if (result.hits.length) setPetHits(result.hits);
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [!!s.pets?.length, options.indoor, setS]);
+  // Beasts are no longer blocked or auto-killed around the base on the world map.
+  // Defense will occur inside the base village view during siege / invasion events.
 
   // Stegoron regen + tribe_shelter 2x recovery bonus for crew & pets.
   const regenPct = activePetAbilities(s.pets ?? []).regen ?? 0;
