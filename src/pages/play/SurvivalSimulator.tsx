@@ -317,9 +317,21 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     setActorTarget(null);
     playAction('walk', 500);
   };
+  const [playerFacing, setPlayerFacing] = useState<'right' | 'left'>('right');
   const lastPos = useRef(s.pos);
   useEffect(() => {
-    if (lastPos.current.lat !== s.pos.lat || lastPos.current.lng !== s.pos.lng) { lastPos.current = s.pos; setAction(a => (a === 'idle' ? 'walk' : a)); window.clearTimeout(actionTimer.current); actionTimer.current = window.setTimeout(() => setAction('idle'), 1500); }
+    const dLng = s.pos.lng - lastPos.current.lng;
+    if (dLng < -0.000001) {
+      setPlayerFacing('left');
+    } else if (dLng > 0.000001) {
+      setPlayerFacing('right');
+    }
+    if (lastPos.current.lat !== s.pos.lat || lastPos.current.lng !== s.pos.lng) {
+      lastPos.current = s.pos;
+      setAction(a => (a === 'idle' ? 'walk' : a));
+      window.clearTimeout(actionTimer.current);
+      actionTimer.current = window.setTimeout(() => setAction('idle'), 1500);
+    }
   }, [s.pos]);
   useEffect(() => () => { window.clearTimeout(actionTimer.current); window.clearTimeout(returnTimer.current); }, []);
   // Return sprite to GPS center when the player really walks or the object leaves the radius.
@@ -895,6 +907,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                     // Visual-only offset: stop slightly short of the object so the sprite stands beside it.
                     const t = actorTarget ? project(actorTarget) : p;
                     const dx = (t.x - p.x) * 0.85, dy = (t.y - p.y) * 0.85;
+                    const isFacingLeft = actorTarget ? dx < -1 : playerFacing === 'left';
                     return (
                       <motion.div className="absolute left-1/2 top-1/2" initial={false} animate={{ x: dx, y: dy }} transition={{ duration: actorTarget ? 0.25 : 0.5, ease: 'easeOut' }}>
                         <div className="-translate-x-1/2 -translate-y-[85%]">
@@ -907,7 +920,44 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                             </div>;
                           })()}
                           {bubbles[presence.selfId] && <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbleView(bubbles[presence.selfId])}</span>}
-                          <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><HitFlash hit={hit}><div style={{ transform: dx < -1 ? 'scaleX(-1)' : undefined, opacity: crew ? 0.35 : 1, transition: 'opacity 0.3s' }}><CharacterSprite action={action} level={s.level} height={PLAYER_SPRITE_HEIGHT} /></div></HitFlash>{escortReady(s.tribe, Date.now(), !!s.observedExpedition?.mercenary) && <>{Array.from({ length: Math.min(5, s.tribe?.count ?? 1) }, (_, k) => <div key={k} aria-label={k ? undefined : "동행 부족민"} className="pointer-events-none absolute bottom-0" style={{ left: dx < -1 ? 36 + k * 22 : -36 - k * 22, bottom: (k % 2) * 6, transform: dx < -1 ? 'scaleX(-1)' : undefined }}><TribeSprite action={action} height={48} tribeClass={s.tribe?.classId} /></div>)}</>}{(s.pets ?? []).filter(x => petRole(x) === 'follow').map((x, i) => <div key={x.uid} className="pointer-events-none absolute bottom-0" style={{ left: 40 + i * 26, transform: dx < -1 ? 'scaleX(-1)' : undefined }}><PetSprite speciesId={x.speciesId} name={x.name} height={30} /></div>)}</div>
+                          <div className="relative">
+                            <div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" />
+                            <HitFlash hit={hit}>
+                              <div style={{ transform: isFacingLeft ? 'scaleX(-1)' : undefined, opacity: crew ? 0.35 : 1, transition: 'opacity 0.3s' }}>
+                                <CharacterSprite action={action} level={s.level} height={PLAYER_SPRITE_HEIGHT} />
+                              </div>
+                            </HitFlash>
+                            {escortReady(s.tribe, Date.now(), !!s.observedExpedition?.mercenary) && (
+                              <>
+                                {Array.from({ length: Math.min(5, s.tribe?.count ?? 1) }, (_, k) => (
+                                  <div
+                                    key={k}
+                                    aria-label={k ? undefined : "동행 부족민"}
+                                    className="pointer-events-none absolute bottom-0"
+                                    style={{
+                                      left: isFacingLeft ? 36 + k * 22 : -36 - k * 22,
+                                      bottom: (k % 2) * 6,
+                                      transform: isFacingLeft ? 'scaleX(-1)' : undefined
+                                    }}
+                                  >
+                                    <TribeSprite action={action} height={48} tribeClass={s.tribe?.classId} />
+                                  </div>
+                                ))}
+                              </>
+                            )}
+                            {(s.pets ?? []).filter(x => petRole(x) === 'follow').map((x, i) => (
+                              <div
+                                key={x.uid}
+                                className="pointer-events-none absolute bottom-0"
+                                style={{
+                                  left: isFacingLeft ? 40 + i * 26 : -40 - i * 26,
+                                  transform: isFacingLeft ? 'scaleX(-1)' : undefined
+                                }}
+                              >
+                                <PetSprite speciesId={x.speciesId} name={x.name} height={30} />
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </motion.div>
                     );
