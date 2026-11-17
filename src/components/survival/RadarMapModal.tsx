@@ -196,7 +196,7 @@ export default function RadarMapModal({
     return entities.filter(e => {
       if (depleted[e.id]) return false;
       if (selectedItemId === 'dino_egg') {
-        return e.kind === 'egg' || e.type === 'egg' || e.type.includes('egg');
+        return (e.type as string).includes('egg');
       }
       if (e.kind === 'node') {
         const def = nodeDef(e.type);
