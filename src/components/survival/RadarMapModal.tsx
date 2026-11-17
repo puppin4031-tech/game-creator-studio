@@ -1,20 +1,18 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import {
   ChevronDown,
   Compass,
   Flag,
-  Layers,
   MapPin,
   Navigation,
   Plus,
   Radar,
-  Sparkles,
+  RotateCcw,
   Star,
   Trash2,
   X,
   ZoomIn,
   ZoomOut,
-  RotateCcw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -37,24 +35,44 @@ export interface SearchItemOption {
   id: string;
   name: string;
   icon: string;
-  category: 'node' | 'creature' | 'egg';
+  category: 'material' | 'food' | 'ore' | 'hunt';
+  categoryLabel: string;
 }
 
+/** Complete list of actual in-game materials and drops from world entities */
 export const SEARCHABLE_ITEMS: SearchItemOption[] = [
-  { id: 'branch', name: '나뭇가지', icon: '🪵', category: 'node' },
-  { id: 'flint', name: '부싯돌', icon: '🪨', category: 'node' },
-  { id: 'clay', name: '점토', icon: '🏺', category: 'node' },
-  { id: 'herb', name: '약초 / 향신초', icon: '🌿', category: 'node' },
-  { id: 'log', name: '통나무 / 송진', icon: '🌲', category: 'node' },
-  { id: 'frost_shard', name: '빙결석 / 황토', icon: '❄️', category: 'node' },
-  { id: 'quartz', name: '석영', icon: '💎', category: 'node' },
-  { id: 'obsidian', name: '흑요석', icon: '🖤', category: 'node' },
-  { id: 'jade', name: '옥 원석', icon: '❇️', category: 'node' },
-  { id: 'dino_egg', name: '공룡 알', icon: '🥚', category: 'egg' },
-  { id: 'apple', name: '사과 / 과일', icon: '🍎', category: 'node' },
-  { id: 'raw_meat', name: '고기 / 짐승', icon: '🍖', category: 'creature' },
-  { id: 'tusk', name: '엄니 / 가죽', icon: '🐘', category: 'creature' },
-  { id: 'ancient_fang', name: '고대 송곳니', icon: '🦷', category: 'creature' },
+  // ── 기초 채집 자원 ──
+  { id: 'branch', name: '나뭇가지', icon: '🪵', category: 'material', categoryLabel: '기초 채집' },
+  { id: 'log', name: '통나무', icon: '🌲', category: 'material', categoryLabel: '기초 채집' },
+  { id: 'fiber', name: '식물 섬유', icon: '🌾', category: 'material', categoryLabel: '기초 채집' },
+  { id: 'flint', name: '부싯돌', icon: '🪨', category: 'material', categoryLabel: '기초 채집' },
+  { id: 'clay', name: '점토', icon: '🏺', category: 'material', categoryLabel: '기초 채집' },
+  { id: 'soil', name: '흙더미', icon: '🟤', category: 'material', categoryLabel: '기초 채집' },
+  { id: 'resin', name: '송진', icon: '🍯', category: 'material', categoryLabel: '기초 채집' },
+
+  // ── 야생 식량 & 약초 ──
+  { id: 'apple', name: '야생 사과', icon: '🍎', category: 'food', categoryLabel: '야생 식량' },
+  { id: 'pear', name: '돌배', icon: '🍐', category: 'food', categoryLabel: '야생 식량' },
+  { id: 'berry', name: '산딸기', icon: '🫐', category: 'food', categoryLabel: '야생 식량' },
+  { id: 'herb', name: '약초', icon: '🌿', category: 'food', categoryLabel: '야생 식량' },
+  { id: 'wild_spice', name: '야생 향신초', icon: '🍃', category: 'food', categoryLabel: '야생 식량' },
+  { id: 'pepper_berry', name: '매운 후추열매', icon: '🌶️', category: 'food', categoryLabel: '야생 식량' },
+
+  // ── 희귀 광물 & 보석 ──
+  { id: 'rock_salt', name: '암염 결정', icon: '🧂', category: 'ore', categoryLabel: '광물·보석' },
+  { id: 'frost_shard', name: '빙결석', icon: '❄️', category: 'ore', categoryLabel: '광물·보석' },
+  { id: 'quartz', name: '석영 결정', icon: '💎', category: 'ore', categoryLabel: '광물·보석' },
+  { id: 'ochre', name: '황토 안료', icon: '🎨', category: 'ore', categoryLabel: '광물·보석' },
+  { id: 'obsidian', name: '흑요석', icon: '🖤', category: 'ore', categoryLabel: '광물·보석' },
+  { id: 'jade', name: '옥 원석', icon: '❇️', category: 'ore', categoryLabel: '광물·보석' },
+
+  // ── 사냥 전리품 & 공룡 알 ──
+  { id: 'dino_egg', name: '공룡 알', icon: '🥚', category: 'hunt', categoryLabel: '사냥·알' },
+  { id: 'raw_meat', name: '날고기', icon: '🥩', category: 'hunt', categoryLabel: '사냥·알' },
+  { id: 'bone', name: '짐승 뼈', icon: '🦴', category: 'hunt', categoryLabel: '사냥·알' },
+  { id: 'hide', name: '날가죽', icon: '🦌', category: 'hunt', categoryLabel: '사냥·알' },
+  { id: 'tusk', name: '거대 엄니', icon: '🐘', category: 'hunt', categoryLabel: '사냥·알' },
+  { id: 'ancient_fang', name: '고대 송곳니', icon: '🦷', category: 'hunt', categoryLabel: '사냥·알' },
 ];
 
 interface Props {
@@ -96,14 +114,14 @@ export default function RadarMapModal({
   onTrack,
   onDispatchTo,
 }: Props) {
-  // Top 3 categories requested: 희귀광물 (), 공룡알 (), 우두머리 ()
+  // Top 3 category toggles
   const [filters, setFilters] = useState<Record<RadarFilterKind, boolean>>({
     ore: true,
     egg: true,
     boss: true,
   });
 
-  // Dropdown for 찾는물품 v (리스트 나오도록)
+  // Dropdown for item search
   const [selectedItemId, setSelectedItemId] = useState<string>('all');
   const [itemDropdownOpen, setItemDropdownOpen] = useState(false);
 
@@ -111,8 +129,10 @@ export default function RadarMapModal({
   const [favBoxOpen, setFavBoxOpen] = useState(true);
   const [customName, setCustomName] = useState('');
 
-  // Map Zoom scale & pan offset
+  // Map Zoom scale & pan offset (meters)
   const [zoomScale, setZoomScale] = useState(1);
+  const [panM, setPanM] = useState({ x: 0, y: 0 });
+
   const [selectedSpot, setSelectedSpot] = useState<{
     id: string;
     name: string;
@@ -122,6 +142,33 @@ export default function RadarMapModal({
     probabilityPct?: number;
     distanceM?: number;
   } | null>(null);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Touch gesture state for pinch-to-zoom & smooth panning
+  const touchStateRef = useRef<{
+    mode: 'none' | 'pan' | 'pinch';
+    startX: number;
+    startY: number;
+    startPanX: number;
+    startPanY: number;
+    initialDist: number;
+    initialZoom: number;
+    hasDragged: boolean;
+  }>({
+    mode: 'none',
+    startX: 0,
+    startY: 0,
+    startPanX: 0,
+    startPanY: 0,
+    initialDist: 0,
+    initialZoom: 1,
+    hasDragged: false,
+  });
+
+  const isMouseDraggingRef = useRef(false);
+  const lastMousePosRef = useRef({ x: 0, y: 0 });
+  const hasMouseDraggedRef = useRef(false);
 
   const center = base ?? pos;
   const levelInfo = useMemo(
@@ -134,41 +181,41 @@ export default function RadarMapModal({
     [center.lat, center.lng, levelInfo.level, depleted]
   );
 
-  // Compute counts for the top badges
+  // Compute counts for top category badges
   const oreCount = hotspots.filter(h => h.kind === 'ore').length;
   const eggCount = hotspots.filter(h => h.kind === 'egg').length;
   const bossCount = hotspots.filter(h => h.kind === 'boss').length;
 
-  // Filter spots by category toggles
   const visibleHotspots = hotspots.filter(h => filters[h.kind]);
 
-  // Specific item search filter logic
+  // Specific item search filter matching actual entities in the world
   const matchedEntities = useMemo(() => {
     if (selectedItemId === 'all') return [];
     return entities.filter(e => {
       if (depleted[e.id]) return false;
+      if (selectedItemId === 'dino_egg') {
+        return e.kind === 'egg' || e.type === 'egg' || e.type.includes('egg');
+      }
       if (e.kind === 'node') {
         const def = nodeDef(e.type);
-        return def.loot.some(l => l.itemId === selectedItemId);
+        return def?.loot?.some(l => l.itemId === selectedItemId);
       }
       if (e.kind === 'creature') {
         const def = creatureDef(e.type);
-        return def.loot.some(l => l.itemId === selectedItemId);
+        return def?.loot?.some(l => l.itemId === selectedItemId);
       }
       return false;
     });
   }, [entities, depleted, selectedItemId]);
 
-  if (!open) return null;
-
   const currentScanRadius = RADAR_SCAN_RADIUS_M / zoomScale;
 
-  /** Projects LatLng to percentage coordinates on the radar map canvas */
+  /** Projects LatLng to percentage coordinates on the radar map canvas with pan & zoom */
   const toMapPct = (target: LatLng) => {
     const mLat = 111_320;
     const mLng = 111_320 * Math.cos((center.lat * Math.PI) / 180);
-    const dxM = (target.lng - center.lng) * mLng;
-    const dyM = (target.lat - center.lat) * mLat;
+    const dxM = (target.lng - center.lng) * mLng - panM.x;
+    const dyM = (target.lat - center.lat) * mLat - panM.y;
     const xPct = 50 + (dxM / currentScanRadius) * 44;
     const yPct = 50 - (dyM / currentScanRadius) * 44;
     return { xPct, yPct };
@@ -190,25 +237,143 @@ export default function RadarMapModal({
 
   const selectedItemMeta = SEARCHABLE_ITEMS.find(i => i.id === selectedItemId);
 
+  // Grouped items for the dropdown
+  const groupedItems = useMemo(() => {
+    const map = new Map<string, SearchItemOption[]>();
+    for (const item of SEARCHABLE_ITEMS) {
+      const list = map.get(item.categoryLabel) ?? [];
+      list.push(item);
+      map.set(item.categoryLabel, list);
+    }
+    return Array.from(map.entries());
+  }, []);
+
+  // ── Touch Gesture Handlers (Pinch-to-zoom & 1-finger Pan) ──
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      touchStateRef.current = {
+        mode: 'pan',
+        startX: e.touches[0].clientX,
+        startY: e.touches[0].clientY,
+        startPanX: panM.x,
+        startPanY: panM.y,
+        initialDist: 0,
+        initialZoom: zoomScale,
+        hasDragged: false,
+      };
+    } else if (e.touches.length >= 2) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      touchStateRef.current = {
+        mode: 'pinch',
+        startX: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        startY: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+        startPanX: panM.x,
+        startPanY: panM.y,
+        initialDist: Math.max(10, dist),
+        initialZoom: zoomScale,
+        hasDragged: true,
+      };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    const w = rect?.width || 360;
+    const h = rect?.height || 640;
+
+    if (touchStateRef.current.mode === 'pinch' && e.touches.length >= 2) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      if (touchStateRef.current.initialDist > 0) {
+        const factor = dist / touchStateRef.current.initialDist;
+        const nextZoom = Math.min(3.5, Math.max(0.5, touchStateRef.current.initialZoom * factor));
+        setZoomScale(Math.round(nextZoom * 100) / 100);
+      }
+    } else if (touchStateRef.current.mode === 'pan' && e.touches.length === 1) {
+      const dxPx = e.touches[0].clientX - touchStateRef.current.startX;
+      const dyPx = e.touches[0].clientY - touchStateRef.current.startY;
+      if (Math.abs(dxPx) > 5 || Math.abs(dyPx) > 5) {
+        touchStateRef.current.hasDragged = true;
+      }
+      const meterScale = (currentScanRadius / 44) * 100;
+      const deltaMx = (dxPx / w) * meterScale;
+      const deltaMy = (dyPx / h) * meterScale;
+      setPanM({
+        x: touchStateRef.current.startPanX - deltaMx,
+        y: touchStateRef.current.startPanY + deltaMy,
+      });
+    }
+  };
+
+  const handleTouchEnd = () => {
+    touchStateRef.current.mode = 'none';
+  };
+
+  // ── Mouse Drag & Wheel Handlers (Desktop support) ──
+  const handleMouseDown = (e: React.MouseEvent) => {
+    isMouseDraggingRef.current = true;
+    hasMouseDraggedRef.current = false;
+    lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isMouseDraggingRef.current) return;
+    const dxPx = e.clientX - lastMousePosRef.current.x;
+    const dyPx = e.clientY - lastMousePosRef.current.y;
+    if (Math.abs(dxPx) > 3 || Math.abs(dyPx) > 3) {
+      hasMouseDraggedRef.current = true;
+    }
+    lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+    const rect = containerRef.current?.getBoundingClientRect();
+    const w = rect?.width || 360;
+    const h = rect?.height || 640;
+    const meterScale = (currentScanRadius / 44) * 100;
+    const deltaMx = (dxPx / w) * meterScale;
+    const deltaMy = (dyPx / h) * meterScale;
+    setPanM(p => ({ x: p.x - deltaMx, y: p.y + deltaMy }));
+  };
+
+  const handleMouseUp = () => {
+    isMouseDraggingRef.current = false;
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    const delta = e.deltaY < 0 ? 1.2 : 0.82;
+    setZoomScale(z => Math.round(Math.min(3.5, Math.max(0.5, z * delta)) * 100) / 100);
+  };
+
+  const resetView = () => {
+    setZoomScale(1);
+    setPanM({ x: 0, y: 0 });
+    setSelectedSpot(null);
+  };
+
+  if (!open) return null;
+
   return (
     <div
       role="dialog"
       aria-label="전략 지도 및 즐겨찾기"
-      className="fixed inset-0 z-50 flex flex-col bg-[#14231a] font-pixel text-xs text-white select-none overflow-hidden"
+      className="fixed inset-0 z-50 flex flex-col bg-[#0b140e] font-pixel text-xs text-white select-none overflow-hidden"
     >
-      {/* ──────────────── TOP CONTROL BAR (Overlay above full map) ──────────────── */}
-      <div className="absolute inset-x-0 top-0 z-40 flex flex-col gap-1.5 p-2 bg-gradient-to-b from-black/90 via-black/75 to-transparent pb-4 pointer-events-none">
+      {/* ──────────────── TOP CONTROL BAR ──────────────── */}
+      <div className="absolute inset-x-0 top-0 z-40 flex flex-col gap-2 p-2.5 bg-gradient-to-b from-[#080f0a]/95 via-[#080f0a]/85 to-transparent pb-6 pointer-events-none">
         {/* Top Header: Title & Close Button */}
         <div className="flex items-center justify-between pointer-events-auto">
           <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded border-2 border-emerald-400 bg-emerald-950/80 text-sm">
+            <span className="flex h-8 w-8 items-center justify-center rounded border-2 border-emerald-500 bg-[#14231a] text-base shadow-md">
               🗺️
             </span>
             <div>
               <b className="text-sm font-black text-emerald-300 drop-shadow">
                 광역 탐색 맵 & 지휘소
               </b>
-              <span className="ml-2 text-[10px] text-zinc-300">
+              <span className="ml-2 text-[10px] text-emerald-200/80">
                 중심: {base ? '거점 모닥불' : '현재 위치'} (반경 {Math.round(currentScanRadius)}m)
               </span>
             </div>
@@ -217,7 +382,7 @@ export default function RadarMapModal({
             type="button"
             aria-label="지도 닫기"
             onClick={onClose}
-            className="pixel-btn flex h-8 w-8 items-center justify-center bg-card p-0 text-white shadow-md active:scale-95"
+            className="pixel-btn flex h-8 w-8 items-center justify-center rounded border-2 border-emerald-600 bg-[#162a1d] text-emerald-200 shadow-lg hover:bg-[#1f3827] active:scale-95"
           >
             <X className="!h-4 !w-4" />
           </button>
@@ -230,14 +395,14 @@ export default function RadarMapModal({
             type="button"
             aria-pressed={filters.ore}
             onClick={() => toggleFilter('ore')}
-            className={`pixel-btn flex items-center gap-1 py-1 px-2.5 text-xs transition-colors shadow ${
+            className={`pixel-btn flex items-center gap-1 py-1 px-2.5 text-xs rounded transition-all shadow ${
               filters.ore
-                ? 'border-emerald-400 bg-emerald-800 text-white font-bold'
-                : 'border-zinc-700 bg-zinc-900/90 text-zinc-400'
+                ? 'border-2 border-emerald-400 bg-emerald-800 text-white font-bold ring-1 ring-emerald-300'
+                : 'border border-emerald-900 bg-[#122016] text-emerald-400/60'
             }`}
           >
             <span>💎 희귀광물</span>
-            <span className="rounded bg-black/40 px-1 text-[11px] font-mono text-emerald-300">
+            <span className="rounded bg-black/50 px-1 text-[11px] font-mono text-emerald-300">
               ({oreCount})
             </span>
           </button>
@@ -247,14 +412,14 @@ export default function RadarMapModal({
             type="button"
             aria-pressed={filters.egg}
             onClick={() => toggleFilter('egg')}
-            className={`pixel-btn flex items-center gap-1 py-1 px-2.5 text-xs transition-colors shadow ${
+            className={`pixel-btn flex items-center gap-1 py-1 px-2.5 text-xs rounded transition-all shadow ${
               filters.egg
-                ? 'border-amber-400 bg-amber-700 text-white font-bold'
-                : 'border-zinc-700 bg-zinc-900/90 text-zinc-400'
+                ? 'border-2 border-amber-400 bg-amber-800 text-white font-bold ring-1 ring-amber-300'
+                : 'border border-amber-900 bg-[#122016] text-amber-400/60'
             }`}
           >
             <span>🥚 공룡알</span>
-            <span className="rounded bg-black/40 px-1 text-[11px] font-mono text-amber-300">
+            <span className="rounded bg-black/50 px-1 text-[11px] font-mono text-amber-300">
               ({eggCount})
             </span>
           </button>
@@ -264,14 +429,14 @@ export default function RadarMapModal({
             type="button"
             aria-pressed={filters.boss}
             onClick={() => toggleFilter('boss')}
-            className={`pixel-btn flex items-center gap-1 py-1 px-2.5 text-xs transition-colors shadow ${
+            className={`pixel-btn flex items-center gap-1 py-1 px-2.5 text-xs rounded transition-all shadow ${
               filters.boss
-                ? 'border-rose-400 bg-rose-800 text-white font-bold'
-                : 'border-zinc-700 bg-zinc-900/90 text-zinc-400'
+                ? 'border-2 border-rose-400 bg-rose-800 text-white font-bold ring-1 ring-rose-300'
+                : 'border border-rose-900 bg-[#122016] text-rose-400/60'
             }`}
           >
             <span>🦖 우두머리</span>
-            <span className="rounded bg-black/40 px-1 text-[11px] font-mono text-rose-300">
+            <span className="rounded bg-black/50 px-1 text-[11px] font-mono text-rose-300">
               ({bossCount})
             </span>
           </button>
@@ -281,42 +446,56 @@ export default function RadarMapModal({
             <button
               type="button"
               onClick={() => setItemDropdownOpen(o => !o)}
-              className="pixel-btn flex items-center gap-1.5 py-1 px-2.5 text-xs border-primary bg-primary/25 text-primary-foreground font-bold shadow"
+              className="pixel-btn flex items-center gap-1.5 py-1 px-2.5 text-xs rounded border-2 border-emerald-400 bg-[#162a1d] text-emerald-100 font-bold shadow-lg hover:bg-[#1f3827]"
             >
               <span>{selectedItemMeta ? `${selectedItemMeta.icon} ${selectedItemMeta.name}` : '🔍 찾는물품'}</span>
               <ChevronDown className={`!h-3.5 !w-3.5 transition-transform ${itemDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {itemDropdownOpen && (
-              <div className="pixel-frame absolute left-0 top-full mt-1 z-50 max-h-56 w-48 overflow-y-auto bg-card p-1 shadow-2xl border-2 border-primary">
+              <div className="pixel-frame absolute left-0 top-full mt-1.5 z-50 max-h-72 w-56 overflow-y-auto rounded bg-[#0d1911] p-1.5 shadow-2xl border-2 border-emerald-500 text-white divide-y divide-emerald-900/60">
                 <button
                   type="button"
                   onClick={() => {
                     setSelectedItemId('all');
                     setItemDropdownOpen(false);
                   }}
-                  className={`flex w-full items-center justify-between px-2 py-1.5 text-left text-xs ${
-                    selectedItemId === 'all' ? 'bg-primary text-primary-foreground font-bold' : 'hover:bg-accent'
+                  className={`flex w-full items-center justify-between rounded px-2.5 py-1.5 text-left text-xs ${
+                    selectedItemId === 'all'
+                      ? 'bg-emerald-600 text-white font-bold'
+                      : 'text-emerald-100 hover:bg-[#172d1f]'
                   }`}
                 >
-                  <span>전체 탐색</span>
-                  <span className="text-[10px] text-muted-foreground">기본</span>
+                  <span className="font-bold">전체 보기 (초기화)</span>
+                  <span className="text-[10px] text-emerald-300/70">기본</span>
                 </button>
-                {SEARCHABLE_ITEMS.map(item => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedItemId(item.id);
-                      setItemDropdownOpen(false);
-                    }}
-                    className={`flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-xs ${
-                      selectedItemId === item.id ? 'bg-primary text-primary-foreground font-bold' : 'hover:bg-accent'
-                    }`}
-                  >
-                    <span>{item.icon}</span>
-                    <span className="truncate">{item.name}</span>
-                  </button>
+
+                {groupedItems.map(([groupLabel, items]) => (
+                  <div key={groupLabel} className="pt-1.5 pb-1">
+                    <div className="px-2 py-0.5 text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
+                      {groupLabel}
+                    </div>
+                    {items.map(item => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedItemId(item.id);
+                          setItemDropdownOpen(false);
+                        }}
+                        className={`flex w-full items-center justify-between rounded px-2.5 py-1.5 text-left text-xs ${
+                          selectedItemId === item.id
+                            ? 'bg-emerald-600 text-white font-bold ring-1 ring-emerald-300'
+                            : 'text-emerald-100 hover:bg-[#172d1f]'
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <span>{item.icon}</span>
+                          <span className="font-medium text-white">{item.name}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 ))}
               </div>
             )}
@@ -324,35 +503,48 @@ export default function RadarMapModal({
         </div>
       </div>
 
-      {/* ──────────────── FULL-SCREEN RICH TERRAIN MAP CANVAS ──────────────── */}
+      {/* ──────────────── FULL-SCREEN CRISP TERRAIN MAP CANVAS ──────────────── */}
       <div
+        ref={containerRef}
         data-radar-canvas
-        className="relative flex-1 w-full h-full overflow-hidden bg-[#162a1c] cursor-grab active:cursor-grabbing"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onWheel={handleWheel}
+        className="relative flex-1 w-full h-full overflow-hidden bg-[#0a150e] cursor-grab active:cursor-grabbing touch-none select-none"
       >
-        {/* Full-Map Stylized Background Texture (Grass/Forest Pattern & Topographic Contours) */}
+        {/* Crisp Tactical Map Grid Background */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-40 bg-[radial-gradient(#2d5538_1.5px,transparent_1.5px)] [background-size:24px_24px]"
+          className="pointer-events-none absolute inset-0 opacity-50 bg-[radial-gradient(#1e4028_1.8px,transparent_1.8px)] [background-size:28px_28px]"
         />
 
-        {/* Topographic Rings & Radar Circles (100m, 250m, 500m, 1km) */}
+        {/* Topographic Rings & High-Contrast Coordinate Grid */}
         <svg
           viewBox="0 0 100 100"
           className="pointer-events-none absolute inset-0 h-full w-full"
           aria-hidden
         >
-          {/* Subtle Coordinate Axis */}
-          <line x1="50" y1="0" x2="50" y2="100" stroke="rgba(74,222,128,0.15)" strokeWidth="0.4" />
-          <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(74,222,128,0.15)" strokeWidth="0.4" />
+          {/* Main Axis with clean emerald lines */}
+          <line x1="50" y1="0" x2="50" y2="100" stroke="#34d399" strokeWidth="0.4" strokeOpacity="0.4" />
+          <line x1="0" y1="50" x2="100" y2="50" stroke="#34d399" strokeWidth="0.4" strokeOpacity="0.4" />
 
-          {/* Concentric Range Rings */}
-          <circle cx="50" cy="50" r="12" fill="none" stroke="rgba(74,222,128,0.25)" strokeWidth="0.4" strokeDasharray="1.5 1.5" />
-          <circle cx="50" cy="50" r="24" fill="none" stroke="rgba(74,222,128,0.3)" strokeWidth="0.4" strokeDasharray="2 1.5" />
-          <circle cx="50" cy="50" r="38" fill="none" stroke="rgba(74,222,128,0.4)" strokeWidth="0.5" strokeDasharray="2.5 2" />
-          <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(74,222,128,0.5)" strokeWidth="0.6" />
+          {/* Range Circles with glowing green styling */}
+          <circle cx="50" cy="50" r="11" fill="none" stroke="#34d399" strokeWidth="0.5" strokeDasharray="1.5 1.5" strokeOpacity="0.5" />
+          <circle cx="50" cy="50" r="22" fill="none" stroke="#34d399" strokeWidth="0.6" strokeDasharray="2 1.5" strokeOpacity="0.6" />
+          <circle cx="50" cy="50" r="34" fill="none" stroke="#34d399" strokeWidth="0.7" strokeDasharray="2.5 2" strokeOpacity="0.7" />
+          <circle cx="50" cy="50" r="44" fill="none" stroke="#34d399" strokeWidth="0.8" strokeOpacity="0.8" />
+          <circle cx="50" cy="50" r="48" fill="none" stroke="#10b981" strokeWidth="1" strokeOpacity="0.9" />
 
-          {/* Dynamic Compass / Sweep Indicator */}
-          <circle cx="50" cy="50" r="48" fill="none" stroke="rgba(74,222,128,0.6)" strokeWidth="0.7" />
+          {/* Range Labels on SVG axis */}
+          <text x="51.5" y="39.5" fill="#a7f3d0" fontSize="2.4" fontWeight="bold">100m</text>
+          <text x="51.5" y="28.5" fill="#a7f3d0" fontSize="2.4" fontWeight="bold">250m</text>
+          <text x="51.5" y="16.5" fill="#a7f3d0" fontSize="2.4" fontWeight="bold">500m</text>
+          <text x="51.5" y="6.5" fill="#a7f3d0" fontSize="2.4" fontWeight="bold">1,000m</text>
 
           {/* Route Guide Line to Tracked Spot or Selected Spot */}
           {(tracked || selectedSpot) && (() => {
@@ -367,7 +559,7 @@ export default function RadarMapModal({
                 y2={destPt.yPct}
                 stroke="#facc15"
                 strokeWidth="1.2"
-                strokeDasharray="2.5 1.5"
+                strokeDasharray="2 1.2"
               />
             );
           })()}
@@ -376,16 +568,16 @@ export default function RadarMapModal({
         {/* Visible Hotspot Areas (Ore, Egg, Boss) */}
         {visibleHotspots.map(h => {
           const { xPct, yPct } = toMapPct(h);
-          if (xPct < -10 || xPct > 110 || yPct < -10 || yPct > 110) return null;
+          if (xPct < -15 || xPct > 115 || yPct < -15 || yPct > 115) return null;
           const isSelected = selectedSpot?.id === h.id;
           const colorBg =
             h.kind === 'ore'
-              ? 'border-emerald-400 bg-emerald-500/30 text-emerald-200'
+              ? 'border-2 border-emerald-400 bg-emerald-900/80 text-emerald-200 shadow-[0_0_12px_rgba(52,211,153,0.4)]'
               : h.kind === 'egg'
-                ? 'border-amber-400 bg-amber-500/30 text-amber-100'
-                : 'border-rose-500 bg-rose-600/35 text-rose-100 animate-pulse';
+                ? 'border-2 border-amber-400 bg-amber-900/80 text-amber-100 shadow-[0_0_12px_rgba(251,191,36,0.4)]'
+                : 'border-2 border-rose-400 bg-rose-950/85 text-rose-100 shadow-[0_0_14px_rgba(244,63,94,0.6)] animate-pulse';
           const icon = h.kind === 'ore' ? '💎' : h.kind === 'egg' ? '🥚' : '🦖';
-          const sizePx = Math.max(34, Math.round((h.radiusM / currentScanRadius) * 280));
+          const sizePx = Math.max(38, Math.round((h.radiusM / currentScanRadius) * 280));
 
           return (
             <button
@@ -393,7 +585,8 @@ export default function RadarMapModal({
               type="button"
               data-radar-hotspot={h.kind}
               aria-label={`${h.name} (${h.probabilityPct}%)`}
-              onClick={() =>
+              onClick={() => {
+                if (touchStateRef.current.hasDragged || hasMouseDraggedRef.current) return;
                 setSelectedSpot({
                   id: h.id,
                   name: h.name,
@@ -407,10 +600,10 @@ export default function RadarMapModal({
                         : '🦖 우두머리 출몰 구역',
                   probabilityPct: h.probabilityPct,
                   distanceM: Math.round(distanceM(center, h)),
-                })
-              }
-              className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed flex flex-col items-center justify-center transition-all ${colorBg} ${
-                isSelected ? 'ring-4 ring-yellow-400 scale-110 z-30' : 'hover:scale-105 z-20'
+                });
+              }}
+              className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full flex flex-col items-center justify-center transition-transform ${colorBg} ${
+                isSelected ? 'ring-4 ring-yellow-400 scale-110 z-35' : 'hover:scale-105 z-20'
               }`}
               style={{
                 left: `${xPct}%`,
@@ -419,8 +612,8 @@ export default function RadarMapModal({
                 height: sizePx,
               }}
             >
-              <span className="text-sm leading-none drop-shadow">{icon}</span>
-              <span className="mt-0.5 text-[9px] font-black leading-none drop-shadow">
+              <span className="text-sm drop-shadow">{icon}</span>
+              <span className="mt-0.5 text-[9px] font-black leading-none drop-shadow text-white">
                 {h.probabilityPct}%
               </span>
             </button>
@@ -432,13 +625,14 @@ export default function RadarMapModal({
           const { xPct, yPct } = toMapPct(e);
           if (xPct < -5 || xPct > 105 || yPct < -5 || yPct > 105) return null;
           const isNode = e.kind === 'node';
-          const name = isNode ? nodeDef(e.type).name : creatureDef(e.type).name;
+          const name = isNode ? nodeDef(e.type)?.name ?? e.type : creatureDef(e.type)?.name ?? e.type;
           const icon = selectedItemMeta?.icon ?? '🔍';
           return (
             <button
               key={e.id}
               type="button"
-              onClick={() =>
+              onClick={() => {
+                if (touchStateRef.current.hasDragged || hasMouseDraggedRef.current) return;
                 setSelectedSpot({
                   id: e.id,
                   name,
@@ -447,15 +641,15 @@ export default function RadarMapModal({
                   kindLabel: `🔍 실시간 감지: ${selectedItemMeta?.name}`,
                   probabilityPct: 100,
                   distanceM: Math.round(distanceM(center, e)),
-                })
-              }
-              className="absolute z-25 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center animate-bounce"
+                });
+              }}
+              className="absolute z-30 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center animate-bounce cursor-pointer"
               style={{ left: `${xPct}%`, top: `${yPct}%` }}
             >
-              <span className="rounded-full bg-yellow-400/90 border border-white p-1 text-xs shadow-[0_0_10px_#facc15]">
+              <span className="rounded-full bg-yellow-400 border-2 border-black p-1 text-sm shadow-[0_0_12px_#facc15]">
                 {icon}
               </span>
-              <span className="rounded bg-black/80 px-1 py-0.5 text-[8px] font-bold text-yellow-300 whitespace-nowrap">
+              <span className="rounded border border-black/80 bg-black/90 px-1.5 py-0.5 text-[9px] font-bold text-yellow-300 whitespace-nowrap shadow-md mt-0.5">
                 {name}
               </span>
             </button>
@@ -470,7 +664,8 @@ export default function RadarMapModal({
             <button
               key={lm.id}
               type="button"
-              onClick={() =>
+              onClick={() => {
+                if (touchStateRef.current.hasDragged || hasMouseDraggedRef.current) return;
                 setSelectedSpot({
                   id: lm.id,
                   name: lm.origin ?? '신비한 유적 성소',
@@ -479,13 +674,13 @@ export default function RadarMapModal({
                   kindLabel: '🏛️ 대지 유적 / 성소',
                   probabilityPct: 100,
                   distanceM: Math.round(distanceM(center, lm)),
-                })
-              }
-              className="absolute z-20 -translate-x-1/2 -translate-y-1/2 flex items-center gap-0.5 rounded bg-amber-950/85 border border-amber-400 px-1 py-0.5 text-[9px] text-amber-200 shadow"
+                });
+              }}
+              className="absolute z-20 -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 rounded bg-[#2a170b] border-2 border-amber-400 px-1.5 py-0.5 text-[10px] text-amber-200 font-bold shadow-lg"
               style={{ left: `${xPct}%`, top: `${yPct}%` }}
             >
               <span>🏛️</span>
-              <span className="truncate max-w-[64px]">{lm.origin ?? '성소'}</span>
+              <span className="truncate max-w-[70px]">{lm.origin ?? '성소'}</span>
             </button>
           );
         })}
@@ -498,7 +693,8 @@ export default function RadarMapModal({
             <button
               key={pin.id}
               type="button"
-              onClick={() =>
+              onClick={() => {
+                if (touchStateRef.current.hasDragged || hasMouseDraggedRef.current) return;
                 setSelectedSpot({
                   id: pin.id,
                   name: pin.label,
@@ -507,9 +703,9 @@ export default function RadarMapModal({
                   kindLabel: '✨ 원정대 실측 발견 좌표',
                   probabilityPct: 100,
                   distanceM: Math.round(distanceM(center, pin)),
-                })
-              }
-              className="absolute z-30 -translate-x-1/2 -translate-y-1/2 animate-bounce rounded-full bg-yellow-400 px-1.5 py-0.5 text-[9px] font-black text-black shadow-[0_0_10px_#facc15]"
+                });
+              }}
+              className="absolute z-30 -translate-x-1/2 -translate-y-1/2 animate-bounce rounded-full border border-black bg-yellow-400 px-2 py-0.5 text-[9px] font-black text-black shadow-[0_0_12px_#facc15]"
               style={{ left: `${xPct}%`, top: `${yPct}%` }}
             >
               ✨{pin.label}
@@ -526,7 +722,8 @@ export default function RadarMapModal({
             <button
               key={fav.id}
               type="button"
-              onClick={() =>
+              onClick={() => {
+                if (touchStateRef.current.hasDragged || hasMouseDraggedRef.current) return;
                 setSelectedSpot({
                   id: fav.id,
                   name: fav.name,
@@ -534,12 +731,12 @@ export default function RadarMapModal({
                   lng: fav.lng,
                   kindLabel: `⭐ 즐겨찾기 #${idx + 1}`,
                   distanceM: Math.round(distanceM(center, fav)),
-                })
-              }
-              className={`absolute z-35 -translate-x-1/2 -translate-y-1/2 rounded border px-1.5 py-0.5 text-[9px] font-bold shadow ${
+                });
+              }}
+              className={`absolute z-35 -translate-x-1/2 -translate-y-1/2 rounded border-2 px-1.5 py-0.5 text-[9px] font-bold shadow-lg ${
                 isTracked
                   ? 'border-yellow-300 bg-yellow-400 text-black scale-110'
-                  : 'border-sky-300 bg-sky-900/90 text-sky-100'
+                  : 'border-sky-400 bg-sky-950 text-sky-100'
               }`}
               style={{ left: `${xPct}%`, top: `${yPct}%` }}
             >
@@ -548,7 +745,7 @@ export default function RadarMapModal({
           );
         })}
 
-        {/* Center Base & Hero Position Marker */}
+        {/* Center Base Marker */}
         {base && (() => {
           const pt = toMapPct(base);
           return (
@@ -556,26 +753,31 @@ export default function RadarMapModal({
               className="pointer-events-none absolute z-40 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
               style={{ left: `${pt.xPct}%`, top: `${pt.yPct}%` }}
             >
-              <span className="rounded bg-amber-500 px-1.5 py-0.5 text-[9px] font-black text-black shadow-[0_0_8px_rgba(245,158,11,0.8)]">
-                🔥거점 모닥불
+              <span className="rounded-full border-2 border-white bg-amber-600 px-2 py-0.5 text-[10px] font-black text-white shadow-[0_0_12px_rgba(245,158,11,0.9)]">
+                🔥 거점 모닥불
               </span>
             </div>
           );
         })()}
 
+        {/* Player Position Marker */}
         {(() => {
           const pt = toMapPct(pos);
           return (
             <div
-              className="pointer-events-none absolute z-40 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
+              className="pointer-events-none absolute z-45 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
               style={{ left: `${pt.xPct}%`, top: `${pt.yPct}%` }}
             >
-              <span className="h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-400 shadow-[0_0_12px_#34d399]" />
-              <span className="rounded bg-black/75 px-1 text-[8px] text-white">나</span>
+              <span className="h-4 w-4 rounded-full border-2 border-white bg-emerald-400 shadow-[0_0_14px_#34d399] animate-ping opacity-75 absolute" />
+              <span className="h-4 w-4 rounded-full border-2 border-white bg-emerald-400 shadow-[0_0_12px_#34d399]" />
+              <span className="mt-0.5 rounded border border-black/80 bg-black/85 px-1 text-[8px] font-bold text-white">
+                나
+              </span>
             </div>
           );
         })()}
 
+        {/* Expedition Crew Marker */}
         {crewPos && (() => {
           const pt = toMapPct(crewPos);
           return (
@@ -583,68 +785,65 @@ export default function RadarMapModal({
               className="pointer-events-none absolute z-40 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
               style={{ left: `${pt.xPct}%`, top: `${pt.yPct}%` }}
             >
-              <span className="rounded bg-primary px-1.5 py-0.5 text-[9px] font-black text-primary-foreground shadow">
-                🚩원정대
+              <span className="rounded-full border-2 border-white bg-indigo-600 px-2 py-0.5 text-[9px] font-black text-white shadow-[0_0_10px_#6366f1]">
+                🚩 원정대
               </span>
             </div>
           );
         })()}
 
-        {/* Floating Zoom In/Out Buttons (Right Edge of Map) */}
-        <div className="absolute right-2 top-24 z-40 flex flex-col gap-1.5">
-          <Button
+        {/* Floating Zoom & Reset Buttons (Right Edge of Map) */}
+        <div className="absolute right-2.5 top-24 z-40 flex flex-col gap-2">
+          <button
             type="button"
-            size="sm"
-            onClick={() => setZoomScale(z => Math.min(2.5, z * 1.35))}
-            className="pixel-btn h-9 w-9 p-0 bg-card text-white shadow-lg active:scale-95"
+            onClick={() => setZoomScale(z => Math.min(3.5, z * 1.35))}
+            className="pixel-btn flex h-9 w-9 items-center justify-center rounded border-2 border-emerald-500 bg-[#162a1d] text-emerald-200 shadow-xl hover:bg-[#203a27] active:scale-95"
             aria-label="지도 확대"
           >
             <ZoomIn className="!h-4 !w-4" />
-          </Button>
-          <Button
+          </button>
+          <button
             type="button"
-            size="sm"
-            onClick={() => setZoomScale(z => Math.max(0.6, z / 1.35))}
-            className="pixel-btn h-9 w-9 p-0 bg-card text-white shadow-lg active:scale-95"
+            onClick={() => setZoomScale(z => Math.max(0.5, z / 1.35))}
+            className="pixel-btn flex h-9 w-9 items-center justify-center rounded border-2 border-emerald-500 bg-[#162a1d] text-emerald-200 shadow-xl hover:bg-[#203a27] active:scale-95"
             aria-label="지도 축소"
           >
             <ZoomOut className="!h-4 !w-4" />
-          </Button>
-          <Button
+          </button>
+          <button
             type="button"
-            size="sm"
-            onClick={() => setZoomScale(1)}
-            className="pixel-btn h-9 w-9 p-0 bg-card text-white shadow-lg active:scale-95"
-            aria-label="배율 초기화"
+            onClick={resetView}
+            className="pixel-btn flex h-9 w-9 items-center justify-center rounded border-2 border-emerald-500 bg-[#162a1d] text-emerald-200 shadow-xl hover:bg-[#203a27] active:scale-95"
+            aria-label="화면 중앙 초기화"
           >
             <RotateCcw className="!h-3.5 !w-3.5" />
-          </Button>
+          </button>
         </div>
       </div>
 
       {/* ──────────────── SELECTED SPOT ACTION FLOATER (Bottom Center) ──────────────── */}
       {selectedSpot && (
-        <div className="absolute inset-x-3 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+6.5rem)] z-40 pixel-frame max-w-md mx-auto space-y-1.5 bg-card/95 p-2.5 shadow-2xl border-2 border-primary">
+        <div className="absolute inset-x-3 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+6.5rem)] z-40 pixel-frame max-w-md mx-auto space-y-2 bg-[#0f1d14]/95 p-3 shadow-2xl border-2 border-emerald-500 text-white rounded">
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-[10px] font-bold text-primary">{selectedSpot.kindLabel}</span>
-              <b className="block text-sm text-foreground">
+              <span className="text-[10px] font-bold text-emerald-400">{selectedSpot.kindLabel}</span>
+              <b className="block text-sm text-white drop-shadow">
                 {selectedSpot.name}
                 {selectedSpot.probabilityPct !== undefined && ` (확률 ${selectedSpot.probabilityPct}%)`}
               </b>
             </div>
-            <div className="text-right text-[10px] text-muted-foreground">
+            <div className="text-right text-[10px] text-emerald-200/80">
               <span>거리 {selectedSpot.distanceM ?? Math.round(distanceM(center, selectedSpot))}m</span>
               <button
                 type="button"
                 onClick={() => setSelectedSpot(null)}
-                className="ml-2 text-destructive font-bold underline"
+                className="ml-2 text-rose-400 font-bold underline"
               >
                 닫기
               </button>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-1">
+          <div className="grid grid-cols-3 gap-1.5">
             <Button
               type="button"
               size="sm"
@@ -652,7 +851,7 @@ export default function RadarMapModal({
                 onDispatchTo({ lat: selectedSpot.lat, lng: selectedSpot.lng }, selectedSpot.name);
                 onClose();
               }}
-              className="pixel-btn h-auto min-h-0 gap-1 py-1.5 px-2 text-xs bg-primary text-primary-foreground font-bold"
+              className="pixel-btn h-auto min-h-0 gap-1 py-1.5 px-2 text-xs border-2 border-emerald-400 bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
             >
               <Flag className="!h-3.5 !w-3.5" />
               원정 파견
@@ -678,7 +877,7 @@ export default function RadarMapModal({
                   onTrack(id);
                 }
               }}
-              className="pixel-btn h-auto min-h-0 gap-1 py-1.5 px-2 text-xs"
+              className="pixel-btn h-auto min-h-0 gap-1 py-1.5 px-2 text-xs border-2 border-emerald-600 bg-[#162a1d] hover:bg-[#203a27] text-emerald-200 font-bold"
             >
               <Navigation className="!h-3.5 !w-3.5" />
               안내선 표시
@@ -694,7 +893,7 @@ export default function RadarMapModal({
                   selectedSpot.name
                 )
               }
-              className="pixel-btn h-auto min-h-0 gap-1 py-1.5 px-2 text-xs"
+              className="pixel-btn h-auto min-h-0 gap-1 py-1.5 px-2 text-xs border-2 border-amber-600 bg-[#241c10] hover:bg-[#342716] text-amber-200 font-bold"
             >
               <Star className="!h-3.5 !w-3.5" />
               즐겨찾기 추가
@@ -704,25 +903,25 @@ export default function RadarMapModal({
       )}
 
       {/* ──────────────── BOTTOM LEFT: FAVORITE COORDINATES MANAGER BOX ──────────────── */}
-      <div className="absolute left-2 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 w-auto max-w-[calc(100vw-1rem)] sm:max-w-sm flex flex-col items-start">
+      <div className="absolute left-2.5 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 w-auto max-w-[calc(100vw-1.5rem)] sm:max-w-sm flex flex-col items-start">
         {/* Toggle Pill Button */}
         <button
           type="button"
           onClick={() => setFavBoxOpen(o => !o)}
-          className="pixel-btn flex items-center gap-1.5 py-1 px-2.5 text-xs bg-card border-2 border-foreground text-foreground font-bold shadow-lg"
+          className="pixel-btn flex items-center gap-1.5 py-1 px-3 text-xs rounded border-2 border-emerald-500 bg-[#162a1d] text-emerald-100 font-bold shadow-xl hover:bg-[#203a27]"
         >
           <span>⭐ 즐겨찾기 좌표 관리</span>
-          <span className="rounded bg-primary/20 px-1 text-[10px] text-primary font-mono">
+          <span className="rounded bg-black/50 px-1 text-[10px] text-emerald-300 font-mono">
             {favorites.length}/{MAX_FAVORITE_SPOTS}
           </span>
-          <span className="text-[10px] text-muted-foreground">
+          <span className="text-[10px] text-emerald-400">
             {favBoxOpen ? '▼ 접기' : '▲ 펼치기'}
           </span>
         </button>
 
         {/* Collapsible Panel */}
         {favBoxOpen && (
-          <div className="pixel-frame mt-1 w-full space-y-1.5 bg-card/95 p-2 shadow-2xl border-2 border-foreground max-h-52 overflow-y-auto">
+          <div className="pixel-frame mt-1.5 w-full space-y-1.5 rounded bg-[#0d1911]/95 p-2.5 shadow-2xl border-2 border-emerald-600 max-h-56 overflow-y-auto text-white">
             {/* Quick Add Bar */}
             <div className="flex gap-1">
               <input
@@ -731,23 +930,22 @@ export default function RadarMapModal({
                 onChange={e => setCustomName(e.target.value)}
                 placeholder="장소 이름 (예: 흑요석 광맥)"
                 maxLength={18}
-                className="pixel-box min-w-0 flex-1 bg-background px-2 py-1 text-xs text-foreground"
+                className="pixel-box min-w-0 flex-1 rounded bg-[#162a1d] border border-emerald-700 px-2 py-1 text-xs text-white placeholder:text-emerald-300/40 focus:outline-none focus:border-emerald-400"
               />
-              <Button
+              <button
                 type="button"
-                size="sm"
                 disabled={favorites.length >= MAX_FAVORITE_SPOTS}
                 onClick={() => addQuickFavorite(pos, `내 스팟 #${favorites.length + 1}`)}
-                className="pixel-btn h-auto min-h-0 shrink-0 gap-1 py-1 px-2 text-xs font-bold"
+                className="pixel-btn flex items-center gap-1 py-1 px-2.5 text-xs font-bold rounded border border-emerald-400 bg-emerald-700 hover:bg-emerald-600 text-white disabled:opacity-40"
               >
                 <Plus className="!h-3 !w-3" />
                 현위치
-              </Button>
+              </button>
             </div>
 
             {/* Favorite Item Rows */}
             {!favorites.length ? (
-              <p className="py-2 text-center text-[11px] text-muted-foreground">
+              <p className="py-2 text-center text-[11px] text-emerald-300/60">
                 저장된 즐겨찾기가 없습니다. 위 지도 스팟을 터치하거나 [현위치]를 눌러 등록하세요.
               </p>
             ) : (
@@ -758,56 +956,57 @@ export default function RadarMapModal({
                   return (
                     <div
                       key={fav.id}
-                      className={`pixel-box flex items-center justify-between gap-1 p-1.5 ${
-                        isTracked ? 'border-primary bg-primary/15' : 'bg-background'
+                      className={`pixel-box flex items-center justify-between gap-1 rounded p-1.5 ${
+                        isTracked
+                          ? 'border border-emerald-400 bg-emerald-950/80 text-white'
+                          : 'border border-emerald-900 bg-[#14231a] text-emerald-100'
                       }`}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1">
-                          <b className="truncate text-[11px] text-foreground">
+                          <b className="truncate text-[11px] text-white">
                             #{idx + 1} {fav.name}
                           </b>
                           {isTracked && (
-                            <span className="rounded bg-primary px-1 text-[8px] text-primary-foreground font-bold">
+                            <span className="rounded bg-emerald-600 px-1 text-[8px] text-white font-bold">
                               안내 중
                             </span>
                           )}
                         </div>
-                        <span className="text-[9px] text-muted-foreground">
+                        <span className="text-[9px] text-emerald-300/70">
                           {dist >= 1000 ? `${(dist / 1000).toFixed(1)}km` : `${dist}m`} ({fav.lat.toFixed(4)}, {fav.lng.toFixed(4)})
                         </span>
                       </div>
-                      <div className="flex shrink-0 items-center gap-0.5">
-                        <Button
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
                           type="button"
-                          size="sm"
                           onClick={() => {
                             onDispatchTo({ lat: fav.lat, lng: fav.lng }, fav.name);
                             onClose();
                           }}
-                          className="pixel-btn h-auto min-h-0 py-0.5 px-1.5 text-[10px] bg-primary text-primary-foreground font-bold"
+                          className="pixel-btn rounded py-0.5 px-2 text-[10px] font-bold border border-emerald-400 bg-emerald-600 text-white hover:bg-emerald-500"
                         >
                           파견
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           type="button"
-                          size="sm"
-                          variant={isTracked ? 'default' : 'outline'}
                           onClick={() => onTrack(isTracked ? null : fav.id)}
-                          className="pixel-btn h-auto min-h-0 py-0.5 px-1.5 text-[10px]"
+                          className={`pixel-btn rounded py-0.5 px-2 text-[10px] font-bold border ${
+                            isTracked
+                              ? 'border-emerald-300 bg-emerald-500 text-black'
+                              : 'border-emerald-700 bg-[#1e3424] text-emerald-200'
+                          }`}
                         >
                           {isTracked ? '끄기' : '안내'}
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                           type="button"
-                          size="sm"
-                          variant="ghost"
                           aria-label={`${fav.name} 삭제`}
                           onClick={() => onRemoveFavorite(fav.id)}
-                          className="h-6 w-6 p-0 text-destructive hover:bg-destructive/10"
+                          className="flex h-6 w-6 items-center justify-center rounded text-rose-400 hover:bg-rose-950/50"
                         >
                           <Trash2 className="!h-3 !w-3" />
-                        </Button>
+                        </button>
                       </div>
                     </div>
                   );
