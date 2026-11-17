@@ -9,6 +9,16 @@ export const stackWeight = (stacks: Stack[]) => round1(stacks.reduce((s, x) => s
 export const gearWeight = (gear: GearInstance[]) => round1(gear.reduce((s, g) => s + ITEMS[g.itemId].weight, 0));
 export const countOf = (stacks: Stack[], id: ItemId) => stacks.find((s) => s.itemId === id)?.count ?? 0;
 
+export const validStackCount = (count: number, held: number) => Number.isSafeInteger(count) && count >= 1 && count <= held;
+
+/** Move exactly the requested amount, or leave both inventories untouched. */
+export function transferStack(source: Stack[], destination: Stack[], itemId: ItemId, count: number) {
+  if (!validStackCount(count, countOf(source, itemId))) return null;
+  const remaining = removeStacks(source, [{ itemId, count }]);
+  if (!remaining) return null;
+  return { source: remaining, destination: addStacks(destination, [{ itemId, count }]) };
+}
+
 /** Merge stacks (pure), keeping catalogue order and dropping empties. */
 export function addStacks(base: Stack[], add: Stack[]): Stack[] {
   const map = new Map<ItemId, number>();

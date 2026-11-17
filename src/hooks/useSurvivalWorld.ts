@@ -28,7 +28,7 @@ import { applyTribeWallDefense, DEFAULT_TRIBE_CLASS, getTribeClass, tribeCarryBo
 import { blueprintResearchCost, canPlaceVillageBuilding, computeBuildingHarvestBubble, computeVillageBonuses, ensureVillageState, isArtisanUnlocked, isBlueprintResearched, moveVillageBuilding, placeVillageBuilding, removeVillageBuilding, SHAMAN_SKILL_DEFS, shamanSkillLevel, VILLAGE_BUILDINGS, type ShamanSkillId, type VillageBuildingId, type VillageState } from '@/lib/survival/village';
 import { settleFoodSpoilage, SMOKE_CURING_MS, TAVERN_RECIPES, type SmokehouseBatch } from '@/lib/survival/culinary';
 import { computeExpeditionLevel, detectExpeditionPins, type RadarPin } from '@/lib/survival/radar';
-import { addStacks, countOf, hasAll, removeStacks, splitDeathDrop, splitByCapacity, stackWeight } from '@/lib/survival/inventory';
+import { addStacks, countOf, hasAll, removeStacks, splitDeathDrop, splitByCapacity, stackWeight, transferStack, validStackCount } from '@/lib/survival/inventory';
 import { addExperience, dayPhase, xpToNext } from '@/lib/survival/progression';
 import { claimWorldQuest, freshProgress, type WorldProgress } from '@/lib/survival/worldProgress';
 import { currentQuest, LANGUAGE_QUEST, languageQuestProgress, questReady, type QuestState } from '@/lib/survival/quests';
@@ -1101,12 +1101,13 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     setS({ ...p, storage, backpack: addStacks(p.backpack, [{ itemId, count: 1 }]), packedItems: [...new Set([...(p.packedItems ?? []), itemId])] });
   }, [capacity, setS]);
 
-  const storeOne = useCallback((itemId: ItemId) => {
+  const storeOne = useCallback((itemId: ItemId, count = 1) => {
     const p = ref.current;
     if (!enabledRef.current || !atWorkshop(p)) { toast.warning('거점 안에서만 보관할 수 있습니다'); return; }
-    const backpack = removeStacks(p.backpack, [{ itemId, count: 1 }]);
-    if (!backpack) return;
-    setS({ ...p, backpack, storage: addStacks(p.storage, [{ itemId, count: 1 }]) });
+    const moved = transferStack(p.backpack, p.storage, itemId, count);
+    if (!moved) { toast.warning('보관할 수량을 다시 확인하세요'); return; }
+    setS({ ...p, backpack: moved.source, storage: moved.destination });
+    toast.success(`${ITEMS[itemId].name} ${count}개를 창고로 옮겼습니다`);
   }, [setS]);
   const storePacked = useCallback(() => {
     if (!enabledRef.current || !atWorkshop(ref.current)) return;
@@ -1120,7 +1121,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const p = ref.current;
     const valid = drops
       .map(d => ({ itemId: d.itemId, count: Math.min(Math.floor(d.count), p.backpack.find(b => b.itemId === d.itemId)?.count ?? 0) }))
-      .filter(d => d.count > 0);
+      .filter(d => validStackCount(d.count, countOf(p.backpack, d.itemId)));
     if (!valid.length) return;
     const left = removeStacks(p.backpack, valid);
     if (!left) { toast.error('버릴 수량을 다시 확인하세요'); return; }
