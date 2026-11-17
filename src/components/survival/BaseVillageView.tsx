@@ -45,6 +45,7 @@ import outpostImg from '@/assets/survival/base-outpost.png';
 import altarImg from '@/assets/survival/dolmen-shrine.png';
 import shamanImg from '@/assets/survival/npc-shaman.png';
 import mercImg from '@/assets/survival/npc-mercenary.png';
+import tribalHallImg from '@/assets/survival/base-tribal-hall.png';
 import baseVillageBg from '@/assets/survival/base-village-bg.png';
 
 type FacilityModalKind = 'workshop' | 'armory' | 'altar' | 'shaman' | 'smokehouse' | 'tavern' | null;
@@ -329,11 +330,26 @@ function BuildingGraphic({
           className="pixelated h-13 w-14 object-contain drop-shadow-[0_0_8px_hsl(var(--sacred))]"
         />
       );
+    case 'tribal_hall':
+      return (
+        <div className="relative flex h-full w-full items-center justify-center p-0.5">
+          <img
+            src={tribalHallImg}
+            alt="부족회관"
+            className="pixelated h-full w-full object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]"
+          />
+        </div>
+      );
+    case 'wandering_shaman':
     case 'shaman_tent':
       return (
-        <div className="relative flex items-center justify-center">
-          <img src={shamanImg} alt="" className="pixelated h-11 w-11 object-contain" />
-          <span className="absolute -right-1 -top-1 animate-bounce rounded bg-primary px-1 text-[9px] font-bold text-primary-foreground">
+        <div className="relative flex h-full w-full items-center justify-center p-0.5">
+          <img
+            src={shamanImg}
+            alt="떠돌이 주술사"
+            className="pixelated h-full w-full object-contain drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]"
+          />
+          <span className="absolute -right-0.5 -top-0.5 animate-bounce rounded bg-primary px-1 text-[9px] font-bold text-primary-foreground shadow">
             !
           </span>
         </div>
@@ -460,7 +476,7 @@ export default function BaseVillageView({
     }
     if (buildingId === 'stone_smeltery' || buildingId === 'brazier') return 'armory';
     if (buildingId === 'ancient_altar') return 'altar';
-    if (buildingId === 'shaman_tent') return 'shaman';
+    if (buildingId === 'shaman_tent' || buildingId === 'wandering_shaman') return 'shaman';
     if (buildingId === 'smokehouse') return 'smokehouse';
     if (buildingId === 'primitive_tavern') return 'tavern';
     return null;
@@ -504,25 +520,12 @@ export default function BaseVillageView({
   };
 
   // Build Living Agents with Role-Playing Routines (0-byte server load, pure client AI)
-  // Scales with base level & building count: combat mercenaries + ambient extra villagers (haulers) + pets + shaman
+  // Scales with base level & building count: combat mercenaries + ambient extra villagers (haulers) + pets
   const desiredAgents = useMemo(() => {
     const list: Omit<
       LivingAgent,
       'x' | 'y' | 'facing' | 'moving' | 'bubble' | 'restTicks' | 'nextMoveAt' | 'moveDurationMs'
-    >[] = [
-      {
-        id: 'npc-shaman',
-        kind: 'shaman',
-        role: 'shaman',
-        label: '떠돌이 주술사',
-      },
-      {
-        id: 'npc-hall',
-        kind: 'hall',
-        role: 'campfire_social',
-        label: '부족회관',
-      },
-    ];
+    >[] = [];
     const rawTribeCount = tribe?.count ?? 0;
     // Only display mercenaries that have actually been hired / recruited.
     const tribeCount = Math.min(popCap.maxTribeCapacity, rawTribeCount);
@@ -804,6 +807,14 @@ export default function BaseVillageView({
     // If the building has a harvest bubble ready, pop & collect it immediately on tap!
     if (buildingBubbles[placed.uid] && onHarvestBubble) {
       triggerPopHarvest(placed);
+      return;
+    }
+    if (placed.buildingId === 'wandering_shaman' || placed.buildingId === 'shaman_tent') {
+      setActiveModal('shaman');
+      return;
+    }
+    if (placed.buildingId === 'tribal_hall') {
+      onOpenBaseTab?.('expedition');
       return;
     }
     setSelectedPlacedUid(placed.uid);

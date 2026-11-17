@@ -178,7 +178,7 @@ export default function BaseNpcs({
   return <>
     <motion.button key={`s-${offsets.shaman?.x}-${offsets.shaman?.y}`} type="button" aria-label="떠돌이 주술사 (끌어서 이동)" {...dragProps('shaman')} onClick={tap('shaman')} className={`${npcBtn} touch-none`} style={{ left: 58 + (offsets.shaman?.x ?? 0), bottom: -(offsets.shaman?.y ?? 0) }}>
       {!shamanMet && <span className="animate-bounce bg-primary px-1 text-[10px] font-bold text-primary-foreground">!</span>}
-      <img src={shamanArt} alt="떠돌이 주술사" className="pixelated h-16 w-auto" style={{ transform: 'scaleX(-1)' }} draggable={false} />
+      <img src={shamanArt} alt="떠돌이 주술사" className="pixelated h-16 w-auto" draggable={false} />
       <span className="mt-0.5 whitespace-nowrap rounded bg-background/90 px-1 text-[10px] font-bold border border-foreground/50 shadow-sm">떠돌이 주술사</span>
     </motion.button>
     <motion.button key={`m-${offsets.merc?.x}-${offsets.merc?.y}`} type="button" aria-label="부족회관 (끌어서 이동)" {...dragProps('merc')} onClick={tap('merc')} className={`${npcBtn} touch-none`} style={{ right: 58 - (offsets.merc?.x ?? 0), bottom: -(offsets.merc?.y ?? 0) }}>

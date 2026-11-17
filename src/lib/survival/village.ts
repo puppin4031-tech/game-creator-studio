@@ -14,6 +14,8 @@ export type VillageBuildingId =
   | 'granite_wall'
   | 'marble_wall'
   | 'campfire'
+  | 'tribal_hall'
+  | 'wandering_shaman'
   | 'brazier'
   | 'torch'
   | 'primitive_storage'
@@ -233,6 +235,40 @@ export const VILLAGE_BUILDINGS: Record<VillageBuildingId, VillageBuildingDef> = 
       amountPerCycle: 1,
       maxCount: 6,
     },
+  },
+  tribal_hall: {
+    id: 'tribal_hall',
+    name: '부족회관',
+    category: 'facility',
+    unlockBaseLevel: 1,
+    maxHp: 600,
+    cost: [S('log', 4), S('hide', 2)],
+    desc: '부족원들이 모여 작전을 논의하고 원정대 용병을 지휘하는 거점 부족회관.',
+    effectLabel: '4칸 (2×2) · 원정대 지휘소 · 주민 +2명',
+    icon: '⛺',
+    restSpot: true,
+    maxCount: 1,
+    widthTiles: 2,
+    heightTiles: 2,
+    footprintLabel: '4칸 (2×2)',
+    residentBonus: 2,
+  },
+  wandering_shaman: {
+    id: 'wandering_shaman',
+    name: '떠돌이 주술사',
+    category: 'facility',
+    unlockBaseLevel: 1,
+    maxHp: 400,
+    cost: [S('herb', 2), S('bone', 2)],
+    desc: '신비한 지혜와 약초, 생존 목표 및 고대 언어를 전수하는 늙은 떠돌이 주술사.',
+    effectLabel: '1칸 (1×1) · 생존 목표 & 언어 학습',
+    icon: '🧙',
+    restSpot: true,
+    maxCount: 1,
+    widthTiles: 1,
+    heightTiles: 1,
+    footprintLabel: '1칸 (1×1)',
+    residentBonus: 1,
   },
   brazier: {
     id: 'brazier',
@@ -500,19 +536,19 @@ export const VILLAGE_BUILDINGS: Record<VillageBuildingId, VillageBuildingDef> = 
   },
   shaman_tent: {
     id: 'shaman_tent',
-    name: '떠돌이 주술사 천막',
+    name: '떠돌이 주술사',
     category: 'facility',
-    unlockBaseLevel: 3,
-    maxHp: 600,
-    cost: [S('hide', 4), S('bone', 4), S('herb', 3)],
-    desc: '늙은 주술사가 머물며 약초와 고대 지혜, 생존 의뢰를 전수하는 천막.',
-    effectLabel: '4칸 (2×2) · 생존 목표 부여 · 약초 채집',
-    icon: '🔮',
+    unlockBaseLevel: 1,
+    maxHp: 400,
+    cost: [S('hide', 2), S('bone', 2), S('herb', 2)],
+    desc: '늙은 주술사가 머물며 약초와 고대 지혜, 생존 의뢰를 전수하는 1칸 성소.',
+    effectLabel: '1칸 (1×1) · 생존 목표 부여 · 약초 채집',
+    icon: '🧙',
     restSpot: true,
     maxCount: 1,
-    widthTiles: 2,
-    heightTiles: 2,
-    footprintLabel: '4칸 (2×2)',
+    widthTiles: 1,
+    heightTiles: 1,
+    footprintLabel: '1칸 (1×1)',
     residentBonus: 1,
     idleYield: {
       itemId: 'herb',
@@ -599,11 +635,13 @@ export function buildingFootprintCells(
   return cells;
 }
 
-/** Creates the initial starter layout around the center of the 12x12 grid with only the central campfire. */
+/** Creates the initial starter layout around the center of the 12x12 grid with central campfire, tribal hall, and wandering shaman. */
 export function createStarterVillage(hasAltar = false): VillageState {
   const initialLastHarvest = Date.now() - 25 * 60_000;
   const buildings: PlacedVillageBuilding[] = [
-    { uid: 'starter-campfire', buildingId: 'campfire', x: 5, y: 5, hp: 250, maxHp: 250, lastHarvestAt: initialLastHarvest }, // 2x2: (5..6, 5..6)
+    { uid: 'starter-shaman', buildingId: 'wandering_shaman', x: 3, y: 5, hp: 400, maxHp: 400, lastHarvestAt: initialLastHarvest }, // 1x1 (1칸)
+    { uid: 'starter-campfire', buildingId: 'campfire', x: 5, y: 5, hp: 250, maxHp: 250, lastHarvestAt: initialLastHarvest }, // 2x2 (4칸)
+    { uid: 'starter-hall', buildingId: 'tribal_hall', x: 8, y: 5, hp: 600, maxHp: 600, lastHarvestAt: initialLastHarvest }, // 2x2 (4칸)
   ];
   if (hasAltar) {
     buildings.push({ uid: 'starter-altar', buildingId: 'ancient_altar', x: 4, y: 0, hp: 900, maxHp: 900, lastHarvestAt: initialLastHarvest });
@@ -613,10 +651,9 @@ export function createStarterVillage(hasAltar = false): VillageState {
 
 export function ensureVillageState(state: VillageState | undefined, hasAltar = false): VillageState {
   if (state?.initialized && Array.isArray(state.buildings)) {
-    // Clean up legacy auto-populated starter buildings so only starter-campfire (and starter-altar) remains
+    // Clean up legacy test starter buildings
     const legacyStarterIds = new Set([
       'starter-storage',
-      'starter-shaman',
       'starter-lumber',
       'starter-smokehouse',
       'starter-tavern',
@@ -633,6 +670,28 @@ export function ensureVillageState(state: VillageState | undefined, hasAltar = f
         y: 5,
         hp: 250,
         maxHp: 250,
+        lastHarvestAt: Date.now() - 25 * 60_000,
+      });
+    }
+    if (!filteredBuildings.some(b => b.buildingId === 'tribal_hall')) {
+      filteredBuildings.push({
+        uid: 'starter-hall',
+        buildingId: 'tribal_hall',
+        x: 8,
+        y: 5,
+        hp: 600,
+        maxHp: 600,
+        lastHarvestAt: Date.now() - 25 * 60_000,
+      });
+    }
+    if (!filteredBuildings.some(b => b.buildingId === 'wandering_shaman' || b.buildingId === 'shaman_tent')) {
+      filteredBuildings.push({
+        uid: 'starter-shaman',
+        buildingId: 'wandering_shaman',
+        x: 3,
+        y: 5,
+        hp: 400,
+        maxHp: 400,
         lastHarvestAt: Date.now() - 25 * 60_000,
       });
     }
@@ -784,6 +843,9 @@ export function wallConnections(state: VillageState, x: number, y: number) {
 
 export const STARTER_BLUEPRINTS: VillageBuildingId[] = [
   'campfire',
+  'tribal_hall',
+  'wandering_shaman',
+  'shaman_tent',
   'primitive_storage',
   'lumber_hut',
   'smokehouse',
