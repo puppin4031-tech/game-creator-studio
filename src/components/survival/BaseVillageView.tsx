@@ -336,7 +336,7 @@ function BuildingGraphic({
           <img
             src={tribalHallImg}
             alt="부족회관"
-            className="pixelated h-full w-full object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]"
+            className="pixelated h-full w-auto object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]"
           />
         </div>
       );
@@ -520,12 +520,19 @@ export default function BaseVillageView({
   };
 
   // Build Living Agents with Role-Playing Routines (0-byte server load, pure client AI)
-  // Scales with base level & building count: combat mercenaries + ambient extra villagers (haulers) + pets
+  // Scales with base level & building count: combat mercenaries + ambient extra villagers (haulers) + pets + tribal hall NPC
   const desiredAgents = useMemo(() => {
     const list: Omit<
       LivingAgent,
       'x' | 'y' | 'facing' | 'moving' | 'bubble' | 'restTicks' | 'nextMoveAt' | 'moveDurationMs'
-    >[] = [];
+    >[] = [
+      {
+        id: 'npc-hall',
+        kind: 'hall',
+        role: 'campfire_social',
+        label: '부족회관',
+      },
+    ];
     const rawTribeCount = tribe?.count ?? 0;
     // Only display mercenaries that have actually been hired / recruited.
     const tribeCount = Math.min(popCap.maxTribeCapacity, rawTribeCount);
@@ -703,6 +710,23 @@ export default function BaseVillageView({
                 bubble: 'Zzz ⛺',
                 restTicks: 2,
                 nextMoveAt: now + 2200,
+              };
+            }
+            if (ag.kind === 'hall') {
+              const hallQuotes = [
+                '🛡️ 부족원들이 대기 중이네!',
+                '⚔️ 부족회관에서 출정할 준비가 되었는가?',
+                '🏕️ 든든한 용병들이 거점을 지킨다네!',
+              ];
+              const cf = campfires[0];
+              const faceDir: 1 | -1 = cf && ag.x > cf.x ? -1 : 1;
+              return {
+                ...ag,
+                facing: faceDir,
+                moving: false,
+                bubble: hallQuotes[Math.floor(Math.random() * hallQuotes.length)],
+                restTicks: 2,
+                nextMoveAt: now + 2400,
               };
             }
             if (ag.role === 'campfire_social') {
@@ -1354,7 +1378,7 @@ export default function BaseVillageView({
                       <img
                         src={mercImg}
                         alt="부족회관"
-                        className="pixelated h-8 w-auto object-contain drop-shadow"
+                        className="pixelated h-10 w-auto object-contain drop-shadow"
                       />
                       <span className="mt-0.5 whitespace-nowrap rounded bg-background/90 px-1 text-[7px] font-bold border border-foreground/40 leading-none">
                         부족회관
