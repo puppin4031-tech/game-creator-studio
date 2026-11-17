@@ -212,7 +212,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [radarOpen, setRadarOpen] = useState(false);
   const expeditionControls = <ExpeditionSystem crew={crew} logs={s.expeditionLogs ?? []} target={expeditionTarget} home={s.base} auto={!!s.expeditionAuto} pocket={g.pocketMode} outdoor={g.outdoorMoving && (g.pocketMode || (!!crew && distanceM(s.pos, crew.pos) <= 40))} watching={view === 'expedition'} gpsReady={gps.ready} canSend={canDispatch}
     focus={crew?.focus ?? expeditionFocus} onFocus={setExpeditionFocus}
-    tribeClass={activeTribeClassId} onSelectClass={g.selectTribeClass}
+    tribeClass={activeTribeClassId}
     expeditionLevel={g.expeditionLevelInfo.level}
     onSend={() => { if (g.dispatchObserved(expeditionDestination, expeditionFocus, activeTribeClassId)) { setWatchExpedition(true); setPanel('none'); setView('expedition'); } }}
     onAuto={() => { g.toggleExpeditionAuto(expeditionDestination, expeditionFocus); setWatchExpedition(true); }} onPocket={g.togglePocket} onMorale={g.rallyExpedition} onReturn={g.recallExpedition} onWatch={() => setView(v => v === 'expedition' ? 'user' : 'expedition')}

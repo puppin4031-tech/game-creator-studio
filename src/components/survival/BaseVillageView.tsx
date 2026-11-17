@@ -100,7 +100,7 @@ type AgentRole = 'campfire_social' | 'shelter_rest' | 'wall_patrol' | 'hauler' |
 
 interface LivingAgent {
   id: string;
-  kind: 'tribe' | 'pet' | 'shaman' | 'extra';
+  kind: 'tribe' | 'pet' | 'shaman' | 'extra' | 'hall';
   role: AgentRole;
   label: string;
   x: number;
@@ -515,6 +515,12 @@ export default function BaseVillageView({
         role: 'shaman',
         label: '떠돌이 주술사',
       },
+      {
+        id: 'npc-hall',
+        kind: 'hall',
+        role: 'campfire_social',
+        label: '부족회관',
+      },
     ];
     const rawTribeCount = tribe?.count ?? 0;
     // Only display mercenaries that have actually been hired / recruited.
@@ -836,6 +842,10 @@ export default function BaseVillageView({
     if (buildMode) return;
     if (ag.kind === 'shaman') {
       setActiveModal('shaman');
+      return;
+    }
+    if (ag.kind === 'hall') {
+      onOpenBaseTab?.('expedition');
       return;
     }
     const pool =
@@ -1348,11 +1358,27 @@ export default function BaseVillageView({
                   }}
                 >
                   {ag.kind === 'shaman' ? (
-                    <img
-                      src={shamanImg}
-                      alt="떠돌이 주술사"
-                      className="pixelated h-8 w-auto object-contain drop-shadow"
-                    />
+                    <div className="flex flex-col items-center">
+                      <img
+                        src={shamanImg}
+                        alt="떠돌이 주술사"
+                        className="pixelated h-8 w-auto object-contain drop-shadow"
+                      />
+                      <span className="mt-0.5 whitespace-nowrap rounded bg-background/90 px-1 text-[7px] font-bold border border-foreground/40 leading-none">
+                        떠돌이 주술사
+                      </span>
+                    </div>
+                  ) : ag.kind === 'hall' ? (
+                    <div className="flex flex-col items-center">
+                      <img
+                        src={mercImg}
+                        alt="부족회관"
+                        className="pixelated h-8 w-auto object-contain drop-shadow"
+                      />
+                      <span className="mt-0.5 whitespace-nowrap rounded bg-background/90 px-1 text-[7px] font-bold border border-foreground/40 leading-none">
+                        부족회관
+                      </span>
+                    </div>
                   ) : ag.kind === 'tribe' || ag.kind === 'extra' ? (
                     <TribeSprite
                       action={ag.moving ? 'walk' : 'idle'}
@@ -1404,6 +1430,10 @@ export default function BaseVillageView({
                     height={38}
                     showBadge={false}
                   />
+                ) : talkingAgent.kind === 'hall' ? (
+                  <img src={mercImg} alt="부족회관" className="pixelated h-10 w-auto object-contain" />
+                ) : talkingAgent.kind === 'shaman' ? (
+                  <img src={shamanImg} alt="떠돌이 주술사" className="pixelated h-10 w-auto object-contain" />
                 ) : (
                   <PetSprite
                     speciesId={talkingAgent.speciesId ?? 'baby_raptor'}

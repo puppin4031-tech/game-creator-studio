@@ -176,13 +176,15 @@ export default function BaseNpcs({
   });
   const tap = (k: 'shaman' | 'merc') => (e: React.MouseEvent) => { e.stopPropagation(); if (!dragged.current) setOpen(k); };
   return <>
-    <motion.button key={`s-${offsets.shaman?.x}-${offsets.shaman?.y}`} type="button" aria-label="떠돌이 주술사와 대화 (끌어서 이동)" {...dragProps('shaman')} onClick={tap('shaman')} className={`${npcBtn} touch-none`} style={{ left: 58 + (offsets.shaman?.x ?? 0), bottom: -(offsets.shaman?.y ?? 0) }}>
+    <motion.button key={`s-${offsets.shaman?.x}-${offsets.shaman?.y}`} type="button" aria-label="떠돌이 주술사 (끌어서 이동)" {...dragProps('shaman')} onClick={tap('shaman')} className={`${npcBtn} touch-none`} style={{ left: 58 + (offsets.shaman?.x ?? 0), bottom: -(offsets.shaman?.y ?? 0) }}>
       {!shamanMet && <span className="animate-bounce bg-primary px-1 text-[10px] font-bold text-primary-foreground">!</span>}
-      <img src={shamanArt} alt="" className="pixelated h-16 w-auto" style={{ transform: 'scaleX(-1)' }} draggable={false} />
+      <img src={shamanArt} alt="떠돌이 주술사" className="pixelated h-16 w-auto" style={{ transform: 'scaleX(-1)' }} draggable={false} />
+      <span className="mt-0.5 whitespace-nowrap rounded bg-background/90 px-1 text-[10px] font-bold border border-foreground/50 shadow-sm">떠돌이 주술사</span>
     </motion.button>
-    <motion.button key={`m-${offsets.merc?.x}-${offsets.merc?.y}`} type="button" aria-label="부족민 영입 (끌어서 이동)" {...dragProps('merc')} onClick={tap('merc')} className={`${npcBtn} touch-none`} style={{ right: 58 - (offsets.merc?.x ?? 0), bottom: -(offsets.merc?.y ?? 0) }}>
-      <span className={`px-1 text-[10px] ${injured ? 'bg-destructive text-destructive-foreground' : 'bg-accent text-accent-foreground'}`}>{injured ? '부상' : `${activeClass.icon} 부족 ${count}/${TRIBE_MAX}`}</span>
-      <img src={mercArt} alt="" className={`pixelated h-16 w-auto ${injured ? 'opacity-40' : ''}`} draggable={false} />
+    <motion.button key={`m-${offsets.merc?.x}-${offsets.merc?.y}`} type="button" aria-label="부족회관 (끌어서 이동)" {...dragProps('merc')} onClick={tap('merc')} className={`${npcBtn} touch-none`} style={{ right: 58 - (offsets.merc?.x ?? 0), bottom: -(offsets.merc?.y ?? 0) }}>
+      <span className={`px-1 text-[10px] ${injured ? 'bg-destructive text-destructive-foreground' : 'bg-accent text-accent-foreground'}`}>{injured ? '부상' : `${count}/${TRIBE_MAX}`}</span>
+      <img src={mercArt} alt="부족회관" className={`pixelated h-16 w-auto ${injured ? 'opacity-40' : ''}`} draggable={false} />
+      <span className="mt-0.5 whitespace-nowrap rounded bg-background/90 px-1 text-[10px] font-bold border border-foreground/50 shadow-sm">부족회관</span>
     </motion.button>
     <Dialog open={open !== null} onOpenChange={o => { if (!o) { setOpen(null); setTour(null); } }}>
       <DialogContent className="pixel-panel max-h-[85dvh] max-w-sm overflow-y-auto" onClick={e => e.stopPropagation()}>
@@ -230,52 +232,51 @@ export default function BaseNpcs({
           </Button>
           {shamanMet && tour === null && <Button variant="outline" className={pixelBtn} onClick={() => setTour(0)}>거점 둘러보기 (안내)</Button>}
         </> : <>
-          <DialogHeader><DialogTitle>부족 회관 · {count}/{TRIBE_MAX}명 ({activeClass.icon} {activeClass.name})</DialogTitle><DialogDescription>"먹을 것만 넉넉하면 부족을 위해 뛰겠소."</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>부족회관 · {count}/{TRIBE_MAX}명</DialogTitle><DialogDescription>"먹을 것만 넉넉하면 부족을 위해 영구히 충성을 바치겠소."</DialogDescription></DialogHeader>
           <div className="flex items-start gap-2.5">
             <div className="flex flex-col items-center">
               <TribeSprite action="walk" tribeClass={activeClassId} height={52} />
-              <span className="mt-0.5 text-[10px] font-bold">{activeClass.weaponName}</span>
+              <span className="mt-0.5 text-[10px] font-bold">{activeClass.name}</span>
             </div>
             <div className="flex-1 space-y-1 text-xs">
               <p>부족민 기본 힘: 내 능력의 <b>{Math.round(tribeRatio(tribe) * 100)}%</b>{tribe?.starving ? ' (굶주림)' : ''}</p>
-              <p className="font-bold text-primary">{activeClass.icon} {activeClass.name} ({activeClass.role}): {activeClass.perkSummary}</p>
-              <p className="text-muted-foreground">{activeClass.desc}</p>
+              <p className="font-bold text-primary">{activeClass.icon} {activeClass.name}: {activeClass.perkSummary}</p>
+              <p className="text-muted-foreground">부족민은 한번 영입되면 해당 부족의 고유 전투·생존 특성을 영구히 유지합니다.</p>
               {injured && <p className="text-destructive">부상 중 · {Math.ceil((tribe!.injuredUntil! - now) / 60000)}분 남음</p>}
             </div>
           </div>
           <div className="space-y-1">
-            <b className="text-xs">4대 부족 병종 선택 (모집·원정·동행 적용)</b>
-            <div role="radiogroup" aria-label="4대 부족 용병 클래스 선택" className="grid grid-cols-2 gap-1.5">
-              {TRIBE_CLASS_LIST.map(c => {
-                const selected = activeClassId === c.id;
-                const memberCount = tribe?.classCounts?.[c.id] ?? 0;
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => chooseClass(c.id)}
-                    className={`pixel-box flex items-center gap-1.5 p-1.5 text-left text-xs transition-colors ${selected ? 'border-primary bg-primary/15 font-bold' : 'bg-background'}`}
-                  >
-                    <TribeSprite action={selected ? 'attack' : 'idle'} tribeClass={c.id} height={34} />
-                    <div className="min-w-0 flex-1 leading-tight">
-                      <div className="flex items-center gap-1 truncate">
-                        <span>{c.icon}</span>
-                        <span className="truncate">{c.name}</span>
-                      </div>
-                      <div className="text-[10px] text-muted-foreground">{c.role}{memberCount > 0 ? ` · ${memberCount}명` : ''}</div>
+            <b className="text-xs">부족 용병단 현황 (영입 시 영구 확정)</b>
+            <div className="pixel-box bg-background p-2 text-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <TribeSprite action="idle" tribeClass="tank" height={28} />
+                  <div>
+                    <div className="font-bold">🛡️ 거인 부족 (탱커)</div>
+                    <div className="text-[10px] text-muted-foreground">HP +80% · 방어 +5 · 성벽 방어 피해 -35%</div>
+                  </div>
+                </div>
+                <span className="font-bold text-primary">{tribe?.classCounts?.tank ?? count}명</span>
+              </div>
+              {(tribe?.classCounts?.gatherer ?? 0) > 0 && (
+                <div className="flex items-center justify-between border-t border-border/50 pt-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <TribeSprite action="idle" tribeClass="gatherer" height={28} />
+                    <div>
+                      <div className="font-bold">🎒 파밍 부족 (암바초)</div>
+                      <div className="text-[10px] text-muted-foreground">이동속도 +40% · 자동 채집 · 배낭 +30%</div>
                     </div>
-                  </button>
-                );
-              })}
+                  </div>
+                  <span className="font-bold text-emerald-600">{tribe?.classCounts?.gatherer}명</span>
+                </div>
+              )}
             </div>
           </div>
           {injured && <Button className={pixelBtn} variant="destructive" disabled={!have(TRIBE_TREAT_COST, storage, backpack)} onClick={onTreat}>응급 치료 ({label(TRIBE_TREAT_COST)})</Button>}
-          <div className="pixel-box space-y-1 bg-background p-2 text-xs"><b>새 부족민 영입 ({activeClass.icon} {activeClass.name})</b><p>{hireCost ? label(hireCost) : '가득 찼어요'}</p></div>
-          <Button className={pixelBtn} disabled={!hireCost || !have(hireCost, storage, backpack)} onClick={() => onHire(activeClassId)}>{count + 1}번째 {activeClass.name} 영입</Button>
+          <div className="pixel-box space-y-1 bg-background p-2 text-xs"><b>새 부족민 영입 (🛡️ 거인 부족)</b><p>{hireCost ? label(hireCost) : '가득 찼어요 (최대 10명)'}</p></div>
+          <Button className={pixelBtn} disabled={!hireCost || !have(hireCost, storage, backpack)} onClick={() => onHire('tank')}>{count + 1}번째 거인 부족 영입</Button>
           {count > 0 && <>
-            <div className="pixel-box space-y-1 bg-background p-2 text-xs"><b>걷기 동행 {tribe?.escort ? '· 켜짐' : ''}</b><p>함께 걸으면 채집 속도 +30%, 맹수 기습 방어 ({activeClass.name} 특성 적용).{expeditionBusy ? ' (원정 중에는 동행 불가)' : ''}</p></div>
+            <div className="pixel-box space-y-1 bg-background p-2 text-xs"><b>걷기 동행 {tribe?.escort ? '· 켜짐' : ''}</b><p>함께 걸으면 채집 속도 +30%, 맹수 기습 방어 (거인 부족 피해 감소 적용).{expeditionBusy ? ' (원정 중에는 동행 불가)' : ''}</p></div>
             <Button variant={tribe?.escort ? 'secondary' : 'default'} className={pixelBtn} disabled={injured} onClick={onEscort}>{tribe?.escort ? '동행 멈추기' : '함께 걷기'}</Button>
             <div className="pixel-box space-y-1 bg-background p-2 text-xs"><b>부족민 훈련 {tribe?.trainLevel ?? 0}/5</b><p>{trainCost ? label(trainCost) : '최고 단계'}</p></div>
             <Button variant="outline" className={pixelBtn} disabled={!trainCost || !have(trainCost, storage, backpack)} onClick={onTrain}>훈련하기 (능력 +3%)</Button>

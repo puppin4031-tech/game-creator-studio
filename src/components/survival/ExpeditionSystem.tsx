@@ -66,46 +66,26 @@ interface Props {
 }
 export interface TribeInfo { count: number; trainLevel: number; ratio: number; maxHp: number; injured: boolean; starving: boolean; classId?: TribeClassId }
 
-function TribeClassPicker({ selected, onSelect, disabled }: { selected: TribeClassId; onSelect?: (c: TribeClassId) => void; disabled?: boolean }) {
+function TribeClassBadge({ selected }: { selected: TribeClassId }) {
   const cls = getTribeClass(selected);
   return (
-    <div className="space-y-1">
-      <div role="radiogroup" aria-label="4대 부족 병종 편성" className="grid grid-cols-4 gap-1">
-        {TRIBE_CLASS_LIST.map(c => {
-          const active = selected === c.id;
-          return (
-            <button
-              key={c.id}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              disabled={disabled}
-              onClick={() => onSelect?.(c.id)}
-              className={`pixel-btn flex items-center justify-center gap-0.5 py-1.5 px-1.5 text-xs ${active ? 'bg-primary text-primary-foreground font-bold' : 'bg-card'}`}
-            >
-              <span>{c.icon}</span>
-              <span className="truncate">{c.shortLabel}</span>
-            </button>
-          );
-        })}
+    <div className="flex items-center gap-1.5 rounded border border-border/70 bg-card/80 px-2 py-1.5 text-[11px]">
+      <TribeSprite action="idle" tribeClass={selected} height={26} />
+      <div className="min-w-0 flex-1 leading-tight">
+        <b className="text-primary">{cls.icon} {cls.name} ({cls.weaponName})</b>
+        <p className="truncate text-muted-foreground">{cls.perkSummary}</p>
       </div>
-      <div className="flex items-center gap-1.5 rounded bg-muted/60 px-2 py-1 text-[11px]">
-        <TribeSprite action="idle" tribeClass={selected} height={26} />
-        <div className="min-w-0 flex-1 leading-tight">
-          <b className="text-primary">{cls.icon} {cls.name} ({cls.weaponName})</b>
-          <p className="truncate text-muted-foreground">{cls.perkSummary}</p>
-        </div>
-      </div>
+      <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">영입 확정</span>
     </div>
   );
 }
 
-function TribeStats({ t, crew, selectedClass, onSelectClass }: { t?: TribeInfo; crew?: ObservedExpedition | null; selectedClass: TribeClassId; onSelectClass?: (c: TribeClassId) => void }) {
+function TribeStats({ t, crew, selectedClass }: { t?: TribeInfo; crew?: ObservedExpedition | null; selectedClass: TribeClassId }) {
   const cls = getTribeClass(selectedClass);
   if (!t || t.count <= 0) return (
     <div className="space-y-2">
-      <TribeClassPicker selected={selectedClass} onSelect={onSelectClass} />
-      <p className="py-2 text-center text-muted-foreground">아직 부족민이 없어요. 거점 부족 회관에서 영입하세요.</p>
+      <TribeClassBadge selected={selectedClass} />
+      <p className="py-2 text-center text-muted-foreground">아직 부족민이 없어요. 거점 부족회관에서 영입하세요.</p>
     </div>
   );
   const atk = Math.max(1, Math.round(12 * t.ratio * cls.atkMult));
@@ -121,7 +101,7 @@ function TribeStats({ t, crew, selectedClass, onSelectClass }: { t?: TribeInfo; 
   ];
   return (
     <div className="space-y-1.5">
-      <TribeClassPicker selected={selectedClass} onSelect={onSelectClass} />
+      <TribeClassBadge selected={selectedClass} />
       <dl className="grid grid-cols-2 gap-1">{rows.map(([k, v]) => <div key={k} className="pixel-box bg-card px-2 py-1"><dt className="text-[10px] text-muted-foreground">{k}</dt><dd className="font-bold text-xs">{v}</dd></div>)}</dl>
     </div>
   );
@@ -135,12 +115,12 @@ export default function ExpeditionSystem(p: Props) {
     <div role="tablist" className="grid grid-cols-2 gap-1">
       {([['exp', '원정 편성'], ['tribe', `부족 용병 (${cls.icon}${cls.name})`]] as const).map(([k, l]) => <Button key={k} role="tab" aria-selected={tab === k} size="sm" variant={tab === k ? 'default' : 'outline'} className={compactBtn} onClick={() => setTab(k)}>{l}</Button>)}
     </div>
-    {tab === 'tribe' ? <TribeStats t={p.tribe} crew={p.crew} selectedClass={activeClass} onSelectClass={p.onSelectClass} /> : <>
+    {tab === 'tribe' ? <TribeStats t={p.tribe} crew={p.crew} selectedClass={activeClass} /> : <>
     <div className="flex flex-wrap items-center gap-1.5">
       <b className="flex items-center gap-1"><Flag className="!h-4 !w-4 text-primary" />{p.expeditionLevel ?? 1}레벨 원정대 ({cls.icon}{cls.name})</b>
       <span className="ml-auto">{p.crew ? `HP ${p.crew.hp}/${p.crew.maxHp ?? 100} · ${p.crew.phase === 'returning' ? '귀환' : p.crew.target ? '작업' : '행군'} 중` : '거점 대기 · 기본 100%'}</span>
     </div>
-    <TribeClassPicker selected={activeClass} onSelect={p.onSelectClass} disabled={!!p.crew} />
+    <TribeClassBadge selected={activeClass} />
     <div role="radiogroup" aria-label="원정 목표" className="grid grid-cols-3 gap-1">
       {(Object.keys(FOCUS_LABEL) as ExpeditionFocus[]).map(f => <Button key={f} size="sm" role="radio" aria-checked={p.focus === f} variant={p.focus === f ? 'default' : 'outline'} disabled={!!p.crew} className={compactBtn} onClick={() => p.onFocus(f)}>{FOCUS_LABEL[f]}</Button>)}
     </div>

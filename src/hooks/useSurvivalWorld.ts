@@ -128,12 +128,40 @@ const fresh = (start: LatLng): WorldSave => ({
   depleted: {}, damage: {}, gathered: {}, techs: [], explored: [start], terrainZones: {}, parkCells: {}, lastTickAt: Date.now(),
 });
 
+function migrateTribeState(saved: Partial<WorldSave>): Partial<WorldSave> {
+  const count = saved.tribe?.count ?? 0;
+  if (count > 0) {
+    const hasAmbacho = (saved.tribe?.classCounts?.gatherer ?? 0) > 0 || saved.mercenary?.name === '암바초';
+    const tankCount = hasAmbacho ? Math.max(0, count - 1) : count;
+    const classCounts: Partial<Record<TribeClassId, number>> = {
+      tank: tankCount,
+      ...(hasAmbacho ? { gatherer: 1 } : {}),
+    };
+    return {
+      ...saved,
+      tribe: {
+        trainLevel: 0,
+        ...saved.tribe,
+        count,
+        classId: 'tank',
+        classCounts,
+      },
+      mercenary: saved.mercenary ? {
+        ...saved.mercenary,
+        classId: saved.mercenary.name === '암바초' ? 'gatherer' : 'tank',
+      } : saved.mercenary,
+    };
+  }
+  return saved;
+}
+
 function load(start: LatLng, saveKey: string): WorldSave {
   try {
     const raw = localStorage.getItem(saveKey);
     if (raw) {
       const saved = JSON.parse(raw) as Partial<WorldSave>;
-      return migratePets({ ...fresh(start), ...saved, base: saved.base ? { ...saved.base, placedAt: saved.base.placedAt ?? Date.now() } : null }, id => petById(id)?.name ?? id);
+      const migrated = migrateTribeState(saved);
+      return migratePets({ ...fresh(start), ...migrated, base: migrated.base ? { ...migrated.base, placedAt: migrated.base.placedAt ?? Date.now() } : null }, id => petById(id)?.name ?? id);
     }
   } catch (e) {
     console.error('[survival] failed to load save', e);
@@ -181,6 +209,25 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     catch { toast.error('진행 상태를 기기에 저장하지 못했습니다. 저장 공간을 확인해 주세요.'); }
   }, [s, saveKey]);
 
+  useEffect(() => {
+    const t = ref.current.tribe;
+    if (t && t.count > 0 && (t.classId !== 'tank' || !t.classCounts?.tank)) {
+      const hasAmbacho = (t.classCounts?.gatherer ?? 0) > 0 || ref.current.mercenary?.name === '암바초';
+      const tankCount = hasAmbacho ? Math.max(0, t.count - 1) : t.count;
+      setS(p => ({
+        ...p,
+        tribe: {
+          ...p.tribe!,
+          classId: 'tank',
+          classCounts: {
+            tank: tankCount,
+            ...(hasAmbacho ? { gatherer: 1 } : {}),
+          },
+        },
+      }));
+    }
+  }, [setS]);
+
   // Cloud sync: on login, restore the newer save (cloud vs this device); then keep uploading changes.
   const cloudReadyRef = useRef(false);
   const skipNextUploadRef = useRef(false);
@@ -200,7 +247,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         : (remote.lastTickAt ?? 0) > local.lastTickAt);
       if (remote && remoteAhead) {
         skipNextUploadRef.current = true;
-        setS(migratePets({ ...fresh(local.pos), ...remote, base: remote.base ? { ...remote.base, placedAt: remote.base.placedAt ?? Date.now() } : null }, id => petById(id)?.name ?? id));
+        const migratedRemote = migrateTribeState(remote);
+        setS(migratePets({ ...fresh(local.pos), ...migratedRemote, base: migratedRemote.base ? { ...migratedRemote.base, placedAt: migratedRemote.base.placedAt ?? Date.now() } : null }, id => petById(id)?.name ?? id));
         toast.success('클라우드에 저장된 생존 진행도를 불러왔습니다.');
       } else {
         const { error: upErr } = await supabase.from('survival_saves').upsert({ user_id: userId, payload: local as unknown as Json, updated_at: new Date().toISOString() });
@@ -456,7 +504,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (!cost) { toast.info('부족민이 가득 찼어요 (10/10)'); return false; }
     const paid = payCost(p, cost);
     if (!paid) { toast.warning(`재료가 부족해요: ${fmt(cost)}`); return false; }
-    const chosenClass = classId ?? p.tribe?.classId ?? DEFAULT_TRIBE_CLASS;
+    const chosenClass = classId ?? 'tank';
     const cls = getTribeClass(chosenClass);
     const m = p.mercenary && mercActive(p.mercenary, now) ? p.mercenary : { ...hireMercenary(now), classId: chosenClass, until: now + 3650 * 86400000 };
     const prevCounts = p.tribe?.classCounts ?? {};
@@ -468,7 +516,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         trainLevel: 0,
         ...p.tribe,
         count: count + 1,
-        classId: chosenClass,
+        classId: p.tribe?.classId ?? chosenClass,
         classCounts: { ...prevCounts, [chosenClass]: (prevCounts[chosenClass] ?? 0) + 1 },
         upkeepAt: p.tribe?.upkeepAt ?? now,
       },

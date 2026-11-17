@@ -599,19 +599,11 @@ export function buildingFootprintCells(
   return cells;
 }
 
-/** Creates the initial starter layout around the center of the 12x12 grid with multi-tile buildings. */
+/** Creates the initial starter layout around the center of the 12x12 grid with only the central campfire. */
 export function createStarterVillage(hasAltar = false): VillageState {
-  const initialLastHarvest = Date.now() - 25 * 60_000; // Ready with initial harvest bubbles on first visit!
+  const initialLastHarvest = Date.now() - 25 * 60_000;
   const buildings: PlacedVillageBuilding[] = [
     { uid: 'starter-campfire', buildingId: 'campfire', x: 5, y: 5, hp: 250, maxHp: 250, lastHarvestAt: initialLastHarvest }, // 2x2: (5..6, 5..6)
-    { uid: 'starter-storage', buildingId: 'primitive_storage', x: 8, y: 5, hp: 350, maxHp: 350, lastHarvestAt: initialLastHarvest }, // 2x2: (8..9, 5..6)
-    { uid: 'starter-shaman', buildingId: 'shaman_tent', x: 2, y: 4, hp: 600, maxHp: 600, lastHarvestAt: initialLastHarvest }, // 2x2: (2..3, 4..5)
-    { uid: 'starter-lumber', buildingId: 'lumber_hut', x: 2, y: 7, hp: 320, maxHp: 320, lastHarvestAt: initialLastHarvest }, // 2x2: (2..3, 7..8)
-    { uid: 'starter-smokehouse', buildingId: 'smokehouse', x: 8, y: 2, hp: 380, maxHp: 380, lastHarvestAt: initialLastHarvest }, // 2x2: (8..9, 2..3)
-    { uid: 'starter-tavern', buildingId: 'primitive_tavern', x: 5, y: 2, hp: 460, maxHp: 460, lastHarvestAt: initialLastHarvest }, // 2x2: (5..6, 2..3)
-    { uid: 'starter-brazier', buildingId: 'brazier', x: 5, y: 8, hp: 200, maxHp: 200, lastHarvestAt: initialLastHarvest }, // 2x1: (5..6, 8)
-    { uid: 'starter-torch-1', buildingId: 'torch', x: 3, y: 2, hp: 120, maxHp: 120 }, // 2x1: (3..4, 2)
-    { uid: 'starter-torch-2', buildingId: 'torch', x: 8, y: 8, hp: 120, maxHp: 120 }, // 2x1: (8..9, 8)
   ];
   if (hasAltar) {
     buildings.push({ uid: 'starter-altar', buildingId: 'ancient_altar', x: 4, y: 0, hp: 900, maxHp: 900, lastHarvestAt: initialLastHarvest });
@@ -620,7 +612,35 @@ export function createStarterVillage(hasAltar = false): VillageState {
 }
 
 export function ensureVillageState(state: VillageState | undefined, hasAltar = false): VillageState {
-  if (state?.initialized && Array.isArray(state.buildings)) return state;
+  if (state?.initialized && Array.isArray(state.buildings)) {
+    // Clean up legacy auto-populated starter buildings so only starter-campfire (and starter-altar) remains
+    const legacyStarterIds = new Set([
+      'starter-storage',
+      'starter-shaman',
+      'starter-lumber',
+      'starter-smokehouse',
+      'starter-tavern',
+      'starter-brazier',
+      'starter-torch-1',
+      'starter-torch-2',
+    ]);
+    const filteredBuildings = state.buildings.filter(b => !legacyStarterIds.has(b.uid));
+    if (!filteredBuildings.some(b => b.buildingId === 'campfire')) {
+      filteredBuildings.unshift({
+        uid: 'starter-campfire',
+        buildingId: 'campfire',
+        x: 5,
+        y: 5,
+        hp: 250,
+        maxHp: 250,
+        lastHarvestAt: Date.now() - 25 * 60_000,
+      });
+    }
+    return {
+      ...state,
+      buildings: filteredBuildings,
+    };
+  }
   return createStarterVillage(hasAltar);
 }
 
