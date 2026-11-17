@@ -45,6 +45,7 @@ import outpostImg from '@/assets/survival/base-outpost.png';
 import altarImg from '@/assets/survival/dolmen-shrine.png';
 import shamanImg from '@/assets/survival/npc-shaman.png';
 import mercImg from '@/assets/survival/npc-mercenary.png';
+import baseVillageBg from '@/assets/survival/base-village-bg.png';
 
 type FacilityModalKind = 'workshop' | 'armory' | 'altar' | 'shaman' | 'smokehouse' | 'tavern' | null;
 
@@ -1084,7 +1085,7 @@ export default function BaseVillageView({
 
       {/* 16x16 Total Map with 2-Tile Outer Invader Spawn Margin + Inner 12x12 Buildable Village (Supports Zoom & Pinch/Wheel) */}
       <div
-        className="pixel-frame relative mx-auto flex max-h-[58dvh] items-center justify-center overflow-auto bg-[#3b542a] p-3"
+        className="pixel-frame relative mx-auto flex max-h-[58dvh] items-center justify-center overflow-auto bg-[#1b2613] p-3"
         onWheel={e => {
           if (Math.abs(e.deltaY) > 4) {
             setZoom(z => clampZoom(z + (e.deltaY < 0 ? 0.12 : -0.12)));
@@ -1122,8 +1123,13 @@ export default function BaseVillageView({
       >
         {/* Outer 16x16 Siege / Invader Spawn Margin Frame */}
         <div
-          className="relative aspect-square w-full max-w-[376px] shrink-0 select-none rounded-sm border-2 border-[#2a3d1d] bg-[radial-gradient(circle_at_50%_50%,#65894c_0%,#4b6937_75%,#385028_100%)] p-[12.5%] shadow-inner transition-transform duration-200"
+          className="relative aspect-square w-full max-w-[376px] shrink-0 select-none rounded-sm border-2 border-[#1c2912] p-[12.5%] shadow-inner transition-transform duration-200 overflow-hidden"
           style={{
+            backgroundImage: `url(${baseVillageBg})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            imageRendering: 'pixelated',
             transform: `${
               isoView ? 'perspective(650px) rotateX(19deg) ' : ''
             }scale(${(isoView ? 0.98 : 1) * zoom})`,
@@ -1134,18 +1140,9 @@ export default function BaseVillageView({
           {/* Outer 2-tile Invader Spawn Margin Indicators */}
           <span
             aria-hidden
-            className="pointer-events-none absolute left-2 top-1 text-[9px] font-bold text-[#cbe5b4]/85"
+            className="pointer-events-none absolute left-2 top-1 z-10 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-bold text-[#cbe5b4]"
           >
-            🌲 외곽 침입 경계림 (16×16 중 외곽 2칸 스폰 구역)
-          </span>
-          <span aria-hidden className="pointer-events-none absolute right-2 top-1 text-xs opacity-80">
-            🌲🪨🌲
-          </span>
-          <span aria-hidden className="pointer-events-none absolute bottom-1 left-2 text-xs opacity-80">
-            🌲🌿🌲
-          </span>
-          <span aria-hidden className="pointer-events-none absolute bottom-1 right-2 text-xs opacity-80">
-            🪨🌲🌲
+            🌲 외곽 침입 경계림 (16×16 외곽 2칸 스폰 구역)
           </span>
 
           {/* Inner 12x12 Buildable Village Grid */}
@@ -1155,8 +1152,8 @@ export default function BaseVillageView({
             data-build-mode={buildMode ? 'on' : 'off'}
             className={`relative grid h-full w-full grid-cols-12 grid-rows-12 transition-all ${
               buildMode
-                ? 'border-2 border-amber-300/90 bg-[#84a96c] shadow-[0_0_12px_rgba(250,204,21,0.35)]'
-                : 'border border-[#4c6b36]/50 bg-[radial-gradient(circle_at_50%_50%,#99c17c_0%,#7fa564_62%,#698d4f_100%)]'
+                ? 'border-2 border-amber-300/90 bg-amber-950/20 shadow-[0_0_12px_rgba(250,204,21,0.35)]'
+                : 'border border-[#2a3d1d]/40 bg-transparent'
             }`}
           >
             {/* Base 12x12 Tiles */}
@@ -1165,7 +1162,6 @@ export default function BaseVillageView({
               const y = Math.floor(idx / VILLAGE_GRID_SIZE);
               const placed = buildingAtTile(vState, x, y);
               const checker = (x + y) % 2 === 0;
-              const seed = (x * 17 + y * 31) % 29;
               return (
                 <button
                   key={`${x}-${y}`}
@@ -1181,38 +1177,12 @@ export default function BaseVillageView({
                   onClick={() => handleTileClick(x, y)}
                   className={`relative flex items-center justify-center transition-colors ${
                     buildMode
-                      ? `border-[0.5px] border-[#2f4222]/55 hover:bg-primary/30 ${
-                          checker ? 'bg-[#8fb377]' : 'bg-[#80a368]'
+                      ? `border-[0.5px] border-[#2f4222]/40 hover:bg-primary/30 ${
+                          checker ? 'bg-amber-300/15' : 'bg-transparent'
                         }`
                       : 'border-0 bg-transparent hover:bg-white/10'
                   }`}
-                >
-                  {!buildMode && !placed && (
-                    <>
-                      {seed === 0 && (
-                        <span aria-hidden className="pointer-events-none select-none text-[9px] opacity-85">
-                          🌿
-                        </span>
-                      )}
-                      {seed === 4 && (
-                        <span aria-hidden className="pointer-events-none select-none text-[8px] opacity-80">
-                          🌱
-                        </span>
-                      )}
-                      {seed === 9 && (
-                        <span aria-hidden className="pointer-events-none select-none text-[7px] opacity-75">
-                          🌼
-                        </span>
-                      )}
-                      {Math.abs(x - 5.5) <= 2 && Math.abs(y - 5.5) <= 2 && (
-                        <span
-                          aria-hidden
-                          className="pointer-events-none absolute inset-0.5 rounded-full bg-[#b08d57]/25"
-                        />
-                      )}
-                    </>
-                  )}
-                </button>
+                />
               );
             })}
 
