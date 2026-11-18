@@ -203,11 +203,12 @@ export default function WanderingShamanModal({
         </button>
       </div>
 
-      {/* Shaman Dialogue Banner */}
-      <div className="flex items-center justify-between gap-2 border-b-2 border-border bg-accent/15 px-3 py-2">
-        <div className="flex items-center gap-2">
-          <img src={shamanImg} alt="떠돌이 주술사" className="pixelated h-12 w-auto" />
-          <p className="leading-snug">
+      {/* Shaman Dialogue Card */}
+      <div className="flex items-center gap-3 border-b border-border bg-accent/15 px-3 py-2.5">
+        <img src={shamanImg} alt="떠돌이 주술사" className="pixelated h-12 w-auto shrink-0 drop-shadow" />
+        <div className="pixel-box flex-1 min-w-0 bg-background/90 p-2.5 text-xs leading-relaxed border border-border">
+          <p className="font-bold text-amber-500 text-[10px] mb-0.5">떠돌이 주술사</p>
+          <p className="text-foreground break-keep leading-snug">
             {level >= 5 && !languageLearned
               ? '"이제 자네도 말을 좀 배워야 될것같네. 내 특별 과제를 마치면 다른 부족민·생존자들과 대화를 나눌 수 있다네!"'
               : activeQuest
@@ -215,40 +216,42 @@ export default function WanderingShamanModal({
                 : '"나무와 돌의 숨결을 깨우치면 더 단단한 성벽과 날카로운 무기를 빚을 수 있다네."'}
           </p>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          {onOpenShamanQuest && (
-            <Button
-              type="button"
-              size="sm"
-              onClick={onOpenShamanQuest}
-              className="pixel-btn h-auto min-h-0 bg-primary text-primary-foreground py-1.5 px-2.5 text-xs font-bold"
-            >
-              🔥 5단계 승급 퀘스트
-            </Button>
-          )}
-          {onOpenCivTech && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={onOpenCivTech}
-              className="pixel-btn h-auto min-h-0 py-1.5 px-2.5 text-xs text-amber-500 border-amber-500/50"
-            >
-              🏛️ 문명 테크
-            </Button>
-          )}
-          {onOpenWorkshop && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={onOpenWorkshop}
-              className="pixel-btn h-auto min-h-0 py-1.5 px-2.5 text-xs"
-            >
-              🪓 건축 공방
-            </Button>
-          )}
-        </div>
+      </div>
+
+      {/* Shaman Quick Action Shortcuts Row */}
+      <div className="grid grid-cols-3 gap-1.5 border-b-2 border-border bg-card/60 px-3 py-2">
+        {onOpenShamanQuest && (
+          <Button
+            type="button"
+            size="sm"
+            onClick={onOpenShamanQuest}
+            className="pixel-btn h-auto min-h-0 bg-primary hover:bg-primary/90 text-primary-foreground py-1.5 px-1.5 text-xs font-bold"
+          >
+            🔥 5단계 승급 퀘스트
+          </Button>
+        )}
+        {onOpenCivTech && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={onOpenCivTech}
+            className="pixel-btn h-auto min-h-0 py-1.5 px-1.5 text-xs font-bold text-amber-500 border-amber-500/50"
+          >
+            🏛️ 문명 테크
+          </Button>
+        )}
+        {onOpenWorkshop && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={onOpenWorkshop}
+            className="pixel-btn h-auto min-h-0 py-1.5 px-1.5 text-xs font-bold"
+          >
+            🪓 건축 공방
+          </Button>
+        )}
       </div>
 
       {/* Mode Tabs */}
