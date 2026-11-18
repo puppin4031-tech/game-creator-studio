@@ -33,6 +33,8 @@ export interface WorldQuery {
   parkCells?: Record<string, boolean>;
   /** Shaman sanctuary centers; creatures never spawn within SANCTUARY_RADIUS_M. */
   sanctuaries?: LatLng[];
+  /** Current player level for tier-based node/resource unlocks */
+  playerLevel?: number;
 }
 
 export const creatureEpoch = (now: number) => Math.floor(now / CREATURE_EPOCH_MS);
@@ -50,7 +52,10 @@ export function generateNodes(q: WorldQuery): WorldNode[] {
   const cy0 = Math.floor((y - r) / NODE_CELL_M);
   const cy1 = Math.floor((y + r) / NODE_CELL_M);
   const out: WorldNode[] = [];
-  const types = Object.keys(NODES) as NodeType[];
+  const pLv = q.playerLevel ?? 1;
+  const types = (Object.keys(NODES) as NodeType[]).filter(
+    (t) => (NODES[t].minPlayerLevel ?? 1) <= pLv
+  );
   for (let cx = cx0; cx <= cx1; cx++) {
     for (let cy = cy0; cy <= cy1; cy++) {
       if (hash01(cx, cy, 1) > NODE_DENSITY) continue;

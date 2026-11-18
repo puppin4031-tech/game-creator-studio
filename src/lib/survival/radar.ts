@@ -45,6 +45,16 @@ const RARE_ORE_TYPES = new Set([
   'quartz_vein',
   'obsidian_rock',
   'jade_rock',
+  'copper_vein',
+  'tin_vein',
+  'silver_vein',
+  'gold_deposit',
+  'magnetite_rock',
+  'coal_seam',
+  'limestone_rock',
+  'sulfur_vent',
+  'mercury_deposit',
+  'meteor_impact',
 ]);
 
 export function isRareOreNode(type: string): boolean {

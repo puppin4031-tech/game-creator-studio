@@ -164,6 +164,21 @@ const MATERIAL_WEATHER_RESIST: Record<string, number> = {
   clay: 4.0,
   hide: 4.5,
   ochre: 7.0,
+  bitumen: 10.0,
+  copper_ore: 7.5,
+  copper_ingot: 8.0,
+  tin_ore: 8.5,
+  bronze_ingot: 9.0,
+  silver_ore: 9.0,
+  gold_ore: 10.0,
+  magnetite: 8.5,
+  steel_ingot: 9.5,
+  coal: 6.0,
+  limestone: 7.5,
+  sulfur: 5.5,
+  mercury: 9.0,
+  meteor_shard: 10.0,
+  mana_stone: 9.5,
 };
 
 export function computeMaterialPhysics(materials: Record<string, number>): PhysicalAttributes {
@@ -296,26 +311,45 @@ export function analyzeCraftingIntent({
       }
     }
 
+    // Material-specific high-tier synergy overrides
+    const hasBitumen = (materials.bitumen ?? 0) > 0;
+    const hasGold = (materials.gold_ore ?? 0) > 0 || (materials.silver_ore ?? 0) > 0;
+    const hasMagnetite = (materials.magnetite ?? 0) > 0;
+
+    if (hasBitumen && !mechanics.includes('WEATHER_RESIST')) {
+      mechanics.unshift('WEATHER_RESIST');
+    }
+    if (hasGold && !mechanics.includes('HEAL_AURA')) {
+      mechanics.push('HEAL_AURA');
+    }
+
     // Strictly limit to 1~2 mechanics (Guardrail requirement)
     const awardedMechanics = mechanics.slice(0, 2);
 
-    // Compute building HP based on durability and density
+    // Compute building HP based on durability and density (Bitumen grants +400 bonus)
     const baseHp = subCategory === 'fence' ? 250 : subCategory === 'tower' ? 450 : 600;
-    const computedHp = Math.round(baseHp + physics.durability * 25 + physics.density * 20);
+    const bitumenBonus = hasBitumen ? 400 : hasMagnetite ? 300 : 0;
+    const computedHp = Math.round(baseHp + bitumenBonus + physics.durability * 25 + physics.density * 20);
 
     const name = isAnachronistic
       ? `보정된 ${matName} 감시망루`
-      : subCategory === 'tower'
-        ? `${matName} 요격 망루`
-        : subCategory === 'fence'
-          ? `강화 ${matName} 방책`
-          : `부족 ${matName} 안식소`;
+      : hasBitumen && subCategory === 'fence'
+        ? `역청 방수 성벽`
+        : hasGold
+          ? `태양신 영광의 ${matName} 제단`
+          : subCategory === 'tower'
+            ? `${matName} 요격 망루`
+            : subCategory === 'fence'
+              ? `강화 ${matName} 방책`
+              : `부족 ${matName} 안식소`;
 
     const desc = isAnachronistic
       ? `시대적 보정을 거쳐 탄성과 내구성을 살린 원시 요격 건축물.`
-      : text.length > 0
-        ? `[의도: ${text.slice(0, 30)}] — 탄성 ${physics.elasticity}·내구성 ${physics.durability} 기반 특수 건축물.`
-        : `${matName}의 물리적 결합으로 탄생한 특수 마을 건축물.`;
+      : hasBitumen
+        ? `역청의 강력한 점성과 방수성이 목재의 부식을 막고 돌 사이의 틈을 메워 내구도 +400 및 부식 저항 95% 달성.`
+        : text.length > 0
+          ? `[의도: ${text.slice(0, 30)}] — 탄성 ${physics.elasticity}·내구성 ${physics.durability} 기반 특수 건축물.`
+          : `${matName}의 물리적 결합으로 탄생한 특수 마을 건축물.`;
 
     return {
       ok: true,
@@ -369,6 +403,22 @@ export function analyzeCraftingIntent({
       }
     }
 
+    // Material-specific high-tier synergy overrides for gear
+    const hasMagnetiteGear = (materials.magnetite ?? 0) > 0;
+    const hasGoldGear = (materials.gold_ore ?? 0) > 0 || (materials.silver_ore ?? 0) > 0;
+    const hasSulfurGear = (materials.sulfur ?? 0) > 0;
+
+    if (hasMagnetiteGear) {
+      if (subCategory === 'tool' && !mechanics.includes('GATHER_BOOST')) mechanics.unshift('GATHER_BOOST');
+      else if (!mechanics.includes('STUN_HIT')) mechanics.unshift('STUN_HIT');
+    }
+    if (hasGoldGear && !mechanics.includes('MELEE_FAST') && subCategory === 'melee') {
+      mechanics.unshift('MELEE_FAST');
+    }
+    if (hasSulfurGear && !mechanics.includes('POISON_HIT')) {
+      mechanics.unshift('POISON_HIT');
+    }
+
     // Strictly limit to 1~2 mechanics (Guardrail requirement)
     const awardedMechanics = mechanics.slice(0, 2);
 
@@ -378,19 +428,27 @@ export function analyzeCraftingIntent({
 
     const name = isAnachronistic
       ? `보정된 ${matName} 결전기`
-      : subCategory === 'ranged'
-        ? `정밀 ${matName} 저격활`
-        : subCategory === 'melee'
-          ? `쾌속 ${matName} 칼날`
-          : subCategory === 'tool'
-            ? `풍요의 ${matName} 도구`
-            : `수호의 ${matName} 갑옷`;
+      : hasMagnetiteGear && subCategory === 'tool'
+        ? `자력 탐사 곡괭이`
+        : hasGoldGear && subCategory === 'melee'
+          ? `태양신 의식용 단검`
+          : subCategory === 'ranged'
+            ? `정밀 ${matName} 저격활`
+            : subCategory === 'melee'
+              ? `쾌속 ${matName} 칼날`
+              : subCategory === 'tool'
+                ? `풍요의 ${matName} 도구`
+                : `수호의 ${matName} 갑옷`;
 
     const desc = isAnachronistic
       ? `시대적 보정을 거쳐 밀도와 파괴력을 극대화한 원시 결전 무기.`
-      : text.length > 0
-        ? `[의도: ${text.slice(0, 30)}] — 탄성 ${physics.elasticity}·밀도 ${physics.density} 부여 장비.`
-        : `${matName}을(를) 정밀 가공하여 제작한 맞춤형 장비.`;
+      : hasMagnetiteGear && subCategory === 'tool'
+        ? `자철석의 자성이 금속 광맥을 끌어당겨 채굴 시 25% 확률로 추가 광석 1개 더 획득.`
+        : hasGoldGear && subCategory === 'melee'
+          ? `부식되지 않는 순금의 전도성과 흑요석의 예리함이 결합되어 처치 시 연구 포인트 +50%.`
+          : text.length > 0
+            ? `[의도: ${text.slice(0, 30)}] — 탄성 ${physics.elasticity}·밀도 ${physics.density} 부여 장비.`
+            : `${matName}을(를) 정밀 가공하여 제작한 맞춤형 장비.`;
 
     return {
       ok: true,

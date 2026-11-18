@@ -90,6 +90,7 @@ interface Props {
   entities?: WorldEntity[];
   landmarks?: Landmark[];
   explored?: LatLng[];
+  civilizationTechs?: string[];
   onToggleFavorite: (fav: Favorite) => void;
   onRemoveFavorite: (id: string) => void;
   onTrack: (id: string | null) => void;
@@ -111,6 +112,7 @@ export default function RadarMapModal({
   entities = [],
   landmarks = [],
   explored = [],
+  civilizationTechs = [],
   onToggleFavorite,
   onRemoveFavorite,
   onTrack,
@@ -210,7 +212,9 @@ export default function RadarMapModal({
     });
   }, [entities, depleted, selectedItemId]);
 
-  const currentScanRadius = RADAR_SCAN_RADIUS_M / zoomScale;
+  const hasCompass = civilizationTechs.includes('tech_magnetic_compass');
+  const baseScanRadius = hasCompass ? 3000 : RADAR_SCAN_RADIUS_M;
+  const currentScanRadius = baseScanRadius / zoomScale;
 
   /** Projects LatLng to percentage coordinates on the radar map canvas with pan & zoom */
   const toMapPct = (target: LatLng) => {
@@ -431,6 +435,11 @@ export default function RadarMapModal({
               <span className="ml-2 text-[10px] text-emerald-200/80">
                 중심: {base ? '거점 모닥불' : '현재 위치'} (반경 {Math.round(currentScanRadius)}m)
               </span>
+              {hasCompass && (
+                <span className="ml-1.5 rounded bg-amber-400/20 border border-amber-400/40 px-1 py-0.2 text-[9px] font-bold text-amber-300">
+                  🧭 자력 나침반 (3km 확장)
+                </span>
+              )}
             </div>
           </div>
           <button

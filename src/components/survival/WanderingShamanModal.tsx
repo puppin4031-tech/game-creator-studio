@@ -28,6 +28,7 @@ interface Props {
   onTrainSkill: (skillId: ShamanSkillId) => boolean;
   onOpenWorkshop?: () => void;
   onOpenShamanQuest?: () => void;
+  onOpenCivTech?: () => void;
   questState?: QuestState;
   canClaimQuest?: boolean;
   onClaimQuest?: () => void;
@@ -52,6 +53,7 @@ export default function WanderingShamanModal({
   onTrainSkill,
   onOpenWorkshop,
   onOpenShamanQuest,
+  onOpenCivTech,
   questState,
   canClaimQuest,
   onClaimQuest,
@@ -220,6 +222,17 @@ export default function WanderingShamanModal({
               className="pixel-btn h-auto min-h-0 bg-primary text-primary-foreground py-1.5 px-2.5 text-xs font-bold"
             >
               🔥 5단계 승급 퀘스트
+            </Button>
+          )}
+          {onOpenCivTech && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={onOpenCivTech}
+              className="pixel-btn h-auto min-h-0 py-1.5 px-2.5 text-xs text-amber-500 border-amber-500/50"
+            >
+              🏛️ 문명 테크
             </Button>
           )}
           {onOpenWorkshop && (

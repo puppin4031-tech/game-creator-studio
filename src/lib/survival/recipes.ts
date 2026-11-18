@@ -59,6 +59,11 @@ export const RECIPES: Recipe[] = [
   { id: 'bone_plate', result: 'bone_plate', count: 1, ingredients: [{ itemId: 'bone', count: 8 }, { itemId: 'leather', count: 2 }, { itemId: 'cordage', count: 2 }], minigame: 'bind', difficulty: 3, baseLevel: 2, processSec: 0, minLevel: 7 },
   { id: 'obsidian_axe', result: 'obsidian_axe', count: 1, ingredients: [{ itemId: 'obsidian', count: 3 }, { itemId: 'branch', count: 2 }, { itemId: 'leather', count: 1 }], minigame: 'knap', difficulty: 3, baseLevel: 3, processSec: 0, minLevel: 8 },
   { id: 'quartz_charm', result: 'quartz_charm', count: 1, ingredients: [{ itemId: 'quartz', count: 2 }, { itemId: 'cordage', count: 1 }, { itemId: 'bone', count: 1 }], minigame: 'knap', difficulty: 3, baseLevel: 2, processSec: 0, minLevel: 8 },
+  // ── Metallurgy & Fuel Processing
+  { id: 'charcoal', result: 'charcoal', count: 3, ingredients: [{ itemId: 'log', count: 1 }, { itemId: 'branch', count: 2 }], minigame: 'fire', difficulty: 1, baseLevel: 1, processSec: 30 },
+  { id: 'copper_ingot', result: 'copper_ingot', count: 1, ingredients: [{ itemId: 'copper_ore', count: 3 }, { itemId: 'charcoal', count: 2 }], minigame: 'fire', difficulty: 2, baseLevel: 2, processSec: 60, minLevel: 11 },
+  { id: 'bronze_ingot', result: 'bronze_ingot', count: 1, ingredients: [{ itemId: 'copper_ore', count: 3 }, { itemId: 'tin_ore', count: 1 }, { itemId: 'charcoal', count: 2 }], minigame: 'fire', difficulty: 2, baseLevel: 2, processSec: 90, minLevel: 15 },
+  { id: 'steel_ingot', result: 'steel_ingot', count: 1, ingredients: [{ itemId: 'magnetite', count: 3 }, { itemId: 'coal', count: 2 }, { itemId: 'limestone', count: 1 }], minigame: 'fire', difficulty: 3, baseLevel: 3, processSec: 120, minLevel: 20 },
 ];
 
 export const recipeById = (id: string) => RECIPES.find((r) => r.id === id);

@@ -25,6 +25,8 @@ export interface NodeDef {
   respawnMin: number;
   /** Relative spawn weight per biome. */
   biomes: Partial<Record<Biome, number>>;
+  /** Minimum player level required for this node to spawn on the field */
+  minPlayerLevel?: number;
 }
 
 export interface CreatureDef {
@@ -122,6 +124,64 @@ export const NODES = {
     name: '옥 원석', sprite: 'node-jade', hp: 8, requires: { kind: 'mine', tier: 2 },
     loot: [{ itemId: 'jade', min: 1, max: 1 }, { itemId: 'quartz', min: 0, max: 1 }], xp: 30, respawnMin: 120,
     biomes: { rocky: 0.6, wetland: 0.2 },
+  },
+  // ── Lv.11+ 청동기·교역 자원 노드
+  copper_vein: {
+    name: '구리 광맥', sprite: 'node-hematite', hp: 5, requires: { kind: 'mine', tier: 1 },
+    loot: [{ itemId: 'copper_ore', min: 1, max: 2 }, { itemId: 'flint', min: 0, max: 1, chance: 0.4 }], xp: 12, respawnMin: 40,
+    biomes: { rocky: 3, plains: 1 }, minPlayerLevel: 11,
+  },
+  tin_vein: {
+    name: '주석 광맥', sprite: 'node-quartz', hp: 5, requires: { kind: 'mine', tier: 1 },
+    loot: [{ itemId: 'tin_ore', min: 1, max: 1 }, { itemId: 'flint', min: 0, max: 1, chance: 0.3 }], xp: 14, respawnMin: 50,
+    biomes: { rocky: 2, wetland: 1 }, minPlayerLevel: 11,
+  },
+  bitumen_seep: {
+    name: '천연 역청 웅덩이', sprite: 'node-clay', hp: 4, requires: { kind: 'none', tier: 0 },
+    loot: [{ itemId: 'bitumen', min: 1, max: 3 }, { itemId: 'soil', min: 1, max: 1 }], xp: 10, respawnMin: 35,
+    biomes: { wetland: 3, plains: 2 }, minPlayerLevel: 11,
+  },
+  silver_vein: {
+    name: '은광석 노두', sprite: 'node-quartz', hp: 6, requires: { kind: 'mine', tier: 1 },
+    loot: [{ itemId: 'silver_ore', min: 1, max: 1 }, { itemId: 'quartz', min: 0, max: 1, chance: 0.5 }], xp: 18, respawnMin: 60,
+    biomes: { rocky: 2 }, minPlayerLevel: 11,
+  },
+  gold_deposit: {
+    name: '사금 · 황금 광맥', sprite: 'node-jade', hp: 7, requires: { kind: 'mine', tier: 1 },
+    loot: [{ itemId: 'gold_ore', min: 1, max: 1 }], xp: 25, respawnMin: 90,
+    biomes: { wetland: 2, rocky: 1 }, minPlayerLevel: 11,
+  },
+  // ── Lv.20+ 철기·자력 자원 노드
+  magnetite_rock: {
+    name: '자철석 노두', sprite: 'node-obsidian', hp: 7, requires: { kind: 'mine', tier: 2 },
+    loot: [{ itemId: 'magnetite', min: 1, max: 2 }], xp: 22, respawnMin: 60,
+    biomes: { rocky: 3 }, minPlayerLevel: 20,
+  },
+  coal_seam: {
+    name: '석탄 지층', sprite: 'node-flint', hp: 5, requires: { kind: 'mine', tier: 1 },
+    loot: [{ itemId: 'coal', min: 2, max: 3 }], xp: 15, respawnMin: 45,
+    biomes: { rocky: 3, forest: 1 }, minPlayerLevel: 20,
+  },
+  limestone_rock: {
+    name: '석회석 암반', sprite: 'node-clay', hp: 5, requires: { kind: 'mine', tier: 1 },
+    loot: [{ itemId: 'limestone', min: 1, max: 2 }], xp: 14, respawnMin: 40,
+    biomes: { plains: 3, rocky: 2 }, minPlayerLevel: 20,
+  },
+  sulfur_vent: {
+    name: '유황 분출구', sprite: 'node-hematite', hp: 6, requires: { kind: 'mine', tier: 1 },
+    loot: [{ itemId: 'sulfur', min: 1, max: 2 }], xp: 20, respawnMin: 60,
+    biomes: { rocky: 3, wetland: 1 }, minPlayerLevel: 20,
+  },
+  // ── Lv.30+ 연금·산업 자원 노드
+  mercury_deposit: {
+    name: '진사 광상', sprite: 'node-hematite', hp: 7, requires: { kind: 'mine', tier: 2 },
+    loot: [{ itemId: 'mercury', min: 1, max: 1 }], xp: 35, respawnMin: 120,
+    biomes: { rocky: 2 }, minPlayerLevel: 30,
+  },
+  meteor_impact: {
+    name: '운석 충돌구', sprite: 'node-obsidian', hp: 10, requires: { kind: 'mine', tier: 2 },
+    loot: [{ itemId: 'meteor_shard', min: 1, max: 1 }, { itemId: 'mana_stone', min: 0, max: 1, chance: 0.5 }], xp: 50, respawnMin: 180,
+    biomes: { plains: 1, rocky: 1 }, minPlayerLevel: 30,
   },
 } satisfies Record<string, NodeDef>;
 

@@ -38,6 +38,8 @@ import AncientAltarModal from './AncientAltarModal';
 import WanderingShamanModal from './WanderingShamanModal';
 import ShamanQuestModal from './ShamanQuestModal';
 import ShamanEvolutionModal from './ShamanEvolutionModal';
+import CivilizationTechModal from './CivilizationTechModal';
+import { getCivilizationEraBadge } from '@/lib/survival/civilizationTech';
 import { type ShamanClassId, type ShamanLevel, SHAMAN_CLASSES } from '@/lib/survival/shamanEvolution';
 import SmokehouseTavernModal from './SmokehouseTavernModal';
 import TribalHallModal from './TribalHallModal';
@@ -67,6 +69,7 @@ type FacilityModalKind =
   | 'shaman'
   | 'shaman_quest'
   | 'shaman_evolution'
+  | 'civ_tech'
   | 'smokehouse'
   | 'tavern'
   | 'tribal_hall'
@@ -80,6 +83,7 @@ interface Props {
   shamanLevel?: ShamanLevel;
   shamanClass?: ShamanClassId | null;
   expeditionDistanceM?: number;
+  civilizationTechs?: string[];
   languageLearned?: boolean;
   languageQuestAccepted?: boolean;
   shamanQuestAcceptedIndex?: number;
@@ -151,6 +155,7 @@ interface Props {
   onPerformShamanRitual?: (targetLevel: number) => boolean;
   onEvolveShaman?: (classId: ShamanClassId) => boolean;
   onEvolvePetToSkullDragon?: (petUid: string) => boolean;
+  onResearchCivilizationTech?: (techId: string) => boolean;
 }
 
 type AgentRole = 'campfire_social' | 'shelter_rest' | 'wall_patrol' | 'hauler' | 'shaman';
@@ -479,6 +484,7 @@ export default function BaseVillageView({
   shamanLevel = 1,
   shamanClass = null,
   expeditionDistanceM = 0,
+  civilizationTechs = ['tech_fire_gathering'],
   languageLearned = false,
   languageQuestAccepted = false,
   shamanQuestAcceptedIndex,
@@ -527,6 +533,7 @@ export default function BaseVillageView({
   onPerformShamanRitual,
   onEvolveShaman,
   onEvolvePetToSkullDragon,
+  onResearchCivilizationTech,
 }: Props) {
   const vState = useMemo(() => ensureVillageState(village, hasAltar), [village, hasAltar]);
   const bonuses = useMemo(() => computeVillageBonuses(vState), [vState]);
@@ -542,6 +549,10 @@ export default function BaseVillageView({
   const speechInfo = useMemo(
     () => getSpeechStageInfo(playerLevel, languageLearned),
     [playerLevel, languageLearned]
+  );
+  const eraBadge = useMemo(
+    () => getCivilizationEraBadge(civilizationTechs, playerLevel),
+    [civilizationTechs, playerLevel]
   );
 
   const [buildMode, setBuildMode] = useState(false);
@@ -1016,6 +1027,14 @@ export default function BaseVillageView({
         <div className="space-y-0.5">
           <div className="flex flex-wrap items-center gap-1.5">
             <b className="text-sm">🌿 부족 마을 광장 (16×16 요새) · Lv.{baseLevel}</b>
+            <button
+              type="button"
+              onClick={() => setActiveModal('civ_tech')}
+              className="pixel-btn rounded bg-amber-500/15 hover:bg-amber-500/25 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 border border-amber-500/40"
+              title="문명 테크트리 열기"
+            >
+              {eraBadge.titleBadge}
+            </button>
             <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-primary">
               🛡️ 성벽 {bonuses.totalWallHp}
             </span>
@@ -1109,6 +1128,16 @@ export default function BaseVillageView({
           >
             <Hammer className="!h-4 !w-4" />
             🔨 건설 {buildMode ? 'ON' : 'OFF'}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setActiveModal('civ_tech')}
+            className="pixel-btn h-auto min-h-0 gap-1 py-1.5 px-2.5 text-xs font-bold text-amber-600 border-amber-500/50 hover:bg-amber-500/10"
+            title="문명 기술 발전 테크트리"
+          >
+            🏛️ 문명 테크
           </Button>
         </div>
       </div>
@@ -2025,6 +2054,7 @@ export default function BaseVillageView({
           setActiveModal(null);
           onOpenObjectives?.();
         }}
+        onOpenCivTech={() => setActiveModal('civ_tech')}
       />
       <ShamanQuestModal
         open={activeModal === 'shaman_quest'}
@@ -2043,6 +2073,7 @@ export default function BaseVillageView({
         onOpenEvolutionModal={() => setActiveModal('shaman_evolution')}
         onOpenSkillsModal={() => setActiveModal('shaman')}
         onOpenWorkshop={() => setActiveModal('workshop')}
+        onOpenCivTech={() => setActiveModal('civ_tech')}
       />
       <ShamanEvolutionModal
         open={activeModal === 'shaman_evolution'}
@@ -2057,6 +2088,18 @@ export default function BaseVillageView({
         onEvolvePetToSkullDragon={petUid =>
           onEvolvePetToSkullDragon ? onEvolvePetToSkullDragon(petUid) : false
         }
+      />
+      <CivilizationTechModal
+        open={activeModal === 'civ_tech'}
+        onClose={() => setActiveModal(null)}
+        playerLevel={playerLevel}
+        researchedTechs={civilizationTechs}
+        storage={storage}
+        backpack={backpack}
+        onResearchTech={techId =>
+          onResearchCivilizationTech ? onResearchCivilizationTech(techId) : false
+        }
+        onOpenWorkshop={() => setActiveModal('workshop')}
       />
       <SmokehouseTavernModal
         open={activeModal === 'smokehouse' || activeModal === 'tavern' ? activeModal : null}

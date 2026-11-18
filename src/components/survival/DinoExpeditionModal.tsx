@@ -48,6 +48,7 @@ interface Props {
   pets: OwnedPet[];
   storage: Stack[];
   backpack: Stack[];
+  playerLevel?: number;
   /** Permanently deletes a fallen pet from the player's save when its HP hits 0 */
   onPermadeathPet: (uid: string) => void;
   /** Syncs surviving pet HP back to the world save */
@@ -147,6 +148,78 @@ const ENCOUNTER_TEMPLATES: Omit<DinoEncounter, 'id' | 'xPct'>[] = [
       { itemId: 'tusk', count: 2 },
     ],
   },
+  {
+    kind: 'node',
+    name: '청동기 구리 광맥',
+    spriteUrl: quartzImg,
+    hp: 55,
+    maxHp: 55,
+    atk: 0,
+    loot: [
+      { itemId: 'copper_ore', count: 2 },
+      { itemId: 'tin_ore', count: 1 },
+    ],
+  },
+  {
+    kind: 'node',
+    name: '천연 역청 웅덩이',
+    spriteUrl: oakImg,
+    hp: 40,
+    maxHp: 40,
+    atk: 0,
+    loot: [
+      { itemId: 'bitumen', count: 2 },
+      { itemId: 'flint', count: 2 },
+    ],
+  },
+  {
+    kind: 'node',
+    name: '신비한 사금·은광맥',
+    spriteUrl: quartzImg,
+    hp: 65,
+    maxHp: 65,
+    atk: 0,
+    loot: [
+      { itemId: 'silver_ore', count: 1 },
+      { itemId: 'gold_ore', count: 1 },
+    ],
+  },
+  {
+    kind: 'node',
+    name: '자철석·석탄 지층',
+    spriteUrl: quartzImg,
+    hp: 75,
+    maxHp: 75,
+    atk: 0,
+    loot: [
+      { itemId: 'magnetite', count: 2 },
+      { itemId: 'coal', count: 3 },
+    ],
+  },
+  {
+    kind: 'node',
+    name: '화산 유황 분출구',
+    spriteUrl: oakImg,
+    hp: 60,
+    maxHp: 60,
+    atk: 0,
+    loot: [
+      { itemId: 'sulfur', count: 2 },
+      { itemId: 'limestone', count: 2 },
+    ],
+  },
+  {
+    kind: 'node',
+    name: '미지의 운석 낙하구',
+    spriteUrl: quartzImg,
+    hp: 110,
+    maxHp: 110,
+    atk: 0,
+    loot: [
+      { itemId: 'meteor_shard', count: 1 },
+      { itemId: 'mercury', count: 1 },
+    ],
+  },
 ];
 
 // 4-frame keyframe offsets so any pet sprite displays a lively 4-frame walk & 4-frame attack motion
@@ -170,6 +243,7 @@ export default function DinoExpeditionModal({
   pets,
   storage,
   backpack,
+  playerLevel = 1,
   onPermadeathPet,
   onUpdatePetHp,
   onConsumeCookedMeat,
@@ -289,8 +363,9 @@ export default function DinoExpeditionModal({
           setEncounter(prev => (prev ? { ...prev, xPct: Math.max(42, prev.xPct - 4.5) } : null));
         } else if (nextDist >= nextSpawnDistRef.current) {
           // Spawn a new wild resource node or hostile beast from off-screen right
-          const tierCap = nextDist < 50 ? 4 : nextDist < 110 ? 6 : ENCOUNTER_TEMPLATES.length;
-          const tpl = ENCOUNTER_TEMPLATES[Math.floor(Math.random() * tierCap)];
+          const maxAllowed = playerLevel >= 30 ? ENCOUNTER_TEMPLATES.length : playerLevel >= 20 ? 11 : playerLevel >= 11 ? 9 : 6;
+          const tierCap = Math.min(maxAllowed, nextDist < 50 ? 4 : nextDist < 110 ? Math.min(6, maxAllowed) : maxAllowed);
+          const tpl = ENCOUNTER_TEMPLATES[Math.floor(Math.random() * Math.max(4, tierCap))];
           const distScale = 1 + Math.floor(nextDist / 60) * 0.2;
           const scaledHp = Math.round(tpl.hp * distScale);
           const scaledAtk = Math.round(tpl.atk * distScale);

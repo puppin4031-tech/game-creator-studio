@@ -35,14 +35,30 @@ export const MATERIAL_PHYSICS: Record<string, MaterialPhysics> = {
   leather:      { hardness: 2, toughness: 7, sharpness: 0, binding: 6, mass: 1, mystic: 0, color: '#7c2d12' },
   prime_pelt:   { hardness: 2, toughness: 8, sharpness: 0, binding: 5, mass: 2, mystic: 2, color: '#44403c' },
   ancient_fang: { hardness: 8, toughness: 6, sharpness: 9, binding: 0, mass: 1, mystic: 7, color: '#fde68a' },
+  bitumen:      { hardness: 2, toughness: 9, sharpness: 0, binding: 9, mass: 4, mystic: 1, color: '#18181b' },
+  copper_ore:   { hardness: 5, toughness: 6, sharpness: 3, binding: 0, mass: 6, mystic: 1, color: '#ea580c' },
+  tin_ore:      { hardness: 3, toughness: 4, sharpness: 2, binding: 0, mass: 5, mystic: 1, color: '#94a3b8' },
+  silver_ore:   { hardness: 4, toughness: 6, sharpness: 4, binding: 0, mass: 8, mystic: 7, color: '#e2e8f0' },
+  gold_ore:     { hardness: 3, toughness: 8, sharpness: 2, binding: 0, mass: 10, mystic: 10, color: '#eab308' },
+  charcoal:     { hardness: 2, toughness: 1, sharpness: 1, binding: 1, mass: 2, mystic: 2, color: '#27272a' },
+  copper_ingot: { hardness: 6, toughness: 7, sharpness: 5, binding: 2, mass: 6, mystic: 2, color: '#c2410c' },
+  bronze_ingot: { hardness: 8, toughness: 8, sharpness: 8, binding: 2, mass: 8, mystic: 3, color: '#d97706' },
+  magnetite:    { hardness: 8, toughness: 7, sharpness: 6, binding: 0, mass: 8, mystic: 6, color: '#09090b' },
+  coal:         { hardness: 2, toughness: 2, sharpness: 1, binding: 0, mass: 3, mystic: 2, color: '#171717' },
+  limestone:    { hardness: 4, toughness: 3, sharpness: 2, binding: 3, mass: 5, mystic: 1, color: '#d4d4d4' },
+  sulfur:       { hardness: 2, toughness: 1, sharpness: 1, binding: 1, mass: 2, mystic: 6, color: '#facc15' },
+  steel_ingot:  { hardness: 10, toughness: 9, sharpness: 9, binding: 2, mass: 9, mystic: 4, color: '#334155' },
+  mercury:      { hardness: 1, toughness: 10, sharpness: 0, binding: 8, mass: 10, mystic: 9, color: '#94a3b8' },
+  meteor_shard: { hardness: 10, toughness: 10, sharpness: 9, binding: 0, mass: 10, mystic: 10, color: '#4c1d95' },
+  mana_stone:   { hardness: 7, toughness: 6, sharpness: 7, binding: 0, mass: 4, mystic: 10, color: '#38bdf8' },
 };
 
 /** Material tier 1-4: higher-tier (rarer, later) materials forge stronger gear. */
 export const MATERIAL_TIER: Record<string, number> = {
   branch: 1, fiber: 1, soil: 1, clay: 1,
-  flint: 2, bone: 2, hide: 2, cordage: 2, log: 2, resin: 2,
-  leather: 3, clay_pot: 3, frost_pelt: 3, frost_shard: 3, quartz: 3, ochre: 3,
-  obsidian: 4, tusk: 4, prime_pelt: 4, ancient_fang: 4, jade: 4,
+  flint: 2, bone: 2, hide: 2, cordage: 2, log: 2, resin: 2, bitumen: 2, copper_ore: 2, tin_ore: 2, charcoal: 2, limestone: 2,
+  leather: 3, clay_pot: 3, frost_pelt: 3, frost_shard: 3, quartz: 3, ochre: 3, copper_ingot: 3, bronze_ingot: 3, silver_ore: 3, coal: 3, sulfur: 3,
+  obsidian: 4, tusk: 4, prime_pelt: 4, ancient_fang: 4, jade: 4, gold_ore: 4, magnetite: 4, steel_ingot: 4, mercury: 4, meteor_shard: 4, mana_stone: 4,
 };
 /** T1 x0.85 ... T4 x1.3, by quantity-weighted average tier. */
 export function tierMultiplier(materials: Record<string, number>): number {

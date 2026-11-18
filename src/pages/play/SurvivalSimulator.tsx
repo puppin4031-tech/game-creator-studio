@@ -104,7 +104,10 @@ export function workKind(e: WorldEntity): { label: string; sample: SampleId } {
   if (req === 'mine' || /rock|vein/.test(e.type)) return { label: '채광 중', sample: 'mine' };
   return { label: '채집 중', sample: 'gather' };
 }
-const STRIKE_NODES = new Set<string>(['flint_rock', 'branch_pile', 'oak_tree', 'pine_tree', 'hematite_rock', 'quartz_vein', 'obsidian_rock', 'jade_rock']);
+const STRIKE_NODES = new Set<string>([
+  'flint_rock', 'branch_pile', 'oak_tree', 'pine_tree', 'hematite_rock', 'quartz_vein', 'obsidian_rock', 'jade_rock',
+  'copper_vein', 'tin_vein', 'bitumen_seep', 'silver_vein', 'gold_deposit', 'magnetite_rock', 'coal_seam', 'limestone_rock', 'sulfur_vent', 'mercury_deposit', 'meteor_impact',
+]);
 
 function Sprite({ k, scale = 1, className = '' }: { k: SpriteKey; scale?: number; className?: string }) {
   const m = SPRITE_META[k];
@@ -1324,6 +1327,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       onPerformShamanRitual={g.performShamanRitual}
                       onEvolveShaman={g.evolveShaman}
                       onEvolvePetToSkullDragon={g.evolvePetToSkullDragon}
+                      civilizationTechs={s.civilizationTechs ?? ['tech_fire_gathering']}
+                      onResearchCivilizationTech={g.researchCivilizationTech}
                       hasAltar={!!s.altar}
                       tribe={s.tribe}
                       pets={s.pets ?? []}
@@ -1605,6 +1610,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         entities={g.entities}
         landmarks={landmarks}
         explored={s.explored}
+        civilizationTechs={s.civilizationTechs ?? ['tech_fire_gathering']}
         onToggleFavorite={favs.toggle}
         onRemoveFavorite={favs.remove}
         onTrack={favs.setTrackedId}
@@ -1676,6 +1682,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         pets={s.pets ?? []}
         storage={s.storage}
         backpack={s.backpack}
+        playerLevel={s.level}
         onPermadeathPet={g.permadeathPet}
         onUpdatePetHp={g.updatePetHp}
         onConsumeCookedMeat={g.consumeDinoMeat}

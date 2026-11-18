@@ -34,6 +34,7 @@ import {
   type ShamanClassId,
   type ShamanLevel,
 } from '@/lib/survival/shamanEvolution';
+import { CIV_TECHS, checkCivTechStatus, getCivilizationEraBadge, type CivTechDef } from '@/lib/survival/civilizationTech';
 import { settleFoodSpoilage, SMOKE_CURING_MS, TAVERN_RECIPES, type SmokehouseBatch } from '@/lib/survival/culinary';
 import { computeExpeditionLevel, detectExpeditionPins, type RadarPin } from '@/lib/survival/radar';
 import { addStacks, countOf, hasAll, removeStacks, splitDeathDrop, splitByCapacity, stackWeight, transferStack, validStackCount } from '@/lib/survival/inventory';
@@ -119,6 +120,7 @@ export interface WorldSave extends WorldProgress {
   shamanQuestAcceptedIndex?: number;
   shamanLevel?: 1 | 2 | 3 | 4 | 5;
   shamanClass?: 'engineer' | 'mage' | 'warlock' | 'orthodox' | null;
+  civilizationTechs?: string[];
   smokeBatches?: SmokehouseBatch[];
   lastFreshnessCheckAt?: number;
   shamanTourDone?: boolean;
@@ -136,7 +138,7 @@ export interface WorldSave extends WorldProgress {
 const fresh = (start: LatLng): WorldSave => ({
   ...freshProgress(),
   pos: start, hp: C.baseMaxHp, hunger: 100, backpack: [], storage: [], gear: [], base: null,
-  depleted: {}, damage: {}, gathered: {}, techs: [], explored: [start], terrainZones: {}, parkCells: {}, shamanLevel: 1, shamanClass: null, lastTickAt: Date.now(),
+  depleted: {}, damage: {}, gathered: {}, techs: [], explored: [start], terrainZones: {}, parkCells: {}, shamanLevel: 1, shamanClass: null, civilizationTechs: ['tech_fire_gathering'], lastTickAt: Date.now(),
 });
 
 function migrateTribeState(saved: Partial<WorldSave>): Partial<WorldSave> {
@@ -366,8 +368,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const customMobVer = getCustomMobVersion();
   const entities: WorldEntity[] = useMemo(() => generateWorld({
     center: s.pos, radiusM: vision, now, isNight, depleted: s.depleted, terrainZones: s.terrainZones, parkCells: s.parkCells, sanctuaries,
-    safeZone: null,
-  }).filter(e => !(e.kind === 'creature' && s.outpost && distanceM(e, s.outpost) < C.outpostRadiusM + 15)), [s.pos, vision, now, isNight, s.depleted, s.terrainZones, s.parkCells, sanctuaries, s.outpost, customMobVer]);
+    safeZone: null, playerLevel: s.level,
+  }).filter(e => !(e.kind === 'creature' && s.outpost && distanceM(e, s.outpost) < C.outpostRadiusM + 15)), [s.pos, vision, now, isNight, s.depleted, s.terrainZones, s.parkCells, sanctuaries, s.outpost, customMobVer, s.level]);
 
   // Beasts are no longer blocked or auto-killed around the base on the world map.
   // Defense will occur inside the base village view during siege / invasion events.
@@ -653,7 +655,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       if (!crew) return;
       const at = Date.now();
       const outdoors = enabledRef.current && at < outdoorMovingRef.current && distanceM(p.pos, crew.pos) <= 40;
-      const nearby = generateWorld({ center: crew.pos, radiusM: crew.manual ? MANUAL_PICK_M : 30, now: at, isNight: dayPhase(new Date(at)) === 'night', depleted: p.depleted, terrainZones: p.terrainZones, parkCells: p.parkCells });
+      const nearby = generateWorld({ center: crew.pos, radiusM: crew.manual ? MANUAL_PICK_M : 30, now: at, isNight: dayPhase(new Date(at)) === 'night', depleted: p.depleted, terrainZones: p.terrainZones, parkCells: p.parkCells, playerLevel: p.level });
       if (crew.manual) setCrewNearby(nearby);
       const result = advanceExpedition(crew, nearby, at, outdoors, !!p.expeditionAuto, Math.random, p.damage);
       const stepDist = Math.round(distanceM(crew.pos, result.crew.pos));
@@ -689,7 +691,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const timer = window.setInterval(() => {
       if (!enabledRef.current || Date.now() >= outdoorMovingRef.current) return;
       const p = ref.current; const at = Date.now();
-      const target = generateWorld({ center: p.pos, radiusM: EXPEDITION_RADIUS_M, now: at, isNight: false, depleted: p.depleted, terrainZones: p.terrainZones }).find(e => e.kind === 'node' && nodeDef(e.type).requires.tier <= 1);
+      const target = generateWorld({ center: p.pos, radiusM: EXPEDITION_RADIUS_M, now: at, isNight: false, depleted: p.depleted, terrainZones: p.terrainZones, playerLevel: p.level }).find(e => e.kind === 'node' && nodeDef(e.type).requires.tier <= 1);
       if (!target) return;
       const cap = C.baseCarryKg + (p.level - 1) * C.carryPerLevelKg + ((p.base?.level ?? 0) >= 2 ? 10 : 0) + pocketBonusKg(p.techs);
       const { fit } = splitByCapacity(expeditionLoot(target, true), cap - stackWeight(p.backpack));
@@ -1799,6 +1801,61 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return true;
   }, [setS]);
 
+  const researchCivilizationTech = useCallback((techId: string): boolean => {
+    const p = ref.current;
+    const tech = CIV_TECHS.find(t => t.id === techId);
+    if (!tech) return false;
+    const researched = p.civilizationTechs ?? ['tech_fire_gathering'];
+    const status = checkCivTechStatus(tech, p.level, researched, p.storage, p.backpack);
+    if (status.isUnlocked) {
+      toast.info('이미 연구를 완료한 문명 기술입니다.');
+      return false;
+    }
+    if (!status.canResearch) {
+      toast.warning(status.reason ?? '연구 조건을 만족하지 못했습니다.');
+      return false;
+    }
+
+    let nextP = p;
+    if (tech.cost.length > 0) {
+      const paid = payAccessible(p, tech.cost);
+      if (!paid) {
+        toast.error(`연구 재료 부족: ${fmt(tech.cost)}`);
+        return false;
+      }
+      nextP = { ...p, ...paid };
+    }
+
+    const nextCivTechs = [...researched, techId];
+    const prevBadge = getCivilizationEraBadge(researched, p.level);
+    const nextBadge = getCivilizationEraBadge(nextCivTechs, p.level);
+
+    let nextVillage = nextP.village;
+    if (techId === 'tech_bitumen_waterproofing' && nextVillage) {
+      nextVillage = {
+        ...nextVillage,
+        buildings: nextVillage.buildings.map(b => ({
+          ...b,
+          customHp: Math.round((b.customHp ?? 300) * 1.3),
+        })),
+      };
+    }
+
+    setS({
+      ...nextP,
+      village: nextVillage,
+      civilizationTechs: nextCivTechs,
+      lastTickAt: Date.now(),
+    });
+
+    if (nextBadge.era !== prevBadge.era) {
+      toast.success(`🎉 ${nextBadge.titleBadge}! 거점이 새로운 문명 시대로 도약했습니다!`, { duration: 5000 });
+    } else {
+      toast.success(`✨ [${tech.title}] 연구 완료! (${tech.unlocks[0] ?? ''})`);
+    }
+    return true;
+  }, [setS]);
+
   const forgeSignatureWeapon = useCallback((itemId: ItemId, cost: Stack[]): boolean => {
     const p = ref.current;
     const def = ITEMS[itemId];
@@ -2062,7 +2119,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return true;
   }, [setS]);
 
-  return { performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
+  return { researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
     moveOutpost, petHits, mergePets, togglePetDeploy, assignPetRole, feedPet, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,

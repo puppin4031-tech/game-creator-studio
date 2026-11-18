@@ -50,6 +50,7 @@ interface Props {
   onOpenEvolutionModal: () => void;
   onOpenSkillsModal?: () => void;
   onOpenWorkshop?: () => void;
+  onOpenCivTech?: () => void;
 }
 
 export default function ShamanQuestModal({
@@ -67,6 +68,7 @@ export default function ShamanQuestModal({
   onOpenEvolutionModal,
   onOpenSkillsModal,
   onOpenWorkshop,
+  onOpenCivTech,
 }: Props) {
   // Current view stage: defaults to current progression stage (clamp to 1~4)
   const currentStageIndex = Math.min(3, Math.max(0, shamanLevel - 1));
@@ -505,17 +507,17 @@ export default function ShamanQuestModal({
           )}
 
           {/* Auxiliary Nav Buttons */}
-          <div className="grid grid-cols-2 gap-2 pt-1">
+          <div className="grid grid-cols-3 gap-1.5 pt-1">
             {onOpenSkillsModal && (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={onOpenSkillsModal}
-                className="pixel-btn h-9 gap-1 text-xs"
+                className="pixel-btn h-9 gap-1 text-[11px]"
               >
                 <Hammer className="h-3.5 w-3.5" />
-                <span>장인 · 원시 제작술 수련</span>
+                <span>장인 수련</span>
               </Button>
             )}
             {onOpenWorkshop && (
@@ -524,10 +526,21 @@ export default function ShamanQuestModal({
                 variant="outline"
                 size="sm"
                 onClick={onOpenWorkshop}
-                className="pixel-btn h-9 gap-1 text-xs"
+                className="pixel-btn h-9 gap-1 text-[11px]"
               >
                 <Shield className="h-3.5 w-3.5" />
-                <span>마을 건축 공방 열기</span>
+                <span>건축 공방</span>
+              </Button>
+            )}
+            {onOpenCivTech && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onOpenCivTech}
+                className="pixel-btn h-9 gap-1 text-[11px] text-amber-500 border-amber-500/50"
+              >
+                <span>🏛️ 문명 테크</span>
               </Button>
             )}
           </div>
