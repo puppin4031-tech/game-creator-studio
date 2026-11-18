@@ -103,12 +103,12 @@ export const ITEMS = def({
   bone_dagger: { name: '뼈 단검', desc: '공격력 8', category: 'weapon', rarity: 'common', weight: 0.5, sprite: 'item-bone-dagger', weapon: { atk: 8 }, durability: 40 },
   stone_maul: { name: '돌 망치', desc: '공격력 13', category: 'weapon', rarity: 'uncommon', weight: 2.5, sprite: 'item-stone-maul', weapon: { atk: 13 }, durability: 60 },
   wooden_club: { name: '나무 몽둥이', desc: '공격력 6', category: 'weapon', rarity: 'common', weight: 1.5, sprite: 'item-wooden-club', weapon: { atk: 6 }, durability: 30 },
-  flint_spear: { name: '부싯돌 창', desc: '공격력 10', category: 'weapon', rarity: 'uncommon', weight: 1.5, sprite: 'item-flint-spear', weapon: { atk: 10 }, durability: 45 },
-  sling: { name: '새총·물매', desc: '공격력 7 · 원거리 (배낭의 돌멩이 1개 소모 · 첫 공격 반격 없음)', category: 'weapon', rarity: 'uncommon', weight: 0.5, sprite: 'item-sling', weapon: { atk: 7, ranged: true }, durability: 60 },
-  bone_bow: { name: '뼈 활', desc: '공격력 12 · 원거리 (배낭의 화살 1개 소모 · 첫 공격 반격 없음)', category: 'weapon', rarity: 'rare', weight: 1, sprite: 'item-bone-bow', weapon: { atk: 12, ranged: true }, durability: 70 },
+  flint_spear: { name: '부싯돌 창', desc: '공격력 10 · 근접 및 투창 (사거리 20~40m · 배낭 부싯돌/돌 소모)', category: 'weapon', rarity: 'uncommon', weight: 1.5, sprite: 'item-flint-spear', weapon: { atk: 10, ranged: true }, durability: 45 },
+  sling: { name: '새총·물매', desc: '공격력 7 · 원거리 투석구 (사거리 50m · 배낭 돌멩이/부싯돌 1개 소모)', category: 'weapon', rarity: 'uncommon', weight: 0.5, sprite: 'item-sling', weapon: { atk: 7, ranged: true }, durability: 60 },
+  bone_bow: { name: '뼈 활', desc: '공격력 12 · 원거리 뼈 활 (평균 30m, 레벨/명품/전설 50~90m · 배낭 화살 1개 소모)', category: 'weapon', rarity: 'rare', weight: 1, sprite: 'item-bone-bow', weapon: { atk: 12, ranged: true }, durability: 70 },
   arrow: { name: '화살', desc: '활로 사냥할 때 쓰는 날카로운 화살. 배낭에 있어야 활을 쏠 수 있다 (1회 공격 시 1개 소모).', category: 'processed', rarity: 'common', weight: 0.05, sprite: 'item-flint-spear' },
   sling_stone: { name: '돌멩이 (탄환)', desc: '새총이나 물매로 던지는 둥근 돌멩이. 배낭에 있어야 물매를 쏠 수 있다 (1회 공격 시 1개 소모).', category: 'processed', rarity: 'common', weight: 0.05, sprite: 'item-flint' },
-  obsidian_spear: { name: '흑요석 창', desc: '공격력 18', category: 'weapon', rarity: 'rare', weight: 1.5, sprite: 'item-obsidian-spear', weapon: { atk: 18 }, durability: 80 },
+  obsidian_spear: { name: '흑요석 창', desc: '공격력 18 · 강력한 근접 및 흑요석 투창 (사거리 20~40m · 배낭 부싯돌/돌 소모)', category: 'weapon', rarity: 'rare', weight: 1.5, sprite: 'item-obsidian-spear', weapon: { atk: 18, ranged: true }, durability: 80 },
   // ── Armor & trinkets
   bark_vest: { name: '나무껍질 조끼', desc: '방어력 1', category: 'armor', rarity: 'common', weight: 1.5, sprite: 'item-bark-vest', armor: { def: 1 }, durability: 40 },
   bone_plate: { name: '뼈 흉갑', desc: '방어력 4', category: 'armor', rarity: 'rare', weight: 2.5, sprite: 'item-bone-plate', armor: { def: 4 }, durability: 100 },
@@ -129,20 +129,104 @@ export const isGearItem = (id: ItemId) => GEAR_CATEGORIES.includes(ITEMS[id].cat
 
 export const RARITY_LABEL: Record<Rarity, string> = { common: '흔함', uncommon: '고급', rare: '희귀', epic: '전설' };
 
-/** Returns required ammo item ID in backpack for a ranged weapon (`arrow` for bows, `sling_stone` for slings). */
+export type RangedWeaponCategory = 'bow' | 'spear' | 'sling';
+
+export function getRangedCategory(itemId: ItemId | string | undefined): RangedWeaponCategory | null {
+  if (!itemId) return null;
+  const id = itemId.toLowerCase();
+  if (id.includes('bow')) return 'bow';
+  if (id.includes('spear') || id.includes('javelin')) return 'spear';
+  if (id.includes('sling')) return 'sling';
+  const def = ITEMS[itemId as ItemId];
+  if (def?.weapon?.ranged) {
+    if (def.name.includes('활') || def.name.includes('Bow')) return 'bow';
+    if (def.name.includes('창') || def.name.includes('투창')) return 'spear';
+    return 'sling';
+  }
+  return null;
+}
+
+/** Calculates actual combat reach in meters:
+ * - 활 (Bow): 평균 30m, 레벨/명품/전설 성장 시 50m ~ 최고 90m
+ * - 투창 (Spear): 기본 20m ~ 레벨/명품 성장 시 40m
+ * - 투석구 (Sling): 기본 50m ~ 레벨 발전 시 65m
+ */
+export function computeRangedReach(
+  weapon: { itemId: ItemId | string; quality?: string; plus?: number } | null | undefined,
+  playerLevel: number = 1
+): { category: RangedWeaponCategory | null; rangeM: number } {
+  if (!weapon) return { category: null, rangeM: 4.5 };
+  const cat = getRangedCategory(weapon.itemId);
+  if (!cat) return { category: null, rangeM: 4.5 };
+
+  const def = ITEMS[weapon.itemId as ItemId];
+  const isMasterwork = weapon.quality === 'MASTERWORK';
+  const isEpicOrLegend = def?.rarity === 'epic' || (weapon.plus ?? 0) >= 3;
+  const isRare = def?.rarity === 'rare' || (weapon.plus ?? 0) >= 1;
+
+  if (cat === 'sling') {
+    // 투석구 (물매): 기본 50m
+    const levelBonus = Math.min(15, Math.floor((playerLevel - 1) * 0.8));
+    return { category: 'sling', rangeM: Math.round(50 + levelBonus) };
+  }
+
+  if (cat === 'spear') {
+    // 투창: 20m - 40m
+    let range = 20;
+    range += Math.min(12, Math.floor((playerLevel - 1) * 1.2));
+    if (isMasterwork) range += 4;
+    if (isRare) range += 2;
+    if (isEpicOrLegend) range += 4;
+    return { category: 'spear', rangeM: Math.min(40, Math.max(20, Math.round(range))) };
+  }
+
+  if (cat === 'bow') {
+    // 활: 평균 30m, 레벨이 오르거나 명품 무기이거나 레전드 무기 라면 50m 이정도. 발전함에 따라 90m까지!
+    let range = 30;
+    range += Math.floor((playerLevel - 1) * 1.8);
+    if (isMasterwork) range += 10;
+    if (isRare) range += 5;
+    if (isEpicOrLegend) range += 15;
+    if ((weapon.plus ?? 0) > 0) range += (weapon.plus ?? 0) * 4;
+    return { category: 'bow', rangeM: Math.min(90, Math.max(30, Math.round(range))) };
+  }
+
+  return { category: null, rangeM: 4.5 };
+}
+
+/** Returns required ammo item ID in backpack for a ranged weapon (`arrow` for bows, `sling_stone` for slings/spears). */
 export function requiredRangedAmmo(weaponId: ItemId | string | undefined): 'arrow' | 'sling_stone' | null {
   if (!weaponId) return null;
-  const def = ITEMS[weaponId as ItemId];
-  if (!def?.weapon?.ranged) return null;
-  if (weaponId === 'sling' || weaponId.includes('sling')) return 'sling_stone';
-  return 'arrow';
+  const cat = getRangedCategory(weaponId);
+  if (cat === 'bow') return 'arrow';
+  if (cat === 'sling' || cat === 'spear') return 'sling_stone';
+  return null;
+}
+
+/** Finds available ammo in backpack. For slings & spears, allows both sling_stone and flint! */
+export function findAvailableAmmo(
+  backpack: { itemId: ItemId; count: number }[],
+  weaponId: ItemId | string | undefined
+): { itemId: ItemId; label: string } | null {
+  const cat = getRangedCategory(weaponId);
+  if (!cat) return null;
+  const countOfItem = (id: ItemId) => backpack.find(b => b.itemId === id)?.count ?? 0;
+
+  if (cat === 'bow') {
+    if (countOfItem('arrow') > 0) return { itemId: 'arrow', label: '화살(🏹)' };
+    return null;
+  }
+  // For slings and throwing spears: either sling_stone or flint
+  if (countOfItem('sling_stone') > 0) return { itemId: 'sling_stone', label: '돌멩이 탄환(🪨)' };
+  if (countOfItem('flint') > 0) return { itemId: 'flint', label: '부싯돌(🪨)' };
+  return null;
 }
 
 /** Plain-language effect line for gear, shown wherever an item appears. */
 export function gearEffect(d: ItemDef | undefined): string | null {
   if (!d) return null;
   const pct = (v: number) => `${Math.round(v * 100)}%`;
-  if (d.weapon) return `공격력 +${d.weapon.atk}${d.weapon.ranged ? ' · 원거리(배낭 화살/돌멩이 1개 소모)' : ' · 근접'}`;
+  if (d.weapon) return `공격력 +${d.weapon.atk}${d.weapon.ranged ? ' · 원거리(화살/돌 소모)' : ' · 근접'}`;
   if (d.armor) return `방어력 +${d.armor.def} (받는 피해 -${d.armor.def})`;
   if (d.tool) return `채집 속도 +${d.tool.power.toFixed(1)}${d.tool.chop ? ` · 벌목 ${d.tool.chop}단계` : ''}${d.tool.mine ? ` · 채굴 ${d.tool.mine}단계` : ''}`;
   if (d.trinket) return `전리품 +${pct(d.trinket.lootBonus)} · 경험치 +${pct(d.trinket.xpBonus)}`;

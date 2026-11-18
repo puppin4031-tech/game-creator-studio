@@ -128,7 +128,7 @@ interface Props {
   backpack: Stack[];
   altar: boolean;
   onForgeSignatureWeapon: (itemId: ItemId, cost: Stack[]) => boolean;
-  onCraftAmmoBundle?: (itemId: 'arrow' | 'sling_stone', count: number, cost: Stack[]) => boolean;
+  onCraftAmmoBundle?: (itemId: 'arrow' | 'sling_stone' | 'javelin', count: number, cost: Stack[]) => boolean;
   onInventWeapon: (
     input: InventionInput,
     naming: { name: string; desc: string; masterwork?: boolean; ranged?: boolean }

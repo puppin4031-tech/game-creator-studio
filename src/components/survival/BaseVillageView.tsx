@@ -88,7 +88,7 @@ interface Props {
   onResearchBlueprint?: (buildingId: VillageBuildingId) => boolean;
   onTrainShamanSkill?: (skillId: ShamanSkillId) => boolean;
   onForgeSignatureWeapon?: (itemId: ItemId, cost: Stack[]) => boolean;
-  onCraftAmmoBundle?: (itemId: 'arrow' | 'sling_stone', count: number, cost: Stack[]) => boolean;
+  onCraftAmmoBundle?: (itemId: 'arrow' | 'sling_stone' | 'javelin', count: number, cost: Stack[]) => boolean;
   onEnhanceWeapon?: (uid: string) => { ok: boolean; plus: number };
   onInvent?: (
     input: InventionInput,

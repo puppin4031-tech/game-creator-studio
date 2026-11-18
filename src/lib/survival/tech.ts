@@ -25,7 +25,7 @@ export const TECHS: TechDef[] = [
   { id: 'knapping', name: '돌 떼기', desc: '부싯돌을 쳐서 날과 돌멩이 탄환을 다듬는 법을 깨우친다.', requires: [], inspire: { itemId: 'flint', count: 2 }, recipes: ['hand_axe', 'sling_stone'] },
   { id: 'binding', name: '끈 꼬기', desc: '섬유를 꼬아 묶는 법을 깨우친다.', requires: [], inspire: { itemId: 'fiber', count: 3 }, recipes: ['cordage', 'wooden_club', 'wood_mallet', 'bark_vest'] },
   { id: 'fire', name: '불 다루기', desc: '나뭇가지를 모아 불씨를 지키는 법.', requires: [], inspire: { itemId: 'branch', count: 6 }, recipes: ['cooked_meat', 'jerky'] },
-  { id: 'hafting', name: '자루 끼우기', desc: '돌날을 나무 자루에 묶어 화살·창·곡괭이를 만든다.', requires: ['knapping', 'binding'], research: [{ itemId: 'branch', count: 3 }, { itemId: 'flint', count: 2 }, { itemId: 'cordage', count: 1 }], recipes: ['arrow', 'flint_spear', 'stone_pickaxe', 'flint_hatchet', 'stone_maul'] },
+  { id: 'hafting', name: '자루 끼우기', desc: '돌날을 나무 자루에 묶어 화살·창·곡괭이를 만든다.', requires: ['knapping', 'binding'], research: [{ itemId: 'branch', count: 3 }, { itemId: 'flint', count: 2 }, { itemId: 'cordage', count: 1 }], recipes: ['arrow', 'javelin', 'throwing_spear', 'flint_spear', 'stone_pickaxe', 'flint_hatchet', 'stone_maul'] },
   { id: 'pottery', name: '토기 굽기', desc: '흙과 점토를 반죽해 불에 굽는다.', requires: ['fire'], research: [{ itemId: 'soil', count: 3 }, { itemId: 'clay', count: 2 }], recipes: ['clay_pot', 'digging_stick'] },
   { id: 'herbalism', name: '약초학', desc: '약초를 짓이겨 상처에 바르는 법.', requires: [], inspire: { itemId: 'herb', count: 3 }, recipes: ['salve'] },
   { id: 'tanning', name: '무두질', desc: '날가죽을 송진과 연기로 질기게 만들어 새총·물매와 가죽 갑옷을 빚는다.', requires: ['fire', 'binding'], research: [{ itemId: 'hide', count: 2 }, { itemId: 'resin', count: 1 }], recipes: ['leather', 'sling', 'sling_stone', 'hide_armor'] },

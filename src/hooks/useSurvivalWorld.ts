@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Json } from '@/integrations/supabase/types';
-import { ITEMS, requiredRangedAmmo, type ItemId } from '@/lib/survival/items';
+import { ITEMS, requiredRangedAmmo, findAvailableAmmo, computeRangedReach, type ItemId } from '@/lib/survival/items';
 import { CREATURES, NODES, creatureDef, nodeDef, type LootRoll } from '@/lib/survival/entities';
 import { activePetAbilities, bleedDamage, walkLimitKmh, regenHp, REGEN_INTERVAL_MS } from '@/lib/survival/petAbilities';
 import { MAX_WALK_KMH } from '@/lib/survival/walkPace';
@@ -311,7 +311,6 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       ),
     [s.expeditionCount, s.expeditionDistanceM, s.walkSteps]
   );
-  const vision = (isNight ? C.visionNightM + villageBonuses.nightVisionBonusM : C.visionDayM) + visionBonus(s.techs);
   const reach = reachRadius(s.techs);
   const baseDef = s.base ? BASE_LEVELS[s.base.level] : null;
   const [sanctuaries, setSanctuaries] = useState<LatLng[]>([]);
@@ -349,6 +348,10 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     [loadout.tool1, loadout.tool2].reduce<GearInstance | null>((b, g) => (g && pick(g) > (b ? pick(b) : 0) ? g : b), null), [loadout]);
   const weapon = loadout.weapon;
   const armor = loadout.armor;
+
+  const rangedInfo = useMemo(() => computeRangedReach(weapon, s.level), [weapon, s.level]);
+  const baseVision = (isNight ? C.visionNightM + villageBonuses.nightVisionBonusM : C.visionDayM) + visionBonus(s.techs);
+  const vision = Math.max(baseVision, rangedInfo.rangeM ? rangedInfo.rangeM + 12 : baseVision);
 
   const customMobVer = getCustomMobVersion();
   const entities: WorldEntity[] = useMemo(() => generateWorld({
@@ -807,8 +810,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (!enabledRef.current) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return false; }
     const p = ref.current;
     if (e.kind === 'node' ? !isNodeAvailable(e.id, e.type, p.depleted, Date.now()) : !!p.depleted[e.id]) return false;
-    const isRangedWeapon = e.kind === 'creature' && !!(weapon && ITEMS[weapon.itemId]?.weapon?.ranged);
-    const r = isRangedWeapon ? Math.max(reachRadius(p.techs), 35) : reachRadius(p.techs);
+    const { category: rangedCat, rangeM: rangedReach } = computeRangedReach(weapon, p.level);
+    const isRangedWeapon = e.kind === 'creature' && !!rangedCat;
+    const r = isRangedWeapon ? Math.max(reachRadius(p.techs), rangedReach) : reachRadius(p.techs);
     if (distanceM(p.pos, e) > r) { toast.warning(`${r}m 안으로 다가가세요`); return false; }
     if (e.kind === 'creature') {
       const at = Date.now();
@@ -840,34 +844,48 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     } else {
       const d = creatureDef(e.type);
       label = d.name; need = d.hp; loot = d.loot;
-      // Ranged weapons (bow / sling) require 1 matching ammo in the backpack per shot
-      const neededAmmo = weapon ? requiredRangedAmmo(weapon.itemId) : null;
-      if (neededAmmo) {
-        const afterAmmo = removeStacks(p.backpack, [{ itemId: neededAmmo, count: 1 }]);
-        if (!afterAmmo) {
-          const ammoLabel = neededAmmo === 'arrow' ? '화살(🏹)' : '돌멩이 탄환(🪨)';
+      // Ranged weapons (bow / sling / spear) require 1 matching ammo in the backpack per shot
+      if (isRangedWeapon && distanceM(p.pos, e) > reachRadius(p.techs)) {
+        const ammo = findAvailableAmmo(p.backpack, weapon?.itemId);
+        if (!ammo) {
+          const ammoLabel = rangedCat === 'bow' ? '화살(🏹)' : '돌멩이 탄환(🪨)이나 부싯돌';
           toast.error(`배낭에 ${ammoLabel}이(가) 없습니다!`, {
-            description: '거점 제작 탭이나 무기 제작소에서 만들어 배낭에 넣어 주세요 (1회 공격 시 1개 소진).',
+            description: '거점 제작 탭이나 모닥불에서 탄환을 만들어 배낭에 넣어 주세요 (1회 공격 시 1개 소진).',
           });
           return false;
         }
+        const afterAmmo = removeStacks(p.backpack, [{ itemId: ammo.itemId, count: 1 }]);
+        if (!afterAmmo) return false;
         next.backpack = afterAmmo;
       }
       power = weapon ? Math.round((ITEMS[weapon.itemId].weapon?.atk ?? C.fistAtk) * gearMult(weapon)) : C.fistAtk;
       if (p.techs.includes('primal_strike')) power *= primalStrikeMult(techLevel(p.techLevels, 'primal_strike'));
-      const rangedFirstShot = isRangedWeapon && !p.damage[e.id];
+      const mobDist = distanceM(p.pos, e);
+      // "원거리 무기의 특징은 몹이 가까이 다가올때까지 시간이 있다는거야."
+      // If the creature is not in melee clash range (<= 1.8m), it cannot counterattack yet!
+      const inMeleeClash = mobDist <= 1.8;
+      const isRangedSafety = isRangedWeapon && !inMeleeClash;
+
       power += (p.companions ?? []).some(c => c.kind === 'wolf') ? 3 : 0;
       power += (p.pets ?? []).filter(x => petRole(x) === 'follow' && x.restUntil <= Date.now()).length * PET_FOLLOW_ATK;
       const wallBonus = atMainBase(p) && p.palisade ? 3 + (p.tribe?.count && p.tribe.classId === 'tank' ? 4 : 0) : 0;
       const defense = wallBonus + (armor ? Math.round((ITEMS[armor.itemId].armor?.def ?? 0) * gearMult(armor)) : 0) + (p.techs.includes('iron_skin') ? ironSkinDef(techLevel(p.techLevels, 'iron_skin')) : 0);
       const bleed = bleedDamage(power, activePetAbilities(p.pets ?? []).bleed ?? 0);
       if (bleed) { power += bleed; toast.success(`테라녹스 출혈! 추가 피해 +${bleed}`); }
-      const exchange = resolveCreatureHit(e.type, p.damage[e.id] ?? 0, power, defense, rangedFirstShot || (p.calmUntil?.[e.id] ?? 0) > Date.now());
+      const exchange = resolveCreatureHit(e.type, p.damage[e.id] ?? 0, power, defense, isRangedSafety || (p.calmUntil?.[e.id] ?? 0) > Date.now());
       power = exchange.dealt - (p.damage[e.id] ?? 0);
-      const reducedCounter = atMainBase(p) ? applyTribeWallDefense(exchange.counterDamage, !!p.palisade, p.tribe?.count ?? 0, p.tribe?.classId) : exchange.counterDamage;
+      const reducedCounter = inMeleeClash
+        ? atMainBase(p)
+          ? applyTribeWallDefense(exchange.counterDamage, !!p.palisade, p.tribe?.count ?? 0, p.tribe?.classId)
+          : exchange.counterDamage
+        : 0;
       hp -= reducedCounter;
-      if (reducedCounter) toast.error(`${d.name} 돌진 박치기 반격! 체력 -${reducedCounter}`);
-      else if (rangedFirstShot && !exchange.defeated) toast.warning(`🏹 원거리 선제 타격! ${d.name}이(가) 분노하여 달려옵니다!`);
+      if (reducedCounter > 0) {
+        toast.error(`${d.name} 돌진 박치기 반격! 체력 -${reducedCounter}`);
+      } else if (!inMeleeClash && !exchange.defeated) {
+        const weaponLabel = rangedCat === 'bow' ? '🏹 활 사격' : rangedCat === 'spear' ? '🗡️ 투창 적중' : '🪨 물매 투척';
+        toast.warning(`${weaponLabel}! (${Math.round(mobDist)}m 거리) ${d.name}이(가) 분노하여 달려옵니다!`);
+      }
       if (hp <= 0) { setS(die({ ...next, hp })); return false; }
       if (!exchange.defeated && !isRangedWeapon && d.temper === 'passive' && Math.random() < (d.escapeChance ?? 0)) {
         toast(`${d.name}이(가) 달아났습니다`);
@@ -1003,12 +1021,12 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (it.durability !== undefined) {
       const g: GearInstance = { uid: crypto.randomUUID(), itemId: r.result, quality: 'NORMAL', durability: it.durability, maxDurability: it.durability };
       setS({ ...next, storage: left, gear: [...p.gear, g] });
-    } else if (r.result === 'arrow' || r.result === 'sling_stone') {
+    } else if (r.result === 'arrow' || r.result === 'sling_stone' || r.result === 'javelin') {
       setS({ ...next, storage: left, backpack: addStacks(p.backpack, [{ itemId: r.result, count: r.count }]) });
     } else {
       setS({ ...next, storage: addStacks(left, [{ itemId: r.result, count: r.count }]) });
     }
-    toast.success(`${it.name} 제작 완료!`, { description: it.durability !== undefined || r.result === 'arrow' || r.result === 'sling_stone' ? '배낭에 담았어요' : '창고에 넣었어요' });
+    toast.success(`${it.name} 제작 완료!`, { description: it.durability !== undefined || r.result === 'arrow' || r.result === 'sling_stone' || r.result === 'javelin' ? '배낭에 담았어요' : '창고에 넣었어요' });
   }, []);
 
   const claimQuest = useCallback(() => {
@@ -1487,7 +1505,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return true;
   }, [setS]);
 
-  const craftAmmoBundle = useCallback((itemId: 'arrow' | 'sling_stone', count: number, cost: Stack[]): boolean => {
+  const craftAmmoBundle = useCallback((itemId: 'arrow' | 'sling_stone' | 'javelin', count: number, cost: Stack[]): boolean => {
     const p = ref.current;
     const paid = payAccessible(p, cost);
     if (!paid) {

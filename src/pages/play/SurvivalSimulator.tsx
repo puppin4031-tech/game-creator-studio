@@ -48,7 +48,7 @@ import { toast } from 'sonner';
 import TerrainMap from '@/components/survival/TerrainMap';
 import { useSurvivalWorld } from '@/hooks/useSurvivalWorld';
 import { zoneCellKey } from '@/lib/survival/terrainZone';
-import { gearEffect, ITEMS, requiredRangedAmmo, type ItemId } from '@/lib/survival/items';
+import { gearEffect, ITEMS, requiredRangedAmmo, findAvailableAmmo, computeRangedReach, type ItemId } from '@/lib/survival/items';
 import { nodeDef, creatureDef, BOSS_TYPES } from '@/lib/survival/entities';
 import { PLAYER_SPRITE_HEIGHT, SPRITE_META, type SpriteKey } from '@/lib/survival/spriteMeta';
 import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
@@ -238,18 +238,19 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const tapEntity = (e: WorldEntity) => {
     if (realGps && !gps.ready) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return; }
     const dist = distanceM(s.pos, e);
-    const isRangedWeapon = !!(g.weapon && ITEMS[g.weapon.itemId]?.weapon?.ranged);
-    const effectiveReach = e.kind === 'creature' && isRangedWeapon ? Math.max(g.reach, 35) : g.reach;
+    const rangedInfo = computeRangedReach(g.weapon, s.level);
+    const isRangedWeapon = e.kind === 'creature' && !!rangedInfo.category;
+    const effectiveReach = isRangedWeapon ? Math.max(g.reach, rangedInfo.rangeM) : g.reach;
     if (!realGps && dist > effectiveReach) { g.moveTo({ lat: e.lat, lng: e.lng }); return; }
     if (auto.job?.id === e.id) { auto.stop(); toast('작업을 멈췄습니다'); return; }
     if (dist > effectiveReach) { g.interact(e); return; }
     // For ranged weapon shots beyond melee reach, verify backpack ammo first before firing!
     if (e.kind === 'creature' && isRangedWeapon && dist > g.reach) {
-      const neededAmmo = g.weapon ? requiredRangedAmmo(g.weapon.itemId) : null;
-      if (neededAmmo && countOf(s.backpack, neededAmmo) < 1) {
-        const ammoLabel = neededAmmo === 'arrow' ? '화살(🏹)' : '돌멩이 탄환(🪨)';
+      const ammo = findAvailableAmmo(s.backpack, g.weapon?.itemId);
+      if (!ammo) {
+        const ammoLabel = rangedInfo.category === 'bow' ? '화살(🏹)' : '돌멩이 탄환(🪨)이나 부싯돌';
         toast.error(`배낭에 ${ammoLabel}이(가) 없습니다!`, {
-          description: '거점 제작 탭이나 무기 제작소에서 만들어 배낭에 넣어 주세요 (1회 공격 시 1개 소진).',
+          description: '거점 제작 탭이나 모닥불에서 탄환을 만들어 배낭에 넣어 주세요 (1회 공격 시 1개 소진).',
         });
         return;
       }
@@ -257,7 +258,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         id: `${e.id}-${Date.now()}`,
         from: s.pos,
         to: mobPositions[e.id] ?? { lat: e.lat, lng: e.lng },
-        kind: g.weapon?.itemId === 'sling' ? 'stone' : 'arrow',
+        kind: rangedInfo.category === 'bow' ? 'arrow' : rangedInfo.category === 'spear' ? 'spear' : 'stone',
       });
       setMobPositions(prev => ({
         ...prev,
@@ -286,8 +287,9 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       }
       return 'stop';
     }
-    const isRangedWeapon = !!(w.weapon && ITEMS[w.weapon.itemId]?.weapon?.ranged);
-    const effectiveReach = e.kind === 'creature' && isRangedWeapon ? Math.max(w.reach, 35) : w.reach;
+    const rangedInfo = computeRangedReach(w.weapon, p.level);
+    const isRangedWeapon = e.kind === 'creature' && !!rangedInfo.category;
+    const effectiveReach = isRangedWeapon ? Math.max(w.reach, rangedInfo.rangeM) : w.reach;
     if (distanceM(p.pos, e) > effectiveReach) { toast('대상과 멀어져 작업을 멈췄습니다'); returnToCenter(); return 'stop'; }
     if (e.kind === 'node' && w.weight >= w.capacity) { toast.warning('배낭이 가득 찼습니다'); return 'stop'; }
     const act: SpriteAction = e.kind === 'creature' ? 'attack' : 'gather';
@@ -300,7 +302,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         id: `${e.id}-${Date.now()}`,
         from: p.pos,
         to: mobPositionsRef.current[e.id] ?? { lat: e.lat, lng: e.lng },
-        kind: w.weapon?.itemId === 'sling' ? 'stone' : 'arrow',
+        kind: rangedInfo.category === 'bow' ? 'arrow' : rangedInfo.category === 'spear' ? 'spear' : 'stone',
       });
     }
     if (e.kind === 'creature') {
@@ -507,7 +509,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     if (baby) setHatched({ ...baby, eggId: readyEgg.id });
   }, [readyEgg?.id, g.inBase, hatched, gps.ready]); // eslint-disable-line react-hooks/exhaustive-deps
   const [beastStrike, setBeastStrike] = useState<{ id: string; at: number } | null>(null);
-  const [rangedProjectile, setRangedProjectile] = useState<{ id: string; from: LatLng; to: LatLng; kind: 'arrow' | 'stone' } | null>(null);
+  const [rangedProjectile, setRangedProjectile] = useState<{ id: string; from: LatLng; to: LatLng; kind: 'arrow' | 'stone' | 'spear' } | null>(null);
   const [mobPositions, setMobPositions] = useState<Record<string, LatLng>>({});
   const mobPositionsRef = useRef<Record<string, LatLng>>({});
   mobPositionsRef.current = mobPositions;
@@ -853,17 +855,59 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
             {rangedProjectile && (() => {
               const fromPt = project(rangedProjectile.from);
               const toPt = project(rangedProjectile.to);
+              const dx = toPt.x - fromPt.x;
+              const dy = toPt.y - fromPt.y;
+              const distPx = Math.hypot(dx, dy) || 1;
+              const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+              const durationSec = Math.min(0.65, Math.max(0.25, distPx / 380));
+
               return (
-                <motion.div
-                  key={rangedProjectile.id}
-                  aria-hidden
-                  className="pointer-events-none absolute z-30 text-sm drop-shadow-[0_0_6px_#facc15]"
-                  initial={{ left: fromPt.x, top: fromPt.y - 16, scale: 0.9, opacity: 1 }}
-                  animate={{ left: toPt.x, top: toPt.y - 16, scale: 1.2, opacity: 0 }}
-                  transition={{ duration: 0.32, ease: 'easeOut' }}
-                >
-                  {rangedProjectile.kind === 'stone' ? '🪨💨' : '🏹✨'}
-                </motion.div>
+                <div key={rangedProjectile.id} className="pointer-events-none absolute inset-0 z-30">
+                  <svg className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden>
+                    <line
+                      x1={fromPt.x}
+                      y1={fromPt.y - 12}
+                      x2={toPt.x}
+                      y2={toPt.y - 12}
+                      stroke={rangedProjectile.kind === 'arrow' ? '#fde047' : rangedProjectile.kind === 'spear' ? '#67e8f9' : '#cbd5e1'}
+                      strokeWidth="1.5"
+                      strokeDasharray="4 4"
+                      className="opacity-40"
+                    />
+                  </svg>
+                  <motion.div
+                    aria-hidden
+                    className="absolute flex items-center justify-center drop-shadow-[0_0_8px_rgba(250,204,21,0.85)]"
+                    style={{
+                      left: fromPt.x,
+                      top: fromPt.y - 12,
+                      transformOrigin: 'center center',
+                    }}
+                    initial={{
+                      x: 0,
+                      y: 0,
+                      rotate: rangedProjectile.kind === 'stone' ? 0 : angleDeg,
+                      scale: 0.9,
+                      opacity: 1,
+                    }}
+                    animate={{
+                      x: dx,
+                      y: dy,
+                      rotate: rangedProjectile.kind === 'stone' ? 720 : angleDeg,
+                      scale: [0.9, 1.25, 1.1],
+                      opacity: [1, 1, 0.9],
+                    }}
+                    transition={{ duration: durationSec, ease: 'easeOut' }}
+                  >
+                    {rangedProjectile.kind === 'arrow' ? (
+                      <span className="inline-block -rotate-45 text-lg select-none">🏹</span>
+                    ) : rangedProjectile.kind === 'spear' ? (
+                      <span className="inline-block -rotate-45 text-lg select-none font-bold text-cyan-200">🗡️💨</span>
+                    ) : (
+                      <span className="inline-block text-lg select-none">🪨💨</span>
+                    )}
+                  </motion.div>
+                </div>
               );
             })()}
             {visibleEntities.map((e) => {
@@ -1072,12 +1116,15 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           <div>
             배낭 {g.weight}/{g.capacity}kg
             {(() => {
-              const ammoId = g.weapon ? requiredRangedAmmo(g.weapon.itemId) : null;
-              if (!ammoId) return null;
-              const cnt = countOf(s.backpack, ammoId);
+              const rangedInfo = computeRangedReach(g.weapon, s.level);
+              if (!rangedInfo.category) return null;
+              const ammo = findAvailableAmmo(s.backpack, g.weapon?.itemId);
+              const cnt = ammo ? countOf(s.backpack, ammo.itemId) : 0;
+              const rangeStr = `${rangedInfo.rangeM}m`;
               return (
-                <span className={`ml-1.5 rounded px-1 font-bold ${cnt > 0 ? 'bg-accent/30 text-primary' : 'bg-destructive/20 text-destructive'}`}>
-                  {ammoId === 'arrow' ? `🏹 화살 ${cnt}발` : `🪨 돌멩이 ${cnt}개`}
+                <span className={`ml-1.5 rounded px-1.5 py-0.5 text-[10px] font-bold ${cnt > 0 ? 'bg-accent/30 text-primary border border-primary/40' : 'bg-destructive/20 text-destructive border border-destructive/40'}`}>
+                  {rangedInfo.category === 'bow' ? `🏹 활 (${rangeStr}) ` : rangedInfo.category === 'spear' ? `🗡️ 투창 (${rangeStr}) ` : `🪨 물매 (${rangeStr}) `}
+                  {cnt > 0 ? `${cnt}발` : '탄약 없음!'}
                 </span>
               );
             })()}

@@ -25,7 +25,7 @@ export const CREATURE_ATTACK_INTERVAL_MS = 900;
 /** Beasts notice the player inside this radius and strike first. */
 export const AGGRO_RADIUS_M = 14;
 /** Beyond this the beast gives up and returns home (increased so ranged bow/sling hits pull the mob in). */
-export const LEASH_RADIUS_M = 40;
+export const LEASH_RADIUS_M = 100;
 export const BEAST_STRIKE_INTERVAL_MS = 2200;
 
 /** Whether a beast attacks a nearby player on its own or chases after being hit (including ranged bow/sling). */
