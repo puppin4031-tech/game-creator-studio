@@ -1642,7 +1642,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     }
     if (isBlueprintResearched(v, buildingId)) return true;
     const cost = blueprintResearchCost(buildingId);
-    const paid = payAccessible(p, cost);
+    const paid0 = payCost(p, cost); const paid = paid0 && { ...p, ...paid0 };
     if (!paid) { toast.error(`설계도 연구 재료 부족: ${fmt(cost)}`); return false; }
     const def = VILLAGE_BUILDINGS[buildingId];
     const nextV: VillageState = {
@@ -1664,7 +1664,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (curLv >= def.maxLevel) { toast('이미 최고 단계입니다'); return false; }
     const nextLv = curLv + 1;
     const cost = def.costForLevel(nextLv);
-    const paid = payAccessible(p, cost);
+    const paid0 = payCost(p, cost); const paid = paid0 && { ...p, ...paid0 };
     if (!paid) { toast.error(`수련 재료 부족: ${fmt(cost)}`); return false; }
     const nextV: VillageState = {
       ...v,
@@ -1701,7 +1701,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     let nextP = p;
     if (stage.requiredMaterials.length > 0) {
       const costStacks: Stack[] = stage.requiredMaterials.map(m => ({ itemId: m.itemId, count: m.count }));
-      const paid = payAccessible(p, costStacks);
+      const paid = payCost(p, costStacks);
       if (!paid) {
         toast.error(`승급 공양 재료 부족: ${fmt(costStacks)}`);
         return false;
@@ -1826,7 +1826,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
     let nextP = p;
     if (tech.cost.length > 0) {
-      const paid = payAccessible(p, tech.cost);
+      const paid = payCost(p, tech.cost);
       if (!paid) {
         toast.error(`연구 재료 부족: ${fmt(tech.cost)}`);
         return false;
