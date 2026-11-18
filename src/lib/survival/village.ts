@@ -119,6 +119,8 @@ export interface VillageState {
   initialized?: boolean;
   researchedBlueprints?: VillageBuildingId[];
   shamanSkills?: ShamanSkillMap;
+  shamanLevel?: 1 | 2 | 3 | 4 | 5;
+  shamanClass?: 'engineer' | 'mage' | 'warlock' | 'orthodox' | null;
 }
 
 const S = (itemId: Stack['itemId'], count: number): Stack => ({ itemId, count });
@@ -672,7 +674,7 @@ export function createStarterVillage(hasAltar = false): VillageState {
   if (hasAltar) {
     buildings.push({ uid: 'starter-altar', buildingId: 'ancient_altar', x: 4, y: 0, hp: 900, maxHp: 900, lastHarvestAt: initialLastHarvest });
   }
-  return { buildings, initialized: true };
+  return { buildings, initialized: true, shamanLevel: 1, shamanClass: null };
 }
 
 export function ensureVillageState(state: VillageState | undefined, hasAltar = false): VillageState {
@@ -724,6 +726,8 @@ export function ensureVillageState(state: VillageState | undefined, hasAltar = f
     return {
       ...state,
       buildings: filteredBuildings,
+      shamanLevel: state.shamanLevel ?? 1,
+      shamanClass: state.shamanClass ?? null,
     };
   }
   return createStarterVillage(hasAltar);

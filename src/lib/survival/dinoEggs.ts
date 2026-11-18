@@ -21,6 +21,7 @@ export const BABY_DINOS: PetDef[] = [
   { id: 'mini_triceratops', name: '케라톱스', needM: EGG_HATCH_M, maxKmh: MAX_WALK_KMH, weight: 1 },
   { id: 'baby_stego', name: '스테고론', needM: EGG_HATCH_M, maxKmh: MAX_WALK_KMH, weight: 1 },
   { id: 'baby_ptera', name: '아기 프테라노돈', needM: EGG_HATCH_M, maxKmh: MAX_WALK_KMH, weight: 1 },
+  { id: 'skull_dragon', name: '스컬 드래곤', needM: 0, maxKmh: MAX_WALK_KMH, weight: 0 },
 ];
 export type BabyDinoId = string;
 

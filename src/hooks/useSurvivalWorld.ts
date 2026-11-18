@@ -27,6 +27,13 @@ import { hireMercenary, mercActive, tribeHireCost, tribeTrainCost, tribeRatio, t
 import { applyTribeWallDefense, DEFAULT_TRIBE_CLASS, getTribeClass, tribeCarryBonusKg, type TribeClassId } from '@/data/tribeClasses';
 import { blueprintResearchCost, canPlaceVillageBuilding, computeBuildingHarvestBubble, computeVillageBonuses, ensureVillageState, isArtisanUnlocked, isBlueprintResearched, moveVillageBuilding, placeVillageBuilding, placeCustomVillageBuilding, removeVillageBuilding, SHAMAN_SKILL_DEFS, shamanSkillLevel, VILLAGE_BUILDINGS, type ShamanSkillId, type VillageBuildingId, type VillageState } from '@/lib/survival/village';
 import type { BuildingMechanicTag, GearMechanicTag, PhysicalAttributes } from '@/lib/survival/intentCrafting';
+import {
+  SHAMAN_CLASSES,
+  SHAMAN_QUEST_STAGES,
+  checkShamanQuestStageProgress,
+  type ShamanClassId,
+  type ShamanLevel,
+} from '@/lib/survival/shamanEvolution';
 import { settleFoodSpoilage, SMOKE_CURING_MS, TAVERN_RECIPES, type SmokehouseBatch } from '@/lib/survival/culinary';
 import { computeExpeditionLevel, detectExpeditionPins, type RadarPin } from '@/lib/survival/radar';
 import { addStacks, countOf, hasAll, removeStacks, splitDeathDrop, splitByCapacity, stackWeight, transferStack, validStackCount } from '@/lib/survival/inventory';
@@ -110,6 +117,8 @@ export interface WorldSave extends WorldProgress {
   languageQuestAccepted?: boolean;
   languageLearned?: boolean;
   shamanQuestAcceptedIndex?: number;
+  shamanLevel?: 1 | 2 | 3 | 4 | 5;
+  shamanClass?: 'engineer' | 'mage' | 'warlock' | 'orthodox' | null;
   smokeBatches?: SmokehouseBatch[];
   lastFreshnessCheckAt?: number;
   shamanTourDone?: boolean;
@@ -127,7 +136,7 @@ export interface WorldSave extends WorldProgress {
 const fresh = (start: LatLng): WorldSave => ({
   ...freshProgress(),
   pos: start, hp: C.baseMaxHp, hunger: 100, backpack: [], storage: [], gear: [], base: null,
-  depleted: {}, damage: {}, gathered: {}, techs: [], explored: [start], terrainZones: {}, parkCells: {}, lastTickAt: Date.now(),
+  depleted: {}, damage: {}, gathered: {}, techs: [], explored: [start], terrainZones: {}, parkCells: {}, shamanLevel: 1, shamanClass: null, lastTickAt: Date.now(),
 });
 
 function migrateTribeState(saved: Partial<WorldSave>): Partial<WorldSave> {
@@ -880,6 +889,18 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         toast.success('🧪 맹독 주입! 추가 피해 +6');
       }
 
+      // 4 Shaman Class Combat Passives
+      const shamanClass = p.shamanClass ?? p.village?.shamanClass;
+      if (shamanClass === 'mage') {
+        power += 8;
+        toast.success('🔮 원소 마법 주술 발동! 화염/빙결 마법 피해 +8');
+      } else if (shamanClass === 'warlock') {
+        power += 6;
+        toast.success('💀 암흑 심연 주술 발동! 지속 맹독 피해 +6');
+      } else if (shamanClass === 'orthodox') {
+        power = Math.round(power * 1.2);
+      }
+
       // BLEED_HIT mechanic (+25% bleed crit)
       const hasBleedHit = weapon?.mechanics?.includes('BLEED_HIT') || ITEMS[weapon?.itemId ?? '']?.mechanics?.includes('BLEED_HIT');
       if (hasBleedHit) {
@@ -896,7 +917,10 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       }
 
       const wallBonus = atMainBase(p) && p.palisade ? 3 + (p.tribe?.count && p.tribe.classId === 'tank' ? 4 : 0) : 0;
-      const defense = wallBonus + (armor ? Math.round((ITEMS[armor.itemId].armor?.def ?? 0) * gearMult(armor)) : 0) + (p.techs.includes('iron_skin') ? ironSkinDef(techLevel(p.techLevels, 'iron_skin')) : 0);
+      let defense = wallBonus + (armor ? Math.round((ITEMS[armor.itemId].armor?.def ?? 0) * gearMult(armor)) : 0) + (p.techs.includes('iron_skin') ? ironSkinDef(techLevel(p.techLevels, 'iron_skin')) : 0);
+      if (shamanClass === 'orthodox') {
+        defense = Math.round(defense * 1.2);
+      }
       const bleed = bleedDamage(power, activePetAbilities(p.pets ?? []).bleed ?? 0);
       if (bleed) { power += bleed; toast.success(`테라녹스 출혈! 추가 피해 +${bleed}`); }
       const exchange = resolveCreatureHit(e.type, p.damage[e.id] ?? 0, power, defense, isRangedSafety || (p.calmUntil?.[e.id] ?? 0) > Date.now());
@@ -945,6 +969,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       if (hasGatherBoost && got.length > 0) {
         got = got.map(g => ({ ...g, count: g.count + 1 }));
         toast.success('🌾 풍요로운 수확! 자원 획득량 +1개 추가');
+      }
+      const shamanClass = p.shamanClass ?? p.village?.shamanClass;
+      if (shamanClass === 'orthodox' && Math.random() < 0.25 && got.length > 0) {
+        got = got.map(g => ({ ...g, count: g.count + 1 }));
+        toast.success('👑 정직한 대현자의 축복! 자원 채집량 +25% 추가 수확');
       }
     }
     const free = capacity - stackWeight(next.backpack);
@@ -1547,12 +1576,15 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
     registerInventions([inv]);
 
+    const isEngineer = p.shamanClass === 'engineer' || p.village?.shamanClass === 'engineer';
+    const gearDur = isEngineer ? INVENTED_DURABILITY * 3 : INVENTED_DURABILITY;
+
     const gearPiece: GearInstance = {
       uid: crypto.randomUUID(),
       itemId: id as ItemId,
       quality: 'MASTERWORK',
-      durability: INVENTED_DURABILITY,
-      maxDurability: INVENTED_DURABILITY,
+      durability: gearDur,
+      maxDurability: gearDur,
       plus: 0,
       mechanics: params.mechanics,
     };
@@ -1631,6 +1663,139 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const nextTechs = [...new Set([...paid.techs, ...def.grantsTechIds])];
     setS({ ...paid, techs: nextTechs, village: nextV, lastTickAt: Date.now() });
     toast.success(`${def.icon} ${def.name} Lv.${nextLv} 달성!`);
+    return true;
+  }, [setS]);
+
+  const performShamanRitual = useCallback((targetLevel: number): boolean => {
+    const p = ref.current;
+    if (!p.base) { toast.warning('먼저 거점을 세우세요'); return false; }
+    const stage = SHAMAN_QUEST_STAGES.find(s => s.toLevel === targetLevel);
+    if (!stage) return false;
+
+    const v = ensureVillageState(p.village, !!p.altar);
+    const totalDist = (p.expeditionDistanceM ?? 0) + (p.walkSteps ?? 0) * 20;
+    const prog = checkShamanQuestStageProgress({
+      stage,
+      storage: p.storage,
+      backpack: p.backpack,
+      village: v,
+      pets: p.pets ?? [],
+      expeditionDistanceM: totalDist,
+    });
+
+    if (!prog.canRitual) {
+      toast.warning('아직 승급 조건을 모두 달성하지 못했습니다.');
+      return false;
+    }
+
+    let nextP = p;
+    if (stage.requiredMaterials.length > 0) {
+      const costStacks: Stack[] = stage.requiredMaterials.map(m => ({ itemId: m.itemId, count: m.count }));
+      const paid = payAccessible(p, costStacks);
+      if (!paid) {
+        toast.error(`승급 공양 재료 부족: ${fmt(costStacks)}`);
+        return false;
+      }
+      nextP = { ...p, ...paid };
+    }
+
+    const curSkills = v.shamanSkills ?? {};
+    const nextSkills = { ...curSkills };
+    if (targetLevel === 2) {
+      nextSkills.tanning = Math.max(1, nextSkills.tanning ?? 0);
+      nextSkills.woodworking = Math.max(1, nextSkills.woodworking ?? 0);
+    } else if (targetLevel === 3) {
+      nextSkills.masonry_smelting = Math.max(1, nextSkills.masonry_smelting ?? 0);
+      nextSkills.stone_artisan = Math.max(1, nextSkills.stone_artisan ?? 0);
+    } else if (targetLevel === 4) {
+      nextSkills.masonry_smelting = Math.max(2, nextSkills.masonry_smelting ?? 0);
+      nextSkills.wood_artisan = Math.max(2, nextSkills.wood_artisan ?? 0);
+    }
+
+    const nextBaseLevel = (targetLevel === 2 ? Math.max(p.base.level, 2) : targetLevel >= 3 ? 3 : p.base.level) as 1 | 2 | 3;
+    const nextV: VillageState = {
+      ...v,
+      shamanLevel: targetLevel as 1 | 2 | 3 | 4 | 5,
+      shamanSkills: nextSkills,
+    };
+
+    setS({
+      ...nextP,
+      base: { ...nextP.base, level: nextBaseLevel },
+      village: nextV,
+      shamanLevel: targetLevel as 1 | 2 | 3 | 4 | 5,
+      lastTickAt: Date.now(),
+    });
+
+    toast.success(`🔥 [${stage.title}] 승급 의식 성공! 주술사 Lv.${targetLevel} 및 마을 Lv.${nextBaseLevel} 승급!`);
+    return true;
+  }, [setS]);
+
+  const evolveShaman = useCallback((classId: ShamanClassId): boolean => {
+    const p = ref.current;
+    const v = ensureVillageState(p.village, !!p.altar);
+    const meta = SHAMAN_CLASSES[classId];
+    if (!meta) return false;
+
+    const nextV: VillageState = {
+      ...v,
+      shamanClass: classId,
+    };
+
+    setS({
+      ...p,
+      village: nextV,
+      shamanClass: classId,
+      lastTickAt: Date.now(),
+    });
+
+    toast.success(`🎉 ${meta.icon} [${meta.name}] 전직 의식 완수! 새로운 전용 권능이 개방되었습니다!`);
+    return true;
+  }, [setS]);
+
+  const evolvePetToSkullDragon = useCallback((petUid: string): boolean => {
+    const p = ref.current;
+    const isWarlock = p.shamanClass === 'warlock' || p.village?.shamanClass === 'warlock';
+    if (!isWarlock) {
+      toast.warning('암흑 흑마술사만이 스컬 드래곤 암흑 의식을 거행할 수 있습니다.');
+      return false;
+    }
+    const targetPet = (p.pets ?? []).find(pet => pet.uid === petUid);
+    if (!targetPet) return false;
+    if (targetPet.level < 4) {
+      toast.warning('Lv.4 이상의 강력한 공룡 펫만이 스컬 드래곤으로 진화할 수 있습니다.');
+      return false;
+    }
+
+    const boneCount = (p.storage.find(s => s.itemId === 'bone')?.count ?? 0) + (p.backpack.find(s => s.itemId === 'bone')?.count ?? 0);
+    if (boneCount < 5) {
+      toast.error('암흑 의식을 위해 공룡 뼈 5개가 제물로 필요합니다.');
+      return false;
+    }
+
+    const paid = payAccessible(p, [{ itemId: 'bone', count: 5 }]);
+    if (!paid) return false;
+
+    const nextPets = paid.pets.map(pet => {
+      if (pet.uid === petUid) {
+        return {
+          ...pet,
+          speciesId: 'skull_dragon',
+          name: '💀 스컬 드래곤',
+          hp: 250,
+          level: Math.max(pet.level, 4),
+        };
+      }
+      return pet;
+    });
+
+    setS({
+      ...paid,
+      pets: nextPets,
+      lastTickAt: Date.now(),
+    });
+
+    toast.success('💀 암흑 의식 성공! 공룡 펫이 전설의 [스컬 드래곤]으로 각성했습니다!');
     return true;
   }, [setS]);
 
@@ -1897,7 +2062,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return true;
   }, [setS]);
 
-  return { placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
+  return { performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
     moveOutpost, petHits, mergePets, togglePetDeploy, assignPetRole, feedPet, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,

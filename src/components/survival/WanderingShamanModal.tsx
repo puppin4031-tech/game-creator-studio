@@ -27,6 +27,7 @@ interface Props {
   backpack: Stack[];
   onTrainSkill: (skillId: ShamanSkillId) => boolean;
   onOpenWorkshop?: () => void;
+  onOpenShamanQuest?: () => void;
   questState?: QuestState;
   canClaimQuest?: boolean;
   onClaimQuest?: () => void;
@@ -50,6 +51,7 @@ export default function WanderingShamanModal({
   backpack,
   onTrainSkill,
   onOpenWorkshop,
+  onOpenShamanQuest,
   questState,
   canClaimQuest,
   onClaimQuest,
@@ -209,17 +211,29 @@ export default function WanderingShamanModal({
                 : '"나무와 돌의 숨결을 깨우치면 더 단단한 성벽과 날카로운 무기를 빚을 수 있다네."'}
           </p>
         </div>
-        {onOpenWorkshop && (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={onOpenWorkshop}
-            className="pixel-btn h-auto min-h-0 shrink-0 py-1.5 px-2.5 text-xs"
-          >
-            🪓 건축 공방
-          </Button>
-        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {onOpenShamanQuest && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={onOpenShamanQuest}
+              className="pixel-btn h-auto min-h-0 bg-primary text-primary-foreground py-1.5 px-2.5 text-xs font-bold"
+            >
+              🔥 5단계 승급 퀘스트
+            </Button>
+          )}
+          {onOpenWorkshop && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={onOpenWorkshop}
+              className="pixel-btn h-auto min-h-0 py-1.5 px-2.5 text-xs"
+            >
+              🪓 건축 공방
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Mode Tabs */}

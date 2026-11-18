@@ -36,6 +36,9 @@ import ArchitectureWorkshopModal from './ArchitectureWorkshopModal';
 import PrimitiveArmoryModal from './PrimitiveArmoryModal';
 import AncientAltarModal from './AncientAltarModal';
 import WanderingShamanModal from './WanderingShamanModal';
+import ShamanQuestModal from './ShamanQuestModal';
+import ShamanEvolutionModal from './ShamanEvolutionModal';
+import { type ShamanClassId, type ShamanLevel, SHAMAN_CLASSES } from '@/lib/survival/shamanEvolution';
 import SmokehouseTavernModal from './SmokehouseTavernModal';
 import TribalHallModal from './TribalHallModal';
 import CulinaryDishIcon from './CulinaryDishIcon';
@@ -62,6 +65,8 @@ type FacilityModalKind =
   | 'armory'
   | 'altar'
   | 'shaman'
+  | 'shaman_quest'
+  | 'shaman_evolution'
   | 'smokehouse'
   | 'tavern'
   | 'tribal_hall'
@@ -72,6 +77,9 @@ interface Props {
   village: VillageState | undefined;
   baseLevel: 1 | 2 | 3;
   playerLevel?: number;
+  shamanLevel?: ShamanLevel;
+  shamanClass?: ShamanClassId | null;
+  expeditionDistanceM?: number;
   languageLearned?: boolean;
   languageQuestAccepted?: boolean;
   shamanQuestAcceptedIndex?: number;
@@ -140,6 +148,9 @@ interface Props {
     def?: number;
     materials: Record<string, number>;
   }) => boolean;
+  onPerformShamanRitual?: (targetLevel: number) => boolean;
+  onEvolveShaman?: (classId: ShamanClassId) => boolean;
+  onEvolvePetToSkullDragon?: (petUid: string) => boolean;
 }
 
 type AgentRole = 'campfire_social' | 'shelter_rest' | 'wall_patrol' | 'hauler' | 'shaman';
@@ -385,19 +396,41 @@ function BuildingGraphic({
         </div>
       );
     case 'wandering_shaman':
-    case 'shaman_tent':
+    case 'shaman_tent': {
+      const cls = state.shamanClass;
+      const classMeta = cls ? SHAMAN_CLASSES[cls] : null;
       return (
         <div className="relative flex h-full w-full items-center justify-center p-0.5">
           <img
             src={shamanImg}
             alt="떠돌이 주술사"
-            className="pixelated h-full w-full object-contain drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]"
+            className={`pixelated h-full w-full object-contain ${
+              cls === 'warlock'
+                ? 'drop-shadow-[0_0_8px_rgba(168,85,247,0.9)]'
+                : cls === 'mage'
+                  ? 'drop-shadow-[0_0_8px_rgba(59,130,246,0.9)]'
+                  : cls === 'engineer'
+                    ? 'drop-shadow-[0_0_8px_rgba(245,158,11,0.9)]'
+                    : cls === 'orthodox'
+                      ? 'drop-shadow-[0_0_8px_rgba(234,179,8,0.9)]'
+                      : 'drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]'
+            }`}
           />
-          <span className="absolute -right-0.5 -top-0.5 animate-bounce rounded bg-primary px-1 text-[9px] font-bold text-primary-foreground shadow">
-            !
-          </span>
+          {classMeta ? (
+            <span
+              className={`absolute -bottom-1 -right-1 rounded-full border px-1 py-0.2 text-[9px] font-bold shadow ${classMeta.badgeBg}`}
+              title={classMeta.name}
+            >
+              {classMeta.icon}
+            </span>
+          ) : (
+            <span className="absolute -right-0.5 -top-0.5 animate-bounce rounded bg-primary px-1 text-[9px] font-bold text-primary-foreground shadow">
+              !
+            </span>
+          )}
         </div>
       );
+    }
     case 'golden_totem':
       return (
         <div className="flex flex-col items-center justify-center">
@@ -443,6 +476,9 @@ export default function BaseVillageView({
   village,
   baseLevel,
   playerLevel = 1,
+  shamanLevel = 1,
+  shamanClass = null,
+  expeditionDistanceM = 0,
   languageLearned = false,
   languageQuestAccepted = false,
   shamanQuestAcceptedIndex,
@@ -488,6 +524,9 @@ export default function BaseVillageView({
   onOpenObjectives,
   onPlaceCustomBuilding,
   onCraftCustomGear,
+  onPerformShamanRitual,
+  onEvolveShaman,
+  onEvolvePetToSkullDragon,
 }: Props) {
   const vState = useMemo(() => ensureVillageState(village, hasAltar), [village, hasAltar]);
   const bonuses = useMemo(() => computeVillageBonuses(vState), [vState]);
@@ -543,7 +582,7 @@ export default function BaseVillageView({
     }
     if (buildingId === 'stone_smeltery' || buildingId === 'brazier') return 'armory';
     if (buildingId === 'ancient_altar') return 'altar';
-    if (buildingId === 'shaman_tent' || buildingId === 'wandering_shaman') return 'shaman';
+    if (buildingId === 'shaman_tent' || buildingId === 'wandering_shaman') return 'shaman_quest';
     if (buildingId === 'tribal_hall') return 'tribal_hall';
     if (buildingId === 'smokehouse') return 'smokehouse';
     if (buildingId === 'primitive_tavern') return 'tavern';
@@ -896,7 +935,7 @@ export default function BaseVillageView({
       return;
     }
     if (placed.buildingId === 'wandering_shaman' || placed.buildingId === 'shaman_tent') {
-      setActiveModal('shaman');
+      setActiveModal('shaman_quest');
       return;
     }
     if (placed.buildingId === 'tribal_hall') {
@@ -939,7 +978,7 @@ export default function BaseVillageView({
   const handleAgentClick = (ag: LivingAgent) => {
     if (buildMode) return;
     if (ag.kind === 'shaman') {
-      setActiveModal('shaman');
+      setActiveModal('shaman_quest');
       return;
     }
     if (ag.kind === 'hall') {
@@ -1467,10 +1506,20 @@ export default function BaseVillageView({
                       <img
                         src={shamanImg}
                         alt="떠돌이 주술사"
-                        className="pixelated h-8 w-auto object-contain drop-shadow"
+                        className={`pixelated h-8 w-auto object-contain ${
+                          vState.shamanClass === 'warlock'
+                            ? 'drop-shadow-[0_0_8px_rgba(168,85,247,0.9)]'
+                            : vState.shamanClass === 'mage'
+                              ? 'drop-shadow-[0_0_8px_rgba(59,130,246,0.9)]'
+                              : vState.shamanClass === 'engineer'
+                                ? 'drop-shadow-[0_0_8px_rgba(245,158,11,0.9)]'
+                                : vState.shamanClass === 'orthodox'
+                                  ? 'drop-shadow-[0_0_8px_rgba(234,179,8,0.9)]'
+                                  : 'drop-shadow'
+                        }`}
                       />
                       <span className="mt-0.5 whitespace-nowrap rounded bg-background/90 px-1 text-[7px] font-bold border border-foreground/40 leading-none">
-                        떠돌이 주술사
+                        {vState.shamanClass ? SHAMAN_CLASSES[vState.shamanClass].name : '떠돌이 주술사'}
                       </span>
                     </div>
                   ) : ag.kind === 'hall' ? (
@@ -1962,6 +2011,7 @@ export default function BaseVillageView({
         backpack={backpack}
         onTrainSkill={id => (onTrainShamanSkill ? onTrainShamanSkill(id) : false)}
         onOpenWorkshop={() => setActiveModal('workshop')}
+        onOpenShamanQuest={() => setActiveModal('shaman_quest')}
         questState={questState}
         canClaimQuest={canClaimQuest}
         onClaimQuest={onClaimQuest}
@@ -1975,6 +2025,38 @@ export default function BaseVillageView({
           setActiveModal(null);
           onOpenObjectives?.();
         }}
+      />
+      <ShamanQuestModal
+        open={activeModal === 'shaman_quest'}
+        onClose={() => setActiveModal(null)}
+        shamanLevel={(vState.shamanLevel ?? shamanLevel ?? 1) as any}
+        shamanClass={vState.shamanClass ?? shamanClass ?? null}
+        baseLevel={baseLevel}
+        storage={storage}
+        backpack={backpack}
+        village={vState}
+        pets={pets}
+        expeditionDistanceM={expeditionDistanceM}
+        onPerformRitual={targetLevel =>
+          onPerformShamanRitual ? onPerformShamanRitual(targetLevel) : false
+        }
+        onOpenEvolutionModal={() => setActiveModal('shaman_evolution')}
+        onOpenSkillsModal={() => setActiveModal('shaman')}
+        onOpenWorkshop={() => setActiveModal('workshop')}
+      />
+      <ShamanEvolutionModal
+        open={activeModal === 'shaman_evolution'}
+        onClose={() => setActiveModal(null)}
+        currentClass={vState.shamanClass ?? shamanClass ?? null}
+        pets={pets}
+        storage={storage}
+        backpack={backpack}
+        onSelectShamanClass={classId =>
+          onEvolveShaman ? onEvolveShaman(classId) : false
+        }
+        onEvolvePetToSkullDragon={petUid =>
+          onEvolvePetToSkullDragon ? onEvolvePetToSkullDragon(petUid) : false
+        }
       />
       <SmokehouseTavernModal
         open={activeModal === 'smokehouse' || activeModal === 'tavern' ? activeModal : null}
