@@ -26,6 +26,7 @@ export default function CharacterSprite({
           once={
             action === 'gather' ||
             action === 'attack' ||
+            action === 'chop' ||
             action === 'celebrate' ||
             action === 'poop' ||
             action === 'pick_nose' ||
@@ -45,6 +46,8 @@ export default function CharacterSprite({
             ? '🎉'
             : action === 'attack'
             ? '⚔️'
+            : action === 'chop'
+            ? '🪓'
             : action === 'gather'
             ? '⛏️'
             : action === 'walk'

@@ -408,7 +408,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     const effectiveReach = isRangedWeapon ? Math.max(w.reach, rangedInfo.rangeM) : w.reach;
     if (distanceM(p.pos, e) > effectiveReach) { toast('대상과 멀어져 작업을 멈췄습니다'); returnToCenter(); return 'stop'; }
     if (e.kind === 'node' && w.weight >= w.capacity) { toast.warning('배낭이 가득 찼습니다'); return 'stop'; }
-    const act: SpriteAction = e.kind === 'creature' ? 'attack' : 'gather';
+    const isChopNode = e.kind === 'node' && (nodeDef(e.type).requires.kind === 'chop' || /tree|branch|wood/.test(e.type));
+    const act: SpriteAction = e.kind === 'creature' ? 'attack' : isChopNode ? 'chop' : 'gather';
     const liveEntity = e.kind === 'creature' && mobPositionsRef.current[e.id]
       ? { ...e, lat: mobPositionsRef.current[e.id].lat, lng: mobPositionsRef.current[e.id].lng }
       : e;

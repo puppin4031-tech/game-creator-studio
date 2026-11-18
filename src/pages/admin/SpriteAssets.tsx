@@ -38,11 +38,12 @@ const DINO_PET_TARGETS = [
 
 const MOB_ACTIONS: SpriteAction[] = ['idle', 'attack'];
 const PET_ACTIONS: SpriteAction[] = ['idle', 'attack', 'walk'];
-const TRIBE_ACTIONS: SpriteAction[] = ['walk', 'attack', 'gather'];
+const TRIBE_ACTIONS: SpriteAction[] = ['walk', 'attack', 'chop', 'gather'];
 const TRIBE_ACTION_TITLE: Partial<Record<SpriteAction, string>> = {
   walk: '걷기 모션 (이동·대기 겸용)',
   attack: '공격 액션 모션 (전투·무기 휘두르기)',
-  gather: '채집 액션 모션 (벌목·채광·수집)',
+  chop: '벌목 액션 모션 (장작패기·도끼질)',
+  gather: '채집 액션 모션 (채광·열매 수집)',
 };
 
 export function ScaleControl({ target }: { target: string }) {
@@ -240,6 +241,8 @@ export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARAC
                 ? '🎉'
                 : action === 'attack'
                 ? '⚔️'
+                : action === 'chop'
+                ? '🪓'
                 : action === 'gather'
                 ? '⛏️'
                 : action === 'walk'
@@ -277,7 +280,7 @@ export default function SpriteAssets() {
   const [target, setTarget] = useState('hunter');
 
   const targets = [
-    { key: 'hunter', label: '👤 유저 캐릭터 (8가지 액션 모션)' },
+    { key: 'hunter', label: '👤 유저 캐릭터 (9가지 액션 모션)' },
     ...TRIBE_TARGETS,
     ...DINO_PET_TARGETS,
     ...(catalog?.pets ?? []).map(p => ({
@@ -308,7 +311,7 @@ export default function SpriteAssets() {
       <div>
         <h1 className="text-2xl font-bold">캐릭터 · 펫 · 몹 스프라이트 스튜디오</h1>
         <p className="text-sm text-muted-foreground">
-          유저 캐릭터의 8가지 액션 모션과 펫/몹의 스프라이트 시트 및 크기 비율(배율)을 직접 등록·관리합니다.
+          유저 캐릭터의 9가지 액션 모션(벌목·장작패는 도끼질 포함)과 펫/몹의 스프라이트 시트 및 크기 비율(배율)을 직접 등록·관리합니다.
         </p>
       </div>
 
@@ -321,7 +324,7 @@ export default function SpriteAssets() {
           onClick={() => setTarget('hunter')}
           className="text-xs font-bold"
         >
-          👤 유저 캐릭터 (8가지)
+          👤 유저 캐릭터 (9가지)
         </Button>
         {TRIBE_TARGETS.slice(1).map(t => (
           <Button

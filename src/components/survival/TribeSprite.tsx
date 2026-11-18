@@ -11,6 +11,7 @@ import gather from '@/assets/survival/tribe-gather.png';
 const WALK_FRAMES = [walk1, idle, walk2, idle];
 const RAPID_ATTACK_FRAMES = [walk1, attack, walk2, attack];
 const GATHER_FRAMES = [gather, walk1, gather, walk2];
+const CHOP_FRAMES = [attack, walk1, attack, idle];
 
 export default function TribeSprite({
   action = 'walk',
@@ -31,13 +32,15 @@ export default function TribeSprite({
   const cls = tribeClass ? getTribeClass(tribeClass) : null;
   const [frame, setFrame] = useState(0);
 
-  // Normalize action to only walk ('walk') or active work/combat ('attack' | 'gather')
-  const normalizedAction: 'walk' | 'attack' | 'gather' =
+  // Normalize action to only walk ('walk') or active work/combat ('attack' | 'gather' | 'chop')
+  const normalizedAction: 'walk' | 'attack' | 'gather' | 'chop' =
     action === 'attack'
       ? 'attack'
-      : action === 'gather' || action === 'chop'
-        ? 'gather'
-        : 'walk';
+      : action === 'chop'
+        ? 'chop'
+        : action === 'gather'
+          ? 'gather'
+          : 'walk';
 
   useEffect(() => {
     const interval =
@@ -53,9 +56,11 @@ export default function TribeSprite({
       ? cls?.id === 'assassin'
         ? RAPID_ATTACK_FRAMES[frame % 4]
         : RAPID_ATTACK_FRAMES[frame % 2 === 0 ? 1 : 0]
-      : normalizedAction === 'gather'
-        ? GATHER_FRAMES[frame % 4]
-        : WALK_FRAMES[frame % 4];
+      : normalizedAction === 'chop'
+        ? CHOP_FRAMES[frame % 4]
+        : normalizedAction === 'gather'
+          ? GATHER_FRAMES[frame % 4]
+          : WALK_FRAMES[frame % 4];
 
   const rapidOffset =
     normalizedAction === 'attack' && cls?.id === 'assassin'
@@ -68,11 +73,13 @@ export default function TribeSprite({
   // Prefer class-specific admin sprite sheet (tribe:<classId>), then fallback to general 'tribe' admin sheet
   const customClassSheet =
     classSheets?.[normalizedAction] ??
+    (normalizedAction === 'chop' ? (classSheets?.chop ?? classSheets?.attack) : undefined) ??
     (normalizedAction === 'gather' ? classSheets?.attack : undefined) ??
     classSheets?.walk ??
     classSheets?.idle;
   const fallbackAdminSheet =
     baseSheets?.[normalizedAction] ??
+    (normalizedAction === 'chop' ? (baseSheets?.chop ?? baseSheets?.attack) : undefined) ??
     (normalizedAction === 'gather' ? baseSheets?.attack : undefined) ??
     baseSheets?.walk ??
     baseSheets?.idle;

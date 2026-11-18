@@ -2,23 +2,23 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadSpriteSheet } from '@/components/survival/SpriteAnimator';
 
-/** 8 core actions for user character */
+/** 9 core actions for user character */
 export const CHARACTER_ACTIONS = [
   'idle',        // 1. 기본
   'walk',        // 2. 걷기
   'attack',      // 3. 공격
-  'gather',      // 4. 채집
-  'poop',        // 5. 똥싸기 (음식 섭취 2시간 후 대기 시 가끔)
-  'pick_nose',   // 6. 코파기 (대기 시 20% 확률)
-  'celebrate',   // 7. 신난다 (업적 달성, 우두머리 처치, 희귀 광석 채취)
-  'hurt',        // 8. 피격 (공격받을 때)
+  'chop',        // 4. 벌목·도끼질 (장작패기 / 나무 베기)
+  'gather',      // 5. 채집·채광 (곡괭이 / 손 채집)
+  'poop',        // 6. 똥싸기 (음식 섭취 2시간 후 대기 시 가끔)
+  'pick_nose',   // 7. 코파기 (대기 시 20% 확률)
+  'celebrate',   // 8. 신난다 (업적 달성, 우두머리 처치, 희귀 광석 채취)
+  'hurt',        // 9. 피격 (공격받을 때)
 ] as const;
 
 export type CharacterAction = (typeof CHARACTER_ACTIONS)[number];
 
 export const SPRITE_ACTIONS = [
   ...CHARACTER_ACTIONS,
-  'chop',
   'talk',
 ] as const;
 export type SpriteAction = (typeof SPRITE_ACTIONS)[number];
@@ -27,12 +27,12 @@ export const SPRITE_ACTION_LABELS: Record<SpriteAction, string> = {
   idle: '1. 기본 (대기)',
   walk: '2. 걷기',
   attack: '3. 공격',
-  gather: '4. 채집',
-  poop: '5. 똥싸기 (음식 섭취 2시간 후 대기 시 가끔)',
-  pick_nose: '6. 코파기 (대기 시 20% 확률)',
-  celebrate: '7. 신난다 (달성·우두머리·희귀 광석)',
-  hurt: '8. 피격 (공격받을 때)',
-  chop: '찍기',
+  chop: '4. 벌목 · 도끼질 (장작패기)',
+  gather: '5. 채집 · 채광',
+  poop: '6. 똥싸기 (음식 섭취 2시간 후 대기 시 가끔)',
+  pick_nose: '7. 코파기 (대기 시 20% 확률)',
+  celebrate: '8. 신난다 (달성·우두머리·희귀 광석)',
+  hurt: '9. 피격 (공격받을 때)',
   talk: '대화',
 };
 
