@@ -18,6 +18,8 @@ export interface GearInstance {
   maxDurability: number;
   /** Altar reinforcement level (0-5). */
   plus?: number;
+  /** Custom intent mechanics awarded during crafting. */
+  mechanics?: string[];
 }
 
 export type EquipSlot = 'weapon' | 'armor' | 'trinket';

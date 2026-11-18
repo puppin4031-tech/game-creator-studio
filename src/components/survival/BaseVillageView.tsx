@@ -48,8 +48,25 @@ import shamanImg from '@/assets/survival/npc-shaman.png';
 import mercImg from '@/assets/survival/npc-mercenary.png';
 import tribalHallImg from '@/assets/survival/base-tribal-hall.png';
 import baseVillageBg from '@/assets/survival/base-village-bg.png';
+import IntentCraftingModal, { type CraftingMode } from './IntentCraftingModal';
+import {
+  BUILDING_MECHANICS_META,
+  GEAR_MECHANICS_META,
+  type BuildingMechanicTag,
+  type GearMechanicTag,
+  type PhysicalAttributes,
+} from '@/lib/survival/intentCrafting';
 
-type FacilityModalKind = 'workshop' | 'armory' | 'altar' | 'shaman' | 'smokehouse' | 'tavern' | 'tribal_hall' | null;
+type FacilityModalKind =
+  | 'workshop'
+  | 'armory'
+  | 'altar'
+  | 'shaman'
+  | 'smokehouse'
+  | 'tavern'
+  | 'tribal_hall'
+  | 'intent_crafting'
+  | null;
 
 interface Props {
   village: VillageState | undefined;
@@ -102,6 +119,27 @@ interface Props {
   onToggleEscort?: () => void;
   onOpenBaseTab?: (tab: 'village' | 'lab' | 'craft' | 'storage' | 'expedition' | 'pets') => void;
   onOpenObjectives?: () => void;
+  onPlaceCustomBuilding?: (params: {
+    name: string;
+    desc: string;
+    category: 'fence' | 'tower' | 'building';
+    mechanics: BuildingMechanicTag[];
+    physics: PhysicalAttributes;
+    hp: number;
+    materials: Record<string, number>;
+    x: number;
+    y: number;
+  }) => boolean;
+  onCraftCustomGear?: (params: {
+    name: string;
+    desc: string;
+    category: 'melee' | 'ranged' | 'tool' | 'armor';
+    mechanics: GearMechanicTag[];
+    physics: PhysicalAttributes;
+    atk?: number;
+    def?: number;
+    materials: Record<string, number>;
+  }) => boolean;
 }
 
 type AgentRole = 'campfire_social' | 'shelter_rest' | 'wall_patrol' | 'hauler' | 'shaman';
@@ -381,6 +419,21 @@ function BuildingGraphic({
           <span>🌿</span>
         </div>
       );
+    case 'custom_intent_building': {
+      const isTower = b.customCategory === 'tower';
+      const isFence = b.customCategory === 'fence';
+      const icon = isTower ? '🏹' : isFence ? '🛡️' : '🏛️';
+      return (
+        <div className="relative flex flex-col items-center justify-center p-0.5 text-center">
+          <div className="flex items-center justify-center text-lg drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
+            <span>{icon}</span>
+          </div>
+          <span className="truncate max-w-[44px] text-[8px] font-bold text-amber-300 drop-shadow">
+            {b.customName?.slice(0, 4) ?? '특수시설'}
+          </span>
+        </div>
+      );
+    }
     default:
       return <span className="text-base">{def.icon}</span>;
   }
@@ -433,6 +486,8 @@ export default function BaseVillageView({
   onToggleEscort,
   onOpenBaseTab,
   onOpenObjectives,
+  onPlaceCustomBuilding,
+  onCraftCustomGear,
 }: Props) {
   const vState = useMemo(() => ensureVillageState(village, hasAltar), [village, hasAltar]);
   const bonuses = useMemo(() => computeVillageBonuses(vState), [vState]);
@@ -459,6 +514,7 @@ export default function BaseVillageView({
   const [selectedBuildId, setSelectedBuildId] = useState<VillageBuildingId>('branch_fence');
   const [selectedPlacedUid, setSelectedPlacedUid] = useState<string | null>(null);
   const [activeModal, setActiveModal] = useState<FacilityModalKind>(null);
+  const [intentCraftingTab, setIntentCraftingTab] = useState<CraftingMode>('architecture');
   const [talkingAgent, setTalkingAgent] = useState<LivingAgent | null>(null);
   const [buildingPopup, setBuildingPopup] = useState<PlacedVillageBuilding | null>(null);
   const [popFloats, setPopFloats] = useState<PopFloat[]>([]);
@@ -1038,6 +1094,44 @@ export default function BaseVillageView({
         </div>
       )}
 
+      {/* AI Intent Crafting Workshop Entrance */}
+      <div className="flex items-center justify-between gap-2 p-2 rounded-md bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-rose-500/15 border border-amber-500/40">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-base shrink-0">✨</span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-xs text-amber-950">AI 맞춤 의도 설계 공방</span>
+              <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-800 font-mono font-bold">NEW</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground truncate">
+              원하는 용도를 자연어로 적으면 재료 물리 속성을 분석해 맞춤 건축물·장비를 제작합니다
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              setIntentCraftingTab('architecture');
+              setActiveModal('intent_crafting');
+            }}
+            className="pixel-btn bg-amber-600 text-white px-2 py-1 text-[10px] font-bold hover:bg-amber-500 shadow-sm"
+          >
+            건축 설계
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIntentCraftingTab('armory');
+              setActiveModal('intent_crafting');
+            }}
+            className="pixel-btn bg-orange-600 text-white px-2 py-1 text-[10px] font-bold hover:bg-orange-500 shadow-sm"
+          >
+            장비 제련
+          </button>
+        </div>
+      </div>
+
       {/* 6 Core Facility Fullscreen Quick Bar (Added Smokehouse & Tavern!) */}
       <div className="grid grid-cols-6 gap-1" role="group" aria-label="거점 핵심 시설 바로가기">
         <button
@@ -1557,10 +1651,18 @@ export default function BaseVillageView({
             <div className="flex items-start justify-between gap-2 border-b-2 border-foreground pb-2">
               <div className="flex items-center gap-2">
                 <span className="flex h-10 w-10 items-center justify-center border-2 border-foreground bg-card text-xl">
-                  {VILLAGE_BUILDINGS[buildingPopup.buildingId].icon}
+                  {buildingPopup.buildingId === 'custom_intent_building'
+                    ? buildingPopup.customCategory === 'tower'
+                      ? '🏹'
+                      : buildingPopup.customCategory === 'fence'
+                        ? '🛡️'
+                        : '🏛️'
+                    : VILLAGE_BUILDINGS[buildingPopup.buildingId].icon}
                 </span>
                 <div>
-                  <b className="text-sm">{VILLAGE_BUILDINGS[buildingPopup.buildingId].name}</b>
+                  <b className="text-sm">
+                    {buildingPopup.customName ?? VILLAGE_BUILDINGS[buildingPopup.buildingId].name}
+                  </b>
                   <p className="text-[10px] text-primary">
                     크기: {VILLAGE_BUILDINGS[buildingPopup.buildingId].footprintLabel} · 내구도{' '}
                     {buildingPopup.hp}/{buildingPopup.maxHp}
@@ -1578,13 +1680,54 @@ export default function BaseVillageView({
             </div>
 
             <p className="text-xs leading-relaxed text-muted-foreground">
-              {VILLAGE_BUILDINGS[buildingPopup.buildingId].desc}
+              {buildingPopup.customDesc ?? VILLAGE_BUILDINGS[buildingPopup.buildingId].desc}
             </p>
+
+            {buildingPopup.buildingId === 'custom_intent_building' && buildingPopup.customMechanics && (
+              <div className="space-y-1 rounded-md border border-amber-500/30 bg-amber-500/10 p-2">
+                <span className="text-[10px] font-bold text-amber-950 block">부여된 특수 메커닉:</span>
+                <div className="flex flex-wrap gap-1">
+                  {buildingPopup.customMechanics.map(tag => {
+                    const meta = BUILDING_MECHANICS_META[tag as BuildingMechanicTag];
+                    return (
+                      <span
+                        key={tag}
+                        className="px-1.5 py-0.5 rounded text-[10px] bg-background/80 text-amber-800 border border-amber-500/40 font-bold"
+                      >
+                        {meta ? `${meta.icon} ${meta.name}` : tag}
+                      </span>
+                    );
+                  })}
+                </div>
+                {buildingPopup.physics && (
+                  <div className="text-[9px] text-muted-foreground flex gap-2 font-mono pt-1">
+                    <span>내구도 {buildingPopup.physics.durability}</span>
+                    <span>탄성 {buildingPopup.physics.elasticity}</span>
+                    <span>내후성 {buildingPopup.physics.weatherResist}</span>
+                    <span>밀도 {buildingPopup.physics.density}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="pixel-box bg-accent/15 p-2 font-bold text-primary">
-              ✨ 시설 효과: {VILLAGE_BUILDINGS[buildingPopup.buildingId].effectLabel}
+              ✨ 시설 효과: {buildingPopup.buildingId === 'custom_intent_building' ? '의도 기반 특수 메커닉 상시 발동' : VILLAGE_BUILDINGS[buildingPopup.buildingId].effectLabel}
             </div>
 
             <div className="flex flex-wrap gap-1.5 pt-1">
+              {buildingPopup.buildingId === 'custom_intent_building' && (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setBuildingPopup(null);
+                    setIntentCraftingTab('architecture');
+                    setActiveModal('intent_crafting');
+                  }}
+                  className="pixel-btn min-h-10 flex-1 bg-amber-600 text-xs font-bold text-white hover:bg-amber-500"
+                >
+                  ✨ AI 의도 공방 열기
+                </Button>
+              )}
               {buildingPopup.buildingId === 'primitive_storage' && onOpenBaseTab && (
                 <Button
                   type="button"
@@ -1778,6 +1921,10 @@ export default function BaseVillageView({
         onResearchBlueprint={id => (onResearchBlueprint ? onResearchBlueprint(id) : false)}
         onConstructBuilding={onPlace}
         onOpenShaman={() => setActiveModal('shaman')}
+        onOpenIntentCrafting={() => {
+          setIntentCraftingTab('architecture');
+          setActiveModal('intent_crafting');
+        }}
       />
       <PrimitiveArmoryModal
         open={activeModal === 'armory'}
@@ -1794,6 +1941,10 @@ export default function BaseVillageView({
         }
         onInventWeapon={(inp, naming) => (onInvent ? onInvent(inp, naming) : null)}
         onEnhanceWeapon={uid => (onEnhanceWeapon ? onEnhanceWeapon(uid) : { ok: false, plus: 0 })}
+        onOpenIntentCrafting={() => {
+          setIntentCraftingTab('armory');
+          setActiveModal('intent_crafting');
+        }}
       />
       <AncientAltarModal
         open={activeModal === 'altar'}
@@ -1858,6 +2009,19 @@ export default function BaseVillageView({
           setActiveModal(null);
           onOpenBaseTab?.('expedition');
         }}
+      />
+      <IntentCraftingModal
+        open={activeModal === 'intent_crafting'}
+        onClose={() => setActiveModal(null)}
+        initialMode={intentCraftingTab}
+        storage={storage}
+        backpack={backpack}
+        village={village}
+        baseLevel={baseLevel}
+        onConstructCustomBuilding={params =>
+          onPlaceCustomBuilding ? onPlaceCustomBuilding(params) : false
+        }
+        onCraftCustomGear={params => (onCraftCustomGear ? onCraftCustomGear(params) : false)}
       />
     </div>
   );

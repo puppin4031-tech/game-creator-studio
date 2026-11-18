@@ -24,6 +24,15 @@ export interface ItemDef {
   durability?: number;
   /** Reading teaches this tech id (consumed). */
   book?: { techId: string };
+  /** Custom intent mechanics awarded during crafting. */
+  mechanics?: string[];
+  /** Material physics matrix (elasticity, durability, weather-resistance, density). */
+  physics?: {
+    elasticity: number;
+    durability: number;
+    weatherResist: number;
+    density: number;
+  };
 }
 
 // Widen values to ItemDef (keeps literal keys for ItemId) so gear fields
@@ -138,10 +147,11 @@ export function getRangedCategory(itemId: ItemId | string | undefined): RangedWe
   if (id.includes('spear') || id.includes('javelin')) return 'spear';
   if (id.includes('sling')) return 'sling';
   const def = ITEMS[itemId as ItemId];
-  if (def?.weapon?.ranged) {
+  if (def?.weapon?.ranged || def?.mechanics?.includes('RANGED_SNIPE')) {
     if (def.name.includes('활') || def.name.includes('Bow')) return 'bow';
     if (def.name.includes('창') || def.name.includes('투창')) return 'spear';
-    return 'sling';
+    if (def.name.includes('물매') || def.name.includes('투석')) return 'sling';
+    return 'bow';
   }
   return null;
 }
@@ -150,9 +160,10 @@ export function getRangedCategory(itemId: ItemId | string | undefined): RangedWe
  * - 활 (Bow): 평균 30m, 레벨/명품/전설 성장 시 50m ~ 최고 90m
  * - 투창 (Spear): 기본 20m ~ 레벨/명품 성장 시 40m
  * - 투석구 (Sling): 기본 50m ~ 레벨 발전 시 65m
+ * - RANGED_SNIPE 특수 메커닉 보유 시 +25m 추가 보너스!
  */
 export function computeRangedReach(
-  weapon: { itemId: ItemId | string; quality?: string; plus?: number } | null | undefined,
+  weapon: { itemId: ItemId | string; quality?: string; plus?: number; mechanics?: string[] } | null | undefined,
   playerLevel: number = 1
 ): { category: RangedWeaponCategory | null; rangeM: number } {
   if (!weapon) return { category: null, rangeM: 4.5 };
@@ -163,11 +174,13 @@ export function computeRangedReach(
   const isMasterwork = weapon.quality === 'MASTERWORK';
   const isEpicOrLegend = def?.rarity === 'epic' || (weapon.plus ?? 0) >= 3;
   const isRare = def?.rarity === 'rare' || (weapon.plus ?? 0) >= 1;
+  const hasSnipeMechanic = def?.mechanics?.includes('RANGED_SNIPE') || weapon.mechanics?.includes('RANGED_SNIPE');
 
   if (cat === 'sling') {
     // 투석구 (물매): 기본 50m
     const levelBonus = Math.min(15, Math.floor((playerLevel - 1) * 0.8));
-    return { category: 'sling', rangeM: Math.round(50 + levelBonus) };
+    const range = Math.round(50 + levelBonus + (hasSnipeMechanic ? 25 : 0));
+    return { category: 'sling', rangeM: Math.min(90, range) };
   }
 
   if (cat === 'spear') {
@@ -177,7 +190,8 @@ export function computeRangedReach(
     if (isMasterwork) range += 4;
     if (isRare) range += 2;
     if (isEpicOrLegend) range += 4;
-    return { category: 'spear', rangeM: Math.min(40, Math.max(20, Math.round(range))) };
+    if (hasSnipeMechanic) range += 25;
+    return { category: 'spear', rangeM: Math.min(65, Math.max(20, Math.round(range))) };
   }
 
   if (cat === 'bow') {
@@ -188,7 +202,8 @@ export function computeRangedReach(
     if (isRare) range += 5;
     if (isEpicOrLegend) range += 15;
     if ((weapon.plus ?? 0) > 0) range += (weapon.plus ?? 0) * 4;
-    return { category: 'bow', rangeM: Math.min(90, Math.max(30, Math.round(range))) };
+    if (hasSnipeMechanic) range += 25;
+    return { category: 'bow', rangeM: Math.min(95, Math.max(30, Math.round(range))) };
   }
 
   return { category: null, rangeM: 4.5 };

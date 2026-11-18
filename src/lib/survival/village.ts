@@ -30,7 +30,8 @@ export type VillageBuildingId =
   | 'shaman_tent'
   | 'golden_totem'
   | 'rex_skull'
-  | 'flower_bed';
+  | 'flower_bed'
+  | 'custom_intent_building';
 
 export type ShamanSkillId =
   | 'tanning'
@@ -100,6 +101,17 @@ export interface PlacedVillageBuilding {
   maxHp: number;
   /** Timestamp when this building's roof harvest bubble was last collected */
   lastHarvestAt?: number;
+  /** Custom intent mechanics awarded during crafting. */
+  customName?: string;
+  customDesc?: string;
+  customCategory?: 'fence' | 'tower' | 'building';
+  customMechanics?: string[];
+  physics?: {
+    elasticity: number;
+    durability: number;
+    weatherResist: number;
+    density: number;
+  };
 }
 
 export interface VillageState {
@@ -610,6 +622,20 @@ export const VILLAGE_BUILDINGS: Record<VillageBuildingId, VillageBuildingDef> = 
     heightTiles: 1,
     footprintLabel: '2칸 (2×1)',
   },
+  custom_intent_building: {
+    id: 'custom_intent_building',
+    name: '특수 맞춤 건축물',
+    category: 'facility',
+    unlockBaseLevel: 1,
+    maxHp: 500,
+    cost: [],
+    desc: '의도 분석 AI와 재료 물리 속성을 기반으로 제작된 맞춤형 특수 건축물.',
+    effectLabel: '맞춤 특수 효과 활성',
+    icon: '🏛️',
+    widthTiles: 1,
+    heightTiles: 1,
+    footprintLabel: '1칸 (1×1)',
+  },
 };
 
 export const VILLAGE_BUILDING_LIST: VillageBuildingDef[] = Object.values(VILLAGE_BUILDINGS);
@@ -760,6 +786,48 @@ export function placeVillageBuilding(
   };
 }
 
+export function placeCustomVillageBuilding(
+  state: VillageState,
+  params: {
+    uid: string;
+    x: number;
+    y: number;
+    hp: number;
+    customName: string;
+    customDesc: string;
+    customCategory: 'fence' | 'tower' | 'building';
+    customMechanics: string[];
+    physics: {
+      elasticity: number;
+      durability: number;
+      weatherResist: number;
+      density: number;
+    };
+  }
+): VillageState {
+  return {
+    ...state,
+    initialized: true,
+    buildings: [
+      ...state.buildings,
+      {
+        uid: params.uid,
+        buildingId: 'custom_intent_building',
+        x: params.x,
+        y: params.y,
+        hp: params.hp,
+        maxHp: params.hp,
+        lastHarvestAt: Date.now(),
+        customName: params.customName,
+        customDesc: params.customDesc,
+        customCategory: params.customCategory,
+        customMechanics: params.customMechanics,
+        physics: params.physics,
+      },
+    ],
+  };
+}
+
 export function moveVillageBuilding(
   state: VillageState,
   uid: string,
@@ -810,20 +878,29 @@ export function computeVillageBonuses(state: VillageState | undefined) {
   const shelters = list.filter(b => b.buildingId === 'tribe_shelter' && b.hp > 0).length;
   const storages = list.filter(b => b.buildingId === 'primitive_storage' && b.hp > 0).length;
   const smelteries = list.filter(b => b.buildingId === 'stone_smeltery' && b.hp > 0).length;
-  const wallBuildings = list.filter(b => VILLAGE_BUILDINGS[b.buildingId]?.category === 'wall' && b.hp > 0);
+  const wallBuildings = list.filter(b => (VILLAGE_BUILDINGS[b.buildingId]?.category === 'wall' || b.customMechanics?.includes('WALL_BLOCK')) && b.hp > 0);
   const totalWallHp = wallBuildings.reduce((sum, b) => sum + b.hp, 0);
+
+  const customBuildings = list.filter(b => b.hp > 0 && b.customMechanics && b.customMechanics.length > 0);
+  const customNightVision = customBuildings.some(b => b.customMechanics?.includes('NIGHT_VISION')) ? 30 : 0;
+  const customHealAura = customBuildings.some(b => b.customMechanics?.includes('HEAL_AURA'));
+  const customStorageBonus = customBuildings.filter(b => b.customMechanics?.includes('STORAGE_UP')).length * 50;
+  const autoArrowCount = customBuildings.filter(b => b.customMechanics?.includes('AUTO_ARROW')).length;
+
   return {
-    /** Night vision bonus in meters (+6m per torch, max +24m) */
-    nightVisionBonusM: Math.min(24, torches * 6),
-    /** Tribe & pet HP recovery speed multiplier (2x when tribe_shelter is placed) */
-    regenSpeedMult: shelters > 0 ? 2 : 1,
-    /** Extra storage/backpack carry capacity in kg (+5kg per primitive_storage, max +10kg) */
-    carryBonusKg: Math.min(10, storages * 5),
+    /** Night vision bonus in meters (+6m per torch, max +24m, +30m with NIGHT_VISION building) */
+    nightVisionBonusM: Math.min(60, torches * 6 + customNightVision),
+    /** Tribe & pet HP recovery speed multiplier (2x when tribe_shelter or HEAL_AURA is active) */
+    regenSpeedMult: shelters > 0 || customHealAura ? 2 : 1,
+    /** Extra storage/backpack carry capacity in kg (+5kg per primitive_storage, +50kg per STORAGE_UP building) */
+    carryBonusKg: Math.min(150, storages * 5 + customStorageBonus),
     /** Tribe attack multiplier from stone_smeltery */
     tribeAtkMult: smelteries > 0 ? 1.15 : 1,
     /** Total wall durability surrounding the village */
     totalWallHp,
     wallCount: wallBuildings.length,
+    customHealAura,
+    autoArrowCount,
   };
 }
 

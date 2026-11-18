@@ -25,7 +25,8 @@ import { generateWorld, isNodeAvailable } from '@/lib/survival/world';
 import { getCustomMobVersion } from '@/lib/survival/customMobs';
 import { hireMercenary, mercActive, tribeHireCost, tribeTrainCost, tribeRatio, tribeInjured, settleUpkeep, upkeepDemand, escortReady, escortAmbushDamage, ESCORT_GATHER_MULT, TRIBE_INJURY_MS, TRIBE_TREAT_COST, UPKEEP_MS, type MercenaryContract, type TribeState } from '@/lib/survival/mercenaries';
 import { applyTribeWallDefense, DEFAULT_TRIBE_CLASS, getTribeClass, tribeCarryBonusKg, type TribeClassId } from '@/data/tribeClasses';
-import { blueprintResearchCost, canPlaceVillageBuilding, computeBuildingHarvestBubble, computeVillageBonuses, ensureVillageState, isArtisanUnlocked, isBlueprintResearched, moveVillageBuilding, placeVillageBuilding, removeVillageBuilding, SHAMAN_SKILL_DEFS, shamanSkillLevel, VILLAGE_BUILDINGS, type ShamanSkillId, type VillageBuildingId, type VillageState } from '@/lib/survival/village';
+import { blueprintResearchCost, canPlaceVillageBuilding, computeBuildingHarvestBubble, computeVillageBonuses, ensureVillageState, isArtisanUnlocked, isBlueprintResearched, moveVillageBuilding, placeVillageBuilding, placeCustomVillageBuilding, removeVillageBuilding, SHAMAN_SKILL_DEFS, shamanSkillLevel, VILLAGE_BUILDINGS, type ShamanSkillId, type VillageBuildingId, type VillageState } from '@/lib/survival/village';
+import type { BuildingMechanicTag, GearMechanicTag, PhysicalAttributes } from '@/lib/survival/intentCrafting';
 import { settleFoodSpoilage, SMOKE_CURING_MS, TAVERN_RECIPES, type SmokehouseBatch } from '@/lib/survival/culinary';
 import { computeExpeditionLevel, detectExpeditionPins, type RadarPin } from '@/lib/survival/radar';
 import { addStacks, countOf, hasAll, removeStacks, splitDeathDrop, splitByCapacity, stackWeight, transferStack, validStackCount } from '@/lib/survival/inventory';
@@ -817,7 +818,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (distanceM(p.pos, e) > r) { toast.warning(`${r}m 안으로 다가가세요`); return false; }
     if (e.kind === 'creature') {
       const at = Date.now();
-      if (at - lastCreatureAttack.current < CREATURE_ATTACK_INTERVAL_MS) return false;
+      const hasMeleeFast = weapon?.mechanics?.includes('MELEE_FAST') || ITEMS[weapon?.itemId ?? '']?.mechanics?.includes('MELEE_FAST');
+      const attackInterval = hasMeleeFast ? Math.round(CREATURE_ATTACK_INTERVAL_MS * 0.6) : CREATURE_ATTACK_INTERVAL_MS;
+      if (at - lastCreatureAttack.current < attackInterval) return false;
       lastCreatureAttack.current = at;
     }
     let next: WorldSave = { ...p, damage: { ...p.damage } };
@@ -869,17 +872,49 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
       power += (p.companions ?? []).some(c => c.kind === 'wolf') ? 3 : 0;
       power += (p.pets ?? []).filter(x => petRole(x) === 'follow' && x.restUntil <= Date.now()).length * PET_FOLLOW_ATK;
+
+      // POISON_HIT mechanic (+6 poison damage)
+      const hasPoisonHit = weapon?.mechanics?.includes('POISON_HIT') || ITEMS[weapon?.itemId ?? '']?.mechanics?.includes('POISON_HIT');
+      if (hasPoisonHit) {
+        power += 6;
+        toast.success('🧪 맹독 주입! 추가 피해 +6');
+      }
+
+      // BLEED_HIT mechanic (+25% bleed crit)
+      const hasBleedHit = weapon?.mechanics?.includes('BLEED_HIT') || ITEMS[weapon?.itemId ?? '']?.mechanics?.includes('BLEED_HIT');
+      if (hasBleedHit) {
+        const bleedCrit = Math.max(3, Math.round(power * 0.25));
+        power += bleedCrit;
+        toast.success(`🩸 출혈 급소타격! 치명타 피해 +${bleedCrit}`);
+      }
+
+      // STUN_HIT mechanic (35% stun nullifying monster counterattack)
+      const hasStunHit = weapon?.mechanics?.includes('STUN_HIT') || ITEMS[weapon?.itemId ?? '']?.mechanics?.includes('STUN_HIT');
+      const isStunned = hasStunHit && Math.random() < 0.35;
+      if (isStunned) {
+        toast.success('💫 충격 기절(스턴)! 몬스터 반격 무력화');
+      }
+
       const wallBonus = atMainBase(p) && p.palisade ? 3 + (p.tribe?.count && p.tribe.classId === 'tank' ? 4 : 0) : 0;
       const defense = wallBonus + (armor ? Math.round((ITEMS[armor.itemId].armor?.def ?? 0) * gearMult(armor)) : 0) + (p.techs.includes('iron_skin') ? ironSkinDef(techLevel(p.techLevels, 'iron_skin')) : 0);
       const bleed = bleedDamage(power, activePetAbilities(p.pets ?? []).bleed ?? 0);
       if (bleed) { power += bleed; toast.success(`테라녹스 출혈! 추가 피해 +${bleed}`); }
       const exchange = resolveCreatureHit(e.type, p.damage[e.id] ?? 0, power, defense, isRangedSafety || (p.calmUntil?.[e.id] ?? 0) > Date.now());
       power = exchange.dealt - (p.damage[e.id] ?? 0);
-      const reducedCounter = inMeleeClash
+      let reducedCounter = inMeleeClash && !isStunned
         ? atMainBase(p)
           ? applyTribeWallDefense(exchange.counterDamage, !!p.palisade, p.tribe?.count ?? 0, p.tribe?.classId)
           : exchange.counterDamage
         : 0;
+
+      // DAMAGE_REDUCE mechanic (-30% incoming damage)
+      const hasDamageReduce = armor?.mechanics?.includes('DAMAGE_REDUCE') || ITEMS[armor?.itemId ?? '']?.mechanics?.includes('DAMAGE_REDUCE');
+      if (hasDamageReduce && reducedCounter > 0) {
+        const orig = reducedCounter;
+        reducedCounter = Math.round(reducedCounter * 0.7);
+        toast.info(`🛡️ 충격 완화 방어구 효과! (받는 피해: ${orig} → ${reducedCounter})`);
+      }
+
       hp -= reducedCounter;
       if (reducedCounter > 0) {
         toast.error(`${d.name} 돌진 박치기 반격! 체력 -${reducedCounter}`);
@@ -904,7 +939,14 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       return true;
     }
     delete next.damage[e.id];
-    const got = options.indoor && Date.now() < outdoorMovingRef.current ? expeditionLoot(e, true) : rollLoot(loot);
+    let got = options.indoor && Date.now() < outdoorMovingRef.current ? expeditionLoot(e, true) : rollLoot(loot);
+    if (e.kind === 'node') {
+      const hasGatherBoost = weapon?.mechanics?.includes('GATHER_BOOST') || ITEMS[weapon?.itemId ?? '']?.mechanics?.includes('GATHER_BOOST');
+      if (hasGatherBoost && got.length > 0) {
+        got = got.map(g => ({ ...g, count: g.count + 1 }));
+        toast.success('🌾 풍요로운 수확! 자원 획득량 +1개 추가');
+      }
+    }
     const free = capacity - stackWeight(next.backpack);
     const fits = stackWeight(got) <= free;
     next.backpack = fits ? addStacks(next.backpack, got) : next.backpack;
@@ -1429,6 +1471,104 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return true;
   }, [setS, options.indoor]);
 
+  const placeCustomVillageTile = useCallback((params: {
+    name: string;
+    desc: string;
+    category: 'fence' | 'tower' | 'building';
+    mechanics: BuildingMechanicTag[];
+    physics: PhysicalAttributes;
+    hp: number;
+    materials: Record<string, number>;
+    x: number;
+    y: number;
+  }): boolean => {
+    const p = ref.current;
+    if (!p.base) { toast.warning('먼저 거점을 세우세요'); return false; }
+    const v = ensureVillageState(p.village, !!p.altar);
+    const check = canPlaceVillageBuilding(v, 'custom_intent_building', params.x, params.y, p.base.level);
+    if (check.ok === false) { toast.warning(check.reason); return false; }
+    const costStacks: Stack[] = Object.entries(params.materials)
+      .filter(([, count]) => count > 0)
+      .map(([itemId, count]) => ({ itemId: itemId as ItemId, count }));
+    const paid = payAccessible(p, costStacks);
+    if (!paid) { toast.error(`재료가 부족합니다: ${fmt(costStacks)}`); return false; }
+    const uid = `custom_b_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const nextV = placeCustomVillageBuilding(v, {
+      uid,
+      x: params.x,
+      y: params.y,
+      hp: params.hp,
+      customName: params.name,
+      customDesc: params.desc,
+      customCategory: params.category,
+      customMechanics: params.mechanics,
+      physics: params.physics,
+    });
+    const hasPal = nextV.buildings.some(b => b.customMechanics?.includes('WALL_BLOCK') || VILLAGE_BUILDINGS[b.buildingId]?.category === 'wall');
+    setS({ ...paid, village: nextV, palisade: p.palisade || hasPal, lastTickAt: Date.now() });
+    toast.success(`🏛️ 「${params.name}」 맞춤 건축 완료! (마을 배치됨)`);
+    return true;
+  }, [setS]);
+
+  const craftCustomGear = useCallback((params: {
+    name: string;
+    desc: string;
+    category: 'melee' | 'ranged' | 'tool' | 'armor';
+    mechanics: GearMechanicTag[];
+    physics: PhysicalAttributes;
+    atk?: number;
+    def?: number;
+    materials: Record<string, number>;
+  }): boolean => {
+    const p = ref.current;
+    const costStacks: Stack[] = Object.entries(params.materials)
+      .filter(([, count]) => count > 0)
+      .map(([itemId, count]) => ({ itemId: itemId as ItemId, count }));
+    const paid = payAccessible(p, costStacks);
+    if (!paid) { toast.error(`재료가 부족합니다: ${fmt(costStacks)}`); return false; }
+
+    const inventionCat = params.category === 'armor' ? 'building' : params.category === 'tool' ? 'tool' : 'weapon';
+    const hash = `intent_${params.category}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const id = `inv_${hash.slice(0, 10)}`;
+    const power = params.category === 'armor' ? (params.def ?? 5) * 3 : (params.atk ?? 12);
+    const inv: InventedItem = {
+      id,
+      hash,
+      name: params.name,
+      desc: params.desc,
+      category: inventionCat,
+      materials: params.materials,
+      power,
+      ranged: params.category === 'ranged' || params.mechanics.includes('RANGED_SNIPE'),
+      customMechanics: params.mechanics,
+      physics: params.physics,
+      createdAt: Date.now(),
+    };
+
+    registerInventions([inv]);
+
+    const gearPiece: GearInstance = {
+      uid: crypto.randomUUID(),
+      itemId: id as ItemId,
+      quality: 'MASTERWORK',
+      durability: INVENTED_DURABILITY,
+      maxDurability: INVENTED_DURABILITY,
+      plus: 0,
+      mechanics: params.mechanics,
+    };
+
+    const nextInventions = [...(paid.inventions ?? []), inv];
+    const nextGear = [...paid.gear, gearPiece];
+    setS({
+      ...paid,
+      inventions: nextInventions,
+      gear: nextGear,
+      lastTickAt: Date.now(),
+    });
+    toast.success(`⚔️ 「${params.name}」 제련 완료! (배낭 장비함에 보관됨)`);
+    return true;
+  }, [setS]);
+
   const moveVillageTile = useCallback((uid: string, toX: number, toY: number): boolean => {
     const p = ref.current;
     if (!p.base) return false;
@@ -1757,7 +1897,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return true;
   }, [setS]);
 
-  return { craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
+  return { placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
     moveOutpost, petHits, mergePets, togglePetDeploy, assignPetRole, feedPet, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,

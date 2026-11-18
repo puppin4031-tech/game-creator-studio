@@ -29,6 +29,7 @@ interface Props {
   onResearchBlueprint: (buildingId: VillageBuildingId) => boolean;
   onConstructBuilding: (buildingId: VillageBuildingId, x: number, y: number) => boolean;
   onOpenShaman?: () => void;
+  onOpenIntentCrafting?: () => void;
 }
 
 const fmtCost = (cost: Stack[]) =>
@@ -45,6 +46,7 @@ export default function ArchitectureWorkshopModal({
   onResearchBlueprint,
   onConstructBuilding,
   onOpenShaman,
+  onOpenIntentCrafting,
 }: Props) {
   const [filter, setFilter] = useState<'all' | 'wall' | 'facility'>('all');
   const vState = useMemo(() => ensureVillageState(village, hasAltar), [village, hasAltar]);
@@ -72,7 +74,7 @@ export default function ArchitectureWorkshopModal({
   };
 
   const list = VILLAGE_BUILDING_LIST.filter(
-    b => filter === 'all' || b.category === filter
+    b => b.id !== 'custom_intent_building' && (filter === 'all' || b.category === filter)
   );
 
   return (
@@ -124,6 +126,24 @@ export default function ArchitectureWorkshopModal({
           </Button>
         )}
       </div>
+
+      {/* AI Intent Architecture Banner */}
+      {onOpenIntentCrafting && (
+        <div className="flex items-center justify-between gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-2">
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="h-4 w-4 text-amber-500" />
+            <span className="font-bold text-xs text-amber-900">AI 맞춤 건축 설계 (자연어 용도 입력)</span>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            onClick={onOpenIntentCrafting}
+            className="pixel-btn h-auto min-h-0 bg-amber-600 text-white font-bold py-1 px-2.5 text-xs hover:bg-amber-500"
+          >
+            ✨ AI 건축 설계실 열기
+          </Button>
+        </div>
+      )}
 
       {/* Category Filter */}
       <div className="grid grid-cols-3 gap-1 border-b border-border bg-background px-3 py-2">

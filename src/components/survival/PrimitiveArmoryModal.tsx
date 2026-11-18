@@ -134,6 +134,7 @@ interface Props {
     naming: { name: string; desc: string; masterwork?: boolean; ranged?: boolean }
   ) => InventedItem | null;
   onEnhanceWeapon: (uid: string) => { ok: boolean; plus: number };
+  onOpenIntentCrafting?: () => void;
 }
 
 export default function PrimitiveArmoryModal({
@@ -147,6 +148,7 @@ export default function PrimitiveArmoryModal({
   onCraftAmmoBundle,
   onInventWeapon,
   onEnhanceWeapon,
+  onOpenIntentCrafting,
 }: Props) {
   const [activeTab, setActiveTab] = useState<'both' | 'develop' | 'enhance'>('both');
   const [mats, setMats] = useState<Record<string, number>>({});
@@ -258,6 +260,27 @@ export default function PrimitiveArmoryModal({
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto p-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        {/* AI Intent Crafting Banner */}
+        {onOpenIntentCrafting && (
+          <div className="flex items-center justify-between gap-2 rounded-md border border-orange-500/40 bg-orange-500/10 px-3 py-2">
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="h-4 w-4 text-orange-400" />
+              <div>
+                <span className="font-bold text-xs text-orange-950">AI 맞춤 무기·도구·방어구 제련소</span>
+                <p className="text-[10px] text-muted-foreground">자연어로 용도를 적으면 재료 물리 속성을 분석해 맞춤 특수 효과 부여</p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              onClick={onOpenIntentCrafting}
+              className="pixel-btn h-auto min-h-0 bg-orange-600 text-white font-bold py-1 px-2.5 text-xs hover:bg-orange-500 shrink-0"
+            >
+              ✨ AI 제련실 열기
+            </Button>
+          </div>
+        )}
+
         {/* UPPER SECTION: [무기 개발/발명] */}
         {(activeTab === 'both' || activeTab === 'develop') && (
           <section

@@ -25,6 +25,14 @@ export interface InventedItem {
   baseTier?: number;
   /** Reforge outcome grade; multiplies reforged power. */
   grade?: ReforgeGrade;
+  /** Custom intent mechanics awarded during crafting. */
+  customMechanics?: string[];
+  physics?: {
+    elasticity: number;
+    durability: number;
+    weatherResist: number;
+    density: number;
+  };
 }
 
 export const ALTAR_COST: Stack[] = [{ itemId: 'flint', count: 8 }, { itemId: 'obsidian', count: 3 }, { itemId: 'quartz', count: 4 }];
@@ -71,9 +79,21 @@ export function inventedItemDef(inv: InventedItem): ItemDef {
   const sprite = inventedSprite(inv);
   const weight = Math.min(5, Math.round(Object.entries(inv.materials).reduce((s, [id, q]) => s + (ITEMS[id as keyof typeof ITEMS]?.weight ?? 0.5) * q, 0) * 0.3 * 10) / 10);
   const prefix = inv.grade === 'legend' ? '[레전드] ' : inv.grade === 'masterwork' ? '[명품] ' : '';
-  const base = { name: prefix + inv.name, desc: inv.desc, rarity: (inv.grade === 'legend' ? 'epic' : 'rare') as 'epic' | 'rare', weight, sprite, durability: INVENTED_DURABILITY };
+  const base = {
+    name: prefix + inv.name,
+    desc: inv.desc,
+    rarity: (inv.grade === 'legend' ? 'epic' : 'rare') as 'epic' | 'rare',
+    weight,
+    sprite,
+    durability: INVENTED_DURABILITY,
+    mechanics: inv.customMechanics,
+    physics: inv.physics,
+  };
   switch (inv.category) {
-    case 'weapon': return { ...base, category: 'weapon', weapon: { atk: Math.max(1, Math.round(inv.power)), ...(inv.ranged ? { ranged: true } : {}) } };
+    case 'weapon': {
+      const isRanged = inv.ranged || inv.customMechanics?.includes('RANGED_SNIPE');
+      return { ...base, category: 'weapon', weapon: { atk: Math.max(1, Math.round(inv.power)), ...(isRanged ? { ranged: true } : {}) } };
+    }
     case 'tool': { const tier = Math.max(inv.power >= 2 ? 2 : 1, inv.baseTier ?? 0); return { ...base, category: 'tool', tool: { chop: tier, mine: tier, power: 1 + inv.power } }; }
     case 'building': return { ...base, category: 'armor', armor: { def: Math.max(1, Math.round(inv.power / 3)) } };
     case 'relic': return { ...base, category: 'trinket', trinket: { lootBonus: inv.power, xpBonus: inv.power } };
@@ -84,6 +104,10 @@ export function inventedItemDef(inv: InventedItem): ItemDef {
 export function registerInventions(list: InventedItem[] | undefined) {
   const table = ITEMS as Record<string, ItemDef>;
   for (const inv of list ?? []) {
+    if (inv.customMechanics && inv.customMechanics.length > 0) {
+      table[inv.id] = inventedItemDef(inv);
+      continue;
+    }
     const check = checkFacility(inv, true);
     if (!check.ok) continue;
     const power = inv.basePower != null ? reforgePower(inv.category, inv.basePower, check.power, inv.grade) : check.power;
