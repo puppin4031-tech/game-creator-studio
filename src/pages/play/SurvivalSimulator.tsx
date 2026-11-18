@@ -240,6 +240,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     onAuto={() => { g.toggleExpeditionAuto(expeditionDestination, expeditionFocus); setWatchExpedition(true); }} onPocket={g.togglePocket} onMorale={g.rallyExpedition} onReturn={g.recallExpedition} onWatch={() => setView(v => v === 'expedition' ? 'user' : 'expedition')}
     tribe={s.tribe ? { count: s.tribe.count, trainLevel: s.tribe.trainLevel ?? 0, ratio: tribeRatio(s.tribe), maxHp: Math.max(1, Math.round(g.maxHp * tribeRatio(s.tribe) * s.tribe.count)), injured: tribeInjured(s.tribe, Date.now()), starving: !!s.tribe.starving, classId: s.tribe.classId } : undefined} />;
   const [panel, setPanel] = useState<Panel>('none');
+  const [baseTab, setBaseTab] = useState<'village' | 'lab' | 'craft' | 'storage' | 'expedition' | 'pets'>('village');
+  const [craftCat, setCraftCat] = useState<CraftCat>('all');
 
   // 3-Phase Interactive Survival Tutorial State
   const [tutorialStep, setTutorialStep] = useState<TutorialStep | null>(() => {
@@ -331,8 +333,6 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [damageNumbers, setDamageNumbers] = useState<FloatingDamage[]>([]);
   const [projectiles, setProjectiles] = useState<ProjectileVfx[]>([]);
   const { shaking, triggerShake } = useScreenShake();
-  const [craftCat, setCraftCat] = useState<CraftCat>('all');
-  const [baseTab, setBaseTab] = useState<'village' | 'lab' | 'craft' | 'storage' | 'expedition' | 'pets'>('village');
 
   const onTap = (p: LatLng) => {
     if (auto.job) { auto.stop(); returnToCenter(); }
