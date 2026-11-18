@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export type SkillVfxType = 'fireball' | 'iceball' | 'thunder' | 'dark_magic' | 'mana_shield';
+export type SkillVfxType =
+  | 'fireball'
+  | 'iceball'
+  | 'thunder'
+  | 'dark_magic'
+  | 'mana_shield'
+  | 'ember_spark'
+  | 'shockwave_roar';
 
 export interface CombatVfxEvent {
   id: string;
@@ -423,6 +430,172 @@ export function ManaShieldVFX({ x, y, onComplete }: { x: number; y: number; onCo
   );
 }
 
+/** 6. 🌿 Ember Spark VFX (Primitive scattered sparks from flint/campfire) */
+export function EmberSparkVFX({ x, y, onComplete }: { x: number; y: number; onComplete?: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(() => onComplete?.(), 700);
+    return () => clearTimeout(t);
+  }, [onComplete]);
+
+  const sparks = Array.from({ length: 8 }, (_, i) => {
+    const angle = (i * 45 * Math.PI) / 180 + (Math.random() * 0.4 - 0.2);
+    const dist = 18 + Math.random() * 16;
+    return {
+      dx: Math.cos(angle) * dist,
+      dy: Math.sin(angle) * dist - 8,
+      color: i % 2 === 0 ? '#fb923c' : '#fef08a',
+    };
+  });
+
+  return (
+    <div className="pointer-events-none absolute z-45 -translate-x-1/2 -translate-y-1/2" style={{ left: x, top: y }}>
+      <motion.div
+        initial={{ scale: 0.6, opacity: 1 }}
+        animate={{ scale: [0.6, 1.2, 0], opacity: [1, 0.8, 0] }}
+        transition={{ duration: 0.35 }}
+        className="text-lg flex items-center justify-center"
+      >
+        <span>✨</span>
+      </motion.div>
+
+      {sparks.map((s, i) => (
+        <motion.div
+          key={i}
+          initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
+          animate={{ x: s.dx, y: s.dy, opacity: 0, scale: 0.3 }}
+          transition={{ duration: 0.45, ease: 'easeOut' }}
+          className="absolute h-1.5 w-1.5 rounded-none"
+          style={{ backgroundColor: s.color }}
+        />
+      ))}
+
+      <motion.span
+        initial={{ y: 0, opacity: 1 }}
+        animate={{ y: -22, opacity: [1, 1, 0] }}
+        transition={{ duration: 0.65 }}
+        className="absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-stone-900/90 border border-orange-500/60 px-1 text-[9px] font-bold text-orange-300 shadow"
+      >
+        🔥 불씨 뿌리기
+      </motion.span>
+    </div>
+  );
+}
+
+/** 7. 📢 Shockwave Roar VFX (Primitive beast sonic intimidation ring) */
+export function ShockwaveRoarVFX({ x, y, onComplete }: { x: number; y: number; onComplete?: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(() => onComplete?.(), 650);
+    return () => clearTimeout(t);
+  }, [onComplete]);
+
+  return (
+    <div className="pointer-events-none absolute z-45 -translate-x-1/2 -translate-y-1/2" style={{ left: x, top: y }}>
+      {/* Expanding Soundwave Ring 1 */}
+      <motion.div
+        initial={{ scale: 0.3, opacity: 0.9 }}
+        animate={{ scale: 1.8, opacity: 0 }}
+        transition={{ duration: 0.45, ease: 'easeOut' }}
+        className="absolute -inset-8 rounded-full border-2 border-amber-300/80 bg-amber-500/15"
+      />
+      {/* Expanding Soundwave Ring 2 */}
+      <motion.div
+        initial={{ scale: 0.2, opacity: 0.8 }}
+        animate={{ scale: 2.4, opacity: 0 }}
+        transition={{ duration: 0.6, delay: 0.1, ease: 'easeOut' }}
+        className="absolute -inset-6 rounded-full border border-amber-400/50"
+      />
+
+      {/* Roar Icon in Center */}
+      <motion.div
+        initial={{ scale: 0.8, opacity: 1 }}
+        animate={{ scale: [0.8, 1.4, 0.9], opacity: [1, 1, 0] }}
+        transition={{ duration: 0.5 }}
+        className="text-2xl flex items-center justify-center text-amber-300 drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]"
+      >
+        <span>📢</span>
+      </motion.div>
+
+      <motion.span
+        initial={{ y: 0, opacity: 1 }}
+        animate={{ y: -26, opacity: [1, 1, 0] }}
+        transition={{ duration: 0.6 }}
+        className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-stone-900/90 border border-amber-400/60 px-1 text-[9px] font-bold text-amber-300 shadow"
+      >
+        📢 포효 (위압)
+      </motion.span>
+    </div>
+  );
+}
+
+/**
+ * Resolves the appropriate skill VFX depending on WHO is casting or attacking:
+ * - Primitive players and low-level pets (Lv.1-2) use natural physical/primitive effects (flint sparks, soundwave roar, flying stones).
+ * - Advanced entities (Evolved Mage/Warlock/Chief Shamans, or High-Tier Lv.3+ Evolved Pets and Skull Dragons) unleash true elemental and dark magic spells.
+ */
+export function resolveEntitySkillVfx({
+  skillId,
+  shamanClass,
+  petSpecies,
+  petLevel,
+  isSkullDragon,
+}: {
+  skillId?: string;
+  shamanClass?: string | null;
+  petSpecies?: string;
+  petLevel?: number;
+  isSkullDragon?: boolean;
+}): { vfxType?: SkillVfxType; isStoneBarrage?: boolean } {
+  // 1. High-tier or Special Evolved Pet Attack
+  if (isSkullDragon) {
+    return { vfxType: 'dark_magic' };
+  }
+  if (petSpecies && petLevel && petLevel >= 3) {
+    const sp = petSpecies.toLowerCase();
+    if (sp.includes('draco') || sp.includes('carno')) {
+      return { vfxType: 'fireball' };
+    }
+    if (sp.includes('ptero')) {
+      return { vfxType: 'thunder' };
+    }
+    if (sp.includes('stago') || sp.includes('stego')) {
+      return { vfxType: 'iceball' };
+    }
+    if (sp.includes('kerat') || sp.includes('balo')) {
+      return { vfxType: 'mana_shield' };
+    }
+  }
+
+  // 2. Evolved Shaman Magic
+  if (shamanClass === 'mage') {
+    if (skillId === 'ember_scatter') return { vfxType: 'fireball' };
+    if (skillId === 'roar') return { vfxType: 'iceball' };
+    if (skillId === 'stone_barrage') return { vfxType: 'thunder' };
+    return { vfxType: 'fireball' };
+  }
+  if (shamanClass === 'warlock') {
+    return { vfxType: 'dark_magic' };
+  }
+  if (shamanClass === 'orthodox') {
+    return { vfxType: 'mana_shield' };
+  }
+  if (shamanClass === 'engineer') {
+    return { vfxType: 'fireball' }; // Mechanical explosive burst
+  }
+
+  // 3. Normal / Primitive Player Skills (Default)
+  if (skillId === 'stone_barrage') {
+    return { isStoneBarrage: true }; // Fires 3 rapid stone projectiles instead of a thunder spell!
+  }
+  if (skillId === 'roar') {
+    return { vfxType: 'shockwave_roar' }; // Expanding sonic wave instead of an ice spell!
+  }
+  if (skillId === 'ember_scatter') {
+    return { vfxType: 'ember_spark' }; // Realistic primitive sparks instead of a giant wizard fireball!
+  }
+
+  return {};
+}
+
 /** Complete Combat VFX Dispatcher Component */
 export function CombatEffectLayer({
   events,
@@ -481,6 +654,10 @@ export function CombatEffectLayer({
             return <DarkMagicVFX key={ev.id} x={x} y={y} onComplete={() => onRemoveEvent(ev.id)} />;
           case 'mana_shield':
             return <ManaShieldVFX key={ev.id} x={x} y={y} onComplete={() => onRemoveEvent(ev.id)} />;
+          case 'ember_spark':
+            return <EmberSparkVFX key={ev.id} x={x} y={y} onComplete={() => onRemoveEvent(ev.id)} />;
+          case 'shockwave_roar':
+            return <ShockwaveRoarVFX key={ev.id} x={x} y={y} onComplete={() => onRemoveEvent(ev.id)} />;
           default:
             return null;
         }

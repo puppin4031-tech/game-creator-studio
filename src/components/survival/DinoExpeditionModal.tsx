@@ -395,7 +395,21 @@ export default function DinoExpeditionModal({
         const dmg = Math.max(4, totalAtk + Math.floor(Math.random() * 5));
         const nextHp = Math.max(0, enc.hp - dmg);
         playSample(enc.kind === 'beast' ? 'strike' : 'chop');
-        pushFloat(enc.xPct, 36, `-${dmg}${roarActive ? '⚡' : ''}`, 'enemy');
+        // Advanced elemental pet attack check (Skull Dragon or Lv.3+ Evolved Pets)
+        const advancedPet = squad.find(p => p.level >= 3 || p.name.includes('스컬') || p.speciesId.includes('skull'));
+        let elemBadge = '';
+        if (advancedPet) {
+          const sp = advancedPet.speciesId.toLowerCase();
+          const isSkull = advancedPet.name.includes('스컬') || sp.includes('skull');
+          if (isSkull) elemBadge = ' 💀';
+          else if (sp.includes('draco') || sp.includes('carno')) elemBadge = ' 🔥';
+          else if (sp.includes('ptero')) elemBadge = ' ⚡';
+          else if (sp.includes('stago') || sp.includes('stego')) elemBadge = ' ❄️';
+          else if (sp.includes('kerat') || sp.includes('balo')) elemBadge = ' 🛡️';
+        } else if (roarActive) {
+          elemBadge = ' 📢';
+        }
+        pushFloat(enc.xPct, 36, `-${dmg}${elemBadge}`, 'enemy');
 
         if (nextHp <= 0) {
           // Encounter defeated / harvested!

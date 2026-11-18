@@ -48,6 +48,7 @@ import {
   CombatEffectLayer,
   HitReactionWrapper,
   lungeVariants,
+  resolveEntitySkillVfx,
   type CombatVfxEvent,
   type FloatingDamage,
   type ProjectileVfx,
@@ -589,19 +590,50 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     if (g.useSkill(id)) {
       playAction('attack', 900);
       playSample('strike');
-      triggerShake(180);
+      triggerShake(160);
       const playerScreen = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-      const vfxType: SkillVfxType =
-        id === 'ember_scatter' ? 'fireball' : id === 'roar' ? 'iceball' : 'thunder';
-      setCombatVfxEvents(prev => [
-        ...prev.slice(-3),
-        {
-          id: crypto.randomUUID(),
-          type: vfxType,
-          x: playerScreen.x,
-          y: playerScreen.y - 25,
-        },
-      ]);
+
+      const shamanClass = s.shamanClass || s.village?.shamanClass;
+      const followingPet = (s.pets ?? []).find(p => p.role === 'follow');
+      const isSkull = followingPet ? (followingPet.name.includes('스컬') || followingPet.speciesId.includes('skull')) : false;
+
+      const resolved = resolveEntitySkillVfx({
+        skillId: id,
+        shamanClass,
+        petSpecies: followingPet?.speciesId,
+        petLevel: followingPet?.level,
+        isSkullDragon: isSkull,
+      });
+
+      if (resolved.isStoneBarrage) {
+        // Primitive flint barrage: 3 fast stones fly in a spread towards enemy/front
+        for (let i = 0; i < 3; i++) {
+          setTimeout(() => {
+            const spreadX = (i - 1) * 32;
+            setProjectiles(prev => [
+              ...prev.slice(-4),
+              {
+                id: crypto.randomUUID(),
+                startX: playerScreen.x,
+                startY: playerScreen.y,
+                targetX: playerScreen.x + 75 + spreadX,
+                targetY: playerScreen.y - 85 - Math.abs(spreadX) * 0.4,
+                kind: 'stone',
+              },
+            ]);
+          }, i * 90);
+        }
+      } else if (resolved.vfxType) {
+        setCombatVfxEvents(prev => [
+          ...prev.slice(-3),
+          {
+            id: crypto.randomUUID(),
+            type: resolved.vfxType!,
+            x: playerScreen.x,
+            y: playerScreen.y - 25,
+          },
+        ]);
+      }
     }
   };
   const inPark = !!s.parkCells?.[zoneCellKey(s.pos)];
