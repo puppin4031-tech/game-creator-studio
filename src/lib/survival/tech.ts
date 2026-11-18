@@ -48,7 +48,7 @@ export const TECHS: TechDef[] = [
   { id: 'recruitment', name: '부족원 모집', desc: '샤먼 곁 NPC 모집: 조개 10·구운 고기 2. 거점 작업 5분마다 나뭇가지 2·섬유 1.', requires: ['hut_building'], research: [{ itemId: 'cooked_meat', count: 2 }, { itemId: 'hide', count: 2 }], recipes: [] },
   { id: 'rescue', name: '포로 구출', desc: '우두머리 처치 후 NPC 구조: 연고 1·말린 고기 2. 거점 작업 5분마다 뼈 1·흙 1. 동료 총 2명.', requires: ['recruitment', 'herbalism'], research: [{ itemId: 'salve', count: 1 }, { itemId: 'cordage', count: 2 }], recipes: [] },
   { id: 'keen_eye', name: '시야 확장', desc: '안개 속 시야 반경 +15m (낮·밤 모두).', requires: ['fire'], research: [{ itemId: 'resin', count: 2 }, { itemId: 'quartz', count: 1 }], recipes: [] },
-  { id: 'long_reach', name: '습득 범위 향상', desc: '채집·사냥·상호작용 반경 25m → 35m.', requires: ['hafting'], research: [{ itemId: 'branch', count: 6 }, { itemId: 'cordage', count: 2 }], recipes: [] },
+  { id: 'long_reach', name: '습득 범위 향상', desc: '채집·사냥·공룡알·공격 상호작용 반경 증가 (기본 25m → Lv.1 35m, 공룡알 20m → 30m). 재연구로 Lv.5까지 강화 (레벨당 +10m, 최대 75m).', requires: ['hafting'], research: [{ itemId: 'branch', count: 6 }, { itemId: 'cordage', count: 2 }], recipes: [] },
   { id: 'auto_pickup', name: '자동 획득', desc: '내 주변 10m 안의 자원을 4초마다 자동으로 채집.', requires: ['long_reach'], research: [{ itemId: 'fiber', count: 6 }, { itemId: 'hide', count: 2 }, { itemId: 'bone', count: 2 }], recipes: [] },
   { id: 'pocket_1', name: '아공간 주머니 Lv.1', desc: '배낭 최대 무게 +30kg.', requires: ['tanning'], research: [{ itemId: 'leather', count: 2 }, { itemId: 'cordage', count: 3 }], recipes: [] },
   { id: 'pocket_2', name: '아공간 주머니 Lv.2', desc: '배낭 최대 무게 +60kg (Lv.1 대체).', requires: ['pocket_1'], research: [{ itemId: 'leather', count: 4 }, { itemId: 'quartz', count: 2 }, { itemId: 'ochre', count: 2 }], recipes: [] },

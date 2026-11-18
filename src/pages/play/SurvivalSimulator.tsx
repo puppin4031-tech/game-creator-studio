@@ -82,7 +82,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { TECH_CATEGORIES, TECH_CATEGORY, type TechCategory } from '@/lib/survival/techCategories';
-import { MAX_TECH_LEVEL, techLevel, techUpgradeCost } from '@/lib/survival/techLevels';
+import { MAX_TECH_LEVEL, techLevel, techUpgradeCost, longReachBonus } from '@/lib/survival/techLevels';
+import { eggReachRadius } from '@/lib/survival/utilitySkills';
 import PetPanel from '@/components/survival/PetPanel';
 import BaseVillageView from '@/components/survival/BaseVillageView';
 import RadarMapModal from '@/components/survival/RadarMapModal';
@@ -240,7 +241,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     const dist = distanceM(s.pos, e);
     const rangedInfo = computeRangedReach(g.weapon, s.level);
     const isRangedWeapon = e.kind === 'creature' && !!rangedInfo.category;
-    const effectiveReach = isRangedWeapon ? Math.max(g.reach, rangedInfo.rangeM) : g.reach;
+    const reachBonus = s.techs.includes('long_reach') ? longReachBonus(techLevel(s.techLevels, 'long_reach')) : 0;
+    const effectiveReach = isRangedWeapon ? Math.max(g.reach, rangedInfo.rangeM + reachBonus) : g.reach;
     if (!realGps && dist > effectiveReach) { g.moveTo({ lat: e.lat, lng: e.lng }); return; }
     if (auto.job?.id === e.id) { auto.stop(); toast('작업을 멈췄습니다'); return; }
     if (dist > effectiveReach) { g.interact(e); return; }
@@ -430,7 +432,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       const p = w.state;
       const radius = gathererActive ? getTribeClass('gatherer').autoGatherRadiusM : AUTO_PICKUP_RADIUS_M;
       if (gathererActive) {
-        const nearEgg = eggSpawnsNear(p.pos, p.depleted, Date.now()).find(e => distanceM(p.pos, e) <= Math.min(radius, 20));
+        const eggRadius = eggReachRadius(p.techs, p.techLevels);
+        const nearEgg = eggSpawnsNear(p.pos, p.depleted, Date.now()).find(e => distanceM(p.pos, e) <= Math.min(radius, eggRadius));
         if (nearEgg && w.pickEgg(nearEgg)) return;
       }
       const target = w.entities.find(e => e.kind === 'node' && (gathererActive ? nodeDef(e.type).requires.tier <= 1 : !STRIKE_NODES.has(e.type))

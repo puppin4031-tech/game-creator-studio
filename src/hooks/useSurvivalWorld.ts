@@ -15,7 +15,7 @@ import { CREATURE_ATTACK_INTERVAL_MS, resolveCreatureHit, rollLoot } from '@/lib
 import { RECIPES, type Recipe } from '@/lib/survival/recipes';
 import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
 import { SURVIVAL_CONFIG as C } from '@/lib/survival/config';
-import { visionBonus, reachRadius, pocketBonusKg } from '@/lib/survival/utilitySkills';
+import { visionBonus, reachRadius, eggReachRadius, pocketBonusKg } from '@/lib/survival/utilitySkills';
 import { BASE_UPGRADE_MS, EXPEDITION_FOOD_COUNT, EXPEDITION_MS, expeditionRewards, mapFragments, payExpeditionFood, scoutReport, type Expedition, type ScoutTarget, type TimedJob } from '@/lib/survival/homeActivities';
 import { EGG_PICK_RADIUS_M, EGG_RESPAWN_MS, advanceEggs, babyFor, eggReady, newEgg, petById, type BabyDinoId, type CarriedEgg, type EggSpawn } from '@/lib/survival/dinoEggs';
 import { ACTIVE_SKILLS, claimResearch, startResearch, atMainBase, atWorkshop, buildStructure, relocateOutpost, collectCompanionWork, prepareSkill, recruitCompanion, tameWolf, type ActiveSkill, type Companion } from '@/lib/survival/abilities';
@@ -33,7 +33,7 @@ import { addExperience, dayPhase, xpToNext } from '@/lib/survival/progression';
 import { claimWorldQuest, freshProgress, type WorldProgress } from '@/lib/survival/worldProgress';
 import { currentQuest, LANGUAGE_QUEST, languageQuestProgress, questReady, type QuestState } from '@/lib/survival/quests';
 import { checkInspiration, isRecipeUnlocked, prerequisitesMet, readSkillBook, techById, type TechDef } from '@/lib/survival/tech';
-import { giantHeartHpBonus, ironSkinDef, primalStrikeMult, techLevel, wildVitalityRegenBonus } from '@/lib/survival/techLevels';
+import { giantHeartHpBonus, ironSkinDef, primalStrikeMult, longReachBonus, techLevel, wildVitalityRegenBonus } from '@/lib/survival/techLevels';
 import { SANCTUARY_RADIUS_M, SANCTUARY_REGEN_PER_TICK, LANDMARK_INFO, SHAMAN_BLESS_XP, SHAMAN_RUMORS, SHAMAN_TIPS, TRADER_STOCK, canClaimLandmark, landmarkReward, recordLandmarkClaim, sellPrice, type Landmark, type LandmarkClaims } from '@/lib/survival/landmarks';
 import type { TerrainZone } from '@/lib/survival/terrainZone';
 import { MELCHIZEDEK_FIRST, MELCHIZEDEK_LINK, RITES, blessingGift, canBless, discoverShrine, emptyShrineState, performRite, recordBlessing, type Shrine, type ShrineState } from '@/lib/survival/sanctuaries';
@@ -311,7 +311,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       ),
     [s.expeditionCount, s.expeditionDistanceM, s.walkSteps]
   );
-  const reach = reachRadius(s.techs);
+  const reach = reachRadius(s.techs, s.techLevels);
   const baseDef = s.base ? BASE_LEVELS[s.base.level] : null;
   const [sanctuaries, setSanctuaries] = useState<LatLng[]>([]);
   const sanctuariesRef = useRef(sanctuaries);
@@ -705,7 +705,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const visitLandmark = useCallback((l: Landmark): string | null => {
     const p = ref.current;
     if (!enabledRef.current) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return null; }
-    const r = reachRadius(p.techs);
+    const r = reachRadius(p.techs, p.techLevels);
     if (distanceM(p.pos, l) > r) { toast.warning(`${r}m 안으로 다가가세요`); return null; }
     const now = Date.now();
     const check = canClaimLandmark(p.landmarkClaims, l.id, now);
@@ -737,7 +737,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const shrineGate = (sh: Shrine): WorldSave | null => {
     const p = ref.current;
     if (!enabledRef.current) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return null; }
-    const r = reachRadius(p.techs);
+    const r = reachRadius(p.techs, p.techLevels);
     if (distanceM(p.pos, sh) > r) { toast.warning(`${r}m 안으로 다가가세요`); return null; }
     return p;
   };
@@ -812,7 +812,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (e.kind === 'node' ? !isNodeAvailable(e.id, e.type, p.depleted, Date.now()) : !!p.depleted[e.id]) return false;
     const { category: rangedCat, rangeM: rangedReach } = computeRangedReach(weapon, p.level);
     const isRangedWeapon = e.kind === 'creature' && !!rangedCat;
-    const r = isRangedWeapon ? Math.max(reachRadius(p.techs), rangedReach) : reachRadius(p.techs);
+    const reachBonus = p.techs.includes('long_reach') ? longReachBonus(techLevel(p.techLevels, 'long_reach')) : 0;
+    const r = isRangedWeapon ? Math.max(reachRadius(p.techs, p.techLevels), rangedReach + reachBonus) : reachRadius(p.techs, p.techLevels);
     if (distanceM(p.pos, e) > r) { toast.warning(`${r}m 안으로 다가가세요`); return false; }
     if (e.kind === 'creature') {
       const at = Date.now();
@@ -845,7 +846,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const d = creatureDef(e.type);
       label = d.name; need = d.hp; loot = d.loot;
       // Ranged weapons (bow / sling / spear) require 1 matching ammo in the backpack per shot
-      if (isRangedWeapon && distanceM(p.pos, e) > reachRadius(p.techs)) {
+      if (isRangedWeapon && distanceM(p.pos, e) > reachRadius(p.techs, p.techLevels)) {
         const ammo = findAvailableAmmo(p.backpack, weapon?.itemId);
         if (!ammo) {
           const ammoLabel = rangedCat === 'bow' ? '화살(🏹)' : '돌멩이 탄환(🪨)이나 부싯돌';
@@ -1270,7 +1271,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (!enabledRef.current) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return false; }
     const now = Date.now();
     if (now - (p.depleted[egg.id] ?? -Infinity) < EGG_RESPAWN_MS) { toast.info('이 자리의 알은 이미 주웠어요. 내일 다시 와 보세요.'); return false; }
-    if (distanceM(p.pos, egg) > EGG_PICK_RADIUS_M) { toast.warning(`${EGG_PICK_RADIUS_M}m 안으로 다가가세요`); return false; }
+    const allowedDist = eggReachRadius(p.techs, p.techLevels);
+    if (distanceM(p.pos, egg) > allowedDist) { toast.warning(`${allowedDist}m 안으로 다가가세요`); return false; }
     setS({ ...p, backpack: addStacks(p.backpack, [{ itemId: 'dino_egg', count: 1 }]), depleted: { ...p.depleted, [egg.id]: now },
       dinoEggs: [...(p.dinoEggs ?? []), newEgg(`${egg.id}:${now}`, p.walkSteps ?? 0, Math.random())] });
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(200);

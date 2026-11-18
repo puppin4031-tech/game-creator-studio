@@ -34,3 +34,11 @@ export const ironSkinDef = (level: number) => 2 + (level - 1);
 export const giantHeartHpBonus = (level: number) => 10 * level;
 /** 야생 활력: extra HP per tick while resting at a base or sanctuary. Lv1 +1 … Lv5 +5. */
 export const wildVitalityRegenBonus = (level: number) => level;
+/** 습득 범위 향상 (long_reach): extra reach radius bonus in meters.
+ * Lv1: +10m (25m → 35m, dino eggs 20m → 30m)
+ * Lv2: +20m (25m → 45m, dino eggs 20m → 40m)
+ * Lv3: +30m (25m → 55m, dino eggs 20m → 50m)
+ * Lv4: +40m (25m → 65m, dino eggs 20m → 60m)
+ * Lv5: +50m (25m → 75m, dino eggs 20m → 70m)
+ */
+export const longReachBonus = (level: number) => 10 * level;

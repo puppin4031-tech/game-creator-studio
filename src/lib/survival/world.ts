@@ -11,8 +11,10 @@ export const CREATURE_CELL_M = 36;
 export const CREATURE_EPOCH_MS = 8 * 60_000;
 export const CREATURE_DENSITY_DAY = 0.65;
 export const CREATURE_DENSITY_NIGHT = 0.78;
-/** Chance that a spawned creature is accompanied by 1~2 packmates 1~2m away. */
-export const PACK_CLUSTER_CHANCE = 0.45;
+/** Minimum separation between any two spawned creatures so mobs don't overlap or cluster too closely. */
+export const MIN_CREATURE_DISTANCE_M = 20;
+/** Chance that a spawned creature is accompanied by close packmates (disabled to strictly enforce >= 20m separation). */
+export const PACK_CLUSTER_CHANCE = 0;
 /** Creatures never spawn this close to the base edge (safe zone). */
 export const SAFE_MARGIN_M = 15;
 /** Chance a park creature cell hosts a boss this epoch. */
@@ -78,47 +80,47 @@ export function generateCreatures(q: WorldQuery): WorldCreature[] {
   const cy1 = Math.floor((y + r) / CREATURE_CELL_M);
   const types = Object.keys(CREATURES) as CreatureType[];
   const out: WorldCreature[] = [];
+
+  // Sort candidate cells from closest to furthest from query center so closest mobs spawn cleanly first
+  const cells: { cx: number; cy: number; d2: number }[] = [];
   for (let cx = cx0; cx <= cx1; cx++) {
     for (let cy = cy0; cy <= cy1; cy++) {
-      const gx = (cx + 0.1 + hash01(cx, cy, epoch, 8) * 0.8) * CREATURE_CELL_M;
-      const gy = (cy + 0.1 + hash01(cx, cy, epoch, 9) * 0.8) * CREATURE_CELL_M;
-      const pos = fromGrid(gx, gy);
-      const inPark = !!q.parkCells?.[zoneCellKey(pos)];
-      if (hash01(cx, cy, epoch, 7) > (inPark ? Math.min(0.95, density * PARK_CREATURE_MULT) : density)) continue;
-      if (distanceM(pos, q.center) > r) continue;
-      if (q.safeZone && distanceM(pos, q.safeZone.center) < q.safeZone.radiusM + SAFE_MARGIN_M) continue;
-      if (q.sanctuaries?.some((c) => distanceM(pos, c) < SANCTUARY_RADIUS_M)) continue;
-      const biome = biomeAt(pos);
-      const weights = types.map((t) => {
-        const d = CREATURES[t];
-        const bw = zoneWeight(d.biomes, biome, q.terrainZones?.[zoneCellKey(pos)]);
-        return [t, bw * (q.isNight ? d.nightWeight : 1)] as [CreatureType, number];
-      });
-      const bossRoll = hash01(cx, cy, epoch, 11);
-      const type = inPark && bossRoll < PARK_BOSS_CHANCE
-        ? BOSS_TYPES[Math.floor((bossRoll / PARK_BOSS_CHANCE) * BOSS_TYPES.length) % BOSS_TYPES.length]
-        : pickWeighted(weights, hash01(cx, cy, epoch, 10));
-      if (!type) continue;
-      const id = `c:${cx}:${cy}:${epoch}`;
-      if (!q.depleted[id]) {
-        out.push({ id, kind: 'creature', type, lat: pos.lat, lng: pos.lng });
-      }
-      // Pack / herd clustering: spawn 1~2 close companions within 1.2m ~ 2.2m so mobs roam in tight groups
-      const isBoss = (BOSS_TYPES as readonly string[]).includes(type);
-      const packRoll = hash01(cx, cy, epoch, 12);
-      if (!isBoss && packRoll < PACK_CLUSTER_CHANCE) {
-        const packCount = packRoll < PACK_CLUSTER_CHANCE * 0.4 ? 2 : 1;
-        for (let pIdx = 1; pIdx <= packCount; pIdx++) {
-          const pid = `c:${cx}:${cy}:${epoch}:p${pIdx}`;
-          if (q.depleted[pid]) continue;
-          const angle = hash01(cx, cy, epoch, 13 + pIdx) * Math.PI * 2;
-          const distM = 1.2 + hash01(cx, cy, epoch, 16 + pIdx) * 1.0; // 1.2m ~ 2.2m apart
-          const pPos = fromGrid(gx + Math.cos(angle) * distM, gy + Math.sin(angle) * distM);
-          if (distanceM(pPos, q.center) <= r) {
-            out.push({ id: pid, kind: 'creature', type, lat: pPos.lat, lng: pPos.lng });
-          }
-        }
-      }
+      const gx = (cx + 0.5) * CREATURE_CELL_M;
+      const gy = (cy + 0.5) * CREATURE_CELL_M;
+      const d2 = (gx - x) * (gx - x) + (gy - y) * (gy - y);
+      cells.push({ cx, cy, d2 });
+    }
+  }
+  cells.sort((a, b) => a.d2 - b.d2 || (a.cx * 10000 + a.cy) - (b.cx * 10000 + b.cy));
+
+  for (const { cx, cy } of cells) {
+    const gx = (cx + 0.1 + hash01(cx, cy, epoch, 8) * 0.8) * CREATURE_CELL_M;
+    const gy = (cy + 0.1 + hash01(cx, cy, epoch, 9) * 0.8) * CREATURE_CELL_M;
+    const pos = fromGrid(gx, gy);
+    const inPark = !!q.parkCells?.[zoneCellKey(pos)];
+    if (hash01(cx, cy, epoch, 7) > (inPark ? Math.min(0.95, density * PARK_CREATURE_MULT) : density)) continue;
+    if (distanceM(pos, q.center) > r) continue;
+    if (q.safeZone && distanceM(pos, q.safeZone.center) < q.safeZone.radiusM + SAFE_MARGIN_M) continue;
+    if (q.sanctuaries?.some((c) => distanceM(pos, c) < SANCTUARY_RADIUS_M)) continue;
+
+    // "몹들 지금 너무 붙어있는 애들이 있어서... 20m 수준으로 떨어져있게 해줘."
+    // Enforce strictly at least 20m separation between any two spawned creatures
+    if (out.some((other) => distanceM(pos, other) < MIN_CREATURE_DISTANCE_M)) continue;
+
+    const biome = biomeAt(pos);
+    const weights = types.map((t) => {
+      const d = CREATURES[t];
+      const bw = zoneWeight(d.biomes, biome, q.terrainZones?.[zoneCellKey(pos)]);
+      return [t, bw * (q.isNight ? d.nightWeight : 1)] as [CreatureType, number];
+    });
+    const bossRoll = hash01(cx, cy, epoch, 11);
+    const type = inPark && bossRoll < PARK_BOSS_CHANCE
+      ? BOSS_TYPES[Math.floor((bossRoll / PARK_BOSS_CHANCE) * BOSS_TYPES.length) % BOSS_TYPES.length]
+      : pickWeighted(weights, hash01(cx, cy, epoch, 10));
+    if (!type) continue;
+    const id = `c:${cx}:${cy}:${epoch}`;
+    if (!q.depleted[id]) {
+      out.push({ id, kind: 'creature', type, lat: pos.lat, lng: pos.lng });
     }
   }
   return out;
