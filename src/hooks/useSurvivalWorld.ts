@@ -1500,7 +1500,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const check = canPlaceVillageBuilding(v, buildingId, x, y, p.base.level);
     if (check.ok === false) { toast.warning(check.reason); return false; }
     const def = VILLAGE_BUILDINGS[buildingId];
-    const paid = payAccessible(p, def.cost);
+    const paid0 = payCost(p, def.cost); const paid = paid0 && { ...p, ...paid0 };
     if (!paid) { toast.error(`재료가 부족해요: ${fmt(def.cost)}`); return false; }
     const nextV = placeVillageBuilding(v, buildingId, x, y, crypto.randomUUID());
     const hasPal = nextV.buildings.some(b => VILLAGE_BUILDINGS[b.buildingId].category === 'wall');

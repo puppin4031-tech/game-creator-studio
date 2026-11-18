@@ -63,6 +63,17 @@ export function payAccessible<T extends AbilitySave>(p: T, cost: Stack[]): T | n
   const storage = removeStacks(p.storage, storedCost);
   return storage ? { ...p, backpack: remaining, storage } : null;
 }
+/** Storage first, then backpack, per item (mixed sources allowed). */
+export function payStored<T extends AbilitySave>(p: T, cost: Stack[]): T | null {
+  let storage = p.storage, backpack = p.backpack;
+  for (const c of cost) {
+    const inStore = storage.find(x => x.itemId === c.itemId)?.count ?? 0;
+    const a = Math.min(inStore, c.count), b = c.count - a;
+    if (a) { const r = removeStacks(storage, [{ itemId: c.itemId, count: a }]); if (!r) return null; storage = r; }
+    if (b) { const r = removeStacks(backpack, [{ itemId: c.itemId, count: b }]); if (!r) return null; backpack = r; }
+  }
+  return { ...p, storage, backpack };
+}
 export function researchTechnology<T extends AbilitySave>(p: T, id: string, gpsReady: boolean): ActionResult<T> {
   const t = techById(id);
   if (!gpsReady) return { ok: false, reason: '정확한 GPS 신호가 필요합니다' };
@@ -124,8 +135,8 @@ export function relocateOutpost<T extends AbilitySave>(p: T, gpsReady: boolean):
   if (!p.base || !p.techs.includes('outpost') || !p.outpost) return { ok: false, reason: '본거지와 전진기지·건축 기술이 필요합니다' };
   if (distanceM(p.pos, p.base) < C.outpostMinDistFromBaseM) return { ok: false, reason: '본거지에서 150m 이상 떨어진 곳으로 옮기세요' };
   if (distanceM(p.pos, p.outpost) <= C.outpostRadiusM) return { ok: false, reason: '기존 전진기지 반경 30m 밖으로 이동한 뒤 옮기세요' };
-  const paid = payAccessible(p, OUTPOST_COST);
-  if (!paid) return { ok: false, reason: '전진기지 이동에 필요한 건축 재료를 배낭에 챙기세요' };
+  const paid = payStored(p, OUTPOST_COST);
+  if (!paid) return { ok: false, reason: '전진기지 이동에 필요한 건축 재료가 부족합니다' };
   return { ok: true, state: { ...paid, outpost: { ...p.outpost, ...p.pos } } };
 }
 export function buildStructure<T extends AbilitySave>(p: T, kind: 'palisade' | 'outpost', gpsReady: boolean): ActionResult<T> {
@@ -133,7 +144,7 @@ export function buildStructure<T extends AbilitySave>(p: T, kind: 'palisade' | '
   if (!p.base || !p.techs.includes(kind)) return { ok: false, reason: '본거지와 건축 기술이 필요합니다' };
   if (kind === 'palisade' && (!atMainBase(p) || p.palisade)) return { ok: false, reason: '본거지에서 목책을 한 번만 설치할 수 있습니다' };
   if (kind === 'outpost' && (p.outpost || distanceM(p.pos, p.base) < C.outpostMinDistFromBaseM)) return { ok: false, reason: '전진기지는 1개만, 본거지에서 150m 이상 떨어져 설치하세요' };
-  const paid = payAccessible(p, kind === 'palisade' ? PALISADE_COST : OUTPOST_COST);
+  const paid = payStored(p, kind === 'palisade' ? PALISADE_COST : OUTPOST_COST);
   if (!paid) return { ok: false, reason: '건축 재료가 부족합니다' };
   return { ok: true, state: kind === 'palisade' ? { ...paid, palisade: true } : { ...paid, outpost: { ...p.pos } } };
 }
