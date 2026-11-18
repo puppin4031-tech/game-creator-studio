@@ -30,6 +30,7 @@ import {
   checkShamanQuestStageProgress,
   SHAMAN_CLASSES,
   SHAMAN_QUEST_STAGES,
+  SHAMAN_STAGE_5_DESTINY,
   type ShamanClassId,
   type ShamanLevel,
   type ShamanQuestStage,
@@ -70,13 +71,21 @@ export default function ShamanQuestModal({
   onOpenWorkshop,
   onOpenCivTech,
 }: Props) {
-  // Current view stage: defaults to current progression stage (clamp to 1~4)
-  const currentStageIndex = Math.min(3, Math.max(0, shamanLevel - 1));
+  // Current view stage: defaults to current progression stage (0~3 for stages 1~4, 4 for stage 5 destiny)
+  const currentStageIndex = shamanLevel >= 5 ? 4 : Math.min(3, Math.max(0, shamanLevel - 1));
   const [selectedStageIdx, setSelectedStageIdx] = useState<number>(currentStageIndex);
 
-  const activeStage = SHAMAN_QUEST_STAGES[selectedStageIdx];
+  const isDestinyStage = selectedStageIdx === 4;
+  const activeStage = isDestinyStage ? null : SHAMAN_QUEST_STAGES[selectedStageIdx];
 
   const progress = useMemo(() => {
+    if (!activeStage) {
+      return {
+        canRitual: shamanLevel >= 5,
+        materialChecks: [],
+        buildingChecks: [],
+      };
+    }
     return checkShamanQuestStageProgress({
       stage: activeStage,
       storage,
@@ -85,13 +94,13 @@ export default function ShamanQuestModal({
       pets,
       expeditionDistanceM,
     });
-  }, [activeStage, storage, backpack, village, pets, expeditionDistanceM]);
+  }, [activeStage, storage, backpack, village, pets, expeditionDistanceM, shamanLevel]);
 
   if (!open) return null;
 
-  const isCurrentStageAchieved = shamanLevel > activeStage.fromLevel;
-  const isTargetStage = shamanLevel === activeStage.fromLevel;
-  const isFutureStage = shamanLevel < activeStage.fromLevel;
+  const isCurrentStageAchieved = activeStage ? shamanLevel > activeStage.fromLevel : !!shamanClass;
+  const isTargetStage = activeStage ? shamanLevel === activeStage.fromLevel : shamanLevel >= 5 && !shamanClass;
+  const isFutureStage = activeStage ? shamanLevel < activeStage.fromLevel : shamanLevel < 5;
 
   const classMeta = shamanClass ? SHAMAN_CLASSES[shamanClass] : null;
 
@@ -184,66 +193,177 @@ export default function ShamanQuestModal({
         {/* 5th Stage: Evolution Choice */}
         <button
           type="button"
-          onClick={() => {
-            if (shamanLevel >= 5) {
-              onOpenEvolutionModal();
-            } else {
-              setSelectedStageIdx(3);
-            }
-          }}
+          onClick={() => setSelectedStageIdx(4)}
           className={`flex flex-col items-center justify-center p-2 rounded-md border text-center transition-all ${
-            shamanLevel >= 5
-              ? 'border-purple-500 bg-purple-500/20 text-purple-300 ring-1 ring-purple-500 animate-pulse'
-              : 'border-border/60 bg-muted/20 text-muted-foreground opacity-60'
+            selectedStageIdx === 4
+              ? 'border-purple-500 bg-purple-500/25 text-purple-300 ring-2 ring-purple-500 shadow-md'
+              : shamanLevel >= 5
+                ? 'border-purple-500/50 bg-purple-500/10 text-purple-300 animate-pulse'
+                : 'border-border/60 bg-muted/20 text-muted-foreground opacity-60'
           }`}
         >
           <div className="flex items-center gap-1 font-bold text-xs">
             <Sparkles className="h-3.5 w-3.5 text-purple-400" />
-            <span>4대 전직</span>
+            <span>5막 전직</span>
           </div>
           <span className="text-[9px] opacity-75 mt-0.5">
-            {shamanClass ? classMeta?.name ?? '전직 완료' : shamanLevel >= 5 ? '선택 가능!' : 'Lv.5 해금'}
+            {shamanClass ? classMeta?.name ?? '전직 완료' : shamanLevel >= 5 ? '의식 준비됨' : 'Lv.5 잠김'}
           </span>
         </button>
       </div>
 
       {/* Main Body */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-        {/* Shaman Story Dialogue Box */}
-        <div className="rounded-lg border-2 border-primary/40 bg-card p-3.5 space-y-2.5">
-          <div className="flex items-start gap-3">
-            <img
-              src={shamanImg}
-              alt="떠돌이 주술사"
-              className="pixelated h-14 w-auto rounded border-2 border-foreground bg-background p-1"
-            />
-            <div className="space-y-1 min-w-0 flex-1">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-sm text-amber-400 flex items-center gap-1.5">
-                  <span>🧙 떠돌이 주술사</span>
-                  <span className="text-xs text-muted-foreground font-normal">
-                    [제{activeStage.toLevel - 1}막: {activeStage.title}]
-                  </span>
+        {isDestinyStage ? (
+          <div className="space-y-4">
+            {/* Shaman Story Dialogue Box */}
+            <div className="rounded-lg border-2 border-purple-500/50 bg-card p-3.5 space-y-2.5">
+              <div className="flex items-start gap-3">
+                <img
+                  src={shamanImg}
+                  alt="떠돌이 주술사"
+                  className="pixelated h-14 w-auto rounded border-2 border-purple-500 bg-background p-1"
+                />
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-sm text-purple-400 flex items-center gap-1.5">
+                      <span>🧙 떠돌이 주술사</span>
+                      <span className="text-xs text-muted-foreground font-normal">
+                        [제5막: {SHAMAN_STAGE_5_DESTINY.title}]
+                      </span>
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 font-mono font-bold">
+                      {SHAMAN_STAGE_5_DESTINY.subtitle}
+                    </span>
+                  </div>
+                  <p className="text-xs text-foreground/90 italic leading-relaxed">
+                    "{SHAMAN_STAGE_5_DESTINY.storyQuote}"
+                  </p>
+                </div>
+              </div>
+
+              {/* Story Snippet */}
+              <div className="space-y-1 border-t border-border/80 pt-2 text-[11px] text-muted-foreground">
+                {SHAMAN_STAGE_5_DESTINY.storyDialogue.map((line, i) => (
+                  <p key={i} className="leading-snug">
+                    {line}
+                  </p>
+                ))}
+              </div>
+            </div>
+
+            {/* 4 Evolution Paths Overview Card */}
+            <div className="rounded-lg border border-border bg-card p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between border-b border-border/80 pb-2">
+                <span className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                  <Sparkles className="h-4 w-4 text-purple-400" />
+                  <span>4대 주술사 전직 클래스 선택 분기</span>
                 </span>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-primary/20 text-primary border border-primary/40 font-mono font-bold">
-                  {activeStage.subtitle}
+                <span className="text-[10px] text-muted-foreground">
+                  (주술사 Lv.5 달성 시 4가지 길 중 1가지 선택)
                 </span>
               </div>
-              <p className="text-xs text-foreground/90 italic leading-relaxed">
-                "{activeStage.storyQuote}"
-              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                {(Object.values(SHAMAN_CLASSES) as any[]).map(cls => (
+                  <div
+                    key={cls.id}
+                    className={`p-3 rounded-lg border ${cls.borderClass} bg-gradient-to-br ${cls.bgGradient} space-y-1.5 shadow-sm`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{cls.icon}</span>
+                        <div>
+                          <div className="font-bold text-xs text-foreground flex items-center gap-1">
+                            <span>{cls.name}</span>
+                            <span className="text-[10px] text-muted-foreground font-normal">{cls.appearance}</span>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground">{cls.badge}</span>
+                        </div>
+                      </div>
+                      {shamanClass === cls.id && (
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[9px] font-bold border border-emerald-500/40">
+                          현재 선택됨
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-foreground/90 leading-tight">
+                      {cls.desc}
+                    </p>
+                    <div className="space-y-0.5 text-[10px] pt-1 border-t border-border/50">
+                      <div className="text-emerald-400 font-bold">✓ {cls.pros[0]}</div>
+                      <div className="text-destructive font-bold">⚠️ {cls.cons[0]}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Action Button */}
+            <div className="pt-2">
+              {shamanLevel >= 5 ? (
+                <Button
+                  type="button"
+                  onClick={onOpenEvolutionModal}
+                  className="pixel-btn w-full h-12 gap-2 bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-600 text-white font-bold text-xs hover:opacity-90 shadow-lg animate-pulse"
+                >
+                  <Sparkles className="h-4 w-4 text-amber-300" />
+                  <span>
+                    {shamanClass
+                      ? `🔮 [${classMeta?.name ?? '전직 주술사'}] 4대 전직 상세 메뉴 열기`
+                      : '🔮 4대 전직 의식 진행하기 (클래스 선택 및 궁극 진화)'}
+                  </span>
+                </Button>
+              ) : (
+                <div className="p-3.5 rounded-lg border border-border bg-muted/20 text-center space-y-1">
+                  <span className="font-bold text-muted-foreground text-xs flex items-center justify-center gap-1.5">
+                    <Lock className="h-4 w-4" />
+                    <span>주술사 Lv.5 달성 시 4대 전직 의식이 개방됩니다</span>
+                  </span>
+                  <p className="text-[10px] text-muted-foreground">
+                    현재 주술사 Lv.{shamanLevel}/5 단계입니다. 제{shamanLevel}막 승급 퀘스트를 먼저 완수하세요.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
+        ) : activeStage ? (
+          <>
+            {/* Shaman Story Dialogue Box */}
+            <div className="rounded-lg border-2 border-primary/40 bg-card p-3.5 space-y-2.5">
+              <div className="flex items-start gap-3">
+                <img
+                  src={shamanImg}
+                  alt="떠돌이 주술사"
+                  className="pixelated h-14 w-auto rounded border-2 border-foreground bg-background p-1"
+                />
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-sm text-amber-400 flex items-center gap-1.5">
+                      <span>🧙 떠돌이 주술사</span>
+                      <span className="text-xs text-muted-foreground font-normal">
+                        [제{activeStage.toLevel - 1}막: {activeStage.title}] — 퀘스트명: {activeStage.questName}
+                      </span>
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-primary/20 text-primary border border-primary/40 font-mono font-bold">
+                      {activeStage.subtitle}
+                    </span>
+                  </div>
+                  <p className="text-xs text-foreground/90 italic leading-relaxed">
+                    "{activeStage.storyQuote}"
+                  </p>
+                </div>
+              </div>
 
-          {/* Interactive Story Snippet */}
-          <div className="space-y-1 border-t border-border/80 pt-2 text-[11px] text-muted-foreground">
-            {activeStage.storyDialogue.map((line, i) => (
-              <p key={i} className="leading-snug">
-                {line}
-              </p>
-            ))}
-          </div>
-        </div>
+              {/* Interactive Story Snippet */}
+              <div className="space-y-1 border-t border-border/80 pt-2 text-[11px] text-muted-foreground">
+                {activeStage.storyDialogue.map((line, i) => (
+                  <p key={i} className="leading-snug">
+                    {line}
+                  </p>
+                ))}
+              </div>
+            </div>
 
         {/* Requirements Checklist Card */}
         <div className="rounded-lg border border-border bg-card p-3.5 space-y-3">
@@ -545,7 +665,9 @@ export default function ShamanQuestModal({
             )}
           </div>
         </div>
-      </div>
-    </div>
-  );
+      </>
+    ) : null}
+  </div>
+</div>
+);
 }

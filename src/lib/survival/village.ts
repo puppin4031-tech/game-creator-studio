@@ -1,8 +1,18 @@
 import type { Stack } from './types';
 
+export const VILLAGE_GRID_SIZE_DEFAULT = 12;
 export const VILLAGE_GRID_SIZE = 12;
 export const VILLAGE_TOTAL_GRID_SIZE = 16;
 export const VILLAGE_SPAWN_MARGIN = 2;
+
+/**
+ * Dynamic village grid size based on Shaman level.
+ * Shaman Lv.1: 12x12
+ * Shaman Lv.2~5 (Stage 1 '불씨의 기억' completion reward): 14x14
+ */
+export function getVillageGridSize(shamanLevel: number = 1): number {
+  return shamanLevel >= 2 ? 14 : 12;
+}
 
 export type VillageBuildingCategory = 'wall' | 'facility' | 'decor';
 
@@ -642,8 +652,8 @@ export const VILLAGE_BUILDINGS: Record<VillageBuildingId, VillageBuildingDef> = 
 
 export const VILLAGE_BUILDING_LIST: VillageBuildingDef[] = Object.values(VILLAGE_BUILDINGS);
 
-export function inVillageBounds(x: number, y: number): boolean {
-  return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && x < VILLAGE_GRID_SIZE && y >= 0 && y < VILLAGE_GRID_SIZE;
+export function inVillageBounds(x: number, y: number, gridSize: number = VILLAGE_GRID_SIZE): boolean {
+  return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && x < gridSize && y >= 0 && y < gridSize;
 }
 
 export function buildingFootprintCells(
@@ -752,7 +762,8 @@ export function canPlaceVillageBuilding(
   const def = VILLAGE_BUILDINGS[buildingId];
   if (!def) return { ok: false, reason: '알 수 없는 시설입니다' };
   const cells = buildingFootprintCells(buildingId, x, y);
-  if (cells.some(c => !inVillageBounds(c.x, c.y))) {
+  const gridSize = getVillageGridSize(state.shamanLevel ?? 1);
+  if (cells.some(c => !inVillageBounds(c.x, c.y, gridSize))) {
     return { ok: false, reason: `${def.name}(${def.footprintLabel})이(가) 마을 경계를 벗어납니다` };
   }
   if (baseLevel < def.unlockBaseLevel) {
@@ -843,7 +854,8 @@ export function moveVillageBuilding(
   if (target.x === toX && target.y === toY) return { ok: true, state };
   const def = VILLAGE_BUILDINGS[target.buildingId];
   const cells = buildingFootprintCells(target.buildingId, toX, toY);
-  if (cells.some(c => !inVillageBounds(c.x, c.y))) {
+  const gridSize = getVillageGridSize(state.shamanLevel ?? 1);
+  if (cells.some(c => !inVillageBounds(c.x, c.y, gridSize))) {
     return { ok: false, reason: `${def?.name ?? '건물'}이(가) 마을 경계를 벗어납니다` };
   }
   const restState: VillageState = {

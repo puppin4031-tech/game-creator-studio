@@ -15,6 +15,7 @@ export interface ShamanQuestStage {
   toLevel: ShamanLevel;
   title: string;
   subtitle: string;
+  questName: string;
   storyQuote: string;
   storyDialogue: string[];
   requiredMaterials: { itemId: ItemId; count: number; label: string }[];
@@ -33,87 +34,126 @@ export const SHAMAN_QUEST_STAGES: ShamanQuestStage[] = [
     fromLevel: 1,
     toLevel: 2,
     title: '불씨의 기억',
-    subtitle: 'Lv.1 → Lv.2 주술사 & 마을 동시 승급',
-    storyQuote: '어둠 속에서 살아남으려면 불씨와 쉼터가 필요하네. 맹수를 피해 쉴 뼈 움막을 짓고, 불을 피울 나뭇가지와 부싯돌을 바치게.',
+    subtitle: '거점 Lv.1 → Lv.2 승급 조건',
+    questName: '차가운 밤을 몰아내는 첫 번째 춤',
+    storyQuote: '내 뼈마디가 시린 걸 보니 곧 짐승들의 밤이 올 겐가. 모닥불만으론 부족하네. 나뭇가지와 돌을 엮어 바람을 막을 움막을 세우고, 암바초와 함께 첫 사냥을 다녀오게나.',
     storyDialogue: [
-      '주술사: "바람이 차가워지고 있네, 족장이여. 광야의 맹수들은 어둠을 틈타 냄새를 맡고 다가오지."',
+      '주술사: "내 뼈마디가 시린 걸 보니 곧 짐승들의 밤이 올 겐가. 모닥불만으론 부족하네."',
       '나: "주술사여, 부족민들이 쉴 수 있는 따뜻한 보금자리와 방어 수단이 필요합니다."',
-      '주술사: "좋네. 따스한 불씨를 피울 나뭇가지와 부싯돌을 모으고, 우리를 지켜줄 [뼈 움막]을 마을에 세우게. 그에 답해 고대 무두질과 목공술의 비밀을 가르쳐주마."',
+      '주술사: "나뭇가지와 돌을 엮어 바람을 막을 움막을 세우고, 암바초와 함께 첫 사냥을 다녀오게나."',
     ],
     requiredMaterials: [
       { itemId: 'branch', count: 10, label: '나뭇가지 10개' },
       { itemId: 'flint', count: 5, label: '부싯돌 5개' },
     ],
     requiredBuildings: [
-      { buildingId: 'tribe_shelter', label: '뼈 움막(부족민 안식처) 마을에 건설' },
+      { buildingId: 'tribe_shelter', label: '마을에 [뼈 움막] 1채 건설' },
     ],
-    rewardsSummary: '주술사 & 마을 Lv.2 승급 · 무두질(tanning) 및 초급 목공술(woodworking) 즉시 해금',
-    unlockedFeatures: ['마을 레벨 Lv.2 승급', '무두질(tanning) Lv.1 습득', '초급 목공술(woodworking) Lv.1 습득'],
+    rewardsSummary: '주술사 Lv.2 승급 (무두질·초급 목공술 해금), 마을 그리드 확장(12x12 → 14x14)',
+    unlockedFeatures: [
+      '주술사 & 마을 거점 Lv.2 승급',
+      '무두질(tanning) 및 초급 목공술(woodworking) 해금',
+      '마을 그리드 확장 (12x12 → 14x14 타일로 영토 확장)',
+    ],
   },
   {
     fromLevel: 2,
     toLevel: 3,
     title: '영혼을 담는 그릇',
-    subtitle: 'Lv.2 → Lv.3 주술사 & 마을 최고 단계 승급',
-    storyQuote: '대지의 신성한 영을 담으려면 단단한 제단과 고대 공룡 뼈가 필요하네. 흑요석과 공룡 뼈를 바치고 고대 제단을 완성하게.',
+    subtitle: '거점 Lv.2 → Lv.3 승급 조건',
+    questName: '정령의 목소리가 닿는 돌',
+    storyQuote: '자네의 손재주가 예사롭지 않군. 땅속 깊은 곳에서 잠든 흑요석과 공룡 뼈를 가져오게. 내 천막 옆에 고대 제단을 세우면, 물질 속에 숨은 진짜 이치를 깨우칠 수 있을 걸세.',
     storyDialogue: [
-      '주술사: "불씨는 타올랐으나, 아직 대지의 혼령들은 안식처를 찾지 못했네."',
-      '나: "영혼을 담는 제단을 세워 부족의 안녕을 빌어야겠군요."',
-      '주술사: "그렇네! 단단한 흑요석과 고대 공룡의 영혼이 깃든 뼈를 모아 [고대 제단]을 축조하게. 제단이 서면 단단한 돌을 깎아내는 석공술과 대장간의 문이 열릴 걸세."',
+      '주술사: "자네의 손재주가 예사롭지 않군."',
+      '주술사: "땅속 깊은 곳에서 잠든 흑요석과 공룡 뼈를 가져오게."',
+      '주술사: "내 천막 옆에 고대 제단을 세우면, 물질 속에 숨은 진짜 이치를 깨우칠 수 있을 걸세."',
     ],
     requiredMaterials: [
       { itemId: 'obsidian', count: 3, label: '흑요석 3개' },
       { itemId: 'bone', count: 5, label: '공룡 뼈 5개' },
     ],
     requiredBuildings: [
-      { buildingId: 'ancient_altar', label: '고대 제단(Ancient Altar) 마을에 건설' },
+      { buildingId: 'ancient_altar', label: '[고대 제단] 마을에 건설' },
     ],
-    rewardsSummary: '주술사 & 마을 최고 레벨(Lv.3) 승급 · 석공술(masonry_smelting) 및 석공 장인 해금',
-    unlockedFeatures: ['마을 최고 단계(Lv.3) 달성', '석공술(masonry_smelting) Lv.1 습득', '석공 장인(stone_artisan) 해금'],
+    rewardsSummary: '주술사 Lv.3 승급 (석공술 해금, AI 물리 분석 창 활성화)',
+    unlockedFeatures: [
+      '주술사 Lv.3 승급 (마을 최고 단계 승급)',
+      '석공술(masonry_smelting) 해금',
+      'AI 물리 분석 창 (의도 기반 AI 제작/설계소) 활성화',
+    ],
   },
   {
     fromLevel: 3,
     toLevel: 4,
     title: '짐승의 발톱을 막아라',
-    subtitle: 'Lv.3 → Lv.4 주술사 승급 & 거점 요새화',
-    storyQuote: '광야의 포식자들이 마을의 불빛을 보고 몰려오고 있네. 마을을 지킬 울타리 8개와 적을 감시할 망루를 세우고, 우리를 수호할 펫 2마리를 배치하게!',
+    subtitle: '거점 Lv.3 → Lv.4 승급 조건',
+    questName: '피 냄새를 맡은 어둠의 무리',
+    storyQuote: '마을에 고기 냄새가 진동하니 굶주린 랩터 떼가 몰려들고 있네! 건축공방에서 탄성과 밀도가 높은 울타리와 망루를 설계해 마을을 둘러싸게. 공룡 펫도 최소 2마리는 수호대로 세워야 안전할 걸세.',
     storyDialogue: [
-      '주술사: "어젯밤 숲 너머에서 거대한 랩터 무리의 울음소리가 들렸네. 단순한 천막으로는 발톱을 막을 수 없어."',
-      '나: "성벽을 둘러치고 고지대 망루와 수호 펫들로 요새를 굳혀야 합니다."',
-      '주술사: "옳은 판단일세! 마을 외곽에 울타리 8개 이상과 망루 1개를 세우고, 충직한 공룡 펫 2마리를 배치하게. 요새화가 끝나면 무쇠를 벼리는 중급 제련술을 전수하겠네."',
+      '주술사: "마을에 고기 냄새가 진동하니 굶주린 랩터 떼가 몰려들고 있네!"',
+      '주술사: "건축공방에서 탄성과 밀도가 높은 울타리와 망루를 설계해 마을을 둘러싸게."',
+      '주술사: "공룡 펫도 최소 2마리는 수호대로 세워야 안전할 걸세."',
     ],
     requiredMaterials: [],
     minWalls: 8,
     minTowers: 1,
     minPets: 2,
-    rewardsSummary: '주술사 Lv.4 승급 · 중급 제련술 및 나무 장인 Lv.2 해금',
-    unlockedFeatures: ['주술사 Lv.4 달성', '중급 제련술(masonry_smelting Lv.2) 해금', '나무 장인(wood_artisan Lv.2) 해금'],
+    rewardsSummary: '주술사 Lv.4 승급 (중급 제련술 해금, 마을 야간 시야 반경 +30m)',
+    unlockedFeatures: [
+      '주술사 Lv.4 승급 (거점 요새화)',
+      '중급 제련술(masonry_smelting Lv.2) 해금',
+      '마을 야간 시야 반경 +30m 영구 확장',
+    ],
   },
   {
     fromLevel: 4,
     toLevel: 5,
     title: '잊혀진 시대의 유물',
-    subtitle: 'Lv.4 → Lv.5 주술사 최종 승급 & 4대 전직 개방',
-    storyQuote: '고대의 위대한 지혜를 깨우칠 마지막 시련일세. 탐험대를 미지의 땅 500m 너머로 파견하고, 강력한 합체 공룡 펫을 육성하여 4대 전직 의식을 준비하게!',
+    subtitle: '거점 Lv.4 → Lv.5 승급 조건',
+    questName: '지평선 너머의 고대 거수',
+    storyQuote: '이제 자네 부족도 제법 꼴을 갖추었군. 하지만 진정한 시련은 마을 밖에 있네. 공룡 탐험대를 내보내 500m 이상 전진하고, Lv.2 이상 합체 성장한 펫의 힘을 증명해 보이게!',
     storyDialogue: [
-      '주술사: "이제 자네와 이 마을은 원시의 한계를 넘어섰네. 저 지평선 너머 잊혀진 시대의 고대 유물이 깨어나는 것이 느껴지는가?"',
-      '나: "탐험대를 더 멀리 보내어 문명의 궁극적인 비밀을 밝혀내겠습니다."',
-      '주술사: "탐험대로 500m 이상의 미지의 대지를 돌파하고, 2단계 이상으로 합체 진화한 공룡 펫을 보여주게! 그 순간, 자네는 4대 전직의 길 중 하나를 선택해 부족의 운명을 영원히 바꾸게 될 걸세!"',
+      '주술사: "이제 자네 부족도 제법 꼴을 갖추었군. 하지만 진정한 시련은 마을 밖에 있네."',
+      '주술사: "공룡 탐험대를 내보내 500m 이상 전진하고, Lv.2 이상 합체 성장한 펫의 힘을 증명해 보이게!"',
     ],
     requiredMaterials: [],
     minExpeditionDistanceM: 500,
     minMergedPetLevel: 2,
-    rewardsSummary: '주술사 최종 Lv.5 달성 · 4대 전직(공돌이·마법·흑마·정직) 의식 영구 해금!',
-    unlockedFeatures: ['주술사 최종 Lv.5 완성', '4대 전직 의식(Evolution) 즉시 개방', '전직별 전용 메뉴 및 궁극기 활성화'],
+    rewardsSummary: '주술사 Lv.5 마스터 (모든 기초 제작술 완료 → 4대 전직 의식 해금)',
+    unlockedFeatures: [
+      '주술사 Lv.5 마스터 달성',
+      '모든 기초 제작술 완료',
+      '4대 전직(공돌이·마법·흑마·정직) 의식 영구 해금',
+    ],
   },
 ];
+
+/** Stage 5 Destiny Story & Dialogue */
+export const SHAMAN_STAGE_5_DESTINY = {
+  title: '운명의 갈림길',
+  subtitle: '주술사 전직 퀘스트',
+  questName: '새로운 시대를 여는 길',
+  storyQuote: '허허, 이제 내가 가르칠 수 있는 원시의 지혜는 모두 전수했네. 이제 내 안의 잠든 영혼을 깨워 새로운 시대의 길을 열 차례야. 자네는 이 부족을 어떤 세계로 이끌고 싶은가?',
+  storyDialogue: [
+    '주술사: "허허, 이제 내가 가르칠 수 있는 원시의 지혜는 모두 전수했네."',
+    '주술사: "이제 내 안의 잠든 영혼을 깨워 새로운 시대의 길을 열 차례야."',
+    '주술사: "자네는 이 부족을 어떤 세계로 이끌고 싶은가?"',
+  ],
+  rewardsSummary: '4대 전직(공돌이·마법·흑마·정직) 선택 및 주술사 고유 외형/스킬/시설 활성화',
+};
 
 export interface ShamanClassMeta {
   id: ShamanClassId;
   name: string;
+  appearance: string;
   badge: string;
   icon: string;
   auraText: string;
+  concept: string;
+  facilitiesDesc?: string;
+  resourcesDesc?: string;
+  skillsDesc?: string;
+  featuresDesc?: string;
   desc: string;
   motto: string;
   pros: string[];
@@ -128,20 +168,26 @@ export const SHAMAN_CLASSES: Record<ShamanClassId, ShamanClassMeta> = {
   engineer: {
     id: 'engineer',
     name: '공돌이 주술사',
-    badge: '🔧 스팀펑크 공학 & 대장간',
+    appearance: '(고글 & 망치)',
+    badge: '🔧 근대 공업 & 제련 테크',
     icon: '🔧',
     auraText: '회전하는 황동 톱니바퀴와 풀무 불꽃 오라',
-    desc: '원시 자연의 한계를 거부하고, 톱니바퀴와 풀무, 강철 대장간의 과학 기술로 시대를 앞서가는 공학 주술사.',
+    concept: '근대 공업 & 제련 테크',
+    facilitiesDesc: '풀무, 용광로, 대장간, 자동 채굴기',
+    resourcesDesc: '철광석, 구리, 주석(청동), 놋쇠 제련',
+    featuresDesc: '자동화 방어 포탑(발리스타/투석기) 건설, 내구도 3배 강철 무기·갑옷 제작',
+    desc: '원시 자연의 한계를 거부하고 풀무와 용광로, 대장간과 자동 채굴기의 과학 기술로 시대를 앞서가는 공학 주술사.',
     motto: '"마법은 환상일 뿐, 강철과 기계만이 영원한 문명을 약속한다."',
     pros: [
-      '풀무 & 대장간 제련소 해금 (정밀 주조)',
-      '철·청동·놋쇠 신규 합금 제련 레시피 활성',
-      '반경 30m 자동 원거리 요격 방어 포탑(Turret) 건설',
-      '모든 무기 및 도구 내구도 3배(300%) 영구 증가',
+      '압도적인 건물/성벽 내구도 및 방어력',
+      '마을 자동 생산량 +50% 증가',
+      '무기 파손(내구도 소모) 거의 없음 (내구도 3배)',
+      '시설: 풀무, 용광로, 대장간, 자동 채굴기 해금',
+      '기능: 자동화 방어 포탑(발리스타/투석기) 건설',
     ],
     cons: [
-      '원소 마법 및 주술 스킬 일체 사용 불가',
-      '고급 기계 제작 시 다량의 금속 광석 및 연료 소모',
+      '마법/저주 계열 스킬 사용 불가',
+      '광석과 연료(목탄/석탄) 소모량이 매우 큼',
     ],
     themeColor: 'amber',
     bgGradient: 'from-amber-500/20 via-orange-500/20 to-yellow-500/10',
@@ -150,22 +196,26 @@ export const SHAMAN_CLASSES: Record<ShamanClassId, ShamanClassMeta> = {
   },
   mage: {
     id: 'mage',
-    name: '원소 마법술사',
-    badge: '🔮 4대 원소 & 아케인 마나',
+    name: '마법술사',
+    appearance: '(푸른 로브 & 수정 지팡이)',
+    badge: '🔮 원소 마법 연구 & 스펠 부여',
     icon: '🔮',
-    auraText: '영롱하게 타오르는 보랏빛 마나 수정체 오라',
-    desc: '자연 속에 잠들어 있는 화염, 냉기, 번개의 원소 정령과 교감하여 전장을 지배하는 순수 마법 주술사.',
+    auraText: '영롱하게 타오르는 푸른 로브와 수정 지팡이 마나 오라',
+    concept: '원소 마법 연구 & 스펠 부여',
+    skillsDesc: '파이어볼(광역 화상), 아이스볼(이동/공속 둔화), 썬더볼트(단일 극딜+기절), 마나 실드(거점/펫 보호막)',
+    featuresDesc: '무기에 원소 속성(화염·냉기·전격) 인챈트 부여',
+    desc: '자연 속에 잠들어 있는 화염, 냉기, 번개의 원소 정령과 교감하여 마법으로 전장을 지배하는 순수 마법술사.',
     motto: '"대지의 원소들이여, 내 부름에 응하여 적들을 재로 만들어라!"',
     pros: [
-      '🔥 파이어볼: 30 강력 화염 피해 및 5초 화상 지속 데미지',
-      '❄️ 아이스볼: 20 냉기 피해 및 적 이동/공속 50% 결빙 감속',
-      '⚡ 썬더볼트: 35 뇌격 관통 피해 및 적 100% 충격 스턴',
-      '🛡️ 마나 실드: 다음 적 공격 3회를 완전 무효화하는 배리어',
-      '장착 무기에 불·얼음·번개 원소 속성 영구 인챈트 부여',
+      '탐험 및 전투에서 가장 강력한 광역 화력',
+      '재료가 적어도 마나(연구 포인트)로 전투 극복 가능',
+      '아이스볼/마나 실드로 펫 생존율 극대화',
+      '스킬 개발: 파이어볼, 아이스볼, 썬더볼트, 마나 실드',
+      '기능: 무기에 원소 속성 인챈트 부여',
     ],
     cons: [
-      '물리 방벽 및 성벽 내구도 -20% 취약',
-      '스킬 시전 시 마나 포인트 소모 (지속 관리 필요)',
+      '물리 건축물/성벽 내구도가 약함',
+      '전투 시 마나(신비한 가루/포인트)를 지속 소모',
     ],
     themeColor: 'violet',
     bgGradient: 'from-violet-500/20 via-purple-500/20 to-indigo-500/10',
@@ -174,21 +224,25 @@ export const SHAMAN_CLASSES: Record<ShamanClassId, ShamanClassMeta> = {
   },
   warlock: {
     id: 'warlock',
-    name: '암흑 흑마술사',
-    badge: '💀 심연의 맹독 & 강령술',
+    name: '흑마술사',
+    appearance: '(해골 가면 & 보라색 오라)',
+    badge: '💀 암흑 주술 & 언데드 연성',
     icon: '💀',
-    auraText: '검푸른 심연의 연기와 떠도는 해골 영혼 오라',
-    desc: '금지된 심연의 주술을 다루며, 뼈와 영혼을 제물로 바쳐 전설의 공룡을 불사의 용으로 진화시키는 흑마술사.',
+    auraText: '검푸른 심연의 연기와 해골 가면 보라색 오라',
+    concept: '암흑 주술 & 언데드 연성',
+    skillsDesc: '맹독 안개(지속 피해), 약화 저주(적 공격력 40% 감소), 스컬 소환(전투 시 해골 병사 2기 자동 소환)',
+    featuresDesc: 'Lv.4 이상 공룡 펫 + 흑요석/뼈 제물로 [스컬 드래곤] 진화',
+    desc: '금지된 심연의 암흑 주술을 다루며, 뼈와 영혼을 제물로 바쳐 전설의 공룡을 불사의 스컬 드래곤으로 각성시키는 흑마술사.',
     motto: '"죽음은 끝이 아닌 새로운 군단의 시작일지니."',
     pros: [
-      '☠️ 맹독 안개: 반경 적들에게 8초간 지속 맹독 피해 살포',
-      '🩸 약화 저주: 적 몬스터의 공격력과 방어력을 40% 강제 붕괴',
-      '💀 스컬 소환: 해골 보초병 미니언 2기를 즉시 소환해 협공',
-      '★ 암흑 의식: Lv.4 이상 공룡 펫을 [스컬 드래곤]으로 최종 각성 진화!',
+      '소모성 해골 소환수로 펫 사망 리스크 분산',
+      '스컬 드래곤의 압도적 보스전 성능 (Lv.4+ 공룡 각성)',
+      '적 처치 시 체력 흡수(흡혈) 생존력',
+      '스킬 개발: 맹독 안개, 약화 저주(적 공격력 -40%), 스컬 소환',
     ],
     cons: [
-      '거점 휴식 및 캠프파이어 회복 효율 -30% 감소',
-      '강력한 암흑 의식 시 공룡 뼈 및 체력 제물 요구',
+      '마을 쉼터 휴식 효율 -30% 감소',
+      '진화 및 소환 시 일정량의 뼈/생명력(HP) 제물 필요',
     ],
     themeColor: 'emerald',
     bgGradient: 'from-emerald-500/20 via-teal-500/20 to-slate-900/40',
@@ -197,20 +251,24 @@ export const SHAMAN_CLASSES: Record<ShamanClassId, ShamanClassMeta> = {
   },
   orthodox: {
     id: 'orthodox',
-    name: '정직한 대현자',
-    badge: '👑 정통 역사 & 문명 번영',
+    name: '정직한 주술사',
+    appearance: '(황금 깃털관 & 토템 지팡이)',
+    badge: '👑 역사적 정통 문명 & 조화 성장',
     icon: '👑',
-    auraText: '황금빛 토템 관과 성스러운 문명 번영의 광채',
-    desc: '구석기에서 철기까지 정통 인류 역사 테크트리를 계승하며, 부족민과 펫의 기본기를 완성시키는 위대한 성자.',
+    auraText: '황금 깃털관과 토템 지팡이 성스러운 문명 번영 광채',
+    concept: '역사적 정통 문명 & 조화 성장',
+    featuresDesc: '구석기→신석기→청동기→철기 정석 계승, 부족민/펫 전체 영구 스탯 버프, 희귀 알 부화율 상승, 교역/외교 보너스',
+    desc: '구석기에서 철기까지 정통 인류 역사 테크트리를 계승하며 모든 분야를 조화롭게 발전시키는 위대한 정통 주술사.',
     motto: '"땀 흘려 일군 대지와 원칙만이 흔들리지 않는 제국을 낳는다."',
     pros: [
-      '모든 부족민 & 펫 영구 스탯 +20% (ATK / DEF / HP 올스탯 증폭)',
-      '나무·광석·약초 파밍 채집량 +25% 추가 수확 영구 패시브',
-      '모든 시설 건축 및 장비 제작 시 재료 소모량 -15% 절약',
-      '실패 없는 완벽한 내실 강화와 안정적인 문명 번영',
+      '단점이 없는 완벽한 올라운더 밸런스',
+      '파밍 획득량 +25% & 모든 펫/용병 최대 체력 +20%',
+      '재료 소모량 -15% 절약 패시브',
+      '구석기→신석기→청동기→철기 정통 문명 균형 발전',
+      '희귀 알 부화율 상승 및 교역/외교 보너스',
     ],
     cons: [
-      '순수 기본기 및 스탯 증폭 중심 (화려한 폭딜 마법이나 특수 포탑 없음)',
+      '공돌이의 자동화 속도나 마법/흑마의 폭발적 순간 화력보다는 성장 템포가 완만함',
     ],
     themeColor: 'sky',
     bgGradient: 'from-sky-500/20 via-blue-500/20 to-cyan-500/10',

@@ -35,6 +35,7 @@ import {
 import {
   canPlaceVillageBuilding,
   ensureVillageState,
+  getVillageGridSize,
   VILLAGE_GRID_SIZE,
   type VillageState,
 } from '@/lib/survival/village';
@@ -218,7 +219,8 @@ export default function IntentCraftingModal({
 
   // Find empty 1x1 tile for architecture placement
   const findNextEmptyTile = (): { x: number; y: number } | null => {
-    for (let r = 1; r < VILLAGE_GRID_SIZE; r++) {
+    const gridSize = getVillageGridSize(vState.shamanLevel ?? 1);
+    for (let r = 1; r < gridSize; r++) {
       for (let dy = -r; dy <= r; dy++) {
         for (let dx = -r; dx <= r; dx++) {
           const x = 5 + dx;
@@ -799,6 +801,34 @@ export default function IntentCraftingModal({
                 })}
               </div>
             </div>
+
+            {/* Real Game Engine Specs Box */}
+            {mode === 'architecture' && analysisResult.buildingSpecs && (
+              <div className="rounded-lg border border-primary/40 bg-primary/10 p-2.5 space-y-1.5 text-xs">
+                <span className="font-bold text-primary flex items-center gap-1.5 text-[11px]">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>실제 적용 게임 기능 태그 (Game Engine Specs)</span>
+                </span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 text-[11px] font-mono">
+                  <div className="flex items-center justify-between p-1 rounded bg-background/60 border border-primary/20">
+                    <span className="text-muted-foreground">night_vision_radius:</span>
+                    <span className="text-sky-400 font-bold">+{analysisResult.buildingSpecs.night_vision_radius}m (야간 시야)</span>
+                  </div>
+                  <div className="flex items-center justify-between p-1 rounded bg-background/60 border border-primary/20">
+                    <span className="text-muted-foreground">auto_turret_range:</span>
+                    <span className="text-red-400 font-bold">{analysisResult.buildingSpecs.auto_turret_range}m, atk: {analysisResult.buildingSpecs.auto_turret_atk}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-1 rounded bg-background/60 border border-primary/20">
+                    <span className="text-muted-foreground">durability:</span>
+                    <span className="text-amber-400 font-bold">{analysisResult.buildingSpecs.durability}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-1 rounded bg-background/60 border border-primary/20">
+                    <span className="text-muted-foreground">corrosion_resist:</span>
+                    <span className="text-emerald-400 font-bold">{analysisResult.buildingSpecs.corrosion_resist}%</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Final Action Button */}
             <div className="pt-2">

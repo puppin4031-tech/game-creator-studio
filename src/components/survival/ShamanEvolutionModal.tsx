@@ -173,6 +173,9 @@ export default function ShamanEvolutionModal({
                   <h2 className="text-base font-bold text-foreground">
                     {viewingMeta.name}
                   </h2>
+                  <span className="text-[10px] text-muted-foreground font-mono">
+                    {viewingMeta.appearance}
+                  </span>
                   <span className="text-[10px] px-2 py-0.5 rounded bg-background/70 border border-current font-bold">
                     {viewingMeta.badge}
                   </span>
@@ -202,6 +205,34 @@ export default function ShamanEvolutionModal({
           <p className="text-xs leading-relaxed text-foreground/90">
             {viewingMeta.desc}
           </p>
+
+          {/* Key Unlocks & Specs Banner */}
+          <div className="rounded-md border border-border/70 bg-background/60 p-2.5 space-y-1 text-xs">
+            {viewingMeta.facilitiesDesc && (
+              <div className="flex items-start gap-1.5">
+                <span className="font-bold text-amber-500 shrink-0">🏛️ 해금 시설:</span>
+                <span className="text-foreground/90">{viewingMeta.facilitiesDesc}</span>
+              </div>
+            )}
+            {viewingMeta.resourcesDesc && (
+              <div className="flex items-start gap-1.5">
+                <span className="font-bold text-amber-500 shrink-0">⛏️ 해금 자원:</span>
+                <span className="text-foreground/90">{viewingMeta.resourcesDesc}</span>
+              </div>
+            )}
+            {viewingMeta.skillsDesc && (
+              <div className="flex items-start gap-1.5">
+                <span className="font-bold text-purple-400 shrink-0">🔮 스킬 개발:</span>
+                <span className="text-foreground/90">{viewingMeta.skillsDesc}</span>
+              </div>
+            )}
+            {viewingMeta.featuresDesc && (
+              <div className="flex items-start gap-1.5">
+                <span className="font-bold text-sky-400 shrink-0">👑 특수 기능:</span>
+                <span className="text-foreground/90">{viewingMeta.featuresDesc}</span>
+              </div>
+            )}
+          </div>
 
           {/* Pros & Cons Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">

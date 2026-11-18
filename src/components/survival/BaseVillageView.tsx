@@ -8,6 +8,7 @@ import {
   computeVillageBonuses,
   computeVillagePopulationCapacity,
   ensureVillageState,
+  getVillageGridSize,
   isArtisanUnlocked,
   VILLAGE_BUILDING_LIST,
   VILLAGE_BUILDINGS,
@@ -536,6 +537,8 @@ export default function BaseVillageView({
   onResearchCivilizationTech,
 }: Props) {
   const vState = useMemo(() => ensureVillageState(village, hasAltar), [village, hasAltar]);
+  const activeShamanLevel = (vState.shamanLevel ?? shamanLevel ?? 1) as ShamanLevel;
+  const villageGridSize = getVillageGridSize(activeShamanLevel);
   const bonuses = useMemo(() => computeVillageBonuses(vState), [vState]);
   const popCap = useMemo(
     () => computeVillagePopulationCapacity(vState, baseLevel, playerLevel),
@@ -730,8 +733,8 @@ export default function BaseVillageView({
   useEffect(() => {
     setAgents(prev => {
       const emptyTiles: { x: number; y: number }[] = [];
-      for (let y = 1; y < VILLAGE_GRID_SIZE - 1; y++) {
-        for (let x = 1; x < VILLAGE_GRID_SIZE - 1; x++) {
+      for (let y = 1; y < villageGridSize - 1; y++) {
+        for (let x = 1; x < villageGridSize - 1; x++) {
           if (!occupiedTileSet.has(`${x},${y}`)) emptyTiles.push({ x, y });
         }
       }
@@ -748,8 +751,8 @@ export default function BaseVillageView({
         const jitterY = ((idx * 23) % 5 - 2) * 0.12;
         return {
           ...d,
-          x: Math.max(0.5, Math.min(VILLAGE_GRID_SIZE - 1.5, spawn.x + jitterX)),
-          y: Math.max(0.5, Math.min(VILLAGE_GRID_SIZE - 1.5, spawn.y + jitterY)),
+          x: Math.max(0.5, Math.min(villageGridSize - 1.5, spawn.x + jitterX)),
+          y: Math.max(0.5, Math.min(villageGridSize - 1.5, spawn.y + jitterY)),
           facing: idx % 2 === 0 ? 1 : -1,
           moving: false,
           insideShelter: false,
@@ -898,9 +901,9 @@ export default function BaseVillageView({
             .filter(
               p =>
                 p.x >= 0.3 &&
-                p.x <= VILLAGE_GRID_SIZE - 1.2 &&
+                p.x <= villageGridSize - 1.2 &&
                 p.y >= 0.3 &&
-                p.y <= VILLAGE_GRID_SIZE - 1.2 &&
+                p.y <= villageGridSize - 1.2 &&
                 !occupiedTileSet.has(`${Math.round(p.x)},${Math.round(p.y)}`)
             );
 
@@ -1037,6 +1040,9 @@ export default function BaseVillageView({
             </button>
             <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-primary">
               🛡️ 성벽 {bonuses.totalWallHp}
+            </span>
+            <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-600 border border-emerald-500/40">
+              영토 {villageGridSize}×{villageGridSize}{villageGridSize === 14 ? ' (14×14 확장)' : ''}
             </span>
             <span className="rounded bg-accent/20 px-1.5 py-0.5 text-[10px] font-bold">
               👥 마을 인구 {popCap.totalResidentDisplay}명
@@ -1263,7 +1269,7 @@ export default function BaseVillageView({
               {selectedPlaced.y + 1}) · 내구도 {selectedPlaced.hp}/{selectedPlaced.maxHp}
             </span>
             <p className="truncate text-[10px] text-primary">
-              중앙 12×12 건설 구역의 빈 타일을 누르면 이동합니다. (외곽 2칸은 침입자 등장 구역)
+              중앙 {villageGridSize}×{villageGridSize} 건설 구역의 빈 타일을 누르면 이동합니다. (외곽 2칸은 침입자 등장 구역)
             </p>
           </div>
           <Button
@@ -1324,9 +1330,11 @@ export default function BaseVillageView({
           swipingHarvestRef.current = false;
         }}
       >
-        {/* Outer 16x16 Siege / Invader Spawn Margin Frame */}
+        {/* Outer Siege / Invader Spawn Margin Frame */}
         <div
-          className="relative aspect-square w-full max-w-[376px] shrink-0 select-none rounded-sm border-2 border-[#1c2912] p-[12.5%] shadow-inner transition-transform duration-200 overflow-hidden"
+          className={`relative aspect-square w-full max-w-[376px] shrink-0 select-none rounded-sm border-2 border-[#1c2912] ${
+            villageGridSize === 14 ? 'p-[11.1%]' : 'p-[12.5%]'
+          } shadow-inner transition-transform duration-200 overflow-hidden`}
           style={{
             backgroundImage: `url(${baseVillageBg})`,
             backgroundSize: 'cover',
@@ -1345,24 +1353,28 @@ export default function BaseVillageView({
             aria-hidden
             className="pointer-events-none absolute left-2 top-1 z-10 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-bold text-[#cbe5b4]"
           >
-            🌲 외곽 침입 경계림 (16×16 외곽 2칸 스폰 구역)
+            🌲 외곽 침입 경계림 ({villageGridSize + 4}×{villageGridSize + 4} 외곽 2칸 스폰 구역)
           </span>
 
-          {/* Inner 12x12 Buildable Village Grid */}
+          {/* Inner Buildable Village Grid */}
           <div
             role="grid"
-            aria-label="12x12 거점 마을 그리드"
+            aria-label={`${villageGridSize}x${villageGridSize} 거점 마을 그리드`}
             data-build-mode={buildMode ? 'on' : 'off'}
-            className={`relative grid h-full w-full grid-cols-12 grid-rows-12 transition-all ${
+            className={`relative grid h-full w-full transition-all ${
               buildMode
                 ? 'border-2 border-amber-300/90 bg-amber-950/20 shadow-[0_0_12px_rgba(250,204,21,0.35)]'
                 : 'border border-[#2a3d1d]/40 bg-transparent'
             }`}
+            style={{
+              gridTemplateColumns: `repeat(${villageGridSize}, minmax(0, 1fr))`,
+              gridTemplateRows: `repeat(${villageGridSize}, minmax(0, 1fr))`,
+            }}
           >
-            {/* Base 12x12 Tiles */}
-            {Array.from({ length: VILLAGE_GRID_SIZE * VILLAGE_GRID_SIZE }, (_, idx) => {
-              const x = idx % VILLAGE_GRID_SIZE;
-              const y = Math.floor(idx / VILLAGE_GRID_SIZE);
+            {/* Base Tiles */}
+            {Array.from({ length: villageGridSize * villageGridSize }, (_, idx) => {
+              const x = idx % villageGridSize;
+              const y = Math.floor(idx / villageGridSize);
               const placed = buildingAtTile(vState, x, y);
               const checker = (x + y) % 2 === 0;
               return (
@@ -1410,10 +1422,10 @@ export default function BaseVillageView({
                         : ''
                   }`}
                   style={{
-                    left: `${(b.x / VILLAGE_GRID_SIZE) * 100}%`,
-                    top: `${(b.y / VILLAGE_GRID_SIZE) * 100}%`,
-                    width: `${(w / VILLAGE_GRID_SIZE) * 100}%`,
-                    height: `${(h / VILLAGE_GRID_SIZE) * 100}%`,
+                    left: `${(b.x / villageGridSize) * 100}%`,
+                    top: `${(b.y / villageGridSize) * 100}%`,
+                    width: `${(w / villageGridSize) * 100}%`,
+                    height: `${(h / villageGridSize) * 100}%`,
                   }}
                 >
                   {/* Floating Idle Harvest Bubble on Roof (Tap or Swipe to Pop!) */}
@@ -1478,8 +1490,8 @@ export default function BaseVillageView({
                 key={f.id}
                 className="pointer-events-none absolute z-40 -translate-y-4 animate-ping whitespace-nowrap rounded bg-primary px-1.5 py-0.5 text-[10px] font-extrabold text-primary-foreground shadow"
                 style={{
-                  left: `${(f.x / VILLAGE_GRID_SIZE) * 100}%`,
-                  top: `${(f.y / VILLAGE_GRID_SIZE) * 100}%`,
+                  left: `${(f.x / villageGridSize) * 100}%`,
+                  top: `${(f.y / villageGridSize) * 100}%`,
                 }}
               >
                 {f.text}
@@ -1506,10 +1518,10 @@ export default function BaseVillageView({
                     : 'pointer-events-auto cursor-pointer hover:scale-110'
                 }`}
                 style={{
-                  width: `${100 / VILLAGE_GRID_SIZE}%`,
-                  height: `${100 / VILLAGE_GRID_SIZE}%`,
-                  left: `${(ag.x / VILLAGE_GRID_SIZE) * 100}%`,
-                  top: `${(ag.y / VILLAGE_GRID_SIZE) * 100}%`,
+                  width: `${100 / villageGridSize}%`,
+                  height: `${100 / villageGridSize}%`,
+                  left: `${(ag.x / villageGridSize) * 100}%`,
+                  top: `${(ag.y / villageGridSize) * 100}%`,
                   transitionDuration: `${ag.moveDurationMs ?? 1900}ms`,
                 }}
               >
