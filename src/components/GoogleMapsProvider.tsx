@@ -11,8 +11,14 @@ export default function GoogleMapsProvider({ children }: Props) {
     libraries: ['services'],
   });
 
-  // Entry, authentication and terrain survival must not wait for the Kakao SDK.
-  if (['/', '/login', '/world'].includes(window.location.pathname) || window.location.pathname.startsWith('/play/survival')) return <>{children}</>;
+  // Entry, authentication, terrain survival and admin tools must not wait for or be blocked by the Kakao SDK.
+  if (
+    ['/', '/login', '/world'].includes(window.location.pathname) ||
+    window.location.pathname.startsWith('/play/survival') ||
+    window.location.pathname.startsWith('/admin')
+  ) {
+    return <>{children}</>;
+  }
 
   if (loading) {
     return (
@@ -23,14 +29,11 @@ export default function GoogleMapsProvider({ children }: Props) {
   }
 
   if (error) {
-    // Dev-only pages (no map needed) still render when the SDK is blocked,
+    // Dev-only and admin pages (no map needed) still render when SDK is blocked,
     // e.g. on localhost where the Kakao Web domain isn't registered.
-    if (window.location.pathname.startsWith('/dev/')) {
+    if (window.location.pathname.startsWith('/dev/') || window.location.pathname.startsWith('/admin')) {
       return (
         <>
-          <div className="bg-destructive/10 px-3 py-1.5 text-center text-xs text-destructive">
-            지도 로딩 실패 (현재 도메인 미등록) — 지도 없는 점검 페이지만 표시합니다.
-          </div>
           {children}
         </>
       );
