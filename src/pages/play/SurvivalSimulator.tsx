@@ -43,6 +43,17 @@ import { useSurvivalGps } from '@/hooks/useSurvivalGps';
 import { Button } from '@/components/ui/button';
 import { ColonionOpening, PIONEER_NAME_KEY } from '@/components/survival/ColonionOpening';
 import { hasSeenStoryTutorial, StoryTutorialModal } from '@/components/survival/StoryTutorial';
+import { ContextThemeWrapper, type ContextMode } from '@/components/survival/ContextThemeWrapper';
+import {
+  CombatEffectLayer,
+  HitReactionWrapper,
+  lungeVariants,
+  type CombatVfxEvent,
+  type FloatingDamage,
+  type ProjectileVfx,
+  type SkillVfxType,
+  useScreenShake,
+} from '@/components/survival/CombatEffectLayer';
 import {
   SurvivalTutorialOverlay,
   TutorialGroundBranches,
@@ -278,6 +289,47 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     setTutorialStep('phase1_intro');
     toast.info('📖 초보자 튜토리얼을 다시 시작합니다.');
   };
+
+  // 4-Context Mode State ('user' | 'base' | 'pet' | 'expedition')
+  const [contextMode, setContextMode] = useState<ContextMode>('user');
+
+  const handleSelectContextMode = (mode: ContextMode) => {
+    setContextMode(mode);
+    if (mode === 'user') {
+      setView('user');
+      setPanel('none');
+    } else if (mode === 'base') {
+      setView('base');
+      setBaseTab('village');
+      setPanel('base');
+    } else if (mode === 'pet') {
+      setView('base');
+      setBaseTab('pets');
+      setPanel('base');
+    } else if (mode === 'expedition') {
+      setView('expedition');
+      setFieldExp(true);
+      setPanel('none');
+    }
+  };
+
+  useEffect(() => {
+    if (view === 'expedition') {
+      setContextMode('expedition');
+    } else if (panel === 'base' && baseTab === 'pets') {
+      setContextMode('pet');
+    } else if (panel === 'base' || view === 'base') {
+      setContextMode('base');
+    } else if (view === 'user' && panel === 'none') {
+      setContextMode('user');
+    }
+  }, [view, panel, baseTab]);
+
+  // Combat VFX, Floating Numbers & Screen Shake
+  const [combatVfxEvents, setCombatVfxEvents] = useState<CombatVfxEvent[]>([]);
+  const [damageNumbers, setDamageNumbers] = useState<FloatingDamage[]>([]);
+  const [projectiles, setProjectiles] = useState<ProjectileVfx[]>([]);
+  const { shaking, triggerShake } = useScreenShake();
   const [craftCat, setCraftCat] = useState<CraftCat>('all');
   const [baseTab, setBaseTab] = useState<'village' | 'lab' | 'craft' | 'storage' | 'expedition' | 'pets'>('village');
 
@@ -367,9 +419,39 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         to: mobPositionsRef.current[e.id] ?? { lat: e.lat, lng: e.lng },
         kind: rangedInfo.category === 'bow' ? 'arrow' : rangedInfo.category === 'spear' ? 'spear' : 'stone',
       });
+      const pScreen = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+      const tScreen = { x: window.innerWidth / 2 + (playerFacing === 'left' ? -60 : 60), y: window.innerHeight / 2 - 35 };
+      setProjectiles(prev => [
+        ...prev.slice(-3),
+        {
+          id: crypto.randomUUID(),
+          startX: pScreen.x,
+          startY: pScreen.y - 10,
+          targetX: tScreen.x,
+          targetY: tScreen.y,
+          kind: rangedInfo.category === 'bow' ? 'arrow' : rangedInfo.category === 'spear' ? 'spear' : 'stone',
+        },
+      ]);
     }
     if (e.kind === 'creature') {
+      const isCrit = Math.random() < 0.28;
+      const baseDmg = w.weapon ? 14 : 6;
+      const dmgDealt = Math.round(isCrit ? baseDmg * 1.6 : baseDmg);
+      triggerShake(isCrit ? 160 : 70);
       setBeastStrike({ id: e.id, at: Date.now() });
+
+      const screenX = window.innerWidth / 2 + (Math.random() * 40 - 20);
+      const screenY = window.innerHeight / 2 - 30;
+      setDamageNumbers(prev => [
+        ...prev.slice(-5),
+        {
+          id: crypto.randomUUID(),
+          x: screenX,
+          y: screenY,
+          damage: dmgDealt,
+          isCrit,
+        },
+      ]);
     }
     playAction(act, 900);
     playSample(workKind(e).sample);
@@ -503,7 +585,25 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     }, gathererActive ? 2000 : AUTO_PICKUP_INTERVAL_MS);
     return () => window.clearInterval(id);
   }, [autoOn, gathererActive]);
-  const activateSkill = (id: Parameters<typeof g.useSkill>[0]) => { if (g.useSkill(id)) { playAction('attack', 900); playSample('strike'); } };
+  const activateSkill = (id: Parameters<typeof g.useSkill>[0]) => {
+    if (g.useSkill(id)) {
+      playAction('attack', 900);
+      playSample('strike');
+      triggerShake(180);
+      const playerScreen = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+      const vfxType: SkillVfxType =
+        id === 'ember_scatter' ? 'fireball' : id === 'roar' ? 'iceball' : 'thunder';
+      setCombatVfxEvents(prev => [
+        ...prev.slice(-3),
+        {
+          id: crypto.randomUUID(),
+          type: vfxType,
+          x: playerScreen.x,
+          y: playerScreen.y - 25,
+        },
+      ]);
+    }
+  };
   const inPark = !!s.parkCells?.[zoneCellKey(s.pos)];
   const [landmarks, setLandmarks] = useState<Landmark[]>([]);
   const { setSanctuaries } = g;
@@ -788,7 +888,41 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   };
 
   return (
-    <div className="relative h-[100dvh] w-full overflow-hidden font-pixel">
+    <ContextThemeWrapper
+      mode={contextMode}
+      onSelectMode={handleSelectContextMode}
+      hp={s.hp}
+      maxHp={g.maxHp}
+      hunger={s.hunger}
+      weight={g.weight}
+      capacity={g.capacity}
+      level={s.level}
+      weapon={g.weapon}
+      backpack={s.backpack}
+      storage={s.storage}
+      baseLevel={s.base?.level ?? 1}
+      palisade={s.palisade}
+      pets={s.pets ?? []}
+      dinoEggs={s.dinoEggs ?? []}
+      walkSteps={s.walkSteps ?? 0}
+      crew={crew}
+      expeditionLevel={g.expeditionLevelInfo.level}
+      expeditionDistanceM={(s.expeditionDistanceM ?? 0) + (s.walkSteps ?? 0) * 20}
+      lastExpeditionLog={s.expeditionLogs?.[s.expeditionLogs.length - 1]?.text}
+      onScanNearby={() => setRadarOpen(true)}
+      onOpenPetFusion={() => {
+        setBaseTab('pets');
+        setPanel('base');
+      }}
+      onStartDinoHunt={() => setFieldExp(true)}
+      onMoraleExpedition={g.rallyExpedition}
+      onRecallExpedition={g.recallExpedition}
+      onOpenVillageModal={(m) => {
+        setBaseTab('village');
+        setPanel('base');
+      }}
+    >
+      <div className={`relative h-[100dvh] w-full overflow-hidden font-pixel ${shaking ? 'animate-combat-shake' : ''}`}>
       {view === 'expedition' && s.base && <div className="pointer-events-none fixed inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-30 flex flex-col items-center gap-1">
         {fieldExp && <div className="pixel-panel pointer-events-auto max-h-[44dvh] w-full max-w-md overflow-y-auto bg-card p-1.5">{expeditionControls}</div>}
         <button type="button" onClick={() => setFieldExp(v => !v)} className="pixel-btn pointer-events-auto flex w-full max-w-md items-center justify-between gap-2 bg-primary py-1.5 px-2.5 text-xs text-primary-foreground">
@@ -1060,10 +1194,14 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       return { x: e.kind === 'creature' ? [0, 3, -3, 0] : 0, y: e.kind === 'creature' ? [0, -4, 0] : 0, rotate: 0, scale: 1 };
                     })()}
                     transition={combatHit || isHeadbutting ? { duration: 0.68, times: [0, 0.22, 0.58, 1], ease: 'easeInOut' } : aggroIds.has(e.id) && !reducedMotion ? { repeat: Infinity, duration: 1.05 } : dmg ? { duration: 0.35 } : { repeat: reducedMotion ? 0 : Infinity, duration: 1.4 }}>
-                    <div className={boss ? 'scale-150 rounded-full ring-2 ring-destructive shadow-[0_0_18px_hsl(var(--destructive))]' : ''} style={{ transform: faceLeft ? 'scaleX(-1)' : undefined }}>{e.kind === 'creature'
-                      ? <CreatureSprite key={e.type} type={e.type} fallbackUrl={url(sprite)} width={SPRITE_META[sprite].w} height={SPRITE_META[sprite].h}
-                          attacking={!!combatHit?.counterDamage || !!petHit?.counterDamage || isHeadbutting} />
-                      : <Sprite k={sprite} />}</div>
+                    <HitReactionWrapper hit={!!(combatHit || isHeadbutting || (dmg && dmg > 0))}>
+                      <div className={boss ? 'scale-150 rounded-full ring-2 ring-destructive shadow-[0_0_18px_hsl(var(--destructive))]' : ''} style={{ transform: faceLeft ? 'scaleX(-1)' : undefined }}>
+                        {e.kind === 'creature'
+                          ? <CreatureSprite key={e.type} type={e.type} fallbackUrl={url(sprite)} width={SPRITE_META[sprite].w} height={SPRITE_META[sprite].h}
+                              attacking={!!combatHit?.counterDamage || !!petHit?.counterDamage || isHeadbutting} />
+                          : <Sprite k={sprite} />}
+                      </div>
+                    </HitReactionWrapper>
                   </motion.div>{combatHit && <CombatImpact stamp={combatHit.at} damage={combatHit.damage} />}</div>
                   {(s.calmUntil?.[e.id] ?? 0) > Date.now() && <span className="bg-primary text-[10px] text-primary-foreground">진정됨</span>}
                   {boss ? <span className="mt-2 rounded bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">우두머리</span> : null}
@@ -1220,15 +1358,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       </button>
 
       <WorldViewTabs
-        view={view}
-        onView={v => {
-          setView(v);
-          setFieldExp(v === 'expedition');
-          if (v === 'base' && s.base) {
-            setBaseTab('village');
-            setPanel('base');
-          }
-        }}
+        contextMode={contextMode}
+        onContextMode={handleSelectContextMode}
         site={baseSite}
         onSite={setBaseSite}
         hasBase={!!s.base}
@@ -1763,7 +1894,16 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         onConsumeCookedMeat={g.consumeDinoMeat}
         onRetreatWithLoot={g.settleDinoExpedition}
       />
+      <CombatEffectLayer
+        events={combatVfxEvents}
+        damageNumbers={damageNumbers}
+        projectiles={projectiles}
+        onRemoveEvent={id => setCombatVfxEvents(prev => prev.filter(e => e.id !== id))}
+        onRemoveDamage={id => setDamageNumbers(prev => prev.filter(d => d.id !== id))}
+        onRemoveProjectile={id => setProjectiles(prev => prev.filter(p => p.id !== id))}
+      />
     </div>
+  </ContextThemeWrapper>
   );
 }
 

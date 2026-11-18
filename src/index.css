@@ -198,3 +198,16 @@ html, body { touch-action: manipulation; }
 .signal-experiment { color:hsl(var(--accent)); }
 .signal-sacred { color:hsl(var(--invention-synergy)); }
 @media (prefers-reduced-motion:reduce) { .fortress-fire { animation:none; } }
+
+/* Combat Hit Screen Shake */
+@keyframes combat-shake {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-4px, 2px); }
+  40% { transform: translate(4px, -2px); }
+  60% { transform: translate(-3px, -2px); }
+  80% { transform: translate(3px, 2px); }
+  100% { transform: translate(0, 0); }
+}
+.animate-combat-shake {
+  animation: combat-shake 0.16s ease-in-out;
+}
