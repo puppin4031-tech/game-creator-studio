@@ -61,6 +61,8 @@ const TOUR_SLIDES = [
 ];
 
 export type TutorialStep =
+  | 'phase1_meet'
+  | 'phase1_mute'
   | 'phase1_intro'
   | 'phase1_gather'
   | 'phase1_explain'
@@ -93,9 +95,9 @@ export function SurvivalTutorialOverlay({
 }: Props) {
   const [tourIndex, setTourIndex] = useState(0);
 
-  // During phase1_intro, automatically plant starter campfire
+  // During phase1_meet, phase1_mute, or phase1_intro, automatically plant starter campfire
   useEffect(() => {
-    if (step === 'phase1_intro') {
+    if (step === 'phase1_meet' || step === 'phase1_mute' || step === 'phase1_intro') {
       onEnsureStarterCamp();
     }
   }, [step, onEnsureStarterCamp]);
@@ -150,6 +152,103 @@ export function SurvivalTutorialOverlay({
         onPointerDownOutside={e => e.preventDefault()}
       >
         <DialogDescription className="sr-only">콜로니온 생존 튜토리얼</DialogDescription>
+
+        {/* Phase 1: Meet (주술사와의 첫 만남) */}
+        {step === 'phase1_meet' && (
+          <div className="space-y-4">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base text-primary">
+                <span>🧙</span>
+                <span>떠돌이 주술사와의 첫 만남</span>
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="flex items-end gap-3 pt-2">
+              <motion.img
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                src={shamanArt}
+                alt="떠돌이 주술사"
+                className="pixelated h-28 w-auto shrink-0 drop-shadow-md"
+              />
+              <div className="pixel-box flex-1 min-w-0 bg-background/90 p-3 text-xs leading-relaxed border border-border">
+                <p className="font-bold text-amber-400 mb-1">떠돌이 주술사</p>
+                <p className="text-foreground leading-snug">
+                  "허허… 험상궂은 원시의 숲에서 꽤나 <b>강해 보이는 젊은이</b>를 만났군."
+                </p>
+                <p className="text-foreground leading-snug mt-2">
+                  "보아하니 자네도 둥지가 없는 모양인데… 뼈마디가 시려 그러니, 자네가 피운 이 <b>모닥불 곁에 잠시 머물러도 되겠나?</b>"
+                </p>
+              </div>
+            </div>
+
+            <Button
+              className={`${pixelBtn} bg-amber-600 hover:bg-amber-500 text-white`}
+              onClick={() => onSetStep('phase1_mute')}
+            >
+              우우우…? (고개를 끄덕인다) ➡️
+            </Button>
+          </div>
+        )}
+
+        {/* Phase 1: Mute (말을 하지 못함 & 언어 학습 복선) */}
+        {step === 'phase1_mute' && (
+          <div className="space-y-4">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base text-sky-400">
+                <span>💬</span>
+                <span>잃어버린 기억과 말</span>
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-3 pt-1">
+              {/* Hero / Player */}
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col items-center justify-center rounded border border-sky-500/40 bg-sky-950/20 p-1.5 shrink-0">
+                  <TribeSprite action="walk" height={52} />
+                  <span className="text-[10px] font-bold text-sky-400">나 (생존자)</span>
+                </div>
+                <div className="pixel-box flex-1 min-w-0 bg-sky-950/20 border border-sky-500/30 p-2.5 text-xs">
+                  <p className="italic text-sky-200">
+                    "우우우…? 크르르…!"
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    (목소리가 나오지 않는다. 아무런 단어도 떠오르지 않는다…)
+                  </p>
+                </div>
+              </div>
+
+              {/* Shaman Reaction */}
+              <div className="flex items-start gap-3">
+                <img
+                  src={shamanArt}
+                  alt="떠돌이 주술사"
+                  className="pixelated h-16 w-auto shrink-0 drop-shadow"
+                />
+                <div className="pixel-box flex-1 min-w-0 bg-background/90 p-2.5 text-xs leading-relaxed border border-border">
+                  <p className="font-bold text-amber-400 text-[11px] mb-0.5">떠돌이 주술사</p>
+                  <p className="text-foreground leading-snug">
+                    "응? 자네… <b>아직 말을 하지 못하는 겐가?</b> 혀가 굳은 게 아니라 기억마저 잃고 낯선 시대에 떨어진 모양이로군."
+                  </p>
+                  <p className="text-amber-300 font-medium leading-snug mt-1.5">
+                    "허허, 잘됐네! 곁에 머무는 값으로 자네에게 <b>말과 도구, 그리고 이 험한 세상에서 살아남는 법</b>을 하나씩 가르쳐 주지."
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded bg-primary/10 border border-primary/30 p-2 text-[11px] text-muted-foreground">
+              💡 <b>언어 학습 힌트</b>: 주술사 천막의 생존 퀘스트를 수행하면 잃어버린 언어와 문명 기술을 하나씩 깨우칠 수 있습니다.
+            </div>
+
+            <Button
+              className={`${pixelBtn} bg-primary hover:bg-primary/90 text-primary-foreground`}
+              onClick={() => onSetStep('phase1_intro')}
+            >
+              주술사의 제안 수락하기 ➡️
+            </Button>
+          </div>
+        )}
 
         {/* Phase 1: Intro */}
         {step === 'phase1_intro' && (

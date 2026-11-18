@@ -244,7 +244,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [tutorialStep, setTutorialStep] = useState<TutorialStep | null>(() => {
     if (typeof window === 'undefined') return null;
     const completed = localStorage.getItem(TUTORIAL_COMPLETED_KEY) === '1';
-    return !completed && hasSeenStoryTutorial() ? 'phase1_intro' : null;
+    return !completed && hasSeenStoryTutorial() ? 'phase1_meet' : null;
   });
   const [tutorialBranches, setTutorialBranches] = useState<TutorialGroundBranch[]>([]);
   const [collectedBranches, setCollectedBranches] = useState(0);
@@ -253,7 +253,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     setShowStoryTutorial(false);
     const completed = localStorage.getItem(TUTORIAL_COMPLETED_KEY) === '1';
     if (!completed) {
-      setTutorialStep('phase1_intro');
+      setTutorialStep('phase1_meet');
     }
   };
 
@@ -286,7 +286,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const handleReplayTutorial = () => {
     setCollectedBranches(0);
     setTutorialBranches(generateTutorialGroundBranches(s.pos));
-    setTutorialStep('phase1_intro');
+    setTutorialStep('phase1_meet');
     toast.info('📖 초보자 튜토리얼을 다시 시작합니다.');
   };
 
@@ -938,7 +938,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       />
       <SurvivalTutorialOverlay
         open={tutorialStep !== null && tutorialStep !== 'completed'}
-        step={tutorialStep ?? 'phase1_intro'}
+        step={tutorialStep ?? 'phase1_meet'}
         collectedBranches={collectedBranches}
         onSetStep={setTutorialStep}
         onEnsureStarterCamp={g.ensureStarterCamp}
