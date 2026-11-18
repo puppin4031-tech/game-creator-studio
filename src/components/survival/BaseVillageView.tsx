@@ -37,6 +37,7 @@ import PrimitiveArmoryModal from './PrimitiveArmoryModal';
 import AncientAltarModal from './AncientAltarModal';
 import WanderingShamanModal from './WanderingShamanModal';
 import SmokehouseTavernModal from './SmokehouseTavernModal';
+import TribalHallModal from './TribalHallModal';
 import CulinaryDishIcon from './CulinaryDishIcon';
 import campfireImg from '@/assets/survival/base-campfire.png';
 import hutImg from '@/assets/survival/base-hut.png';
@@ -48,7 +49,7 @@ import mercImg from '@/assets/survival/npc-mercenary.png';
 import tribalHallImg from '@/assets/survival/base-tribal-hall.png';
 import baseVillageBg from '@/assets/survival/base-village-bg.png';
 
-type FacilityModalKind = 'workshop' | 'armory' | 'altar' | 'shaman' | 'smokehouse' | 'tavern' | null;
+type FacilityModalKind = 'workshop' | 'armory' | 'altar' | 'shaman' | 'smokehouse' | 'tavern' | 'tribal_hall' | null;
 
 interface Props {
   village: VillageState | undefined;
@@ -94,6 +95,11 @@ interface Props {
     input: InventionInput,
     naming: { name: string; desc: string; masterwork?: boolean; ranged?: boolean }
   ) => InventedItem | null;
+  onHireTribe?: (classId: TribeClassId) => boolean;
+  onSelectTribeClass?: (classId: TribeClassId) => void;
+  onTrainTribe?: () => boolean;
+  onTreatTribe?: () => boolean;
+  onToggleEscort?: () => void;
   onOpenBaseTab?: (tab: 'village' | 'lab' | 'craft' | 'storage' | 'expedition' | 'pets') => void;
   onOpenObjectives?: () => void;
 }
@@ -420,6 +426,11 @@ export default function BaseVillageView({
   onCraftAmmoBundle,
   onEnhanceWeapon,
   onInvent,
+  onHireTribe,
+  onSelectTribeClass,
+  onTrainTribe,
+  onTreatTribe,
+  onToggleEscort,
   onOpenBaseTab,
   onOpenObjectives,
 }: Props) {
@@ -477,6 +488,7 @@ export default function BaseVillageView({
     if (buildingId === 'stone_smeltery' || buildingId === 'brazier') return 'armory';
     if (buildingId === 'ancient_altar') return 'altar';
     if (buildingId === 'shaman_tent' || buildingId === 'wandering_shaman') return 'shaman';
+    if (buildingId === 'tribal_hall') return 'tribal_hall';
     if (buildingId === 'smokehouse') return 'smokehouse';
     if (buildingId === 'primitive_tavern') return 'tavern';
     return null;
@@ -838,7 +850,7 @@ export default function BaseVillageView({
       return;
     }
     if (placed.buildingId === 'tribal_hall') {
-      onOpenBaseTab?.('expedition');
+      setActiveModal('tribal_hall');
       return;
     }
     setSelectedPlacedUid(placed.uid);
@@ -881,7 +893,7 @@ export default function BaseVillageView({
       return;
     }
     if (ag.kind === 'hall') {
-      onOpenBaseTab?.('expedition');
+      setActiveModal('tribal_hall');
       return;
     }
     const pool =
@@ -1834,6 +1846,24 @@ export default function BaseVillageView({
         onDiscardSpoiled={() => onDiscardSpoiled?.()}
         onCookTavernRecipe={id => (onCookTavernRecipe ? onCookTavernRecipe(id) : false)}
         onEatDish={id => onEatDish?.(id)}
+      />
+      <TribalHallModal
+        open={activeModal === 'tribal_hall'}
+        onClose={() => setActiveModal(null)}
+        tribe={tribe}
+        storage={storage}
+        backpack={backpack}
+        playerLevel={playerLevel}
+        languageLearned={languageLearned}
+        onHireTribe={onHireTribe}
+        onSelectTribeClass={onSelectTribeClass}
+        onTrainTribe={onTrainTribe}
+        onTreatTribe={onTreatTribe}
+        onToggleEscort={onToggleEscort}
+        onOpenExpedition={() => {
+          setActiveModal(null);
+          onOpenBaseTab?.('expedition');
+        }}
       />
     </div>
   );

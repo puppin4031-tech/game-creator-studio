@@ -1343,6 +1343,11 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       onDiscardSpoiled={g.discardSpoiledFood}
                       onCookTavernRecipe={g.cookTavernRecipe}
                       onEatDish={g.eat}
+                      onHireTribe={g.hireMerc}
+                      onSelectTribeClass={g.selectTribeClass}
+                      onTrainTribe={g.trainTribe}
+                      onTreatTribe={g.treatTribe}
+                      onToggleEscort={g.toggleEscort}
                       onOpenBaseTab={tab => setBaseTab(tab)}
                       onOpenObjectives={() => setPanel('quests')}
                     />
