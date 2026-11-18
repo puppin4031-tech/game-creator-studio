@@ -43,6 +43,14 @@ import { useSurvivalGps } from '@/hooks/useSurvivalGps';
 import { Button } from '@/components/ui/button';
 import { ColonionOpening, PIONEER_NAME_KEY } from '@/components/survival/ColonionOpening';
 import { hasSeenStoryTutorial, StoryTutorialModal } from '@/components/survival/StoryTutorial';
+import {
+  SurvivalTutorialOverlay,
+  TutorialGroundBranches,
+  generateTutorialGroundBranches,
+  type TutorialStep,
+  type TutorialGroundBranch,
+  TUTORIAL_COMPLETED_KEY,
+} from '@/components/survival/SurvivalTutorialOverlay';
 import SurvivalObjectives from '@/components/survival/SurvivalObjectives';
 import { toast } from 'sonner';
 import TerrainMap from '@/components/survival/TerrainMap';
@@ -220,6 +228,56 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     onAuto={() => { g.toggleExpeditionAuto(expeditionDestination, expeditionFocus); setWatchExpedition(true); }} onPocket={g.togglePocket} onMorale={g.rallyExpedition} onReturn={g.recallExpedition} onWatch={() => setView(v => v === 'expedition' ? 'user' : 'expedition')}
     tribe={s.tribe ? { count: s.tribe.count, trainLevel: s.tribe.trainLevel ?? 0, ratio: tribeRatio(s.tribe), maxHp: Math.max(1, Math.round(g.maxHp * tribeRatio(s.tribe) * s.tribe.count)), injured: tribeInjured(s.tribe, Date.now()), starving: !!s.tribe.starving, classId: s.tribe.classId } : undefined} />;
   const [panel, setPanel] = useState<Panel>('none');
+
+  // 3-Phase Interactive Survival Tutorial State
+  const [tutorialStep, setTutorialStep] = useState<TutorialStep | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const completed = localStorage.getItem(TUTORIAL_COMPLETED_KEY) === '1';
+    return !completed && hasSeenStoryTutorial() ? 'phase1_intro' : null;
+  });
+  const [tutorialBranches, setTutorialBranches] = useState<TutorialGroundBranch[]>([]);
+  const [collectedBranches, setCollectedBranches] = useState(0);
+
+  const handleStoryTutorialDone = () => {
+    setShowStoryTutorial(false);
+    const completed = localStorage.getItem(TUTORIAL_COMPLETED_KEY) === '1';
+    if (!completed) {
+      setTutorialStep('phase1_intro');
+    }
+  };
+
+  useEffect(() => {
+    if (tutorialStep === 'phase1_gather' && tutorialBranches.length === 0 && collectedBranches < 3) {
+      setTutorialBranches(generateTutorialGroundBranches(s.pos));
+    }
+  }, [tutorialStep, tutorialBranches.length, collectedBranches, s.pos]);
+
+  const handlePickTutorialBranch = (branchId: string) => {
+    g.pickTutorialBranch();
+    setTutorialBranches(prev => prev.filter(b => b.id !== branchId));
+    setCollectedBranches(prev => {
+      const next = prev + 1;
+      toast.success(`🌿 나뭇가지를 주워 배낭에 넣었습니다! (${next}/3)`);
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(50);
+      return next;
+    });
+  };
+
+  const handleCompleteTutorial = () => {
+    g.meetShaman();
+    try {
+      localStorage.setItem(TUTORIAL_COMPLETED_KEY, '1');
+    } catch { /* ignore */ }
+    setTutorialStep('completed');
+    toast.success('🎉 기본 생존 튜토리얼을 모두 완료했습니다!');
+  };
+
+  const handleReplayTutorial = () => {
+    setCollectedBranches(0);
+    setTutorialBranches(generateTutorialGroundBranches(s.pos));
+    setTutorialStep('phase1_intro');
+    toast.info('📖 초보자 튜토리얼을 다시 시작합니다.');
+  };
   const [craftCat, setCraftCat] = useState<CraftCat>('all');
   const [baseTab, setBaseTab] = useState<'village' | 'lab' | 'craft' | 'storage' | 'expedition' | 'pets'>('village');
 
@@ -740,9 +798,18 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       </div>}
       <StoryTutorialModal
         open={showStoryTutorial}
-        onComplete={() => setShowStoryTutorial(false)}
-        onSkip={() => setShowStoryTutorial(false)}
+        onComplete={handleStoryTutorialDone}
+        onSkip={handleStoryTutorialDone}
         finishLabel="콜로니온 월드 입장하기"
+      />
+      <SurvivalTutorialOverlay
+        open={tutorialStep !== null && tutorialStep !== 'completed'}
+        step={tutorialStep ?? 'phase1_intro'}
+        collectedBranches={collectedBranches}
+        onSetStep={setTutorialStep}
+        onEnsureStarterCamp={g.ensureStarterCamp}
+        onRecruitAmbacho={g.recruitAmbacho}
+        onCompleteTutorial={handleCompleteTutorial}
       />
       <AnimatePresence>{showOpening && <ColonionOpening onEnter={enterWorld} />}</AnimatePresence>
       {<TerrainMap center={viewFocus(view, baseSite, { pos: s.pos, base: s.base, outpost: s.outpost, crew: crew?.pos })} visionM={g.vision} explored={s.explored} onTap={onTap} zone={zone} onSurfaceZone={onSurfaceZone} onSurfacePark={onSurfacePark} onLandmarks={setLandmarks} bearing={compassOn && heading !== null ? heading : 0}>
@@ -750,6 +817,13 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           <>
             {crew && <ExpeditionMarker crew={crew} project={project} members={s.tribe?.count ?? 1} tribeClass={activeTribeClassId} />}
             {crew && view === 'expedition' && <ExpeditionJoystick crew={crew} candidates={g.crewNearby} project={project} onManual={g.setCrewManual} onSteer={g.steerCrew} onCommand={g.commandCrew} onAct={g.crewAct} onHeal={g.healCrew} />}
+            {view === 'user' && (
+              <TutorialGroundBranches
+                project={project}
+                branches={tutorialBranches}
+                onPick={handlePickTutorialBranch}
+              />
+            )}
             {view === 'user' && eggSpawns.map(egg => { const p = project(egg); return (
               <button key={egg.id} type="button" aria-label="신비한 픽셀 공룡 알" onClick={ev => { ev.stopPropagation(); g.pickEgg(egg); }}
                 className="pointer-events-auto absolute z-10 flex min-h-11 min-w-11 -translate-x-1/2 -translate-y-full items-center justify-center" style={{ left: p.x, top: p.y }}>
@@ -1366,6 +1440,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       onToggleEscort={g.toggleEscort}
                       onOpenBaseTab={tab => setBaseTab(tab)}
                       onOpenObjectives={() => setPanel('quests')}
+                      onReplayTutorial={handleReplayTutorial}
                     />
                   )}
                   {baseTab === 'lab' && <>

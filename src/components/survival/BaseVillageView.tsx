@@ -157,6 +157,7 @@ interface Props {
   onEvolveShaman?: (classId: ShamanClassId) => boolean;
   onEvolvePetToSkullDragon?: (petUid: string) => boolean;
   onResearchCivilizationTech?: (techId: string) => boolean;
+  onReplayTutorial?: () => void;
 }
 
 type AgentRole = 'campfire_social' | 'shelter_rest' | 'wall_patrol' | 'hauler' | 'shaman';
@@ -535,6 +536,7 @@ export default function BaseVillageView({
   onEvolveShaman,
   onEvolvePetToSkullDragon,
   onResearchCivilizationTech,
+  onReplayTutorial,
 }: Props) {
   const vState = useMemo(() => ensureVillageState(village, hasAltar), [village, hasAltar]);
   const activeShamanLevel = (vState.shamanLevel ?? shamanLevel ?? 1) as ShamanLevel;
@@ -2067,6 +2069,7 @@ export default function BaseVillageView({
           onOpenObjectives?.();
         }}
         onOpenCivTech={() => setActiveModal('civ_tech')}
+        onReplayTutorial={onReplayTutorial}
       />
       <ShamanQuestModal
         open={activeModal === 'shaman_quest'}

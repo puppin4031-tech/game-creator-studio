@@ -39,6 +39,7 @@ interface Props {
   onAcceptLanguageQuest?: () => void;
   onClaimLanguageQuest?: () => void;
   onOpenObjectives?: () => void;
+  onReplayTutorial?: () => void;
 }
 
 const fmtCost = (cost: Stack[]) =>
@@ -64,6 +65,7 @@ export default function WanderingShamanModal({
   onAcceptLanguageQuest,
   onClaimLanguageQuest,
   onOpenObjectives,
+  onReplayTutorial,
 }: Props) {
   const [tab, setTab] = useState<'quests' | 'skills'>('quests');
   const owned = useMemo(() => addStacks(storage, backpack), [storage, backpack]);
@@ -363,6 +365,19 @@ export default function WanderingShamanModal({
                     >
                       <ListChecks className="!h-4 !w-4" />
                       전체 생존 목표 보기
+                    </Button>
+                  )}
+                  {onReplayTutorial && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        onClose();
+                        onReplayTutorial();
+                      }}
+                      className="pixel-btn min-h-10 gap-1 text-xs text-amber-500 hover:text-amber-400"
+                    >
+                      📖 초보자 튜토리얼 다시 보기
                     </Button>
                   )}
                 </div>
