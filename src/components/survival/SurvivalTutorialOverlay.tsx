@@ -139,7 +139,7 @@ export function SurvivalTutorialOverlay({
     );
   }
 
-  const isModalOpen = step !== 'phase1_gather' && step !== 'completed';
+  const isModalOpen = (step as string) !== 'phase1_gather' && step !== 'completed';
 
   const pixelBtn =
     'w-full rounded-none border-2 border-foreground py-2 px-3 text-xs font-bold shadow-[2px_2px_0_0_hsl(var(--foreground)/0.6)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-transform';

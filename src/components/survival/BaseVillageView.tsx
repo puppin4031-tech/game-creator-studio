@@ -425,7 +425,7 @@ function BuildingGraphic({
           />
           {classMeta ? (
             <span
-              className={`absolute -bottom-1 -right-1 rounded-full border px-1 py-0.2 text-[9px] font-bold shadow ${classMeta.badgeBg}`}
+              className={`absolute -bottom-1 -right-1 rounded-full border px-1 py-0.2 text-[9px] font-bold shadow bg-card border-border`}
               title={classMeta.name}
             >
               {classMeta.icon}

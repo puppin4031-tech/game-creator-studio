@@ -1103,12 +1103,12 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (it.durability !== undefined) {
       const g: GearInstance = { uid: crypto.randomUUID(), itemId: r.result, quality: 'NORMAL', durability: it.durability, maxDurability: it.durability };
       setS({ ...next, storage: left, gear: [...p.gear, g] });
-    } else if (r.result === 'arrow' || r.result === 'sling_stone' || r.result === 'javelin') {
+    } else if (r.result === 'arrow' || r.result === 'sling_stone' || (r.result as string) === 'javelin') {
       setS({ ...next, storage: left, backpack: addStacks(p.backpack, [{ itemId: r.result, count: r.count }]) });
     } else {
       setS({ ...next, storage: addStacks(left, [{ itemId: r.result, count: r.count }]) });
     }
-    toast.success(`${it.name} 제작 완료!`, { description: it.durability !== undefined || r.result === 'arrow' || r.result === 'sling_stone' || r.result === 'javelin' ? '배낭에 담았어요' : '창고에 넣었어요' });
+    toast.success(`${it.name} 제작 완료!`, { description: it.durability !== undefined || r.result === 'arrow' || r.result === 'sling_stone' || (r.result as string) === 'javelin' ? '배낭에 담았어요' : '창고에 넣었어요' });
   }, []);
 
   const claimQuest = useCallback(() => {
@@ -1844,7 +1844,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         ...nextVillage,
         buildings: nextVillage.buildings.map(b => ({
           ...b,
-          customHp: Math.round((b.customHp ?? 300) * 1.3),
+          maxHp: Math.round(b.maxHp * 1.3),
         })),
       };
     }
@@ -1887,7 +1887,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const crafted = { ...paid.crafted, [itemId]: (paid.crafted[itemId] ?? 0) + count };
     setS({
       ...paid,
-      backpack: addStacks(paid.backpack, [{ itemId, count }]),
+      backpack: addStacks(paid.backpack, [{ itemId: itemId as Stack["itemId"], count }]),
       crafted,
       lastTickAt: Date.now(),
     });

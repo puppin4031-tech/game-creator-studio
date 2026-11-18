@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Flame, PawPrint, Compass, Shield, Zap, Search, Sparkles, Swords, RefreshCw, ChevronRight } from 'lucide-react';
-import { HpBar } from './HpBar';
 import { countOf } from '@/lib/survival/inventory';
 import { computeRangedReach, findAvailableAmmo, ITEMS } from '@/lib/survival/items';
 import { eggNeedM, eggWalkedM } from '@/lib/survival/dinoEggs';
@@ -138,7 +137,7 @@ export function ContextThemeWrapper({
 
   // Base resources summary
   const branchCount = countOf(storage, 'branch') + countOf(backpack, 'branch');
-  const stoneCount = countOf(storage, 'flint') + countOf(storage, 'granite') + countOf(backpack, 'flint');
+  const stoneCount = countOf(storage, 'flint') + countOf(backpack, 'flint');
   const boneCount = countOf(storage, 'bone') + countOf(backpack, 'bone');
 
   // Egg progress
@@ -347,7 +346,7 @@ export function ContextThemeWrapper({
             )}
             <div className="flex items-center justify-between gap-2">
               <div className="text-[11px] text-sky-200">
-                <b>원정 지휘</b> · {crew ? `${crew.name} 파견 중` : '출정 준비'}
+                <b>원정 지휘</b> · {crew ? `원정대 파견 중` : '출정 준비'}
               </div>
               <div className="flex items-center gap-1">
                 {onMoraleExpedition && crew && (

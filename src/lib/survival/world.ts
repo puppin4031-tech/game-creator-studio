@@ -54,7 +54,7 @@ export function generateNodes(q: WorldQuery): WorldNode[] {
   const out: WorldNode[] = [];
   const pLv = q.playerLevel ?? 1;
   const types = (Object.keys(NODES) as NodeType[]).filter(
-    (t) => (NODES[t].minPlayerLevel ?? 1) <= pLv
+    (t) => ((NODES[t] as { minPlayerLevel?: number }).minPlayerLevel ?? 1) <= pLv
   );
   for (let cx = cx0; cx <= cx1; cx++) {
     for (let cy = cy0; cy <= cy1; cy++) {
