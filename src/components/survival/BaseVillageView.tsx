@@ -685,13 +685,14 @@ export default function BaseVillageView({
 
           if (ag.restTicks > 0) {
             const exitingShelter = ag.insideShelter && ag.restTicks === 1;
+            const clearBubble = ag.jumpTick ? now - ag.jumpTick > 2500 : true;
             return {
               ...ag,
               moving: false,
               insideShelter: exitingShelter ? false : ag.insideShelter,
               restTicks: ag.restTicks - 1,
               nextMoveAt: now + nextCadence,
-              bubble: exitingShelter ? '체력 회복! ♥' : ag.restTicks === 1 ? null : ag.bubble,
+              bubble: clearBubble ? null : ag.bubble,
             };
           }
 
@@ -712,31 +713,26 @@ export default function BaseVillageView({
             targetPos = { x: dest.x + 0.4, y: dest.y + 1.2 };
           }
 
-          // Check if reached role target to perform role action
+          // Check if reached role target to perform role action quietly (no text spam)
           if (targetPos && Math.hypot(targetPos.x - ag.x, targetPos.y - ag.y) <= 1.35 && Math.random() < 0.5) {
             if (ag.role === 'shelter_rest') {
               return {
                 ...ag,
                 moving: false,
                 insideShelter: true,
-                bubble: 'Zzz ⛺',
+                bubble: null,
                 restTicks: 2,
                 nextMoveAt: now + 2200,
               };
             }
             if (ag.kind === 'hall') {
-              const hallQuotes = [
-                '🛡️ 부족원들이 대기 중이네!',
-                '⚔️ 부족회관에서 출정할 준비가 되었는가?',
-                '🏕️ 든든한 용병들이 거점을 지킨다네!',
-              ];
               const cf = campfires[0];
               const faceDir: 1 | -1 = cf && ag.x > cf.x ? -1 : 1;
               return {
                 ...ag,
                 facing: faceDir,
                 moving: false,
-                bubble: hallQuotes[Math.floor(Math.random() * hallQuotes.length)],
+                bubble: null,
                 restTicks: 2,
                 nextMoveAt: now + 2400,
               };
@@ -748,7 +744,7 @@ export default function BaseVillageView({
                 ...ag,
                 facing: faceDir,
                 moving: false,
-                bubble: idx % 2 === 0 ? '🍖 고기!' : '🔥 따뜻해',
+                bubble: null,
                 restTicks: 2,
                 nextMoveAt: now + 2200,
               };
@@ -757,18 +753,16 @@ export default function BaseVillageView({
               return {
                 ...ag,
                 moving: false,
-                bubble: '🛡️ 성벽 이상 무!',
+                bubble: null,
                 restTicks: 1,
                 nextMoveAt: now + 2000,
               };
             }
             if (ag.role === 'hauler') {
-              const isAmbacho = ag.label.includes('암바초');
-              const ambachoBubble = Math.random() < 0.4 ? '...? ❓' : '족장님! 돌멩이 주웠슴다! 이거 먹는 겁니까? 🪨';
               return {
                 ...ag,
                 moving: false,
-                bubble: isAmbacho ? ambachoBubble : `${ag.carryingIcon ?? '🪵'} 창고 운반!`,
+                bubble: null,
                 restTicks: 1,
                 nextMoveAt: now + 1900,
               };
