@@ -676,14 +676,18 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const p = ref.current;
     const branchesInPack = countOf(p.backpack, 'branch');
     const branchesInStorage = countOf(p.storage, 'branch');
-    if (branchesInPack + branchesInStorage >= 3) return;
-    const needed = Math.max(1, 3 - (branchesInPack + branchesInStorage));
+    if (branchesInPack + branchesInStorage >= 25) return;
+    const needed = Math.max(1, 25 - (branchesInPack + branchesInStorage));
     setS({
       ...p,
-      backpack: addStacks(p.backpack, [{ itemId: 'branch', count: needed }]),
+      backpack: addStacks(p.backpack, [
+        { itemId: 'branch', count: needed },
+        { itemId: 'log', count: 12 },
+        { itemId: 'flint', count: 10 },
+      ]),
       lastTickAt: Date.now(),
     });
-    toast.success(`🌿 떠돌이 주술사가 나뭇가지 ${needed}개를 건네주었습니다! (배낭 보관)`);
+    toast.success(`🌿 건설 지원: 나뭇가지 ${needed}개와 목재/부싯돌이 보급되었습니다!`);
   }, [setS]);
 
   const pickTutorialBranch = useCallback(() => {
@@ -1774,10 +1778,18 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const p = ref.current;
     if (!p.base) return;
     const v = ensureVillageState(p.village, !!p.altar);
+    const target = v.buildings.find(b => b.uid === uid);
     const nextV = removeVillageBuilding(v, uid);
     if (nextV === v) { toast.warning('중심 모닥불은 최소 1개 남겨야 합니다'); return; }
-    setS({ ...p, village: nextV, lastTickAt: Date.now() });
-    toast('시설을 철거했습니다');
+    let nextBackpack = p.backpack;
+    if (target) {
+      const def = VILLAGE_BUILDINGS[target.buildingId];
+      if (def?.cost?.length) {
+        nextBackpack = addStacks(nextBackpack, def.cost);
+      }
+    }
+    setS({ ...p, backpack: nextBackpack, village: nextV, lastTickAt: Date.now() });
+    toast.success('시설을 철거하고 건설 재료를 회수했습니다');
   }, [setS]);
 
   const researchVillageBlueprint = useCallback((buildingId: VillageBuildingId): boolean => {

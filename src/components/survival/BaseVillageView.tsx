@@ -134,6 +134,7 @@ interface Props {
   onMove: (uid: string, toX: number, toY: number) => boolean;
   onRemove: (uid: string) => void;
   onResearchBlueprint?: (buildingId: VillageBuildingId) => boolean;
+  onGrantBranches?: () => void;
   onTrainShamanSkill?: (skillId: ShamanSkillId) => boolean;
   onForgeSignatureWeapon?: (itemId: ItemId, cost: Stack[]) => boolean;
   onCraftAmmoBundle?: (itemId: 'arrow' | 'sling_stone' | 'javelin', count: number, cost: Stack[]) => boolean;
@@ -697,6 +698,7 @@ export default function BaseVillageView({
   onMove,
   onRemove,
   onResearchBlueprint,
+  onGrantBranches,
   onTrainShamanSkill,
   onForgeSignatureWeapon,
   onCraftAmmoBundle,
@@ -1335,7 +1337,13 @@ export default function BaseVillageView({
             variant={buildMode ? 'default' : 'outline'}
             aria-pressed={buildMode}
             onClick={() => {
-              setBuildMode(v => !v);
+              setBuildMode(v => {
+                const next = !v;
+                if (next && onGrantBranches && countOf(ownedPool, 'branch') < 10) {
+                  onGrantBranches();
+                }
+                return next;
+              });
               setSelectedPlacedUid(null);
             }}
             className="pixel-btn h-auto min-h-0 gap-1 py-1.5 px-2.5 text-xs font-bold"
@@ -2215,9 +2223,22 @@ export default function BaseVillageView({
                 </button>
               ))}
             </div>
-            <span className="text-[10px] text-muted-foreground truncate">
-              {filteredCatalog.length}종류
-            </span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {onGrantBranches && countOf(ownedPool, 'branch') < 10 && (
+                <button
+                  type="button"
+                  onClick={() => onGrantBranches()}
+                  className="flex items-center gap-1 rounded bg-emerald-600/20 text-emerald-700 border border-emerald-500/40 px-2 py-0.5 text-[10px] font-bold hover:bg-emerald-600/30"
+                  title="나뭇가지와 기초 건축 재료 보급받기"
+                >
+                  <span>🌿</span>
+                  <span>기초 재료 보급</span>
+                </button>
+              )}
+              <span className="text-[10px] text-muted-foreground truncate">
+                {filteredCatalog.length}종류
+              </span>
+            </div>
           </div>
 
           {/* Compact Button Grid (No long prose, clear selection ring & (i) info icon) */}

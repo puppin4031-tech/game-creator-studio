@@ -1575,6 +1575,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       onCraftCustomGear={g.craftCustomGear}
                       onMove={g.moveVillageTile}
                       onRemove={g.removeVillageTile}
+                      onGrantBranches={g.grantTutorialBranches}
                       onResearchBlueprint={g.researchVillageBlueprint}
                       onTrainShamanSkill={g.trainShamanSkill}
                       onForgeSignatureWeapon={g.forgeSignatureWeapon}
