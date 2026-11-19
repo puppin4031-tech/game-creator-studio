@@ -1,4 +1,4 @@
-import { Flag, Flame, Home, Zap, Eye, Footprints, Pause, Play } from 'lucide-react';
+import { Flag, Flame, Home, Zap, Eye, Footprints, Pause, Play, X, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FOCUS_LABEL, type ExpeditionFocus, type ExpeditionLog, type ObservedExpedition } from '@/lib/survival/expedition';
 import { DEFAULT_TRIBE_CLASS, getTribeClass, TRIBE_CLASS_LIST, type TribeClassId } from '@/data/tribeClasses';
@@ -137,88 +137,161 @@ function TribeStats({ t, crew, selectedClass }: { t?: TribeInfo; crew?: Observed
   );
 }
 export default function ExpeditionSystem(p: Props) {
-  const [tab, setTab] = useState<'exp' | 'tribe'>('exp');
+  const [tribeDetailOpen, setTribeDetailOpen] = useState(false);
   const activeClass = p.crew?.tribeClass ?? p.tribeClass ?? p.tribe?.classId ?? DEFAULT_TRIBE_CLASS;
   const cls = getTribeClass(activeClass);
-  const compactBtn = 'h-auto min-h-0 py-1.5 px-2.5 text-xs';
-  return <section aria-label="원정대 관찰" className="space-y-1.5 border-t border-border bg-background/95 p-2 text-xs">
-    <div role="tablist" className="grid grid-cols-2 gap-1">
-      {([['exp', '원정 편성'], ['tribe', `부족 용병 (${cls.icon}${cls.name})`]] as const).map(([k, l]) => <Button key={k} role="tab" aria-selected={tab === k} size="sm" variant={tab === k ? 'default' : 'outline'} className={compactBtn} onClick={() => setTab(k)}>{l}</Button>)}
-    </div>
-    {tab === 'tribe' ? <TribeStats t={p.tribe} crew={p.crew} selectedClass={activeClass} /> : <>
-    <div className="flex flex-wrap items-center gap-1.5">
-      <b className="flex items-center gap-1"><Flag className="!h-4 !w-4 text-primary" />{p.expeditionLevel ?? 1}레벨 원정대 ({cls.icon}{cls.name})</b>
-      <span className="ml-auto">{p.crew ? `HP ${p.crew.hp}/${p.crew.maxHp ?? 100} · ${p.crew.phase === 'returning' ? '귀환' : p.crew.target ? '작업' : '행군'} 중` : '거점 대기 · 기본 100%'}</span>
-    </div>
-    <TribeClassBadge selected={activeClass} />
-    <div role="radiogroup" aria-label="원정 목표" className="grid grid-cols-3 gap-1">
-      {(Object.keys(FOCUS_META) as ExpeditionFocus[]).map(f => {
-        const meta = FOCUS_META[f];
-        return (
-          <Button
-            key={f}
-            size="sm"
-            role="radio"
-            aria-checked={p.focus === f}
-            variant={p.focus === f ? 'default' : 'outline'}
-            disabled={!!p.crew}
-            className={`${compactBtn} flex items-center justify-center gap-1 font-bold`}
-            onClick={() => p.onFocus(f)}
-          >
-            <span>{meta.icon}</span>
-            <span>{meta.short}</span>
-          </Button>
-        );
-      })}
-    </div>
-    {/* Focus detail banner */}
-    <div className="rounded border border-primary/30 bg-primary/10 px-2 py-1 text-[11px] leading-tight">
-      <span className="font-bold text-primary">
-        {FOCUS_META[p.focus].icon} [{FOCUS_META[p.focus].label} 특화]:{' '}
-      </span>
-      <span className="text-foreground">{FOCUS_META[p.focus].detail}</span>
-    </div>
-    {p.outdoor && <div role="status" className="flex items-center gap-1 bg-primary/15 px-2 py-1 font-bold text-foreground"><Flame className="!h-4 !w-4 shrink-0 text-primary" />족장 친정 · 채집량 200% · 희귀 유물 3배</div>}
-    {/* Daily Auto-Expedition Remaining Limit Bar */}
-    <div className="flex items-center justify-between rounded border border-primary/40 bg-accent/25 px-2 py-1 text-[11px]">
-      <span className="flex items-center gap-1 font-bold text-foreground">
-        <span>⏱️</span>
-        <span>오늘 자동원정 가능:</span>
-      </span>
-      <span className={`font-mono font-bold ${(p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0) ? 'text-destructive' : 'text-primary'}`}>
-        {p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0
-          ? '오늘 6시간 한도 소진 (00:00 초기화)'
-          : `${fmtDuration(p.autoRemainingSec ?? 21600)} / 6시간`}
-      </span>
-    </div>
-    <div className="grid grid-cols-2 gap-1">
-      <Button size="sm" className={`${compactBtn} whitespace-normal`} disabled={!p.canSend || !!p.crew} onClick={p.onSend}><Flag className="!h-4 !w-4 shrink-0" />{p.target && p.home ? `${Math.round(distanceM(p.home, p.target))}m 원정대 파견` : '주변 원정대 파견'}</Button>
-      <Button
-        size="sm"
-        variant={p.auto ? 'default' : 'outline'}
-        className={`${compactBtn} whitespace-normal`}
-        disabled={(!p.canSend && !p.auto) || ((p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0) && !p.auto)}
-        aria-pressed={p.auto}
-        onClick={p.onAuto}
+  const compactBtn = 'h-auto min-h-0 py-1.5 px-2 text-xs';
+  const memberCount = p.tribe?.count ?? 0;
+  const statusText = p.crew
+    ? `HP ${p.crew.hp}/${p.crew.maxHp ?? 100} · ${p.crew.phase === 'returning' ? '귀환' : p.crew.target ? '작업' : '행군'}`
+    : memberCount > 0
+      ? `대기 중 · ${memberCount}명`
+      : '영입 필요';
+
+  return (
+    <section aria-label="원정대 관찰" className="space-y-1.5 border-t border-border bg-background/95 p-2 text-xs">
+      {/* 심플 부족민 카드: 디자인 스프라이트 / 이름 (클릭 시 상세 정보 팝업) */}
+      <button
+        type="button"
+        onClick={() => setTribeDetailOpen(true)}
+        className="flex w-full items-center gap-2 rounded-md border border-border/80 bg-card px-2.5 py-1.5 text-left transition-colors hover:bg-accent/30 active:scale-[0.99]"
       >
-        {p.auto ? <Pause className="!h-4 !w-4" /> : <Play className="!h-4 !w-4" />}
-        {p.auto
-          ? '거점 자동사냥 끄기'
-          : (p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0)
-            ? '자동사냥 (한도 소진)'
-            : '거점 자동사냥 켜기'}
-      </Button>
-      <Button size="sm" variant="outline" className={`${compactBtn} whitespace-normal`} disabled={!p.crew || Date.now() < (p.crew?.moraleReadyAt ?? 0)} onClick={p.onMorale}><Zap className="!h-4 !w-4 shrink-0" />원격 사기 진작</Button>
-      <Button size="sm" variant="outline" className={compactBtn} disabled={!p.crew} onClick={p.onReturn}><Home className="!h-4 !w-4" />즉시 귀환</Button>
-    </div>
-    <div className="flex gap-1">
-      <Button variant={p.pocket ? 'default' : 'outline'} size="sm" className={`${compactBtn} flex-1 whitespace-normal`} aria-pressed={p.pocket} onClick={p.onPocket}><Footprints className="!h-4 !w-4 shrink-0" />산책·러닝 포켓 {p.pocket ? 'ON' : 'OFF'}</Button>
-      <Button variant={p.watching ? 'default' : 'outline'} size="sm" className={compactBtn} disabled={!p.crew} aria-pressed={p.watching} onClick={p.onWatch}><Eye className="!h-4 !w-4" />관찰</Button>
-    </div>
-    {p.pocket && <p className="text-muted-foreground">{p.gpsReady ? '20km/h 이하 이동 자동채집 · GPS 수신 중' : '위치 신호 대기 · 자동채집 일시정지'}</p>}
-    <ol aria-label="원정대 활동 로그" aria-live="polite" className="h-12 space-y-0.5 overflow-y-auto border-l-2 border-primary pl-2 text-[11px]">
-      {p.logs.length ? p.logs.slice(-3).map((log, i) => <li key={`${log.at}-${i}`}>{log.text}</li>) : <li className="text-muted-foreground">모닥불 · 원정대 대기 중</li>}
-    </ol>
-    </>}
-  </section>;
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-muted/60">
+          <TribeSprite action={p.crew ? 'walk' : 'idle'} tribeClass={activeClass} height={34} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="font-bold text-foreground truncate">{cls.icon} {cls.name}</span>
+            <span className="rounded bg-primary/15 px-1.5 py-0.2 text-[10px] font-bold text-primary">Lv.{p.expeditionLevel ?? 1}</span>
+          </div>
+          <p className="text-[11px] text-muted-foreground truncate">{statusText}</p>
+        </div>
+        <span className="flex items-center gap-0.5 text-[10px] font-semibold text-muted-foreground shrink-0">
+          정보 <ChevronRight className="h-3.5 w-3.5" />
+        </span>
+      </button>
+
+      {/* 원정 목표 선택 (심플 3버튼) */}
+      <div role="radiogroup" aria-label="원정 목표" className="grid grid-cols-3 gap-1">
+        {(Object.keys(FOCUS_META) as ExpeditionFocus[]).map(f => {
+          const meta = FOCUS_META[f];
+          return (
+            <Button
+              key={f}
+              size="sm"
+              role="radio"
+              aria-checked={p.focus === f}
+              variant={p.focus === f ? 'default' : 'outline'}
+              disabled={!!p.crew}
+              className={`${compactBtn} flex items-center justify-center gap-1 font-bold`}
+              onClick={() => p.onFocus(f)}
+            >
+              <span>{meta.icon}</span>
+              <span>{meta.short}</span>
+            </Button>
+          );
+        })}
+      </div>
+
+      {/* 자동원정 잔여시간 한 줄 요약 */}
+      <div className="flex items-center justify-between px-1 text-[11px]">
+        <span className="text-muted-foreground">⏱️ 오늘 자동원정</span>
+        <span className={`font-mono font-bold ${(p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0) ? 'text-destructive' : 'text-primary'}`}>
+          {p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0
+            ? '한도 소진 (00:00 초기화)'
+            : `${fmtDuration(p.autoRemainingSec ?? 21600)} / 6시간`}
+        </span>
+      </div>
+
+      {/* 핵심 액션 버튼 */}
+      <div className="grid grid-cols-2 gap-1">
+        <Button size="sm" className={`${compactBtn} whitespace-normal`} disabled={!p.canSend || !!p.crew} onClick={p.onSend}>
+          <Flag className="!h-3.5 !w-3.5 shrink-0" />
+          {p.target && p.home ? `${Math.round(distanceM(p.home, p.target))}m 파견` : '원정대 파견'}
+        </Button>
+        <Button
+          size="sm"
+          variant={p.auto ? 'default' : 'outline'}
+          className={`${compactBtn} whitespace-normal`}
+          disabled={(!p.canSend && !p.auto) || ((p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0) && !p.auto)}
+          aria-pressed={p.auto}
+          onClick={p.onAuto}
+        >
+          {p.auto ? <Pause className="!h-3.5 !w-3.5" /> : <Play className="!h-3.5 !w-3.5" />}
+          {p.auto
+            ? '자동사냥 끄기'
+            : (p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0)
+              ? '자동사냥 (소진)'
+              : '자동사냥 켜기'}
+        </Button>
+        <Button size="sm" variant="outline" className={`${compactBtn} whitespace-normal`} disabled={!p.crew || Date.now() < (p.crew?.moraleReadyAt ?? 0)} onClick={p.onMorale}>
+          <Zap className="!h-3.5 !w-3.5 shrink-0" />사기 진작
+        </Button>
+        <Button size="sm" variant="outline" className={compactBtn} disabled={!p.crew} onClick={p.onReturn}>
+          <Home className="!h-3.5 !w-3.5" />즉시 귀환
+        </Button>
+      </div>
+
+      <div className="flex gap-1">
+        <Button variant={p.pocket ? 'default' : 'outline'} size="sm" className={`${compactBtn} flex-1 whitespace-normal`} aria-pressed={p.pocket} onClick={p.onPocket}>
+          <Footprints className="!h-3.5 !w-3.5 shrink-0" />포켓 {p.pocket ? 'ON' : 'OFF'}
+        </Button>
+        <Button variant={p.watching ? 'default' : 'outline'} size="sm" className={compactBtn} disabled={!p.crew} aria-pressed={p.watching} onClick={p.onWatch}>
+          <Eye className="!h-3.5 !w-3.5" />관찰
+        </Button>
+      </div>
+
+      {/* 부족민 상세 정보 팝업 */}
+      {tribeDetailOpen && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+          onClick={() => setTribeDetailOpen(false)}
+        >
+          <div
+            className="pixel-panel w-full max-w-sm space-y-2.5 bg-background p-3 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-border pb-2">
+              <div className="flex items-center gap-2">
+                <TribeSprite action="idle" tribeClass={activeClass} height={32} />
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">{cls.icon} {cls.name} 상세 정보</h3>
+                  <p className="text-[11px] text-muted-foreground">{p.expeditionLevel ?? 1}레벨 원정대 · {FOCUS_META[p.focus].label}</p>
+                </div>
+              </div>
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setTribeDetailOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <TribeStats t={p.tribe} crew={p.crew} selectedClass={activeClass} />
+
+            {p.outdoor && (
+              <div role="status" className="flex items-center gap-1 rounded bg-primary/15 px-2 py-1 text-[11px] font-bold text-foreground">
+                <Flame className="!h-3.5 !w-3.5 shrink-0 text-primary" />족장 친정 · 채집량 200% · 희귀 유물 3배
+              </div>
+            )}
+
+            <div className="rounded border border-primary/25 bg-primary/10 px-2 py-1.5 text-[11px] leading-snug">
+              <span className="font-bold text-primary">{FOCUS_META[p.focus].icon} {FOCUS_META[p.focus].label}: </span>
+              <span className="text-foreground">{FOCUS_META[p.focus].detail}</span>
+            </div>
+
+            {p.pocket && (
+              <p className="text-[11px] text-muted-foreground">
+                {p.gpsReady ? '20km/h 이하 이동 자동채집 · GPS 수신 중' : '위치 신호 대기 · 자동채집 일시정지'}
+              </p>
+            )}
+
+            <div>
+              <div className="mb-1 text-[10px] font-bold text-muted-foreground">최근 활동 기록</div>
+              <ol aria-label="원정대 활동 로그" aria-live="polite" className="max-h-20 space-y-0.5 overflow-y-auto border-l-2 border-primary pl-2 text-[11px]">
+                {p.logs.length ? p.logs.slice(-5).map((log, i) => <li key={`${log.at}-${i}`}>{log.text}</li>) : <li className="text-muted-foreground">모닥불 · 원정대 대기 중</li>}
+              </ol>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
 }

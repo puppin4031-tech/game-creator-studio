@@ -1,4 +1,8 @@
-import { useMemo, useState, useRef, useEffect } from 'react';
+import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
+import * as maplibregl from 'maplibre-gl';
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import { terrainOnlyStyle, type TerrainPalette } from '@/lib/survival/mapStyle';
 import {
   ChevronDown,
   Compass,
@@ -97,6 +101,32 @@ interface Props {
   onDispatchTo: (target: LatLng, label: string) => void;
 }
 
+maplibregl.setWorkerUrl(workerUrl);
+
+const RADAR_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
+let cachedRadarStyle: maplibregl.StyleSpecification | null = null;
+
+async function loadRadarTerrainStyle(): Promise<maplibregl.StyleSpecification> {
+  if (cachedRadarStyle) return cachedRadarStyle;
+  const res = await fetch(RADAR_STYLE_URL);
+  if (!res.ok) throw new Error(`radar style ${res.status}`);
+  const style = (await res.json()) as maplibregl.StyleSpecification;
+  const css = getComputedStyle(document.documentElement);
+  const color = (key: string) => css.getPropertyValue(`--survival-${key}`).trim();
+  const palette: TerrainPalette = {
+    forest: color('forest') || '#3b6b3a',
+    grass: color('grass') || '#789e54',
+    wetland: color('wetland') || '#4e7a6e',
+    water: color('water') || '#3b7ea1',
+    shore: color('shore') || '#cbb882',
+    ice: color('ice') || '#cfe3ec',
+    path: color('path') || '#d4c49e',
+    pathEdge: color('path-edge') || '#8f7e5b',
+  };
+  cachedRadarStyle = terrainOnlyStyle(style, color('ground') || '#8fa868', palette);
+  return cachedRadarStyle;
+}
+
 export default function RadarMapModal({
   open,
   onClose,
@@ -148,6 +178,11 @@ export default function RadarMapModal({
   } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const mapBoxRef = useRef<HTMLDivElement>(null);
+  const fogCanvasRef = useRef<HTMLCanvasElement>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+  const [, setMapTick] = useState(0);
 
   // Touch gesture state for pinch-to-zoom & smooth panning
   const touchStateRef = useRef<{
@@ -216,8 +251,167 @@ export default function RadarMapModal({
   const baseScanRadius = hasCompass ? 3000 : RADAR_SCAN_RADIUS_M;
   const currentScanRadius = baseScanRadius / zoomScale;
 
+  // Compute current view center LatLng accounting for panM
+  const viewCenterLatLng = useMemo((): LatLng => {
+    const mLat = 111_320;
+    const mLng = 111_320 * Math.cos((center.lat * Math.PI) / 180);
+    return {
+      lat: center.lat + panM.y / mLat,
+      lng: center.lng + panM.x / mLng,
+    };
+  }, [center.lat, center.lng, panM.x, panM.y]);
+
+  const computeMapZoom = useCallback((w: number, h: number, lat: number, radiusM: number) => {
+    const minDim = Math.max(200, Math.min(w, h));
+    const desiredMpp = radiusM / (0.44 * minDim);
+    const z = Math.log2((78271.51696 * Math.cos((lat * Math.PI) / 180)) / desiredMpp);
+    return Math.max(11, Math.min(18.5, z));
+  }, []);
+
+  // Draw fog-of-war canvas: dim unexplored terrain so roads/rivers are still faintly visible,
+  // and cut out visited (explored) areas + player + base so detailed roads & terrain shine through!
+  const drawRadarFog = useCallback(() => {
+    const canvas = fogCanvasRef.current;
+    const container = containerRef.current;
+    const map = mapRef.current;
+    if (!canvas || !container) return;
+    const rect = container.getBoundingClientRect();
+    const w = Math.max(1, Math.round(rect.width));
+    const h = Math.max(1, Math.round(rect.height));
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+    }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.save();
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, h);
+
+    // Semi-transparent dark tactical fog over unexplored regions (lets terrain/roads show dimly)
+    ctx.fillStyle = 'rgba(8, 18, 12, 0.56)';
+    ctx.fillRect(0, 0, w, h);
+
+    // Cut out explored areas & player/base vision to reveal full detailed roads & terrain
+    ctx.globalCompositeOperation = 'destination-out';
+
+    const minDim = Math.max(200, Math.min(w, h));
+    const pxPerM = (0.44 * minDim) / currentScanRadius;
+
+    const projectPx = (pt: LatLng) => {
+      if (map) {
+        const p = map.project([pt.lng, pt.lat]);
+        return { x: p.x, y: p.y };
+      }
+      const mLat = 111_320;
+      const mLng = 111_320 * Math.cos((center.lat * Math.PI) / 180);
+      const dxM = (pt.lng - center.lng) * mLng - panM.x;
+      const dyM = (pt.lat - center.lat) * mLat - panM.y;
+      return {
+        x: (0.5 + (dxM / currentScanRadius) * 0.44) * w,
+        y: (0.5 - (dyM / currentScanRadius) * 0.44) * h,
+      };
+    };
+
+    const punch = (pt: LatLng, radiusM: number, minPx: number) => {
+      const p = projectPx(pt);
+      const r = Math.max(minPx, radiusM * pxPerM);
+      if (p.x < -r || p.x > w + r || p.y < -r || p.y > h + r) return;
+      const grad = ctx.createRadialGradient(p.x, p.y, r * 0.45, p.x, p.y, r);
+      grad.addColorStop(0, 'rgba(0,0,0,1)');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+    };
+
+    if (explored && explored.length > 0) {
+      for (const pt of explored) {
+        punch(pt, 55, 16);
+      }
+    }
+    punch(pos, 75, 26);
+    if (base) punch(base, 85, 30);
+
+    ctx.restore();
+  }, [explored, pos, base, center.lat, center.lng, panM.x, panM.y, currentScanRadius]);
+
+  // Mount real MapLibre terrain map inside RadarMapModal when open
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    let resizeObs: ResizeObserver | null = null;
+    (async () => {
+      try {
+        const style = await loadRadarTerrainStyle();
+        if (cancelled || !mapBoxRef.current || !containerRef.current) return;
+        const rect = containerRef.current.getBoundingClientRect();
+        const z = computeMapZoom(rect.width || 360, rect.height || 640, viewCenterLatLng.lat, currentScanRadius);
+        const map = new maplibregl.Map({
+          container: mapBoxRef.current,
+          style,
+          center: [viewCenterLatLng.lng, viewCenterLatLng.lat],
+          zoom: z,
+          interactive: false,
+          attributionControl: false,
+        });
+        mapRef.current = map;
+        map.on('load', () => {
+          if (cancelled) return;
+          setMapReady(true);
+          setMapTick(t => t + 1);
+          drawRadarFog();
+        });
+        map.on('render', () => {
+          drawRadarFog();
+        });
+        resizeObs = new ResizeObserver(() => {
+          map.resize();
+          setMapTick(t => t + 1);
+          drawRadarFog();
+        });
+        resizeObs.observe(containerRef.current);
+      } catch (e) {
+        console.error('[RadarMapModal] maplibre init failed', e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      resizeObs?.disconnect();
+      mapRef.current?.remove();
+      mapRef.current = null;
+      setMapReady(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Sync MapLibre camera with panM, zoomScale, and center
+  useEffect(() => {
+    const map = mapRef.current;
+    const container = containerRef.current;
+    if (!map || !container) {
+      drawRadarFog();
+      return;
+    }
+    const rect = container.getBoundingClientRect();
+    const z = computeMapZoom(rect.width || 360, rect.height || 640, viewCenterLatLng.lat, currentScanRadius);
+    map.jumpTo({ center: [viewCenterLatLng.lng, viewCenterLatLng.lat], zoom: z });
+    drawRadarFog();
+  }, [viewCenterLatLng.lat, viewCenterLatLng.lng, currentScanRadius, mapReady, drawRadarFog]);
+
   /** Projects LatLng to percentage coordinates on the radar map canvas with pan & zoom */
   const toMapPct = (target: LatLng) => {
+    const map = mapRef.current;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (map && mapReady && rect && rect.width > 0 && rect.height > 0) {
+      const pt = map.project([target.lng, target.lat]);
+      return {
+        xPct: (pt.x / rect.width) * 100,
+        yPct: (pt.y / rect.height) * 100,
+      };
+    }
     const mLat = 111_320;
     const mLng = 111_320 * Math.cos((center.lat * Math.PI) / 180);
     const dxM = (target.lng - center.lng) * mLng - panM.x;
@@ -229,6 +423,12 @@ export default function RadarMapModal({
 
   /** Inverses percentage coordinates on the radar map canvas back to LatLng */
   const fromMapPct = (xPct: number, yPct: number): LatLng => {
+    const map = mapRef.current;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (map && mapReady && rect && rect.width > 0 && rect.height > 0) {
+      const ll = map.unproject([(xPct / 100) * rect.width, (yPct / 100) * rect.height]);
+      return { lat: ll.lat, lng: ll.lng };
+    }
     const mLat = 111_320;
     const mLng = 111_320 * Math.cos((center.lat * Math.PI) / 180);
     const dxM = ((xPct - 50) / 44) * currentScanRadius + panM.x;
@@ -582,10 +782,24 @@ export default function RadarMapModal({
         onWheel={handleWheel}
         className="relative flex-1 w-full h-full overflow-hidden bg-[#0a150e] cursor-grab active:cursor-grabbing touch-none select-none"
       >
-        {/* Crisp Tactical Map Grid Background */}
+        {/* Real OpenFreeMap / MapLibre Terrain & Roads Layer */}
+        <div
+          ref={mapBoxRef}
+          aria-hidden
+          className="pointer-events-none absolute inset-0 h-full w-full"
+        />
+
+        {/* Fog-of-War Canvas: dims unexplored terrain while punching clear holes over visited roads & terrain */}
+        <canvas
+          ref={fogCanvasRef}
+          aria-hidden
+          className="pointer-events-none absolute inset-0 h-full w-full"
+        />
+
+        {/* Subtle Tactical Map Grid Overlay */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-50 bg-[radial-gradient(#1e4028_1.8px,transparent_1.8px)] [background-size:28px_28px]"
+          className="pointer-events-none absolute inset-0 opacity-20 bg-[radial-gradient(#34d399_1.2px,transparent_1.2px)] [background-size:28px_28px]"
         />
 
         {/* Topographic Rings & High-Contrast Coordinate Grid */}
@@ -595,23 +809,23 @@ export default function RadarMapModal({
           aria-hidden
         >
           {/* Main Axis with clean emerald lines */}
-          <line x1="50" y1="0" x2="50" y2="100" stroke="#34d399" strokeWidth="0.4" strokeOpacity="0.4" />
-          <line x1="0" y1="50" x2="100" y2="50" stroke="#34d399" strokeWidth="0.4" strokeOpacity="0.4" />
+          <line x1="50" y1="0" x2="50" y2="100" stroke="#34d399" strokeWidth="0.3" strokeOpacity="0.35" />
+          <line x1="0" y1="50" x2="100" y2="50" stroke="#34d399" strokeWidth="0.3" strokeOpacity="0.35" />
 
-          {/* Range Circles with glowing green styling */}
-          <circle cx="50" cy="50" r="11" fill="none" stroke="#34d399" strokeWidth="0.5" strokeDasharray="1.5 1.5" strokeOpacity="0.5" />
-          <circle cx="50" cy="50" r="22" fill="none" stroke="#34d399" strokeWidth="0.6" strokeDasharray="2 1.5" strokeOpacity="0.6" />
-          <circle cx="50" cy="50" r="34" fill="none" stroke="#34d399" strokeWidth="0.7" strokeDasharray="2.5 2" strokeOpacity="0.7" />
-          <circle cx="50" cy="50" r="44" fill="none" stroke="#34d399" strokeWidth="0.8" strokeOpacity="0.8" />
-          <circle cx="50" cy="50" r="48" fill="none" stroke="#10b981" strokeWidth="1" strokeOpacity="0.9" />
+          {/* Range Circles with clean emerald styling */}
+          <circle cx="50" cy="50" r="11" fill="none" stroke="#34d399" strokeWidth="0.35" strokeDasharray="1.5 1.5" strokeOpacity="0.45" />
+          <circle cx="50" cy="50" r="22" fill="none" stroke="#34d399" strokeWidth="0.4" strokeDasharray="2 1.5" strokeOpacity="0.5" />
+          <circle cx="50" cy="50" r="34" fill="none" stroke="#34d399" strokeWidth="0.45" strokeDasharray="2.5 2" strokeOpacity="0.55" />
+          <circle cx="50" cy="50" r="44" fill="none" stroke="#34d399" strokeWidth="0.5" strokeOpacity="0.6" />
+          <circle cx="50" cy="50" r="48" fill="none" stroke="#10b981" strokeWidth="0.6" strokeOpacity="0.7" />
 
           {/* Range Labels on SVG axis */}
-          <text x="51.5" y="39.5" fill="#a7f3d0" fontSize="2.4" fontWeight="bold">100m</text>
-          <text x="51.5" y="28.5" fill="#a7f3d0" fontSize="2.4" fontWeight="bold">250m</text>
-          <text x="51.5" y="16.5" fill="#a7f3d0" fontSize="2.4" fontWeight="bold">500m</text>
-          <text x="51.5" y="6.5" fill="#a7f3d0" fontSize="2.4" fontWeight="bold">1,000m</text>
+          <text x="51.5" y="39.5" fill="#ecfdf5" fontSize="2.3" fontWeight="bold" stroke="#064e3b" strokeWidth="0.25" paintOrder="stroke">100m</text>
+          <text x="51.5" y="28.5" fill="#ecfdf5" fontSize="2.3" fontWeight="bold" stroke="#064e3b" strokeWidth="0.25" paintOrder="stroke">250m</text>
+          <text x="51.5" y="16.5" fill="#ecfdf5" fontSize="2.3" fontWeight="bold" stroke="#064e3b" strokeWidth="0.25" paintOrder="stroke">500m</text>
+          <text x="51.5" y="6.5" fill="#ecfdf5" fontSize="2.3" fontWeight="bold" stroke="#064e3b" strokeWidth="0.25" paintOrder="stroke">1,000m</text>
 
-          {/* Route Guide Line to Tracked Spot or Selected Spot */}
+          {/* Route Guide Line to Tracked Spot or Selected Spot (thinner & 70% opacity) */}
           {(tracked || selectedSpot) && (() => {
             const dest = selectedSpot ?? tracked!;
             const mePt = toMapPct(pos);
@@ -623,27 +837,12 @@ export default function RadarMapModal({
                 x2={destPt.xPct}
                 y2={destPt.yPct}
                 stroke="#facc15"
-                strokeWidth="1.2"
-                strokeDasharray="2 1.2"
+                strokeWidth="0.55"
+                strokeOpacity="0.7"
+                strokeDasharray="1.8 1.2"
               />
             );
           })()}
-
-          {/* User Explored Path on Tactical Radar */}
-          {explored && explored.map((pt, i) => {
-            const ptPct = toMapPct(pt);
-            if (ptPct.xPct < -5 || ptPct.xPct > 105 || ptPct.yPct < -5 || ptPct.yPct > 105) return null;
-            return (
-              <circle
-                key={`exp-${i}`}
-                cx={ptPct.xPct}
-                cy={ptPct.yPct}
-                r="2.6"
-                fill="#34d399"
-                fillOpacity="0.25"
-              />
-            );
-          })}
         </svg>
 
         {/* Visible Hotspot Areas (Ore, Egg, Boss) */}

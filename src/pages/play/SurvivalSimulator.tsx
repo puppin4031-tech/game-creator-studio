@@ -338,17 +338,9 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
   const onTap = (p: LatLng) => {
     if (auto.job) { auto.stop(); returnToCenter(); }
+    if (realGps) return;
     const d = distanceM(s.pos, p);
-    if (realGps) {
-      setExpeditionTarget(p);
-      toast.success(`📍 목표 좌표 설정 (${d >= 1000 ? `${(d / 1000).toFixed(1)}km` : `${Math.round(d)}m`})`);
-      return;
-    }
-    if (d > g.vision * 1.2) {
-      setExpeditionTarget(p);
-      toast.success(`📍 목표 좌표 설정 (${d >= 1000 ? `${(d / 1000).toFixed(1)}km` : `${Math.round(d)}m`})`);
-      return;
-    }
+    if (d > g.vision * 1.2) return;
     g.moveTo(p);
   };
 
