@@ -76,7 +76,7 @@ export function ScaleControl({ target }: { target: string }) {
       try {
         localStorage.setItem(`survival_scale_${target}`, String(scale));
       } catch {}
-      await qc.invalidateQueries({ queryKey: ['sprite-animations', target] });
+      await qc.invalidateQueries({ queryKey: ['sprite-animations'] });
       toast.success(`크기 비율을 ${scale.toFixed(1)}배로 저장했어요.`);
     } catch (e) {
       toast.error(`저장 실패: ${e instanceof Error ? e.message : '알 수 없는 오류'}`);
@@ -175,7 +175,7 @@ export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARAC
         await supabase.storage.from(SPRITE_BUCKET).remove([current.image_path]);
       }
       setFile(null);
-      await qc.invalidateQueries({ queryKey: ['sprite-animations', CHARACTER] });
+      await qc.invalidateQueries({ queryKey: ['sprite-animations'] });
       toast.success(`${SPRITE_ACTION_LABELS[action]} 애니메이션을 저장했어요.`);
     } catch (e) {
       toast.error(`저장 실패: ${e instanceof Error ? e.message : '알 수 없는 오류'}`);
@@ -190,7 +190,7 @@ export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARAC
       const { error } = await supabase.from('survival_sprite_animations').delete().eq('id', current.id);
       if (error) throw error;
       await supabase.storage.from(SPRITE_BUCKET).remove([current.image_path]);
-      await qc.invalidateQueries({ queryKey: ['sprite-animations', CHARACTER] });
+      await qc.invalidateQueries({ queryKey: ['sprite-animations'] });
       toast.success('스프라이트를 삭제했어요.');
     } catch (e) {
       toast.error(`삭제 실패: ${e instanceof Error ? e.message : '알 수 없는 오류'}`);
@@ -280,7 +280,9 @@ export default function SpriteAssets() {
   const [target, setTarget] = useState('hunter');
 
   const targets = [
-    { key: 'hunter', label: '👤 유저 캐릭터 (9가지 액션 모션)' },
+    { key: 'hunter', label: '👤 유저 캐릭터 (공통 기본 · 9가지 액션)' },
+    { key: 'hunter:lv5', label: '👤 유저 캐릭터 (Lv.5~7 전용 외형)' },
+    { key: 'hunter:lv8', label: '👤 유저 캐릭터 (Lv.8+ 전용 외형)' },
     ...TRIBE_TARGETS,
     ...DINO_PET_TARGETS,
     ...(catalog?.pets ?? []).map(p => ({
@@ -298,7 +300,7 @@ export default function SpriteAssets() {
   const isMob = target.startsWith('mob:');
 
   const actions: SpriteAction[] =
-    target === 'hunter'
+    target === 'hunter' || target.startsWith('hunter:')
       ? (CHARACTER_ACTIONS as unknown as SpriteAction[])
       : isTribe
       ? TRIBE_ACTIONS

@@ -357,14 +357,14 @@ export const SHAMAN_CUISINE_RECIPES: ShamanDishDef[] = [
     hpRestore: 40,
   },
 
-  /* ---------------- 3. 특별식 (일정시간 20~30분 강력 지속 특수 버프) ---------------- */
+  /* ---------------- 3. 특별식 (일정시간 20~30분 지속 특수 버프 · 중복 불가) ---------------- */
   {
     id: 'spec_dino_steak',
     name: '포식자의 티라노 스테이크',
     category: 'special',
     icon: '🦖',
-    tagline: '20분간 공격력 +25% · 공격속도 +20% 특수 버프',
-    desc: '맹수의 질긴 육질을 후추열매와 암염으로 숙성시켜 포식자의 흉포한 기운을 깨웁니다.',
+    tagline: '20분간 공격력 +10% · 공격속도 +5% 특수 버프',
+    desc: '맹수의 육질을 후추열매와 암염으로 숙성시켜 포식자의 날카로운 기운을 깨웁니다.',
     cookTimeSec: 15,
     ingredients: [
       { itemId: 'raw_meat', count: 3 },
@@ -379,10 +379,10 @@ export const SHAMAN_CUISINE_RECIPES: ShamanDishDef[] = [
       id: 'predator_might',
       name: '포식자의 투지',
       icon: '🦖',
-      desc: '공격력 +25% · 공격 속도 +20%',
+      desc: '공격력 +10% · 공격 속도 +5%',
       durationSec: 20 * 60,
-      atkBonusPct: 25,
-      speedBonusPct: 20,
+      atkBonusPct: 10,
+      speedBonusPct: 5,
     },
   },
   {
@@ -390,8 +390,8 @@ export const SHAMAN_CUISINE_RECIPES: ShamanDishDef[] = [
     name: '신비 약초 영양탕',
     category: 'special',
     icon: '🌿',
-    tagline: '30분간 5초당 HP+6 자동 재생 · 허기 소모 -50%',
-    desc: '깊은 숲 약초와 맑은 샘물을 달여내 몸속의 독소를 몰아내고 생명력을 끊임없이 재생시킵니다.',
+    tagline: '30분간 5초당 HP+2 자동 재생 · 허기 소모 -10%',
+    desc: '깊은 숲 약초와 맑은 샘물을 달여내 몸속의 독소를 몰아내고 생명력을 완만히 재생시킵니다.',
     cookTimeSec: 15,
     ingredients: [
       { itemId: 'herb', count: 4 },
@@ -407,9 +407,9 @@ export const SHAMAN_CUISINE_RECIPES: ShamanDishDef[] = [
       id: 'healing_aura',
       name: '치유의 오라',
       icon: '🌿',
-      desc: '5초당 체력 +6 자동 재생 · 허기 소모 속도 50% 둔화',
+      desc: '5초당 체력 +2 자동 재생 · 허기 소모 10% 둔화',
       durationSec: 30 * 60,
-      regenHpPer5s: 6,
+      regenHpPer5s: 2,
     },
   },
   {
@@ -417,7 +417,7 @@ export const SHAMAN_CUISINE_RECIPES: ShamanDishDef[] = [
     name: '강철 거북 등껍질 탕',
     category: 'special',
     icon: '🛡️',
-    tagline: '20분간 받는 피해 -30% 충격 흡수 · 방어력 +25%',
+    tagline: '20분간 받는 피해 -10% 충격 흡수 · 방어력 +10%',
     desc: '단단한 뼈와 부싯돌, 암염을 우려내어 피부를 단단한 갑각처럼 강화합니다.',
     cookTimeSec: 15,
     ingredients: [
@@ -434,9 +434,9 @@ export const SHAMAN_CUISINE_RECIPES: ShamanDishDef[] = [
       id: 'iron_shell_buff',
       name: '강철 피부',
       icon: '🛡️',
-      desc: '피격 피해 30% 흡수 · 방어력 +25%',
+      desc: '피격 피해 10% 흡수 · 방어력 +10%',
       durationSec: 20 * 60,
-      defBonusPct: 25,
+      defBonusPct: 10,
     },
   },
   {
@@ -444,7 +444,7 @@ export const SHAMAN_CUISINE_RECIPES: ShamanDishDef[] = [
     name: '용암 고추 불사조 찜',
     category: 'special',
     icon: '🌶️',
-    tagline: '20분간 이동 속도 +30% · 피격 데미지 20% 반사',
+    tagline: '20분간 이동 속도 +10% · 피격 데미지 5% 반사',
     desc: '매운 후추열매를 듬뿍 넣고 쪄내어 피를 끓어오르게 하고 민첩성을 극대화합니다.',
     cookTimeSec: 15,
     ingredients: [
@@ -460,21 +460,21 @@ export const SHAMAN_CUISINE_RECIPES: ShamanDishDef[] = [
       id: 'fiery_steam_buff',
       name: '열혈 돌격',
       icon: '🌶️',
-      desc: '이동 속도 +30% · 피격 반사 20%',
+      desc: '이동 속도 +10% · 피격 반사 5%',
       durationSec: 20 * 60,
-      speedBonusPct: 30,
+      speedBonusPct: 10,
     },
   },
 
-  /* ---------------- 4. 건강식 / 보약 (솥 끓이기 45~60초 소요 → 영구 스탯 +0.5 ~ +1 상승!) ---------------- */
+  /* ---------------- 4. 건강식 / 보약 (가마솥 1시간 푹 고아내기 → 영구 스탯 +0.5 ~ +1 상승!) ---------------- */
   {
     id: 'tonic_dragon_soup',
     name: '태고 거수 백년 영양탕 (건강식)',
     category: 'tonic',
     icon: '🍲',
-    tagline: '조리 시간 45초 솥 끓이기 → 영구 최대 체력 +10 (HP 스탯 +1) 상승!',
+    tagline: '조리 시간 1시간 가마솥 끓이기 → 영구 최대 체력 +10 (HP 스탯 +1) 상승!',
     desc: '공룡 뼈와 신선한 고기, 깊은 숲 약초와 대지의 비취를 가마솥에 정성껏 달여낸 불로의 보약입니다. 섭취 시 최대 체력이 영구히 +10 상승합니다.',
-    cookTimeSec: 45,
+    cookTimeSec: 3600,
     ingredients: [
       { itemId: 'bone', count: 3 },
       { itemId: 'raw_meat', count: 4 },
@@ -493,9 +493,9 @@ export const SHAMAN_CUISINE_RECIPES: ShamanDishDef[] = [
     name: '흑요석 흑호랑이 골수찜 (건강식)',
     category: 'tonic',
     icon: '🥩',
-    tagline: '조리 시간 45초 솥 끓이기 → 영구 공격력 +1 (ATK 스탯 +1) 상승!',
+    tagline: '조리 시간 1시간 가마솥 끓이기 → 영구 공격력 +1 (ATK 스탯 +1) 상승!',
     desc: '흑요석의 고열로 흑호랑이의 뼈 골수를 진하게 우려낸 비전 건강식입니다. 근육과 신경이 영구히 강화되어 기본 타격 공격력이 +1 상승합니다.',
-    cookTimeSec: 45,
+    cookTimeSec: 3600,
     ingredients: [
       { itemId: 'raw_meat', count: 5 },
       { itemId: 'obsidian', count: 2 },
@@ -513,9 +513,9 @@ export const SHAMAN_CUISINE_RECIPES: ShamanDishDef[] = [
     name: '고대 현무 등껍질 진액 (건강식)',
     category: 'tonic',
     icon: '🐢',
-    tagline: '조리 시간 45초 솥 끓이기 → 영구 방어력 +1 (DEF 스탯 +1) 상승!',
+    tagline: '조리 시간 1시간 가마솥 끓이기 → 영구 방어력 +1 (DEF 스탯 +1) 상승!',
     desc: '고대 거북의 등껍질 뼈와 투명한 석영 결정을 달여낸 불괴의 진액입니다. 골밀도가 강철처럼 단단해져 기본 방어력이 영구히 +1 상승합니다.',
-    cookTimeSec: 45,
+    cookTimeSec: 3600,
     ingredients: [
       { itemId: 'bone', count: 4 },
       { itemId: 'quartz', count: 2 },
@@ -533,9 +533,9 @@ export const SHAMAN_CUISINE_RECIPES: ShamanDishDef[] = [
     name: '영혼의 비취 이슬 환 (건강식)',
     category: 'tonic',
     icon: '✨',
-    tagline: '조리 시간 60초 솥 끓이기 → 모든 스탯 +0.5 & 배낭 무게 +2kg 영구 상승!',
+    tagline: '조리 시간 1시간 가마솥 끓이기 → 모든 스탯 +0.5 & 배낭 무게 +2kg 영구 상승!',
     desc: '대지의 영기 비취 2개와 석영, 말린 과일의 단맛을 조화시켜 빚은 최고급 신선단입니다. 체력(+5), 공격(+0.5), 방어(+0.5), 배낭 무게(+2kg)가 모두 영구 상승합니다.',
-    cookTimeSec: 60,
+    cookTimeSec: 3600,
     ingredients: [
       { itemId: 'jade', count: 2 },
       { itemId: 'quartz', count: 2 },

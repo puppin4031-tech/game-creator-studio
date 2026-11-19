@@ -51,9 +51,23 @@ const CATEGORY_TABS: {
 }[] = [
   { id: 'basic', label: '기초 요리', icon: '🔥', sub: '창고 비축용 주식' },
   { id: 'regular', label: '일반식', icon: '🍖', sub: '체력·허기 대폭 회복' },
-  { id: 'special', label: '특별식', icon: '⚡', sub: '20~30분 강력 버프' },
-  { id: 'tonic', label: '건강식 · 보약', icon: '🌿', sub: '영구 스탯 +0.5~1' },
+  { id: 'special', label: '특별식', icon: '⚡', sub: '20~30분 지속 버프 (중복 불가)' },
+  { id: 'tonic', label: '건강식 · 보약', icon: '🌿', sub: '1시간 끓이기 · 영구 스탯' },
 ];
+
+function formatRemainingTime(sec: number): string {
+  if (sec >= 3600) {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    return m > 0 ? `${h}시간 ${m}분 남음` : `${h}시간 남음`;
+  }
+  if (sec >= 60) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return s > 0 ? `${m}분 ${s}초 남음` : `${m}분 남음`;
+  }
+  return `${sec}초 남음`;
+}
 
 export default function ShamanCuisineModal({
   open,
@@ -212,7 +226,7 @@ export default function ShamanCuisineModal({
                     ) : (
                       <span className="flex items-center gap-1 text-xs font-bold text-amber-500 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/30">
                         <Clock className="h-3 w-3 animate-spin" />
-                        <span>{remainingSec}초 남음</span>
+                        <span>{formatRemainingTime(remainingSec)}</span>
                       </span>
                     )}
                   </div>
@@ -243,6 +257,24 @@ export default function ShamanCuisineModal({
         ))}
       </div>
 
+      {/* Notice Banners for Special & Tonic rules */}
+      {tab === 'special' && (
+        <div className="flex items-start gap-2 border-b-2 border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-200">
+          <span className="text-base shrink-0">💡</span>
+          <p className="leading-tight break-keep">
+            <b>특별식 버프 규칙:</b> 특별식 버프는 <b>서로 중복되지 않으며, 가장 마지막에 먹은 음식의 버프 1종만 적용</b>됩니다.
+          </p>
+        </div>
+      )}
+      {tab === 'tonic' && (
+        <div className="flex items-start gap-2 border-b-2 border-primary/40 bg-primary/10 px-3 py-2 text-[11px] text-primary">
+          <span className="text-base shrink-0">⏳</span>
+          <p className="leading-tight break-keep">
+            <b>건강식 보약 규칙:</b> 조리 시작 시 <b>가마솥에서 1시간 동안 푹 고아내며</b>, 완성 후 섭취하면 <b>스탯이 영구적으로 상승</b>합니다.
+          </p>
+        </div>
+      )}
+
       {/* Recipe List Body */}
       <div className="flex-1 space-y-3 overflow-y-auto p-3 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         <div className="space-y-2.5">
@@ -270,7 +302,7 @@ export default function ShamanCuisineModal({
                         <b className="text-xs sm:text-sm">{recipe.name}</b>
                         {recipe.cookTimeSec > 0 ? (
                           <span className="rounded bg-amber-500/15 border border-amber-500/40 px-1.5 py-0.2 text-[9px] font-bold text-amber-600 dark:text-amber-400">
-                            ⏱️ 조리 {recipe.cookTimeSec}초
+                            ⏱️ 조리 {recipe.cookTimeSec >= 3600 ? `${Math.round(recipe.cookTimeSec / 3600)}시간` : `${recipe.cookTimeSec}초`} (가마솥)
                           </span>
                         ) : (
                           <span className="rounded bg-emerald-500/15 border border-emerald-500/40 px-1.5 py-0.2 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">

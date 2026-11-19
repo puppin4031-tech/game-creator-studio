@@ -68,7 +68,10 @@ export default function TribeSprite({
         ? 3
         : -2
       : 0;
-  const scaledHeight = cls?.id === 'tank' ? Math.round(height * 1.08) : height;
+  const adminScale = classSheets?.scale ?? baseSheets?.scale ?? 1.0;
+  const scaledHeight = Math.round(
+    (cls?.id === 'tank' ? height * 1.08 : height) * adminScale
+  );
 
   // Prefer class-specific admin sprite sheet (tribe:<classId>), then fallback to general 'tribe' admin sheet
   const customClassSheet =

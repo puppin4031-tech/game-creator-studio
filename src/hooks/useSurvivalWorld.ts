@@ -1107,12 +1107,12 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const nowAt = Date.now();
 
     // Check if this food has an active special buff defined in Shaman Cuisine
+    // Rule: Food buffs DO NOT stack; only the last consumed dish's buff remains active!
     const dishRecipe = SHAMAN_CUISINE_RECIPES.find(r => r.resultItemId === itemId && r.buff);
     let activeBuffs = (p.activeBuffs ?? []).filter(b => b.expiresAt > nowAt);
     if (dishRecipe?.buff) {
       const b = dishRecipe.buff;
       activeBuffs = [
-        ...activeBuffs.filter(x => x.id !== b.id),
         {
           id: b.id,
           name: b.name,
@@ -1127,7 +1127,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
           },
         },
       ];
-      toast.success(`⚡ [${b.name}] 특수 버프 활성화! (${Math.round(b.durationSec / 60)}분간 지속)`, {
+      toast.success(`⚡ [${b.name}] 특수 버프 활성화! (${Math.round(b.durationSec / 60)}분간 지속 · 이전 버프 갱신)`, {
         description: b.desc,
       });
     }
@@ -2336,11 +2336,10 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       };
     }
 
-    // Apply timed buff if present
+    // Apply timed buff if present (replaces previous food buffs; only the last eaten buff is active)
     let activeBuffs = (p.activeBuffs ?? []).filter(b => b.expiresAt > nowAt);
     if (r.buff) {
       activeBuffs = [
-        ...activeBuffs.filter(b => b.id !== r.buff!.id),
         {
           id: r.buff.id,
           name: r.buff.name,

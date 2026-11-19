@@ -56,7 +56,8 @@ export type SpriteAnimationsData = Partial<Record<SpriteAction, SpriteAnimation>
 export function useSpriteAnimations(characterKey = 'hunter') {
   return useQuery({
     queryKey: ['sprite-animations', characterKey],
-    staleTime: 5 * 60_000,
+    staleTime: 5_000, // Quick freshness check so admin studio changes reflect in-game promptly
+    refetchOnWindowFocus: true,
     queryFn: async (): Promise<SpriteAnimationsData> => {
       let cachedScale = 1.0;
       try {

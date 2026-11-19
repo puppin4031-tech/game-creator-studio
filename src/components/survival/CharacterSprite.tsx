@@ -18,17 +18,22 @@ export default function CharacterSprite({
   const { data: tierRemote } = useSpriteAnimations(tierKey);
   const { data: baseRemote } = useSpriteAnimations('hunter');
 
+  // Exact action priority: tier action -> base hunter action -> tier idle -> base hunter idle
   const anim =
     tierRemote?.[action] ??
-    tierRemote?.idle ??
     baseRemote?.[action] ??
+    tierRemote?.idle ??
     baseRemote?.idle;
+
+  // Scale ratio configured from /admin/sprite studio
+  const currentScale = tierRemote?.scale ?? baseRemote?.scale ?? 1.0;
+  const scaledHeight = Math.round(height * currentScale);
 
   // Fallback to high-quality bundled TribeSprite when remote sheet is not yet loaded or missing
   const fallback = (
     <TribeSprite
       action={action}
-      height={height}
+      height={scaledHeight}
       className={className}
       showBadge={false}
     />
@@ -45,7 +50,7 @@ export default function CharacterSprite({
           url={anim.url}
           frames={anim.frame_count}
           fps={anim.fps}
-          height={height}
+          height={scaledHeight}
           fallback={fallback}
           once={
             action === 'gather' ||
