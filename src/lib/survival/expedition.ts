@@ -13,6 +13,21 @@ export const BASE_RELIC_CHANCE = 0.01;
 export const EXPEDITION_RADIUS_M = 10;
 export const MAX_EXPEDITION_DISTANCE_M = 1500;
 
+/** Daily maximum auto-expedition active time: 6 hours (21,600 seconds). Resets at 00:00 midnight. */
+export const DAILY_EXPEDITION_AUTO_LIMIT_SEC = 6 * 3600;
+
+/** Tribe members earn 30% of standard XP when gathering or hunting on expeditions. */
+export const TRIBE_XP_RATIO = 0.3;
+
+/** Today's local date key (YYYY-MM-DD) for daily limit tracking. */
+export const getTodayKey = (now: number = Date.now()): string => {
+  const d = new Date(now);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export interface ObservedExpedition {
   pos: LatLng;
   destination: LatLng;

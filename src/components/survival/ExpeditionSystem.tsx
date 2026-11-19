@@ -63,8 +63,17 @@ interface Props {
   tribeClass?: TribeClassId;
   onSelectClass?: (c: TribeClassId) => void;
   expeditionLevel?: number;
+  autoRemainingSec?: number;
+  autoLimitSec?: number;
 }
 export interface TribeInfo { count: number; trainLevel: number; ratio: number; maxHp: number; injured: boolean; starving: boolean; classId?: TribeClassId }
+
+function fmtDuration(sec: number): string {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (h > 0) return `${h}시간 ${m}분`;
+  return `${m}분`;
+}
 
 function TribeClassBadge({ selected }: { selected: TribeClassId }) {
   const cls = getTribeClass(selected);
@@ -125,9 +134,35 @@ export default function ExpeditionSystem(p: Props) {
       {(Object.keys(FOCUS_LABEL) as ExpeditionFocus[]).map(f => <Button key={f} size="sm" role="radio" aria-checked={p.focus === f} variant={p.focus === f ? 'default' : 'outline'} disabled={!!p.crew} className={compactBtn} onClick={() => p.onFocus(f)}>{FOCUS_LABEL[f]}</Button>)}
     </div>
     {p.outdoor && <div role="status" className="flex items-center gap-1 bg-primary/15 px-2 py-1 font-bold text-foreground"><Flame className="!h-4 !w-4 shrink-0 text-primary" />족장 친정 · 채집량 200% · 희귀 유물 3배</div>}
+    {/* Daily Auto-Expedition Remaining Limit Bar */}
+    <div className="flex items-center justify-between rounded border border-primary/40 bg-accent/25 px-2 py-1 text-[11px]">
+      <span className="flex items-center gap-1 font-bold text-foreground">
+        <span>⏱️</span>
+        <span>오늘 자동원정 가능:</span>
+      </span>
+      <span className={`font-mono font-bold ${(p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0) ? 'text-destructive' : 'text-primary'}`}>
+        {p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0
+          ? '오늘 6시간 한도 소진 (00:00 초기화)'
+          : `${fmtDuration(p.autoRemainingSec ?? 21600)} / 6시간`}
+      </span>
+    </div>
     <div className="grid grid-cols-2 gap-1">
       <Button size="sm" className={`${compactBtn} whitespace-normal`} disabled={!p.canSend || !!p.crew} onClick={p.onSend}><Flag className="!h-4 !w-4 shrink-0" />{p.target && p.home ? `${Math.round(distanceM(p.home, p.target))}m 원정대 파견` : '주변 원정대 파견'}</Button>
-      <Button size="sm" variant={p.auto ? 'default' : 'outline'} className={`${compactBtn} whitespace-normal`} disabled={!p.canSend && !p.auto} aria-pressed={p.auto} onClick={p.onAuto}>{p.auto ? <Pause className="!h-4 !w-4" /> : <Play className="!h-4 !w-4" />}거점 자동사냥 {p.auto ? '끄기' : '켜기'}</Button>
+      <Button
+        size="sm"
+        variant={p.auto ? 'default' : 'outline'}
+        className={`${compactBtn} whitespace-normal`}
+        disabled={(!p.canSend && !p.auto) || ((p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0) && !p.auto)}
+        aria-pressed={p.auto}
+        onClick={p.onAuto}
+      >
+        {p.auto ? <Pause className="!h-4 !w-4" /> : <Play className="!h-4 !w-4" />}
+        {p.auto
+          ? '거점 자동사냥 끄기'
+          : (p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0)
+            ? '자동사냥 (한도 소진)'
+            : '거점 자동사냥 켜기'}
+      </Button>
       <Button size="sm" variant="outline" className={`${compactBtn} whitespace-normal`} disabled={!p.crew || Date.now() < (p.crew?.moraleReadyAt ?? 0)} onClick={p.onMorale}><Zap className="!h-4 !w-4 shrink-0" />원격 사기 진작</Button>
       <Button size="sm" variant="outline" className={compactBtn} disabled={!p.crew} onClick={p.onReturn}><Home className="!h-4 !w-4" />즉시 귀환</Button>
     </div>

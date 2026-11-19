@@ -236,6 +236,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     focus={crew?.focus ?? expeditionFocus} onFocus={setExpeditionFocus}
     tribeClass={activeTribeClassId}
     expeditionLevel={g.expeditionLevelInfo.level}
+    autoRemainingSec={g.expeditionAutoRemainingSec}
+    autoLimitSec={g.expeditionAutoLimitSec}
     onSend={() => { if (g.dispatchObserved(expeditionDestination, expeditionFocus, activeTribeClassId)) { setWatchExpedition(true); setPanel('none'); setView('expedition'); } }}
     onAuto={() => { g.toggleExpeditionAuto(expeditionDestination, expeditionFocus); setWatchExpedition(true); }} onPocket={g.togglePocket} onMorale={g.rallyExpedition} onReturn={g.recallExpedition} onWatch={() => setView(v => v === 'expedition' ? 'user' : 'expedition')}
     tribe={s.tribe ? { count: s.tribe.count, trainLevel: s.tribe.trainLevel ?? 0, ratio: tribeRatio(s.tribe), maxHp: Math.max(1, Math.round(g.maxHp * tribeRatio(s.tribe) * s.tribe.count)), injured: tribeInjured(s.tribe, Date.now()), starving: !!s.tribe.starving, classId: s.tribe.classId } : undefined} />;

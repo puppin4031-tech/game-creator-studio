@@ -1,7 +1,7 @@
 // @refresh reset
 import { armorySuccessChance, armoryUpgradeCost, gearMult, upgradeCost, weaponAtkWithPlus, weaponAuraForPlus } from '@/lib/survival/upgrade';
 import { isWalkingPace } from '@/lib/survival/walkPace';
-import { advanceExpedition, steerExpedition, pickManualTarget, MANUAL_PICK_M, expeditionLoot, isPocketMovement, startObservedExpedition, EXPEDITION_RADIUS_M, FOCUS_LABEL, CREW_HEAL_FOODS, crewHealGain, type ExpeditionFocus, type ObservedExpedition, type ExpeditionLog } from '@/lib/survival/expedition';
+import { advanceExpedition, steerExpedition, pickManualTarget, MANUAL_PICK_M, expeditionLoot, isPocketMovement, startObservedExpedition, EXPEDITION_RADIUS_M, FOCUS_LABEL, CREW_HEAL_FOODS, crewHealGain, DAILY_EXPEDITION_AUTO_LIMIT_SEC, TRIBE_XP_RATIO, getTodayKey, type ExpeditionFocus, type ObservedExpedition, type ExpeditionLog } from '@/lib/survival/expedition';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -108,6 +108,8 @@ export interface WorldSave extends WorldProgress {
   expedition?: Expedition | null;
   observedExpedition?: ObservedExpedition | null;
   expeditionAuto?: boolean;
+  expeditionAutoDay?: string;
+  expeditionAutoSecToday?: number;
   mercenary?: MercenaryContract | null;
   shamanMet?: boolean;
   tribe?: TribeState;
@@ -504,6 +506,14 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const toggleExpeditionAuto = useCallback((destination: LatLng, focus: ExpeditionFocus = 'materials') => {
     const p = ref.current;
     if (p.expeditionAuto) { setS({ ...p, expeditionAuto: false }); return; }
+    const todayKey = getTodayKey();
+    const usedSec = p.expeditionAutoDay === todayKey ? (p.expeditionAutoSecToday ?? 0) : 0;
+    if (usedSec >= DAILY_EXPEDITION_AUTO_LIMIT_SEC) {
+      toast.warning('오늘의 자동사냥 가능 시간(6시간)을 모두 소진했습니다.', {
+        description: '내일 자정(00:00)에 다시 충전됩니다. (수동 원정 파견은 계속 가능합니다)',
+      });
+      return;
+    }
     if (p.observedExpedition) { setS({ ...p, expeditionAuto: true }); return; }
     if (dispatchObserved(destination, focus)) setS(p => ({ ...p, expeditionAuto: true }));
   }, [dispatchObserved, setS]);
@@ -734,13 +744,32 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const outdoors = enabledRef.current && at < outdoorMovingRef.current && distanceM(p.pos, crew.pos) <= 40;
       const nearby = generateWorld({ center: crew.pos, radiusM: crew.manual ? MANUAL_PICK_M : 30, now: at, isNight: dayPhase(new Date(at)) === 'night', depleted: p.depleted, terrainZones: p.terrainZones, parkCells: p.parkCells, playerLevel: p.level });
       if (crew.manual) setCrewNearby(nearby);
-      const result = advanceExpedition(crew, nearby, at, outdoors, !!p.expeditionAuto, Math.random, p.damage);
+      const todayKey = getTodayKey(at);
+      let autoSecToday = p.expeditionAutoDay === todayKey ? (p.expeditionAutoSecToday ?? 0) : 0;
+      let nextAuto = !!p.expeditionAuto;
+      if (nextAuto) {
+        autoSecToday += 1;
+        if (autoSecToday >= DAILY_EXPEDITION_AUTO_LIMIT_SEC) {
+          nextAuto = false;
+          if (crew.phase === 'outbound') {
+            crew.phase = 'returning';
+            crew.target = undefined;
+          }
+        }
+      }
+      const result = advanceExpedition(crew, nearby, at, outdoors, nextAuto, Math.random, p.damage);
+      if (nextAuto === false && p.expeditionAuto) {
+        result.text = (result.text ? result.text + ' · ' : '') + '⚠️ 오늘 자동사냥 한도(6시간) 도달로 거점에 복귀합니다';
+      }
       const stepDist = Math.round(distanceM(crew.pos, result.crew.pos));
       const nextDistM = (p.expeditionDistanceM ?? 0) + stepDist;
       const expLv = computeExpeditionLevel(p.expeditionCount ?? 0, nextDistM + (p.walkSteps ?? 0) * 20).level;
       const nextPins = detectExpeditionPins(result.crew.pos, nearby, p.depleted, at, expLv, p.discoveredPins ?? []);
       let next: WorldSave = {
         ...p,
+        expeditionAuto: nextAuto,
+        expeditionAutoDay: todayKey,
+        expeditionAutoSecToday: autoSecToday,
         expeditionDistanceM: nextDistM,
         discoveredPins: nextPins,
         observedExpedition: result.finished ? null : result.crew,
@@ -751,7 +780,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         const e = result.completed;
         const gathered = { ...p.gathered };
         for (const item of result.rewards) gathered[item.itemId] = (gathered[item.itemId] ?? 0) + item.count;
-        next = { ...next, storage: addStacks(p.storage, result.rewards), gathered, depleted: { ...p.depleted, [e.id]: at }, kills: p.kills + (e.kind === 'creature' ? 1 : 0), ...addExperience(p, e.kind === 'node' ? nodeDef(e.type).xp : creatureDef(e.type).xp) };
+        const rawXp = e.kind === 'node' ? nodeDef(e.type).xp : creatureDef(e.type).xp;
+        const tribeXp = Math.max(1, Math.round(rawXp * TRIBE_XP_RATIO));
+        next = { ...next, storage: addStacks(p.storage, result.rewards), gathered, depleted: { ...p.depleted, [e.id]: at }, kills: p.kills + (e.kind === 'creature' ? 1 : 0), ...addExperience(p, tribeXp) };
         next.damage = { ...next.damage };
         delete next.damage[e.id];
         const learned = checkInspiration(gathered, next.techs);
@@ -776,7 +807,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const gathered = { ...p.gathered };
       for (const item of fit) gathered[item.itemId] = (gathered[item.itemId] ?? 0) + item.count;
       const learned = checkInspiration(gathered, p.techs);
-      setS({ ...p, backpack: addStacks(p.backpack, fit), packedItems: [...new Set([...(p.packedItems ?? []), ...fit.map(x => x.itemId)])], gathered, techs: [...p.techs, ...learned.map(t => t.id)], depleted: { ...p.depleted, [target.id]: at }, ...addExperience(p, target.kind === 'node' ? nodeDef(target.type).xp : 0), expeditionLogs: appendLog(p, `포켓 자동채집 · 배낭: ${fmt(fit)}`, at) });
+      const rawXp = target.kind === 'node' ? nodeDef(target.type).xp : 0;
+      const pocketXp = Math.max(1, Math.round(rawXp * TRIBE_XP_RATIO));
+      setS({ ...p, backpack: addStacks(p.backpack, fit), packedItems: [...new Set([...(p.packedItems ?? []), ...fit.map(x => x.itemId)])], gathered, techs: [...p.techs, ...learned.map(t => t.id)], depleted: { ...p.depleted, [target.id]: at }, ...addExperience(p, pocketXp), expeditionLogs: appendLog(p, `포켓 자동채집 · 배낭: ${fmt(fit)}`, at) });
     }, 2000);
     return () => window.clearInterval(timer);
   }, [pocketMode, setS]);
@@ -2389,7 +2422,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return true;
   }, [setS]);
 
-  return { researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
+  return { researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
     moveOutpost, petHits, mergePets, togglePetDeploy, assignPetRole, feedPet, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,
