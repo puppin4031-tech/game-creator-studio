@@ -210,14 +210,14 @@ export default function WanderingShamanModal({
         <img
           src={shamanImg}
           alt="떠돌이 주술사"
-          className="pixelated h-12 w-auto shrink-0 drop-shadow self-center"
+          className="pixelated h-12 w-12 shrink-0 object-contain drop-shadow self-center"
         />
-        <div className="pixel-box flex-1 min-w-[200px] w-full bg-background/95 p-2.5 text-xs leading-relaxed border border-border shadow-sm">
+        <div className="pixel-box flex-1 min-w-0 w-full bg-background/95 p-2.5 text-xs leading-relaxed border border-border shadow-sm">
           <p className="font-bold text-amber-500 text-[10px] mb-0.5 flex items-center gap-1">
             <span>🧙</span>
             <span>떠돌이 주술사</span>
           </p>
-          <p className="text-foreground break-keep leading-snug whitespace-normal">
+          <p className="text-foreground break-keep leading-snug whitespace-normal text-xs sm:text-[13px]">
             {level >= 5 && !languageLearned
               ? '"이제 자네도 말을 좀 배워야 될것같네. 내 특별 과제를 마치면 다른 부족민·생존자들과 대화를 나눌 수 있다네!"'
               : activeQuest

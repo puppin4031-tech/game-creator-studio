@@ -57,23 +57,52 @@ export const NODES = {
   },
   berry_bush: {
     name: '산딸기 덤불', sprite: 'node-bush', hp: 2, requires: { kind: 'none', tier: 0 },
-    loot: [{ itemId: 'berry', min: 2, max: 4 }, { itemId: 'fiber', min: 1, max: 2 }, { itemId: 'pepper_berry', min: 0, max: 1, chance: 0.35 }], xp: 3, respawnMin: 20,
+    loot: [
+      { itemId: 'berry', min: 2, max: 4 },
+      { itemId: 'fiber', min: 1, max: 2 },
+      { itemId: 'pepper_berry', min: 1, max: 2, chance: 0.65 },
+      { itemId: 'wild_spice', min: 0, max: 1, chance: 0.3 },
+    ],
+    xp: 3, respawnMin: 20,
     biomes: { plains: 3, forest: 2, wetland: 2 },
   },
   herb_patch: {
     name: '약초 군락', sprite: 'node-herb', hp: 2, requires: { kind: 'none', tier: 0 },
-    loot: [{ itemId: 'herb', min: 1, max: 2 }, { itemId: 'fiber', min: 0, max: 1 }, { itemId: 'wild_spice', min: 1, max: 2, chance: 0.6 }], xp: 4, respawnMin: 25,
+    loot: [
+      { itemId: 'herb', min: 1, max: 2 },
+      { itemId: 'fiber', min: 0, max: 1 },
+      { itemId: 'wild_spice', min: 1, max: 2, chance: 0.85 },
+      { itemId: 'pepper_berry', min: 0, max: 1, chance: 0.35 },
+    ],
+    xp: 4, respawnMin: 25,
     biomes: { forest: 2, wetland: 3, plains: 1 },
   },
   flint_rock: {
     name: '부싯돌 바위', sprite: 'node-flint', hp: 3, requires: { kind: 'none', tier: 0 },
-    loot: [{ itemId: 'flint', min: 1, max: 2 }, { itemId: 'rock_salt', min: 0, max: 1, chance: 0.45 }], xp: 4, respawnMin: 20,
+    loot: [
+      { itemId: 'flint', min: 1, max: 2 },
+      { itemId: 'rock_salt', min: 1, max: 2, chance: 0.7 },
+    ],
+    xp: 4, respawnMin: 20,
     biomes: { rocky: 4, plains: 2, forest: 1 },
   },
   clay_pit: {
     name: '점토 웅덩이', sprite: 'node-clay', hp: 3, requires: { kind: 'none', tier: 0 },
-    loot: [{ itemId: 'clay', min: 2, max: 3 }], xp: 4, respawnMin: 20,
+    loot: [
+      { itemId: 'clay', min: 2, max: 3 },
+      { itemId: 'spring_water', min: 1, max: 2, chance: 0.85 },
+    ],
+    xp: 4, respawnMin: 20,
     biomes: { wetland: 5, plains: 1 },
+  },
+  fresh_spring: {
+    name: '맑은 옹달샘', sprite: 'node-clay', hp: 2, requires: { kind: 'none', tier: 0 },
+    loot: [
+      { itemId: 'spring_water', min: 2, max: 3 },
+      { itemId: 'clay', min: 0, max: 1, chance: 0.5 },
+    ],
+    xp: 4, respawnMin: 15,
+    biomes: { wetland: 4, forest: 2, plains: 1 },
   },
   bone_pile: {
     name: '짐승 뼈무덤', sprite: 'node-bones', hp: 2, requires: { kind: 'none', tier: 0 },
@@ -92,7 +121,12 @@ export const NODES = {
   },
   soil_mound: {
     name: '흙더미', sprite: 'node-soil', hp: 2, requires: { kind: 'none', tier: 0 },
-    loot: [{ itemId: 'soil', min: 2, max: 3 }, { itemId: 'flint', min: 0, max: 1, chance: 0.3 }], xp: 3, respawnMin: 15,
+    loot: [
+      { itemId: 'soil', min: 2, max: 3 },
+      { itemId: 'flint', min: 0, max: 1, chance: 0.3 },
+      { itemId: 'spring_water', min: 0, max: 1, chance: 0.35 },
+    ],
+    xp: 3, respawnMin: 15,
     biomes: { plains: 3, wetland: 2, rocky: 1, forest: 1 },
   },
   oak_tree: {
@@ -107,12 +141,22 @@ export const NODES = {
   },
   hematite_rock: {
     name: '얼어붙은 빙결석', sprite: 'node-hematite', hp: 5, requires: { kind: 'mine', tier: 1 },
-    loot: [{ itemId: 'ochre', min: 1, max: 2 }, { itemId: 'frost_shard', min: 1, max: 1 }, { itemId: 'flint', min: 0, max: 1 }], xp: 10, respawnMin: 40,
+    loot: [
+      { itemId: 'ochre', min: 1, max: 2 },
+      { itemId: 'frost_shard', min: 1, max: 1 },
+      { itemId: 'flint', min: 0, max: 1 },
+      { itemId: 'rock_salt', min: 1, max: 1, chance: 0.5 },
+    ],
+    xp: 10, respawnMin: 40,
     biomes: { rocky: 3, plains: 1 },
   },
   quartz_vein: {
     name: '석영 광맥', sprite: 'node-quartz', hp: 5, requires: { kind: 'mine', tier: 1 },
-    loot: [{ itemId: 'quartz', min: 1, max: 2 }], xp: 12, respawnMin: 45,
+    loot: [
+      { itemId: 'quartz', min: 1, max: 2 },
+      { itemId: 'rock_salt', min: 1, max: 2, chance: 0.6 },
+    ],
+    xp: 12, respawnMin: 45,
     biomes: { rocky: 2 },
   },
   obsidian_rock: {
@@ -194,7 +238,7 @@ export const CREATURES = {
     biomes: { plains: 5, forest: 3, wetland: 3 }, nightWeight: 0.2,
   },
   boar: {
-    name: '멧돼지', sprite: 'mob-boar', hp: 24, atk: 4, temper: 'neutral',
+    name: '멧돼지', sprite: 'mob-boar', hp: 24, atk: 5, temper: 'neutral',
     loot: [{ itemId: 'raw_meat', min: 2, max: 3 }, { itemId: 'hide', min: 1, max: 2 }, { itemId: 'fur', min: 1, max: 1, chance: 0.3 }, { itemId: 'bone', min: 1, max: 1 }, { itemId: 'tusk', min: 1, max: 1, chance: 0.25 }], xp: 22,
     biomes: { forest: 4, plains: 3, wetland: 4, rocky: 2 }, nightWeight: 0.8,
   },
@@ -204,12 +248,12 @@ export const CREATURES = {
     biomes: { forest: 3, rocky: 3, plains: 1 }, nightWeight: 2.5,
   },
   raptor: {
-    name: '랩터', sprite: 'mob-raptor', hp: 36, atk: 7, temper: 'aggressive',
+    name: '랩터', sprite: 'mob-raptor', hp: 36, atk: 8, temper: 'aggressive',
     loot: [{ itemId: 'hide', min: 2, max: 3 }, { itemId: 'bone', min: 2, max: 3 }, { itemId: 'raw_meat', min: 2, max: 2 }], xp: 45,
     biomes: { rocky: 3, forest: 1, plains: 1 }, nightWeight: 1.4,
   },
   mammoth: {
-    name: '눈보라 털매머드', sprite: 'mob-mammoth', hp: 90, atk: 10, temper: 'neutral',
+    name: '눈보라 털매머드', sprite: 'mob-mammoth', hp: 90, atk: 15, temper: 'neutral',
     loot: [{ itemId: 'frost_pelt', min: 1, max: 2 }, { itemId: 'raw_meat', min: 6, max: 8 }, { itemId: 'hide', min: 4, max: 5 }, { itemId: 'tusk', min: 2, max: 2 }, { itemId: 'bone', min: 4, max: 5 }], xp: 130,
     biomes: { wetland: 1.2, plains: 0.8, rocky: 0.6 }, nightWeight: 0.6,
   },
@@ -221,7 +265,7 @@ export const CREATURES = {
     biomes: {}, nightWeight: 1,
   },
   boss_mammoth: {
-    name: '우두머리 · 분노한 매머드', sprite: 'mob-mammoth', hp: 160, atk: 12, temper: 'neutral', boss: true,
+    name: '우두머리 · 분노한 매머드', sprite: 'mob-mammoth', hp: 160, atk: 18, temper: 'neutral', boss: true,
     loot: [{ itemId: 'raw_meat', min: 6, max: 9 }, { itemId: 'prime_pelt', min: 2, max: 3 }, { itemId: 'tusk', min: 2, max: 3 }, { itemId: 'alpha_heart', min: 1, max: 1, chance: 0.5 },
       { itemId: 'ancient_fang', min: 1, max: 2, chance: 0.35 }, { itemId: 'taming_snare', min: 1, max: 1, chance: 0.3 },
       { itemId: 'tome_iron_skin', min: 1, max: 1, chance: 0.25 }, { itemId: 'tome_beast_mastery', min: 1, max: 1, chance: 0.15 }], xp: 420,

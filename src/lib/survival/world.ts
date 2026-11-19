@@ -113,10 +113,26 @@ export function generateCreatures(q: WorldQuery): WorldCreature[] {
     if (out.some((other) => distanceM(pos, other) < MIN_CREATURE_DISTANCE_M)) continue;
 
     const biome = biomeAt(pos);
+    const pLv = q.playerLevel ?? 1;
+    const isBeginner = pLv <= 1;
+
     const weights = types.map((t) => {
       const d = CREATURES[t];
       const bw = zoneWeight(d.biomes, biome, q.terrainZones?.[zoneCellKey(pos)]);
-      return [t, bw * (q.isNight ? d.nightWeight : 1)] as [CreatureType, number];
+      let w = bw * (q.isNight ? d.nightWeight : 1);
+
+      // 초심자의 축복/버프: 레벨1일 때 토끼(식량/가죽)와 늑대(뼈/털/길들이기) 출현 빈도 대폭 증가
+      if (isBeginner) {
+        if (t === 'rabbit') {
+          w *= 3.5;
+        } else if (t === 'wolf') {
+          w *= 2.5;
+        } else if (t === 'raptor' || t === 'mammoth') {
+          w *= 0.35; // 초심자 구간 고위험 맹수 급사 방지
+        }
+      }
+
+      return [t, w] as [CreatureType, number];
     });
     const bossRoll = hash01(cx, cy, epoch, 11);
     const type = inPark && bossRoll < PARK_BOSS_CHANCE
