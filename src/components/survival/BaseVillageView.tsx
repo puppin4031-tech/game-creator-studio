@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Hammer, Lock, MessageSquare, Rotate3d, ShieldCheck, Sparkles, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { Hammer, Info, Lock, MessageSquare, Rotate3d, ShieldCheck, Sparkles, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   buildingAtTile,
@@ -586,6 +586,8 @@ export default function BaseVillageView({
   const [catFilter, setCatFilter] = useState<'all' | 'wall' | 'facility' | 'decor'>('all');
   const [selectedBuildId, setSelectedBuildId] = useState<VillageBuildingId>('branch_fence');
   const [selectedPlacedUid, setSelectedPlacedUid] = useState<string | null>(null);
+  const [inspectBuildingDef, setInspectBuildingDef] = useState<VillageBuildingDef | null>(null);
+  const [quickDemolishMode, setQuickDemolishMode] = useState(false);
   const [activeModal, setActiveModal] = useState<FacilityModalKind>(null);
   const [intentCraftingTab, setIntentCraftingTab] = useState<CraftingMode>('architecture');
   const [talkingAgent, setTalkingAgent] = useState<LivingAgent | null>(null);
@@ -601,6 +603,7 @@ export default function BaseVillageView({
   }, []);
 
   const selectedPlaced = vState.buildings.find(b => b.uid === selectedPlacedUid) ?? null;
+  const selectedBuildDef = selectedBuildId ? VILLAGE_BUILDINGS[selectedBuildId] : null;
 
   const modalForBuilding = (buildingId: VillageBuildingId): FacilityModalKind => {
     if (
@@ -951,6 +954,19 @@ export default function BaseVillageView({
 
   const handleBuildingPress = (placed: PlacedVillageBuilding) => {
     if (buildMode) {
+      if (quickDemolishMode) {
+        if (
+          placed.buildingId === 'campfire' &&
+          vState.buildings.filter(b => b.buildingId === 'campfire').length <= 1
+        ) {
+          toast.error('마지막 남은 모닥불은 철거할 수 없습니다.');
+          return;
+        }
+        onRemove(placed.uid);
+        setSelectedPlacedUid(null);
+        toast.success(`${VILLAGE_BUILDINGS[placed.buildingId].name} 철거 완료`);
+        return;
+      }
       setSelectedPlacedUid(placed.uid === selectedPlacedUid ? null : placed.uid);
       return;
     }
@@ -986,6 +1002,19 @@ export default function BaseVillageView({
       }
       return;
     }
+    if (quickDemolishMode && existing) {
+      if (
+        existing.buildingId === 'campfire' &&
+        vState.buildings.filter(b => b.buildingId === 'campfire').length <= 1
+      ) {
+        toast.error('마지막 남은 모닥불은 철거할 수 없습니다.');
+        return;
+      }
+      onRemove(existing.uid);
+      setSelectedPlacedUid(null);
+      toast.success(`${VILLAGE_BUILDINGS[existing.buildingId].name} 철거 완료`);
+      return;
+    }
     if (selectedPlacedUid && !existing) {
       if (onMove(selectedPlacedUid, x, y)) {
         setSelectedPlacedUid(null);
@@ -996,7 +1025,9 @@ export default function BaseVillageView({
       setSelectedPlacedUid(existing.uid === selectedPlacedUid ? null : existing.uid);
       return;
     }
-    onPlace(selectedBuildId, x, y);
+    if (selectedBuildId) {
+      onPlace(selectedBuildId, x, y);
+    }
   };
 
   // User Touch Feedback: resident stops, faces front, jumps, and shows heart/sweat + greeting!
@@ -1267,39 +1298,112 @@ export default function BaseVillageView({
         </button>
       </div>
 
-      {/* Selected Building Inspector in Build Mode */}
-      {selectedPlaced && buildMode && (
-        <div className="pixel-box flex items-center justify-between gap-2 bg-accent/15 px-2.5 py-1.5">
-          <div className="min-w-0 flex-1">
-            <b>
-              {VILLAGE_BUILDINGS[selectedPlaced.buildingId].icon}{' '}
-              {VILLAGE_BUILDINGS[selectedPlaced.buildingId].name}
-            </b>{' '}
-            <span className="text-[10px] text-muted-foreground">
-              ({VILLAGE_BUILDINGS[selectedPlaced.buildingId].footprintLabel} · 건설 구역 {selectedPlaced.x + 1},{' '}
-              {selectedPlaced.y + 1}) · 내구도 {selectedPlaced.hp}/{selectedPlaced.maxHp}
-            </span>
-            <p className="truncate text-[10px] text-primary">
-              중앙 {villageGridSize}×{villageGridSize} 건설 구역의 빈 타일을 누르면 이동합니다. (외곽 2칸은 침입자 등장 구역)
-            </p>
+      {/* Build Mode Sticky Action & Status Bar (Always visible while scrolling grid) */}
+      {buildMode && (
+        <div className="sticky top-0 z-30 space-y-1.5 rounded-md border-2 border-primary/50 bg-background/95 p-2 shadow-lg backdrop-blur-md">
+          <div className="flex items-center justify-between gap-1">
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                size="sm"
+                variant={!quickDemolishMode ? 'default' : 'outline'}
+                onClick={() => setQuickDemolishMode(false)}
+                className={`h-7 px-2.5 text-xs font-bold gap-1 ${!quickDemolishMode ? 'bg-primary text-primary-foreground' : ''}`}
+              >
+                <Hammer className="!h-3.5 !w-3.5" />
+                배치 모드
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={quickDemolishMode ? 'destructive' : 'outline'}
+                onClick={() => {
+                  setQuickDemolishMode(v => !v);
+                  setSelectedPlacedUid(null);
+                }}
+                className={`h-7 px-2.5 text-xs font-bold gap-1 ${quickDemolishMode ? 'bg-destructive text-destructive-foreground animate-pulse' : 'text-destructive border-destructive/40'}`}
+              >
+                <Trash2 className="!h-3.5 !w-3.5" />
+                {quickDemolishMode ? '철거 모드 켜짐' : '철거 모드'}
+              </Button>
+            </div>
+
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setBuildMode(false);
+                setQuickDemolishMode(false);
+                setSelectedPlacedUid(null);
+              }}
+              className="h-7 px-2 text-xs font-bold text-muted-foreground hover:text-foreground"
+            >
+              <X className="!h-4 !w-4 mr-0.5" />
+              종료
+            </Button>
           </div>
-          <Button
-            type="button"
-            size="sm"
-            variant="destructive"
-            disabled={
-              selectedPlaced.buildingId === 'campfire' &&
-              vState.buildings.filter(b => b.buildingId === 'campfire').length <= 1
-            }
-            onClick={() => {
-              onRemove(selectedPlaced.uid);
-              setSelectedPlacedUid(null);
-            }}
-            className="h-auto min-h-0 gap-1 py-1 px-2 text-xs"
-          >
-            <Trash2 className="!h-3.5 !w-3.5" />
-            철거
-          </Button>
+
+          {/* Dynamic contextual prompt */}
+          {quickDemolishMode ? (
+            <div className="flex items-center gap-1.5 rounded bg-destructive/15 px-2 py-1 text-[11px] font-bold text-destructive">
+              <Trash2 className="!h-3.5 !w-3.5 shrink-0" />
+              <span>마을에서 철거할 건물을 터치하면 즉시 철거됩니다.</span>
+            </div>
+          ) : selectedPlaced ? (
+            <div className="flex items-center justify-between gap-2 rounded border border-primary/40 bg-accent/30 px-2 py-1 text-xs">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1 truncate">
+                  <span className="text-sm">{VILLAGE_BUILDINGS[selectedPlaced.buildingId].icon}</span>
+                  <b className="truncate">{VILLAGE_BUILDINGS[selectedPlaced.buildingId].name}</b>
+                  <span className="text-[10px] text-muted-foreground">({selectedPlaced.x + 1}, {selectedPlaced.y + 1})</span>
+                </div>
+                <p className="text-[10px] text-primary truncate">빈 타일 터치 시 이동 · 또는 철거</p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="destructive"
+                  disabled={selectedPlaced.buildingId === 'campfire' && vState.buildings.filter(b => b.buildingId === 'campfire').length <= 1}
+                  onClick={() => {
+                    onRemove(selectedPlaced.uid);
+                    setSelectedPlacedUid(null);
+                  }}
+                  className="h-6 px-2 text-xs font-bold gap-1"
+                >
+                  <Trash2 className="!h-3 !w-3" />
+                  철거
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlacedUid(null)}
+                  className="rounded p-1 text-muted-foreground hover:bg-muted"
+                >
+                  <X className="!h-3.5 !w-3.5" />
+                </button>
+              </div>
+            </div>
+          ) : selectedBuildDef ? (
+            <div className="flex items-center justify-between gap-1.5 rounded border border-primary/50 bg-primary/10 px-2 py-1 text-xs">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-base">{selectedBuildDef.icon}</span>
+                <div className="truncate">
+                  <b className="text-primary truncate">{selectedBuildDef.name} ({selectedBuildDef.footprintLabel})</b>
+                  <span className="text-[10px] text-muted-foreground ml-1.5">빈 타일을 터치해 건설</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setInspectBuildingDef(selectedBuildDef)}
+                className="shrink-0 flex items-center gap-0.5 rounded border border-border bg-background px-1.5 py-0.5 text-[10px] text-foreground font-semibold hover:bg-accent"
+                title="건물 정보 확인"
+              >
+                <Info className="!h-3 !w-3 text-primary" />
+                정보
+              </button>
+            </div>
+          ) : null}
         </div>
       )}
 
@@ -1889,6 +1993,23 @@ export default function BaseVillageView({
               )}
               <Button
                 type="button"
+                variant="destructive"
+                disabled={
+                  buildingPopup.buildingId === 'campfire' &&
+                  vState.buildings.filter(b => b.buildingId === 'campfire').length <= 1
+                }
+                onClick={() => {
+                  onRemove(buildingPopup.uid);
+                  setBuildingPopup(null);
+                  toast.success(`${VILLAGE_BUILDINGS[buildingPopup.buildingId].name} 철거 완료`);
+                }}
+                className="pixel-btn min-h-10 px-3 text-xs font-bold gap-1"
+              >
+                <Trash2 className="!h-3.5 !w-3.5" />
+                철거
+              </Button>
+              <Button
+                type="button"
                 variant="outline"
                 onClick={() => setBuildingPopup(null)}
                 className="pixel-btn min-h-10 px-3 text-xs"
@@ -1900,17 +2021,18 @@ export default function BaseVillageView({
         </div>
       )}
 
-      {/* Build Mode Palette */}
+      {/* Build Mode Palette (Super-Compact Buttons + (i) Detail Modal) */}
       {buildMode ? (
-        <div className="pixel-frame space-y-2 bg-card p-2">
+        <div className="pixel-frame space-y-1.5 bg-card p-2">
+          {/* Category Filter Tabs */}
           <div className="flex items-center justify-between gap-1">
             <div role="tablist" aria-label="건설 시설 분류" className="flex flex-wrap gap-1">
               {(
                 [
                   ['all', '전체'],
-                  ['wall', '🛡️ 성벽(1칸)'],
-                  ['facility', '⛺ 시설(2·4·6칸)'],
-                  ['decor', '🌺 조경·토템'],
+                  ['wall', '🛡️ 성벽'],
+                  ['facility', '⛺ 시설'],
+                  ['decor', '🌺 조경'],
                 ] as const
               ).map(([id, label]) => (
                 <button
@@ -1927,64 +2049,85 @@ export default function BaseVillageView({
                 </button>
               ))}
             </div>
-            <span className="text-[10px] text-muted-foreground">
-              {selectedPlaced
-                ? '이동할 빈 타일 선택'
-                : `마을 발전도에 따라 주민이 최대 ${popCap.totalResidentDisplay}명까지 늘어납니다`}
+            <span className="text-[10px] text-muted-foreground truncate">
+              {filteredCatalog.length}종류
             </span>
           </div>
 
-          <div className="grid max-h-48 grid-cols-2 gap-1.5 overflow-y-auto pr-0.5">
+          {/* Compact Button Grid (No long prose, clear selection ring & (i) info icon) */}
+          <div className="grid max-h-52 grid-cols-2 sm:grid-cols-3 gap-1 overflow-y-auto pr-0.5">
             {filteredCatalog.map(def => {
               const artisanOk = isArtisanUnlocked(vState.shamanSkills, def.id);
               const unlocked = baseLevel >= def.unlockBaseLevel && artisanOk;
               const affordable = hasAll(ownedPool, def.cost);
               const count = vState.buildings.filter(b => b.buildingId === def.id).length;
               const capped = def.maxCount !== undefined && count >= def.maxCount;
-              const active = selectedBuildId === def.id;
-              const costLabel = def.cost
-                .map(c => `${ITEMS[c.itemId]?.name ?? c.itemId} ${c.count}`)
-                .join(' · ');
+              const active = selectedBuildId === def.id && !selectedPlacedUid && !quickDemolishMode;
+
               return (
-                <button
+                <div
                   key={def.id}
-                  type="button"
-                  disabled={!unlocked}
-                  onClick={() => {
-                    setSelectedBuildId(def.id);
-                    setSelectedPlacedUid(null);
-                  }}
-                  className={`pixel-box flex flex-col items-start gap-0.5 p-1.5 text-left transition-colors ${
-                    active ? 'border-primary bg-primary/15' : 'bg-background'
-                  } ${!unlocked ? 'opacity-50' : ''}`}
+                  className={`group relative flex items-center justify-between rounded border transition-all ${
+                    active
+                      ? 'border-primary ring-2 ring-primary/80 bg-primary/20 text-foreground font-bold shadow-sm'
+                      : !unlocked
+                        ? 'border-border/40 bg-muted/30 opacity-55'
+                        : affordable && !capped
+                          ? 'border-border bg-background hover:border-primary/60 hover:bg-accent/30'
+                          : 'border-border/60 bg-background/80 opacity-75'
+                  }`}
                 >
-                  <div className="flex w-full items-center justify-between gap-1">
-                    <b className="truncate text-xs">
-                      {def.icon} {def.name}
-                    </b>
-                    {!unlocked ? (
-                      <span className="flex items-center gap-0.5 text-[10px] text-destructive">
-                        <Lock className="!h-3 !w-3" />
-                        {!artisanOk ? '장인 수련' : `Lv.${def.unlockBaseLevel}`}
-                      </span>
-                    ) : (
-                      <span className="rounded bg-accent/20 px-1 text-[9px] font-bold">
-                        {def.footprintLabel}
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[10px] font-bold text-primary">{def.effectLabel}</span>
-                  <span
-                    className={`text-[10px] ${
-                      affordable && !capped ? 'text-muted-foreground' : 'text-destructive'
-                    }`}
+                  {/* Select Building Button */}
+                  <button
+                    type="button"
+                    disabled={!unlocked || capped}
+                    onClick={() => {
+                      setSelectedBuildId(def.id);
+                      setSelectedPlacedUid(null);
+                      setQuickDemolishMode(false);
+                      toast.success(`${def.name} 선택됨 (${def.footprintLabel}): 빈 타일을 눌러 건설하세요.`);
+                    }}
+                    className="flex flex-1 items-center gap-1.5 p-1.5 text-left min-w-0"
                   >
-                    {capped ? '배치 상한 도달' : `재료: ${costLabel}`}
-                  </span>
-                </button>
+                    <span className="text-base shrink-0">{def.icon}</span>
+                    <div className="min-w-0 flex-1 leading-tight">
+                      <div className="flex items-center gap-1">
+                        <span className="truncate text-xs font-bold">{def.name}</span>
+                        {active && <span className="text-[10px] text-primary">✓</span>}
+                      </div>
+                      <div className="flex items-center gap-1 text-[9px]">
+                        <span className="rounded bg-muted px-1 text-muted-foreground">{def.footprintLabel}</span>
+                        {!unlocked ? (
+                          <span className="text-destructive font-semibold">Lv.{def.unlockBaseLevel}</span>
+                        ) : capped ? (
+                          <span className="text-muted-foreground">상한</span>
+                        ) : !affordable ? (
+                          <span className="text-destructive font-semibold">재료 부족</span>
+                        ) : (
+                          <span className="text-emerald-600 font-semibold">건설 가능</span>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Info (i) Button */}
+                  <button
+                    type="button"
+                    aria-label={`${def.name} 상세 정보`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setInspectBuildingDef(def);
+                    }}
+                    className="h-full px-2 text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-r flex items-center justify-center shrink-0 border-l border-border/40"
+                    title="상세 기능 및 필요 재료 확인"
+                  >
+                    <Info className="!h-3.5 !w-3.5" />
+                  </button>
+                </div>
               );
             })}
           </div>
+
           {!inBase && (
             <p className="text-[11px] text-destructive">
               거점 반경 안에서 건설·배치를 진행할 수 있습니다.
@@ -1999,11 +2142,112 @@ export default function BaseVillageView({
           </span>
           <button
             type="button"
-            onClick={() => setBuildMode(true)}
+            onClick={() => {
+              setBuildMode(true);
+              setQuickDemolishMode(false);
+            }}
             className="shrink-0 font-bold text-primary underline"
           >
             격자 건설 모드
           </button>
+        </div>
+      )}
+
+      {/* Building Info (i) Modal */}
+      {inspectBuildingDef && (
+        <div
+          role="dialog"
+          aria-label={`${inspectBuildingDef.name} 상세 정보`}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 text-xs font-pixel"
+          onClick={() => setInspectBuildingDef(null)}
+        >
+          <div
+            className="pixel-frame w-full max-w-sm space-y-3 bg-background p-4 shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-2 border-b-2 border-foreground pb-2">
+              <div className="flex items-center gap-2">
+                <span className="flex h-11 w-11 items-center justify-center border-2 border-foreground bg-card text-2xl">
+                  {inspectBuildingDef.icon}
+                </span>
+                <div>
+                  <b className="text-sm">{inspectBuildingDef.name}</b>
+                  <p className="text-[10px] text-primary">
+                    크기: {inspectBuildingDef.footprintLabel} · 내구도 {inspectBuildingDef.maxHp}
+                    {inspectBuildingDef.maxCount ? ` · 최대 ${inspectBuildingDef.maxCount}채` : ''}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setInspectBuildingDef(null)}
+                className="pixel-btn bg-card p-1.5"
+              >
+                <X className="!h-4 !w-4" />
+              </button>
+            </div>
+
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {inspectBuildingDef.desc}
+            </p>
+
+            <div className="rounded border border-primary/30 bg-primary/10 p-2 text-xs">
+              <span className="font-bold text-primary block mb-0.5">✨ 효과 및 기능</span>
+              <p className="text-foreground">{inspectBuildingDef.effectLabel}</p>
+            </div>
+
+            <div className="space-y-1.5 rounded border border-border bg-card p-2 text-xs">
+              <span className="font-bold text-foreground block">📦 필요 건설 재료</span>
+              <div className="grid grid-cols-2 gap-1">
+                {inspectBuildingDef.cost.map(c => {
+                  const item = ITEMS[c.itemId];
+                  const owned = countOf(ownedPool, c.itemId);
+                  const ok = owned >= c.count;
+                  return (
+                    <div
+                      key={c.itemId}
+                      className={`flex items-center justify-between rounded px-2 py-1 text-[11px] border ${
+                        ok ? 'border-border bg-background' : 'border-destructive/40 bg-destructive/10'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1 truncate">
+                        <span>{item?.icon ?? '📦'}</span>
+                        <span className="truncate">{item?.name ?? c.itemId}</span>
+                      </span>
+                      <span className={`font-mono font-bold shrink-0 ${ok ? 'text-emerald-600' : 'text-destructive'}`}>
+                        {owned}/{c.count}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex gap-1.5 pt-1">
+              <Button
+                type="button"
+                disabled={baseLevel < inspectBuildingDef.unlockBaseLevel || !hasAll(ownedPool, inspectBuildingDef.cost)}
+                onClick={() => {
+                  setSelectedBuildId(inspectBuildingDef.id);
+                  setSelectedPlacedUid(null);
+                  setQuickDemolishMode(false);
+                  setInspectBuildingDef(null);
+                  toast.success(`${inspectBuildingDef.name} 선택됨: 빈 타일을 터치해 건설하세요.`);
+                }}
+                className="pixel-btn min-h-10 flex-1 bg-primary text-xs font-bold text-primary-foreground"
+              >
+                🔨 이 건물 선택하여 배치
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setInspectBuildingDef(null)}
+                className="pixel-btn min-h-10 px-3 text-xs"
+              >
+                닫기
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
