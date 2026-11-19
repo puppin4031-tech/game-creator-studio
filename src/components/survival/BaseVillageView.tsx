@@ -24,7 +24,7 @@ import {
 import { countSpoiledFood, type SmokehouseBatch } from '@/lib/survival/culinary';
 import { getSpeechStageInfo, type QuestState } from '@/lib/survival/quests';
 import { ITEMS, type ItemId } from '@/lib/survival/items';
-import { hasAll, addStacks } from '@/lib/survival/inventory';
+import { hasAll, addStacks, countOf } from '@/lib/survival/inventory';
 import type { OwnedPet } from '@/lib/survival/pets';
 import type { TribeState } from '@/lib/survival/mercenaries';
 import type { GearInstance, Stack } from '@/lib/survival/types';
