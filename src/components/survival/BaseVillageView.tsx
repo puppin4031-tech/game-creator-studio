@@ -666,14 +666,7 @@ export default function BaseVillageView({
     const list: Omit<
       LivingAgent,
       'x' | 'y' | 'facing' | 'moving' | 'bubble' | 'restTicks' | 'nextMoveAt' | 'moveDurationMs'
-    >[] = [
-      {
-        id: 'npc-hall',
-        kind: 'hall',
-        role: 'campfire_social',
-        label: '부족회관',
-      },
-    ];
+    >[] = [];
     const rawTribeCount = tribe?.count ?? 0;
     // Only display mercenaries that have actually been hired / recruited.
     const tribeCount = Math.min(popCap.maxTribeCapacity, rawTribeCount);
@@ -704,7 +697,6 @@ export default function BaseVillageView({
         role,
         label: isAmbacho ? '충성된 암바초 (파밍)' : `${cls.name} ${i + 1}`,
         tribeClass: cid,
-        carryingIcon: cid === 'gatherer' ? (i % 2 === 0 ? '🪵' : '🪨') : undefined,
       });
     }
 
@@ -717,7 +709,6 @@ export default function BaseVillageView({
         role: isHauler ? 'hauler' : 'campfire_social',
         label: isHauler ? `마을 짐꾼 ${e + 1}` : `마을 주민 ${e + 1}`,
         tribeClass: isHauler ? 'gatherer' : 'assassin',
-        carryingIcon: isHauler ? (e % 3 === 0 ? '🪵' : e % 3 === 1 ? '🪨' : '🍖') : undefined,
       });
     }
 
@@ -1448,7 +1439,7 @@ export default function BaseVillageView({
                     height: `${(h / villageGridSize) * 100}%`,
                   }}
                 >
-                  {/* Floating Idle Harvest Bubble on Roof (Tap or Swipe to Pop!) */}
+                  {/* Floating Idle Harvest Badge on Roof */}
                   {harvestBubble && !buildMode && (
                     <button
                       type="button"
@@ -1461,10 +1452,10 @@ export default function BaseVillageView({
                       onPointerEnter={() => {
                         if (swipingHarvestRef.current) triggerPopHarvest(b);
                       }}
-                      className="pointer-events-auto -top-3.5 absolute z-30 flex animate-bounce items-center gap-0.5 rounded-full border-2 border-foreground bg-amber-300 px-1.5 py-0.5 text-[9px] font-extrabold text-black shadow-[0_2px_8px_rgba(250,204,21,0.9)] transition-transform active:scale-125"
+                      className="pointer-events-auto -top-3 absolute z-30 flex items-center gap-0.5 rounded-full border border-black/70 bg-amber-400 px-1.5 py-0.5 text-[8px] font-extrabold text-black shadow-sm transition-transform hover:scale-110 active:scale-95"
                     >
-                      <span>{harvestBubble.icon}</span>
-                      <span>+{harvestBubble.count}</span>
+                      <span className="text-[9px] leading-none">{harvestBubble.icon}</span>
+                      <span className="leading-none">+{harvestBubble.count}</span>
                     </button>
                   )}
 
@@ -1487,7 +1478,7 @@ export default function BaseVillageView({
                       <BuildingGraphic b={b} state={vState} />
                     </div>
                     {!def.connectsWall && !buildMode && (
-                      <span className="pointer-events-none -mt-1 whitespace-nowrap rounded bg-background/85 px-1 py-0 text-[8px] font-bold leading-tight shadow">
+                      <span className="pointer-events-none -mt-0.5 whitespace-nowrap text-[9px] font-extrabold text-black drop-shadow-[0_1px_1px_rgba(255,255,255,0.95)] leading-tight select-none">
                         {def.name}
                       </span>
                     )}
@@ -1508,7 +1499,7 @@ export default function BaseVillageView({
             {popFloats.map(f => (
               <div
                 key={f.id}
-                className="pointer-events-none absolute z-40 -translate-y-4 animate-ping whitespace-nowrap rounded bg-primary px-1.5 py-0.5 text-[10px] font-extrabold text-primary-foreground shadow"
+                className="pointer-events-none absolute z-40 -translate-y-3 whitespace-nowrap rounded bg-black/85 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-sm transition-all duration-700 ease-out select-none"
                 style={{
                   left: `${(f.x / villageGridSize) * 100}%`,
                   top: `${(f.y / villageGridSize) * 100}%`,
@@ -1548,13 +1539,10 @@ export default function BaseVillageView({
                 {ag.bubble && (
                   <span
                     data-agent-bubble={ag.bubble}
-                    className="-top-4 absolute z-30 animate-bounce whitespace-nowrap rounded border border-foreground bg-card px-1 py-0 text-[8px] font-bold leading-tight shadow-sm"
+                    className="-top-5 absolute z-30 whitespace-nowrap rounded border border-black/80 bg-white px-1.5 py-0.5 text-[9px] font-bold text-black shadow-md leading-tight after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-white select-none"
                   >
                     {ag.bubble}
                   </span>
-                )}
-                {ag.carryingIcon && ag.moving && !ag.bubble && (
-                  <span className="-top-2.5 absolute z-20 text-[9px]">{ag.carryingIcon}</span>
                 )}
                 <div
                   className={ag.jumpTick && Date.now() - ag.jumpTick < 1500 ? 'animate-bounce' : ''}
@@ -1579,7 +1567,7 @@ export default function BaseVillageView({
                                   : 'drop-shadow'
                         }`}
                       />
-                      <span className="mt-0.5 whitespace-nowrap rounded bg-background/90 px-1 text-[7px] font-bold border border-foreground/40 leading-none">
+                      <span className="mt-0.5 whitespace-nowrap text-[8px] font-bold text-black drop-shadow-[0_1px_1px_rgba(255,255,255,0.95)] leading-none select-none">
                         {vState.shamanClass ? SHAMAN_CLASSES[vState.shamanClass].name : '떠돌이 주술사'}
                       </span>
                     </div>
@@ -1590,7 +1578,7 @@ export default function BaseVillageView({
                         alt="부족회관"
                         className="pixelated h-10 w-auto object-contain drop-shadow"
                       />
-                      <span className="mt-0.5 whitespace-nowrap rounded bg-background/90 px-1 text-[7px] font-bold border border-foreground/40 leading-none">
+                      <span className="mt-0.5 whitespace-nowrap text-[8px] font-bold text-black drop-shadow-[0_1px_1px_rgba(255,255,255,0.95)] leading-none select-none">
                         부족회관
                       </span>
                     </div>

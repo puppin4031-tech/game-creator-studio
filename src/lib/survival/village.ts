@@ -699,7 +699,20 @@ export function ensureVillageState(state: VillageState | undefined, hasAltar = f
       'starter-torch-1',
       'starter-torch-2',
     ]);
-    const filteredBuildings = state.buildings.filter(b => !legacyStarterIds.has(b.uid));
+    let filteredBuildings = state.buildings.filter(b => !legacyStarterIds.has(b.uid));
+    
+    // Deduplicate unique facility buildings (maxCount: 1) if any duplicates accumulated in save
+    const halls = filteredBuildings.filter(b => b.buildingId === 'tribal_hall');
+    if (halls.length > 1) {
+      const keepUid = halls[0].uid;
+      filteredBuildings = filteredBuildings.filter(b => b.buildingId !== 'tribal_hall' || b.uid === keepUid);
+    }
+    const shamans = filteredBuildings.filter(b => b.buildingId === 'wandering_shaman' || b.buildingId === 'shaman_tent');
+    if (shamans.length > 1) {
+      const keepUid = shamans[0].uid;
+      filteredBuildings = filteredBuildings.filter(b => (b.buildingId !== 'wandering_shaman' && b.buildingId !== 'shaman_tent') || b.uid === keepUid);
+    }
+
     if (!filteredBuildings.some(b => b.buildingId === 'campfire')) {
       filteredBuildings.unshift({
         uid: 'starter-campfire',
