@@ -56,6 +56,10 @@ import shamanImg from '@/assets/survival/npc-shaman.png';
 import mercImg from '@/assets/survival/npc-mercenary.png';
 import tribalHallImg from '@/assets/survival/base-tribal-hall.png';
 import baseVillageBg from '@/assets/survival/base-village-bg.png';
+import wallWoodPillarImg from '@/assets/survival/wall-wood-pillar.png';
+import wallBranchFenceImg from '@/assets/survival/wall-branch-fence.png';
+import wallMarbleWallImg from '@/assets/survival/wall-marble-wall.png';
+import wallStoneFenceImg from '@/assets/survival/wall-stone-fence.png';
 import IntentCraftingModal, { type CraftingMode } from './IntentCraftingModal';
 import {
   BUILDING_MECHANICS_META,
@@ -276,49 +280,211 @@ function BuildingGraphic({
   const def = VILLAGE_BUILDINGS[b.buildingId];
   if (def.connectsWall) {
     const conn = wallConnections(state, b.x, b.y);
-    const stroke =
-      b.buildingId === 'marble_wall'
-        ? '#0f766e'
-        : b.buildingId === 'granite_wall'
-          ? '#44403c'
-          : b.buildingId === 'stone_wall'
-            ? '#78716c'
-            : b.buildingId === 'log_palisade'
-              ? '#78350f'
-              : b.buildingId === 'wood_pillar'
-                ? '#92400e'
-                : '#a16207';
-    const fill =
-      b.buildingId === 'marble_wall'
-        ? '#f5f5f4'
-        : b.buildingId === 'granite_wall'
-          ? '#a8a29e'
-          : b.buildingId === 'stone_wall'
-            ? '#d6d3d1'
-            : b.buildingId === 'log_palisade'
-              ? '#b45309'
-              : b.buildingId === 'wood_pillar'
-                ? '#d97706'
-                : '#ca8a04';
+    const hasAnyConn = conn.n || conn.s || conn.e || conn.w;
+
+    // 1. 나뭇가지 울타리 (branch_fence)
+    if (b.buildingId === 'branch_fence') {
+      return (
+        <div className="relative flex h-full w-full items-center justify-center">
+          {hasAnyConn && (
+            <svg viewBox="0 0 40 40" className="pointer-events-none absolute inset-0 h-full w-full" shapeRendering="geometricPrecision" aria-hidden>
+              {conn.w && (
+                <g strokeLinecap="round">
+                  <path d="M0,13 Q10,15 20,14" stroke="#4a3320" strokeWidth="3" />
+                  <path d="M0,23 Q10,21 20,23" stroke="#5c4028" strokeWidth="3.5" />
+                  <path d="M0,31 Q10,33 20,30" stroke="#3a2818" strokeWidth="3" />
+                  <path d="M0,25 Q10,19 20,26" stroke="#4d7328" strokeWidth="1.8" />
+                </g>
+              )}
+              {conn.e && (
+                <g strokeLinecap="round">
+                  <path d="M20,14 Q30,12 40,13" stroke="#4a3320" strokeWidth="3" />
+                  <path d="M20,23 Q30,25 40,23" stroke="#5c4028" strokeWidth="3.5" />
+                  <path d="M20,30 Q30,28 40,31" stroke="#3a2818" strokeWidth="3" />
+                  <path d="M20,26 Q30,31 40,25" stroke="#4d7328" strokeWidth="1.8" />
+                </g>
+              )}
+              {conn.n && (
+                <g strokeLinecap="round">
+                  <path d="M16,0 Q15,10 16,20" stroke="#3a2818" strokeWidth="3" />
+                  <path d="M24,0 Q25,10 24,20" stroke="#4a3320" strokeWidth="3.2" />
+                  <path d="M19,0 Q21,10 20,20" stroke="#4d7328" strokeWidth="1.6" />
+                </g>
+              )}
+              {conn.s && (
+                <g strokeLinecap="round">
+                  <path d="M16,20 Q17,30 16,40" stroke="#3a2818" strokeWidth="3" />
+                  <path d="M24,20 Q23,30 24,40" stroke="#4a3320" strokeWidth="3.2" />
+                  <path d="M20,20 Q19,30 20,40" stroke="#4d7328" strokeWidth="1.6" />
+                </g>
+              )}
+            </svg>
+          )}
+          <img
+            src={wallBranchFenceImg}
+            alt=""
+            className="pixelated relative z-10 h-[92%] w-[92%] object-contain drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]"
+          />
+        </div>
+      );
+    }
+
+    // 2. 나무 기둥 (wood_pillar) & 통나무 방책 (log_palisade)
+    if (b.buildingId === 'wood_pillar' || b.buildingId === 'log_palisade') {
+      const isPalisade = b.buildingId === 'log_palisade';
+      return (
+        <div className="relative flex h-full w-full items-center justify-center">
+          {hasAnyConn && (
+            <svg viewBox="0 0 40 40" className="pointer-events-none absolute inset-0 h-full w-full" shapeRendering="crispEdges" aria-hidden>
+              {conn.w && (
+                <g>
+                  <rect x="0" y="8" width="20" height="4.5" fill="#4d2f16" stroke="#241408" strokeWidth="1" />
+                  <rect x="0" y="27" width="20" height="4.5" fill="#4d2f16" stroke="#241408" strokeWidth="1" />
+                  <line x1="0" y1="10" x2="20" y2="10" stroke="#6b4423" strokeWidth="1" />
+                  <line x1="0" y1="29" x2="20" y2="29" stroke="#6b4423" strokeWidth="1" />
+                  {isPalisade && <rect x="0" y="14" width="20" height="12" fill="#5c381a" stroke="#241408" strokeWidth="1" />}
+                </g>
+              )}
+              {conn.e && (
+                <g>
+                  <rect x="20" y="8" width="20" height="4.5" fill="#4d2f16" stroke="#241408" strokeWidth="1" />
+                  <rect x="20" y="27" width="20" height="4.5" fill="#4d2f16" stroke="#241408" strokeWidth="1" />
+                  <line x1="20" y1="10" x2="40" y2="10" stroke="#6b4423" strokeWidth="1" />
+                  <line x1="20" y1="29" x2="40" y2="29" stroke="#6b4423" strokeWidth="1" />
+                  {isPalisade && <rect x="20" y="14" width="20" height="12" fill="#5c381a" stroke="#241408" strokeWidth="1" />}
+                </g>
+              )}
+              {conn.n && (
+                <g>
+                  <rect x="17" y="0" width="6" height="20" fill="#4d2f16" stroke="#241408" strokeWidth="1" />
+                  <line x1="20" y1="0" x2="20" y2="20" stroke="#6b4423" strokeWidth="1" />
+                </g>
+              )}
+              {conn.s && (
+                <g>
+                  <rect x="17" y="20" width="6" height="20" fill="#4d2f16" stroke="#241408" strokeWidth="1" />
+                  <line x1="20" y1="20" x2="20" y2="40" stroke="#6b4423" strokeWidth="1" />
+                </g>
+              )}
+            </svg>
+          )}
+          <img
+            src={wallWoodPillarImg}
+            alt=""
+            className="pixelated relative z-10 h-full w-auto max-h-[115%] -translate-y-[6%] object-contain drop-shadow-[0_2px_4px_rgba(0,0,0,0.65)]"
+          />
+        </div>
+      );
+    }
+
+    // 3. 돌담 울타리 (stone_wall) & 화강암 성벽 (granite_wall)
+    if (b.buildingId === 'stone_wall' || b.buildingId === 'granite_wall') {
+      const isGranite = b.buildingId === 'granite_wall';
+      const baseFill = isGranite ? '#4a4642' : '#575249';
+      const strokeCol = isGranite ? '#24211e' : '#2b2824';
+      const hilite = isGranite ? '#6e6963' : '#7b756b';
+      const moss = isGranite ? '#384724' : '#4b5e2d';
+
+      return (
+        <div className="relative flex h-full w-full items-center justify-center">
+          {hasAnyConn && (
+            <svg viewBox="0 0 40 40" className="pointer-events-none absolute inset-0 h-full w-full" shapeRendering="crispEdges" aria-hidden>
+              {conn.w && (
+                <g>
+                  <rect x="0" y="16" width="20" height="18" fill={baseFill} stroke={strokeCol} strokeWidth="1" />
+                  <rect x="2" y="18" width="7" height="4" fill={hilite} />
+                  <rect x="11" y="18" width="7" height="5" fill={baseFill} />
+                  <rect x="0" y="25" width="9" height="5" fill={hilite} />
+                  <rect x="11" y="25" width="8" height="6" fill={hilite} />
+                  <line x1="0" y1="16" x2="20" y2="16" stroke={moss} strokeWidth="2" />
+                </g>
+              )}
+              {conn.e && (
+                <g>
+                  <rect x="20" y="16" width="20" height="18" fill={baseFill} stroke={strokeCol} strokeWidth="1" />
+                  <rect x="22" y="18" width="7" height="4" fill={hilite} />
+                  <rect x="31" y="18" width="7" height="5" fill={baseFill} />
+                  <rect x="20" y="25" width="9" height="5" fill={hilite} />
+                  <rect x="31" y="25" width="8" height="6" fill={hilite} />
+                  <line x1="20" y1="16" x2="40" y2="16" stroke={moss} strokeWidth="2" />
+                </g>
+              )}
+              {conn.n && (
+                <g>
+                  <rect x="14" y="0" width="12" height="20" fill={baseFill} stroke={strokeCol} strokeWidth="1" />
+                  <rect x="16" y="3" width="8" height="5" fill={hilite} />
+                  <rect x="16" y="11" width="8" height="5" fill={hilite} />
+                </g>
+              )}
+              {conn.s && (
+                <g>
+                  <rect x="14" y="20" width="12" height="20" fill={baseFill} stroke={strokeCol} strokeWidth="1" />
+                  <rect x="16" y="23" width="8" height="5" fill={hilite} />
+                  <rect x="16" y="31" width="8" height="5" fill={hilite} />
+                </g>
+              )}
+            </svg>
+          )}
+          <img
+            src={wallStoneFenceImg}
+            alt=""
+            className={`pixelated relative z-10 h-full w-auto max-h-[110%] -translate-y-[5%] object-contain drop-shadow-[0_2px_4px_rgba(0,0,0,0.65)] ${isGranite ? 'brightness-90 contrast-110' : ''}`}
+          />
+        </div>
+      );
+    }
+
+    // 4. 대리석 성벽 (marble_wall)
     return (
-      <svg viewBox="0 0 32 32" className="h-full w-full" shapeRendering="crispEdges" aria-hidden>
-        {conn.n && <rect x="12" y="0" width="8" height="16" fill={fill} stroke={stroke} strokeWidth="2" />}
-        {conn.s && <rect x="12" y="16" width="8" height="16" fill={fill} stroke={stroke} strokeWidth="2" />}
-        {conn.w && <rect x="0" y="12" width="16" height="8" fill={fill} stroke={stroke} strokeWidth="2" />}
-        {conn.e && <rect x="16" y="12" width="16" height="8" fill={fill} stroke={stroke} strokeWidth="2" />}
-        <rect
-          x={b.buildingId === 'wood_pillar' ? 8 : 9}
-          y={b.buildingId === 'wood_pillar' ? 6 : 8}
-          width={b.buildingId === 'wood_pillar' ? 16 : 14}
-          height={b.buildingId === 'wood_pillar' ? 20 : 16}
-          fill={fill}
-          stroke={stroke}
-          strokeWidth="2"
-        />
-        {(b.buildingId === 'stone_wall' || b.buildingId === 'granite_wall' || b.buildingId === 'marble_wall') && (
-          <path d="M10 14h12M14 9v5M18 14v6" stroke={stroke} strokeWidth="1.5" />
+      <div className="relative flex h-full w-full items-center justify-center">
+        {hasAnyConn && (
+          <svg viewBox="0 0 40 40" className="pointer-events-none absolute inset-0 h-full w-full" shapeRendering="crispEdges" aria-hidden>
+            {conn.w && (
+              <g>
+                <rect x="0" y="15" width="20" height="21" fill="#d6d3d1" stroke="#44403c" strokeWidth="1" />
+                <rect x="2" y="10" width="6" height="5" fill="#e7e5e4" stroke="#44403c" strokeWidth="1" />
+                <rect x="12" y="10" width="6" height="5" fill="#e7e5e4" stroke="#44403c" strokeWidth="1" />
+                <line x1="0" y1="21" x2="20" y2="21" stroke="#a8a29e" strokeWidth="1" />
+                <line x1="0" y1="28" x2="20" y2="28" stroke="#a8a29e" strokeWidth="1" />
+                <line x1="9" y1="15" x2="9" y2="21" stroke="#a8a29e" strokeWidth="1" />
+                <line x1="5" y1="21" x2="5" y2="28" stroke="#a8a29e" strokeWidth="1" />
+                <line x1="15" y1="21" x2="15" y2="28" stroke="#a8a29e" strokeWidth="1" />
+              </g>
+            )}
+            {conn.e && (
+              <g>
+                <rect x="20" y="15" width="20" height="21" fill="#d6d3d1" stroke="#44403c" strokeWidth="1" />
+                <rect x="22" y="10" width="6" height="5" fill="#e7e5e4" stroke="#44403c" strokeWidth="1" />
+                <rect x="32" y="10" width="6" height="5" fill="#e7e5e4" stroke="#44403c" strokeWidth="1" />
+                <line x1="20" y1="21" x2="40" y2="21" stroke="#a8a29e" strokeWidth="1" />
+                <line x1="20" y1="28" x2="40" y2="28" stroke="#a8a29e" strokeWidth="1" />
+                <line x1="29" y1="15" x2="29" y2="21" stroke="#a8a29e" strokeWidth="1" />
+                <line x1="25" y1="21" x2="25" y2="28" stroke="#a8a29e" strokeWidth="1" />
+                <line x1="35" y1="21" x2="35" y2="28" stroke="#a8a29e" strokeWidth="1" />
+              </g>
+            )}
+            {conn.n && (
+              <g>
+                <rect x="13" y="0" width="14" height="20" fill="#d6d3d1" stroke="#44403c" strokeWidth="1" />
+                <line x1="13" y1="8" x2="27" y2="8" stroke="#a8a29e" strokeWidth="1" />
+                <line x1="13" y1="15" x2="27" y2="15" stroke="#a8a29e" strokeWidth="1" />
+              </g>
+            )}
+            {conn.s && (
+              <g>
+                <rect x="13" y="20" width="14" height="20" fill="#d6d3d1" stroke="#44403c" strokeWidth="1" />
+                <line x1="13" y1="28" x2="27" y2="28" stroke="#a8a29e" strokeWidth="1" />
+                <line x1="13" y1="35" x2="27" y2="35" stroke="#a8a29e" strokeWidth="1" />
+              </g>
+            )}
+          </svg>
         )}
-      </svg>
+        <img
+          src={wallMarbleWallImg}
+          alt=""
+          className="pixelated relative z-10 h-full w-auto max-h-[135%] -translate-y-[15%] object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.6)]"
+        />
+      </div>
     );
   }
 
