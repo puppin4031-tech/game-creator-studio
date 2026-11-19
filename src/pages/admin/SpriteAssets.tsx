@@ -46,6 +46,23 @@ const TRIBE_ACTION_TITLE: Partial<Record<SpriteAction, string>> = {
   gather: '채집 액션 모션 (채광·열매 수집)',
 };
 
+function formatErrorMessage(e: unknown): string {
+  if (!e) return '알 수 없는 오류';
+  if (typeof e === 'string') return e;
+  const anyE = e as Record<string, unknown>;
+  const msg = String(anyE.message || anyE.error_description || anyE.details || anyE.hint || e);
+  if (msg.includes('survival_sprite_animations_action_check') || (msg.includes('check constraint') && msg.includes('action'))) {
+    return 'DB 액션 제약조건 오류: 데이터베이스에 해당 액션(또는 scale)이 허용 목록에 없습니다. 최신 SQL 마이그레이션을 적용해 주세요.';
+  }
+  if (msg.includes('survival_sprite_animations_fps_check') || (msg.includes('check constraint') && msg.includes('fps'))) {
+    return 'DB FPS 제약조건 오류: fps 값이 허용 범위(30 이하)를 초과했습니다. DB의 fps 제약조건 확장 SQL을 실행해 주세요.';
+  }
+  if (msg.includes('row-level security') || msg.includes('policy') || msg.includes('has_role') || msg.includes('Forbidden')) {
+    return '권한 오류: Supabase 계정에 main_admin 권한이 부여되어 있는지 확인해 주세요.';
+  }
+  return msg;
+}
+
 export function ScaleControl({ target }: { target: string }) {
   const qc = useQueryClient();
   const { data } = useSpriteAnimations(target);
@@ -79,7 +96,7 @@ export function ScaleControl({ target }: { target: string }) {
       await qc.invalidateQueries({ queryKey: ['sprite-animations'] });
       toast.success(`크기 비율을 ${scale.toFixed(1)}배로 저장했어요.`);
     } catch (e) {
-      toast.error(`저장 실패: ${e instanceof Error ? e.message : '알 수 없는 오류'}`);
+      toast.error(`저장 실패: ${formatErrorMessage(e)}`);
     } finally {
       setSaving(false);
     }
@@ -178,7 +195,7 @@ export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARAC
       await qc.invalidateQueries({ queryKey: ['sprite-animations'] });
       toast.success(`${SPRITE_ACTION_LABELS[action]} 애니메이션을 저장했어요.`);
     } catch (e) {
-      toast.error(`저장 실패: ${e instanceof Error ? e.message : '알 수 없는 오류'}`);
+      toast.error(`저장 실패: ${formatErrorMessage(e)}`);
     } finally {
       setSaving(false);
     }
@@ -193,7 +210,7 @@ export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARAC
       await qc.invalidateQueries({ queryKey: ['sprite-animations'] });
       toast.success('스프라이트를 삭제했어요.');
     } catch (e) {
-      toast.error(`삭제 실패: ${e instanceof Error ? e.message : '알 수 없는 오류'}`);
+      toast.error(`삭제 실패: ${formatErrorMessage(e)}`);
     }
   };
 
