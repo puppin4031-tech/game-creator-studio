@@ -23,7 +23,7 @@ import { advanceSurvivalVitals } from '@/lib/survival/metabolism';
 import { distanceM } from '@/lib/survival/geo';
 import { generateWorld, isNodeAvailable } from '@/lib/survival/world';
 import { getCustomMobVersion } from '@/lib/survival/customMobs';
-import { hireMercenary, mercActive, tribeHireCost, tribeTrainCost, tribeRatio, tribeInjured, settleUpkeep, upkeepDemand, escortReady, escortAmbushDamage, ESCORT_GATHER_MULT, TRIBE_INJURY_MS, TRIBE_TREAT_COST, UPKEEP_MS, type MercenaryContract, type TribeState } from '@/lib/survival/mercenaries';
+import { hireMercenary, mercActive, tribeHireCost, tribeTrainCost, tribeRatio, tribeInjured, settleUpkeep, upkeepDemand, hasEdibleFoodInStorage, escortReady, escortAmbushDamage, ESCORT_GATHER_MULT, TRIBE_INJURY_MS, TRIBE_TREAT_COST, UPKEEP_MS, type MercenaryContract, type TribeState } from '@/lib/survival/mercenaries';
 import { applyTribeWallDefense, DEFAULT_TRIBE_CLASS, getTribeClass, tribeCarryBonusKg, type TribeClassId } from '@/data/tribeClasses';
 import { blueprintResearchCost, canPlaceVillageBuilding, computeBuildingHarvestBubble, computeVillageBonuses, ensureVillageState, isArtisanUnlocked, isBlueprintResearched, moveVillageBuilding, placeVillageBuilding, placeCustomVillageBuilding, removeVillageBuilding, SHAMAN_SKILL_DEFS, shamanSkillLevel, VILLAGE_BUILDINGS, type ShamanSkillId, type VillageBuildingId, type VillageState } from '@/lib/survival/village';
 import type { BuildingMechanicTag, GearMechanicTag, PhysicalAttributes } from '@/lib/survival/intentCrafting';
@@ -35,7 +35,7 @@ import {
   type ShamanLevel,
 } from '@/lib/survival/shamanEvolution';
 import { CIV_TECHS, checkCivTechStatus, getCivilizationEraBadge, type CivTechDef } from '@/lib/survival/civilizationTech';
-import { settleFoodSpoilage, SMOKE_CURING_MS, TAVERN_RECIPES, type SmokehouseBatch } from '@/lib/survival/culinary';
+import { settleFoodSpoilage, SMOKE_CURING_MS, TAVERN_RECIPES, SHAMAN_CUISINE_RECIPES, type SmokehouseBatch, type ActiveFoodBuff, type CookingJob, type ShamanDishDef } from '@/lib/survival/culinary';
 import { computeExpeditionLevel, detectExpeditionPins, type RadarPin } from '@/lib/survival/radar';
 import { addStacks, countOf, hasAll, removeStacks, splitDeathDrop, splitByCapacity, stackWeight, transferStack, validStackCount } from '@/lib/survival/inventory';
 import { addExperience, dayPhase, xpToNext } from '@/lib/survival/progression';
@@ -132,6 +132,17 @@ export interface WorldSave extends WorldProgress {
   exploredTotal?: number;
   scoutReport?: ScoutTarget[];
   lastAteAt?: number;
+  /** Active food timed buffs */
+  activeBuffs?: ActiveFoodBuff[];
+  /** Permanent stat increases gained from consuming health tonics/건강식 (+0.5 ~ +1) */
+  permanentStats?: {
+    maxHpBonus?: number;
+    atkBonus?: number;
+    defBonus?: number;
+    carryBonus?: number;
+  };
+  /** Cooking cauldron ongoing jobs */
+  cookingJobs?: CookingJob[];
   lastTickAt: number;
 }
 
@@ -184,9 +195,17 @@ function load(start: LatLng, saveKey: string): WorldSave {
 
 const fmt = (st: Stack[]) => st.map((s) => `${ITEMS[s.itemId].name} ×${s.count}`).join(', ');
 
-/** Max HP grows with the giant_heart tech level. */
-const maxHpOf = (p: { techs: string[]; techLevels?: Record<string, number> }) =>
-  C.baseMaxHp + (p.techs.includes('giant_heart') ? giantHeartHpBonus(techLevel(p.techLevels, 'giant_heart')) : 0);
+/** Max HP grows with giant_heart tech level + permanent health tonic bonus (+10 per tonic). */
+const maxHpOf = (p: {
+  techs: string[];
+  techLevels?: Record<string, number>;
+  permanentStats?: { maxHpBonus?: number };
+}) =>
+  C.baseMaxHp +
+  (p.techs.includes('giant_heart')
+    ? giantHeartHpBonus(techLevel(p.techLevels, 'giant_heart'))
+    : 0) +
+  (p.permanentStats?.maxHpBonus ?? 0);
 
 export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; saveKey?: string; cloudSync?: boolean; indoor?: boolean } = {}) {
   const enabled = options.enabled ?? true;
@@ -332,7 +351,10 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const inBase = atWorkshop(s);
   const weight = stackWeight(s.backpack);
   const baseCapacity = C.baseCarryKg + (s.level - 1) * C.carryPerLevelKg + ((s.base?.level ?? 0) >= 2 ? 10 : 0) + pocketBonusKg(s.techs) + villageBonuses.carryBonusKg;
-  const capacity = baseCapacity + tribeCarryBonusKg(baseCapacity, s.tribe?.count ?? 0, s.tribe?.classId);
+  const capacity =
+    baseCapacity +
+    tribeCarryBonusKg(baseCapacity, s.tribe?.count ?? 0, s.tribe?.classId) +
+    (s.permanentStats?.carryBonus ?? 0);
   const questState: QuestState = { ...s, storedGear: [], stats: { gathered: s.gathered, crafted: s.crafted, kills: s.kills, deposits: s.deposits } };
   const quest = currentQuest(questState);
   const questProgress = quest?.progress(questState) ?? null;
@@ -545,17 +567,64 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     toast.success('응급 치료 완료! 부족민이 다시 일어났어요');
     return true;
   }, [setS]);
+  const lastStarveWarnRef = useRef<number>(0);
   // Hourly food upkeep for residents (tribe, dinos, tamed pets).
+  // Daily rate: 1~2 items per resident per day.
+  // Any edible food in storage (cooked meat, jerky, dried fruit, dishes) satisfies hunger.
   useEffect(() => {
-    const p = ref.current; const t = p.tribe; const now = Date.now();
+    const p = ref.current;
+    const t = p.tribe;
+    const now = Date.now();
     const residents = (t?.count ?? 0) + (p.pets?.length ?? 0) + (p.companions?.length ?? 0);
     if (!residents || !p.base) return;
+
+    // Immediately resolve hunger if storage now contains any edible food!
+    const hasFood = hasEdibleFoodInStorage(p.storage);
+    if (t?.starving && hasFood) {
+      setS(q => ({
+        ...q,
+        tribe: { count: 0, trainLevel: 0, ...q.tribe, starving: false },
+      }));
+      toast.success('🍖 창고 식량을 섭취하여 부족민과 펫의 굶주림이 해소되었어요! (원기 회복)');
+      return;
+    }
+
     const since = t?.upkeepAt ?? now;
     const hours = Math.floor((now - since) / UPKEEP_MS);
-    if (hours < 1) { if (!t?.upkeepAt) setS(q => ({ ...q, tribe: { count: 0, trainLevel: 0, ...q.tribe, upkeepAt: now } })); return; }
-    const r = settleUpkeep(p.storage, upkeepDemand(t?.count ?? 0, p.pets?.length ?? 0, p.companions?.length ?? 0), hours);
-    setS(q => ({ ...q, storage: r.storage, tribe: { count: 0, trainLevel: 0, ...q.tribe, upkeepAt: since + hours * UPKEEP_MS, starving: r.starving } }));
-    if (r.starving) toast.warning('창고 식량이 부족해 부족민과 펫이 굶주려요 (회복 중단·효율 감소)');
+    if (hours < 1) {
+      if (!t?.upkeepAt) {
+        setS(q => ({ ...q, tribe: { count: 0, trainLevel: 0, ...q.tribe, upkeepAt: now } }));
+      }
+      return;
+    }
+
+    const r = settleUpkeep(
+      p.storage,
+      upkeepDemand(t?.count ?? 0, p.pets?.length ?? 0, p.companions?.length ?? 0),
+      hours
+    );
+
+    const wasStarving = !!t?.starving;
+    const isNowStarving = r.starving;
+
+    setS(q => ({
+      ...q,
+      storage: r.storage,
+      tribe: {
+        count: 0,
+        trainLevel: 0,
+        ...q.tribe,
+        upkeepAt: since + hours * UPKEEP_MS,
+        starving: isNowStarving,
+      },
+    }));
+
+    if (wasStarving && !isNowStarving) {
+      toast.success('🍖 창고 식량을 섭취하여 부족민과 펫의 굶주림이 해소되었어요! (원기 회복)');
+    } else if (isNowStarving && (!wasStarving || now - lastStarveWarnRef.current > 30 * 60 * 1000)) {
+      lastStarveWarnRef.current = now;
+      toast.warning('⚠️ 창고 식량이 부족해 부족민과 펫이 굶주려요 (회복 중단·효율 감소)');
+    }
   }, [now, setS]);
   const [crewNearby, setCrewNearby] = useState<WorldEntity[]>([]);
   const setCrewManual = useCallback((on: boolean) => setS(p => p.observedExpedition ? { ...p, expeditionAuto: on ? false : p.expeditionAuto, observedExpedition: { ...p.observedExpedition, manual: on, target: undefined, damage: 0 } } : p), [setS]);
@@ -883,6 +952,16 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       }
       power = weapon ? Math.round((ITEMS[weapon.itemId].weapon?.atk ?? C.fistAtk) * gearMult(weapon)) : C.fistAtk;
       if (p.techs.includes('primal_strike')) power *= primalStrikeMult(techLevel(p.techLevels, 'primal_strike'));
+
+      // Permanent stat bonus from Shaman health tonics (+1 ATK per tonic)
+      power += Math.round(p.permanentStats?.atkBonus ?? 0);
+
+      // Active timed food buff (e.g. predator_might +25% ATK)
+      const activeFoodAtkBuff = (p.activeBuffs ?? []).find(b => b.expiresAt > Date.now() && b.effects.atkBonusPct);
+      if (activeFoodAtkBuff?.effects.atkBonusPct) {
+        power = Math.round(power * (1 + activeFoodAtkBuff.effects.atkBonusPct / 100));
+      }
+
       const mobDist = distanceM(p.pos, e);
       // "원거리 무기의 특징은 몹이 가까이 다가올때까지 시간이 있다는거야."
       // If the creature is not in melee clash range (<= 1.8m), it cannot counterattack yet!
@@ -928,6 +1007,13 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
       const wallBonus = atMainBase(p) && p.palisade ? 3 + (p.tribe?.count && p.tribe.classId === 'tank' ? 4 : 0) : 0;
       let defense = wallBonus + (armor ? Math.round((ITEMS[armor.itemId].armor?.def ?? 0) * gearMult(armor)) : 0) + (p.techs.includes('iron_skin') ? ironSkinDef(techLevel(p.techLevels, 'iron_skin')) : 0);
+      // Permanent stat bonus from Shaman health tonics (+1 DEF per tonic)
+      defense += Math.round(p.permanentStats?.defBonus ?? 0);
+      // Active timed food buff (e.g. iron_shell_buff +25% DEF)
+      const activeFoodDefBuff = (p.activeBuffs ?? []).find(b => b.expiresAt > Date.now() && b.effects.defBonusPct);
+      if (activeFoodDefBuff?.effects.defBonusPct) {
+        defense = Math.round(defense * (1 + activeFoodDefBuff.effects.defBonusPct / 100));
+      }
       if (shamanClass === 'orthodox') {
         defense = Math.round(defense * 1.2);
       }
@@ -1018,15 +1104,44 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const left = removeStacks(p[from], [{ itemId, count: 1 }]);
     if (!left) return;
     const hpGain = it.food?.hp ?? it.heal ?? 0;
+    const nowAt = Date.now();
+
+    // Check if this food has an active special buff defined in Shaman Cuisine
+    const dishRecipe = SHAMAN_CUISINE_RECIPES.find(r => r.resultItemId === itemId && r.buff);
+    let activeBuffs = (p.activeBuffs ?? []).filter(b => b.expiresAt > nowAt);
+    if (dishRecipe?.buff) {
+      const b = dishRecipe.buff;
+      activeBuffs = [
+        ...activeBuffs.filter(x => x.id !== b.id),
+        {
+          id: b.id,
+          name: b.name,
+          icon: b.icon,
+          desc: b.desc,
+          expiresAt: nowAt + b.durationSec * 1000,
+          effects: {
+            atkBonusPct: b.atkBonusPct,
+            defBonusPct: b.defBonusPct,
+            speedBonusPct: b.speedBonusPct,
+            regenHpPer5s: b.regenHpPer5s,
+          },
+        },
+      ];
+      toast.success(`⚡ [${b.name}] 특수 버프 활성화! (${Math.round(b.durationSec / 60)}분간 지속)`, {
+        description: b.desc,
+      });
+    }
+
     setS({
       ...p,
       [from]: left,
       hunger: Math.min(100, p.hunger + (it.food?.hunger ?? 0)),
       hp: Math.max(1, Math.min(maxHpOf(p), p.hp + hpGain)),
-      lastAteAt: Date.now(),
+      activeBuffs,
+      lastAteAt: nowAt,
     });
-    toast(`${it.name} 사용`);
-  }, []);
+    toast(`${it.name} 섭취 완료 (허기 +${it.food?.hunger ?? 0} · 체력 +${hpGain})`);
+  }, [setS]);
 
   const placeBase = useCallback(() => {
     if (!enabledRef.current) return;
@@ -2127,7 +2242,155 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return true;
   }, [setS]);
 
-  return { researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
+  const cookShamanDish = useCallback((recipeId: string): boolean => {
+    const p = ref.current;
+    const r = SHAMAN_CUISINE_RECIPES.find(x => x.id === recipeId);
+    if (!r) return false;
+    const pc = payCost(p, r.ingredients);
+    const paid = pc ? { ...p, ...pc } : null;
+    if (!paid) {
+      toast.error(`재료가 부족합니다: ${fmt(r.ingredients)}`);
+      return false;
+    }
+
+    const nowAt = Date.now();
+    // Health tonics & special dishes require cauldron cooking time
+    if (r.cookTimeSec > 0) {
+      const newJob: CookingJob = {
+        id: `cook_${nowAt}_${Math.random().toString(36).slice(2, 6)}`,
+        recipeId: r.id,
+        startedAt: nowAt,
+        readyAt: nowAt + r.cookTimeSec * 1000,
+      };
+      setS({
+        ...paid,
+        cookingJobs: [...(paid.cookingJobs ?? []), newJob],
+        lastTickAt: nowAt,
+      });
+      toast.info(`🍲 ${r.name} 조리 시작! (가마솥에서 끓이는 중... ${r.cookTimeSec}초 소요)`);
+      return true;
+    }
+
+    // Instant cooking: 기초 요리 & 일반식
+    let nextStorage = paid.storage;
+    const crafted = r.resultItemId
+      ? { ...paid.crafted, [r.resultItemId]: (paid.crafted[r.resultItemId] ?? 0) + (r.resultCount ?? 1) }
+      : paid.crafted;
+
+    if (r.resultItemId) {
+      nextStorage = addStacks(nextStorage, [{ itemId: r.resultItemId, count: r.resultCount ?? 1 }]);
+    }
+
+    let nextHunger = paid.hunger;
+    let nextHp = paid.hp;
+    if (r.category === 'regular') {
+      nextHunger = Math.min(100, paid.hunger + (r.hungerRestore ?? 0));
+      nextHp = Math.min(maxHpOf(paid), paid.hp + (r.hpRestore ?? 0));
+    }
+
+    setS({
+      ...paid,
+      storage: nextStorage,
+      crafted,
+      hunger: nextHunger,
+      hp: nextHp,
+      lastTickAt: nowAt,
+      lastFreshnessCheckAt: nowAt,
+    });
+
+    toast.success(`🍽️ ${r.name} 완성! (${r.tagline})`);
+    return true;
+  }, [setS]);
+
+  const claimShamanCooking = useCallback((jobId: string): boolean => {
+    const p = ref.current;
+    const job = (p.cookingJobs ?? []).find(j => j.id === jobId);
+    if (!job) return false;
+    const nowAt = Date.now();
+    if (nowAt < job.readyAt) {
+      const remainingSec = Math.ceil((job.readyAt - nowAt) / 1000);
+      toast.warning(`⏳ 아직 가마솥에서 푹 끓이는 중입니다! (${remainingSec}초 남음)`);
+      return false;
+    }
+
+    const r = SHAMAN_CUISINE_RECIPES.find(x => x.id === job.recipeId);
+    if (!r) return false;
+
+    let nextStorage = p.storage;
+    const crafted = r.resultItemId
+      ? { ...p.crafted, [r.resultItemId]: (p.crafted[r.resultItemId] ?? 0) + (r.resultCount ?? 1) }
+      : p.crafted;
+
+    if (r.resultItemId) {
+      nextStorage = addStacks(nextStorage, [{ itemId: r.resultItemId, count: r.resultCount ?? 1 }]);
+    }
+
+    // Apply permanent stats if tonic
+    let permStats = p.permanentStats ?? {};
+    if (r.permStats) {
+      permStats = {
+        maxHpBonus: (permStats.maxHpBonus ?? 0) + (r.permStats.maxHpBonus ?? 0),
+        atkBonus: (permStats.atkBonus ?? 0) + (r.permStats.atkBonus ?? 0),
+        defBonus: (permStats.defBonus ?? 0) + (r.permStats.defBonus ?? 0),
+        carryBonus: (permStats.carryBonus ?? 0) + (r.permStats.carryBonus ?? 0),
+      };
+    }
+
+    // Apply timed buff if present
+    let activeBuffs = (p.activeBuffs ?? []).filter(b => b.expiresAt > nowAt);
+    if (r.buff) {
+      activeBuffs = [
+        ...activeBuffs.filter(b => b.id !== r.buff!.id),
+        {
+          id: r.buff.id,
+          name: r.buff.name,
+          icon: r.buff.icon,
+          desc: r.buff.desc,
+          expiresAt: nowAt + r.buff.durationSec * 1000,
+          effects: {
+            atkBonusPct: r.buff.atkBonusPct,
+            defBonusPct: r.buff.defBonusPct,
+            speedBonusPct: r.buff.speedBonusPct,
+            regenHpPer5s: r.buff.regenHpPer5s,
+          },
+        },
+      ];
+    }
+
+    const nextHp = Math.min(
+      maxHpOf({ ...p, permanentStats: permStats }),
+      p.hp + (r.hpRestore ?? 0)
+    );
+    const nextHunger = Math.min(100, p.hunger + (r.hungerRestore ?? 0));
+
+    setS({
+      ...p,
+      storage: nextStorage,
+      crafted,
+      hp: nextHp,
+      hunger: nextHunger,
+      permanentStats: permStats,
+      activeBuffs,
+      cookingJobs: (p.cookingJobs ?? []).filter(j => j.id !== jobId),
+      lastTickAt: nowAt,
+    });
+
+    if (r.category === 'tonic') {
+      toast.success(`🎉 ${r.name} 섭취 완료! 스탯이 영구적으로 상승했습니다!`, {
+        description: r.tagline,
+      });
+    } else if (r.buff) {
+      toast.success(`⚡ ${r.name} 완성! [${r.buff.name}] 버프 활성화 (${Math.round(r.buff.durationSec / 60)}분간 지속)`, {
+        description: r.buff.desc,
+      });
+    } else {
+      toast.success(`🍲 ${r.name} 조리 완성!`);
+    }
+
+    return true;
+  }, [setS]);
+
+  return { researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
     moveOutpost, petHits, mergePets, togglePetDeploy, assignPetRole, feedPet, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,

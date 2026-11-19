@@ -40,11 +40,13 @@ import WanderingShamanModal from './WanderingShamanModal';
 import ShamanQuestModal from './ShamanQuestModal';
 import ShamanEvolutionModal from './ShamanEvolutionModal';
 import CivilizationTechModal from './CivilizationTechModal';
+import ShamanCuisineModal from './ShamanCuisineModal';
 import { getCivilizationEraBadge } from '@/lib/survival/civilizationTech';
 import { type ShamanClassId, type ShamanLevel, SHAMAN_CLASSES } from '@/lib/survival/shamanEvolution';
 import SmokehouseTavernModal from './SmokehouseTavernModal';
 import TribalHallModal from './TribalHallModal';
 import CulinaryDishIcon from './CulinaryDishIcon';
+import type { ActiveFoodBuff, CookingJob } from '@/lib/survival/culinary';
 import campfireImg from '@/assets/survival/base-campfire.png';
 import hutImg from '@/assets/survival/base-hut.png';
 import caveImg from '@/assets/survival/base-cave.png';
@@ -73,6 +75,7 @@ type FacilityModalKind =
   | 'civ_tech'
   | 'smokehouse'
   | 'tavern'
+  | 'cuisine'
   | 'tribal_hall'
   | 'intent_crafting'
   | null;
@@ -105,6 +108,16 @@ interface Props {
   ready: boolean;
   freshnessPct?: number;
   smokeBatches?: SmokehouseBatch[];
+  permanentStats?: {
+    maxHpBonus?: number;
+    atkBonus?: number;
+    defBonus?: number;
+    carryBonus?: number;
+  };
+  activeBuffs?: ActiveFoodBuff[];
+  cookingJobs?: CookingJob[];
+  onCookShamanDish?: (recipeId: string) => boolean;
+  onClaimShamanCooking?: (jobId: string) => boolean;
   onHarvestBubble?: (uid: string) => Stack | null;
   onHarvestAllBubbles?: () => Stack[];
   onStartSmokeBatch?: (itemId: ItemId, count: number) => boolean;
@@ -537,6 +550,11 @@ export default function BaseVillageView({
   onEvolvePetToSkullDragon,
   onResearchCivilizationTech,
   onReplayTutorial,
+  permanentStats = {},
+  activeBuffs = [],
+  cookingJobs = [],
+  onCookShamanDish,
+  onClaimShamanCooking,
 }: Props) {
   const vState = useMemo(() => ensureVillageState(village, hasAltar), [village, hasAltar]);
   const activeShamanLevel = (vState.shamanLevel ?? shamanLevel ?? 1) as ShamanLevel;
@@ -2055,6 +2073,8 @@ export default function BaseVillageView({
         onTrainSkill={id => (onTrainShamanSkill ? onTrainShamanSkill(id) : false)}
         onOpenWorkshop={() => setActiveModal('workshop')}
         onOpenShamanQuest={() => setActiveModal('shaman_quest')}
+        onOpenCivTech={() => setActiveModal('civ_tech')}
+        onOpenCuisine={() => setActiveModal('cuisine')}
         questState={questState}
         canClaimQuest={canClaimQuest}
         onClaimQuest={onClaimQuest}
@@ -2068,7 +2088,6 @@ export default function BaseVillageView({
           setActiveModal(null);
           onOpenObjectives?.();
         }}
-        onOpenCivTech={() => setActiveModal('civ_tech')}
         onReplayTutorial={onReplayTutorial}
       />
       <ShamanQuestModal
@@ -2115,6 +2134,17 @@ export default function BaseVillageView({
           onResearchCivilizationTech ? onResearchCivilizationTech(techId) : false
         }
         onOpenWorkshop={() => setActiveModal('workshop')}
+      />
+      <ShamanCuisineModal
+        open={activeModal === 'cuisine'}
+        onClose={() => setActiveModal(null)}
+        storage={storage}
+        backpack={backpack}
+        permanentStats={permanentStats}
+        activeBuffs={activeBuffs}
+        cookingJobs={cookingJobs}
+        onCookDish={recipeId => (onCookShamanDish ? onCookShamanDish(recipeId) : false)}
+        onClaimCooking={jobId => (onClaimShamanCooking ? onClaimShamanCooking(jobId) : false)}
       />
       <SmokehouseTavernModal
         open={activeModal === 'smokehouse' || activeModal === 'tavern' ? activeModal : null}

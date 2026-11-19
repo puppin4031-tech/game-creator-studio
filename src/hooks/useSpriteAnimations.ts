@@ -64,51 +64,71 @@ export function useSpriteAnimations(characterKey = 'hunter') {
         if (raw) cachedScale = parseFloat(raw) || 1.0;
       } catch {}
 
-      const { data, error } = await supabase
-        .from('survival_sprite_animations')
-        .select('*')
-        .eq('character_key', characterKey);
-
-      if (error) throw error;
-      if (!data?.length) return { _scale: cachedScale, scale: cachedScale };
-
-      // Check scale configuration row
-      const scaleRow = data.find(d => d.action === 'scale');
-      const scale = scaleRow?.fps ? scaleRow.fps / 100 : cachedScale;
       try {
-        localStorage.setItem(`survival_scale_${characterKey}`, String(scale));
-      } catch {}
+        const { data, error } = await supabase
+          .from('survival_sprite_animations')
+          .select('*')
+          .eq('character_key', characterKey);
 
-      const animRows = data.filter(d => d.action !== 'scale');
-      if (!animRows.length) return { _scale: scale, scale };
-
-      const { data: signed, error: signErr } = await supabase.storage
-        .from(SPRITE_BUCKET)
-        .createSignedUrls(animRows.map(d => d.image_path), 60 * 60 * 24);
-      if (signErr) throw signErr;
-
-      const out: SpriteAnimationsData = { _scale: scale, scale };
-      animRows.forEach((row, i) => {
-        const url = signed?.[i]?.signedUrl;
-        if (url) {
-          out[row.action as SpriteAction] = {
-            ...(row as Omit<SpriteAnimation, 'url'>),
-            action: row.action as SpriteAction,
-            url,
-          };
+        if (error || !data?.length) {
+          return { _scale: cachedScale, scale: cachedScale };
         }
-      });
 
-      // Warm every action sheet so switching actions never flashes empty.
-      await Promise.all(
-        Object.entries(out).map(([k, a]) => {
-          if (k !== '_scale' && k !== 'scale' && a && typeof a === 'object' && 'url' in a) {
-            return preloadSpriteSheet((a as SpriteAnimation).url, (a as SpriteAnimation).frame_count);
+        // Check scale configuration row
+        const scaleRow = data.find(d => d.action === 'scale');
+        const scale = scaleRow?.fps ? scaleRow.fps / 100 : cachedScale;
+        try {
+          localStorage.setItem(`survival_scale_${characterKey}`, String(scale));
+        } catch {}
+
+        const animRows = data.filter(d => d.action !== 'scale');
+        if (!animRows.length) return { _scale: scale, scale };
+
+        // Attempt signed URLs with fallback to public URLs (crucial for mobile guests & public buckets)
+        let signedMap = new Map<string, string>();
+        try {
+          const { data: signed } = await supabase.storage
+            .from(SPRITE_BUCKET)
+            .createSignedUrls(animRows.map(d => d.image_path), 60 * 60 * 24);
+          if (signed) {
+            signed.forEach((s, idx) => {
+              if (s?.signedUrl) signedMap.set(animRows[idx].image_path, s.signedUrl);
+            });
           }
-          return Promise.resolve();
-        })
-      );
-      return out;
+        } catch {
+          // Ignore signed URL error and fall back to public URLs
+        }
+
+        const out: SpriteAnimationsData = { _scale: scale, scale };
+        animRows.forEach(row => {
+          let url = signedMap.get(row.image_path);
+          if (!url) {
+            const { data: pub } = supabase.storage.from(SPRITE_BUCKET).getPublicUrl(row.image_path);
+            url = pub?.publicUrl;
+          }
+          if (url) {
+            out[row.action as SpriteAction] = {
+              ...(row as Omit<SpriteAnimation, 'url'>),
+              action: row.action as SpriteAction,
+              url,
+            };
+          }
+        });
+
+        // Warm every action sheet so switching actions never flashes empty
+        await Promise.all(
+          Object.entries(out).map(([k, a]) => {
+            if (k !== '_scale' && k !== 'scale' && a && typeof a === 'object' && 'url' in a) {
+              return preloadSpriteSheet((a as SpriteAnimation).url, (a as SpriteAnimation).frame_count);
+            }
+            return Promise.resolve();
+          })
+        );
+        return out;
+      } catch (err) {
+        console.warn(`[useSpriteAnimations] failed to load for ${characterKey}:`, err);
+        return { _scale: cachedScale, scale: cachedScale };
+      }
     },
   });
 }

@@ -17,23 +17,44 @@ const loaded = new Map<string, number>();
 
 export function preloadSpriteSheet(url: string, frames: number): Promise<void> {
   if (loaded.has(url)) return Promise.resolve();
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.onload = () => {
-      const done = () => { loaded.set(url, img.naturalWidth / frames / img.naturalHeight || 1); resolve(); };
+      const done = () => {
+        loaded.set(url, img.naturalWidth / frames / img.naturalHeight || 1);
+        resolve();
+      };
       // decode() guarantees the bitmap is ready before we swap, avoiding a blank paint.
-      if (img.decode) img.decode().then(done, done); else done();
+      if (img.decode) {
+        img.decode().then(done).catch(done);
+      } else {
+        done();
+      }
     };
     img.onerror = () => resolve();
     img.src = url;
   });
 }
 
-interface Shown { url: string; frames: number; ratio: number }
+interface Shown {
+  url: string;
+  frames: number;
+  ratio: number;
+}
 
 /** Plays a horizontal sprite-sheet strip. Keeps the previous sheet visible until the next one is decoded. */
-export default function SpriteAnimator({ url, frames, fps, height = 64, playing = true, once = false, fallback }: Props) {
+export default function SpriteAnimator({
+  url,
+  frames,
+  fps,
+  height = 64,
+  playing = true,
+  once = false,
+  fallback,
+}: Props) {
   const [frame, setFrame] = useState(0);
+  const [hasError, setHasError] = useState(false);
   const [shown, setShown] = useState<Shown | null>(() => {
     const ratio = loaded.get(url);
     return ratio ? { url, frames, ratio } : null;
@@ -41,9 +62,28 @@ export default function SpriteAnimator({ url, frames, fps, height = 64, playing 
 
   useEffect(() => {
     let alive = true;
-    const swap = () => { const r = loaded.get(url); if (alive && r) { setShown({ url, frames, ratio: r }); setFrame(0); } };
-    if (loaded.has(url)) swap(); else preloadSpriteSheet(url, frames).then(swap);
-    return () => { alive = false; };
+    setHasError(false);
+    const swap = () => {
+      const r = loaded.get(url);
+      if (alive && r) {
+        setShown({ url, frames, ratio: r });
+        setFrame(0);
+      } else if (alive && !r) {
+        setHasError(true);
+      }
+    };
+    if (loaded.has(url)) {
+      swap();
+    } else {
+      preloadSpriteSheet(url, frames)
+        .then(swap)
+        .catch(() => {
+          if (alive) setHasError(true);
+        });
+    }
+    return () => {
+      alive = false;
+    };
   }, [url, frames]);
 
   useEffect(() => {
@@ -51,15 +91,21 @@ export default function SpriteAnimator({ url, frames, fps, height = 64, playing 
     setFrame(0);
     const n = shown.frames;
     if (!playing || n < 2) return;
-    const id = window.setInterval(() => setFrame(f => {
-      const next = f + 1;
-      if (once && next >= n) { window.clearInterval(id); return n - 1; }
-      return next % n;
-    }), 1000 / fps);
+    const id = window.setInterval(() => {
+      setFrame(f => {
+        const next = f + 1;
+        if (once && next >= n) {
+          window.clearInterval(id);
+          return n - 1;
+        }
+        return next % n;
+      });
+    }, 1000 / fps);
     return () => window.clearInterval(id);
   }, [shown, fps, playing, once]);
 
-  if (!shown) return <>{fallback ?? null}</>;
+  if (hasError || !shown) return <>{fallback ?? null}</>;
+
   const width = height * shown.ratio;
   const f = Math.min(frame, shown.frames - 1);
   return (
@@ -67,7 +113,8 @@ export default function SpriteAnimator({ url, frames, fps, height = 64, playing 
       aria-hidden
       className="pixelated select-none"
       style={{
-        width, height,
+        width,
+        height,
         backgroundImage: `url(${shown.url})`,
         backgroundSize: `${width * shown.frames}px ${height}px`,
         backgroundPosition: `${-f * width}px 0`,

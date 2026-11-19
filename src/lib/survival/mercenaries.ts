@@ -47,32 +47,106 @@ export const tribeTrainCost = (level: number): Stack[] | null => level >= TRIBE_
 export const tribeRatio = (t: TribeState | null | undefined) => TRIBE_RATIO + (t?.trainLevel ?? 0) / 30 - (t?.starving ? TRIBE_RATIO / 2 : 0);
 export const tribeInjured = (t: TribeState | null | undefined, now: number) => !!t?.injuredUntil && now < t.injuredUntil;
 
-const FRUITS: Stack['itemId'][] = ['apple', 'pear', 'berry'];
-const MEALS: Stack['itemId'][] = ['cooked_meat', 'jerky'];
-/** Per-hour food demand: tribe eats fruit + cooked/dried meat; dinos eat fruit or raw meat; tamed pets eat raw meat. */
-export function upkeepDemand(tribe: number, dinos: number, pets: number) {
-  return { fruit: tribe + Math.ceil(dinos / 2), meal: tribe, raw: Math.floor(dinos / 2) + pets };
+// Storage foods that satisfy tribe & pet hunger
+export const EDIBLE_STORAGE_FOODS: Stack['itemId'][] = [
+  'cooked_meat',
+  'jerky',
+  'dried_fruit',
+  'bone_stew',
+  'spice_roast',
+  'sweet_fruit_skewers',
+  'dino_tail_steak',
+  'sacred_bread',
+  'purify_dew',
+  'raw_meat',
+  'apple',
+  'pear',
+  'berry',
+  'coconut',
+];
+
+/** Check if storage has any edible food available. */
+export function hasEdibleFoodInStorage(storage: Stack[]): boolean {
+  return storage.some(s => EDIBLE_STORAGE_FOODS.includes(s.itemId) && s.count > 0);
 }
 
-/** Consume hourly upkeep from storage. Missing food marks the tribe starving (no heal, half power). */
-export function settleUpkeep(storage: Stack[], demand: ReturnType<typeof upkeepDemand>, hours: number): { storage: Stack[]; starving: boolean } {
-  let left = storage.map(s => ({ ...s }));
-  let short = false;
-  const take = (ids: Stack['itemId'][], n: number) => {
-    for (const id of ids) {
-      const st = left.find(s => s.itemId === id);
-      if (!st) continue;
-      const k = Math.min(st.count, n); st.count -= k; n -= k;
-      if (n <= 0) break;
-    }
-    if (n > 0) short = true;
+/**
+ * Daily upkeep rate: 1~2 items per tribe member & pet per day (~1.5 items/24h).
+ * Missing food marks the tribe starving (no heal, half power).
+ * As long as ANY edible food (jerky, cooked meat, dried fruit, dishes, etc.) exists in storage, hunger is resolved.
+ */
+export function upkeepDemand(tribe: number, dinos: number, pets: number) {
+  const residents = tribe + dinos + pets;
+  // Per-hour rate: 1.5 units / 24h per resident
+  const hourlyRate = (residents * 1.5) / 24;
+  return {
+    residents,
+    hourlyRate,
+    dailyRate: Math.round(residents * 1.5),
   };
-  const h = Math.min(hours, 24);
-  if (demand.fruit) take(FRUITS, demand.fruit * h);
-  if (demand.meal) take(MEALS, demand.meal * h);
-  if (demand.raw) take(['raw_meat', ...FRUITS], demand.raw * h);
+}
+
+/** Consume upkeep from storage based on elapsed hours. */
+export function settleUpkeep(
+  storage: Stack[],
+  demand: ReturnType<typeof upkeepDemand> | { fruit?: number; meal?: number; raw?: number },
+  hours: number
+): { storage: Stack[]; starving: boolean; consumedCount: number } {
+  let left = storage.map(s => ({ ...s }));
+  const h = Math.min(Math.max(1, hours), 48);
+
+  // If old-style demand was passed or new demand:
+  let residents = 0;
+  if ('residents' in demand) {
+    residents = demand.residents;
+  } else {
+    residents = (demand.meal ?? 0) + (demand.raw ?? 0) + (demand.fruit ?? 0);
+  }
+
+  if (residents <= 0) {
+    return { storage: left, starving: false, consumedCount: 0 };
+  }
+
+  // 1~2 food items per resident per day (1.5 average)
+  // Calculate total food items needed for elapsed hours
+  let needed = Math.floor((residents * 1.5 * h) / 24);
+  if (needed <= 0 && h >= 16) needed = 1;
+
+  let consumed = 0;
+  // Food priority: Cooked/preserved meats -> Cooked dishes -> Dried fruits -> Fresh fruits -> Raw meats
+  const PRIORITY_ORDER: Stack['itemId'][] = [
+    'cooked_meat',
+    'jerky',
+    'bone_stew',
+    'spice_roast',
+    'dino_tail_steak',
+    'sweet_fruit_skewers',
+    'dried_fruit',
+    'sacred_bread',
+    'apple',
+    'pear',
+    'berry',
+    'coconut',
+    'raw_meat',
+  ];
+
+  for (const id of PRIORITY_ORDER) {
+    if (needed <= 0) break;
+    const st = left.find(s => s.itemId === id && s.count > 0);
+    if (!st) continue;
+    const take = Math.min(st.count, needed);
+    st.count -= take;
+    needed -= take;
+    consumed += take;
+  }
+
   left = left.filter(s => s.count > 0);
-  return { storage: left, starving: short };
+
+  // If there is ANY edible food remaining in storage, tribe & pets are NOT starving!
+  const hasRemainingEdible = left.some(s => EDIBLE_STORAGE_FOODS.includes(s.itemId) && s.count > 0);
+  const starving = needed > 0 && !hasRemainingEdible && consumed === 0;
+
+  return { storage: left, starving, consumedCount: consumed };
 }
 
 /* ---------- Walking escort (real GPS only) ---------- */

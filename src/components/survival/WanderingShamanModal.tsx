@@ -29,6 +29,7 @@ interface Props {
   onOpenWorkshop?: () => void;
   onOpenShamanQuest?: () => void;
   onOpenCivTech?: () => void;
+  onOpenCuisine?: () => void;
   questState?: QuestState;
   canClaimQuest?: boolean;
   onClaimQuest?: () => void;
@@ -55,6 +56,7 @@ export default function WanderingShamanModal({
   onOpenWorkshop,
   onOpenShamanQuest,
   onOpenCivTech,
+  onOpenCuisine,
   questState,
   canClaimQuest,
   onClaimQuest,
@@ -203,15 +205,19 @@ export default function WanderingShamanModal({
         </button>
       </div>
 
-      {/* Shaman Dialogue Card */}
-      <div className="flex items-start sm:items-center gap-3 border-b border-border bg-accent/15 px-3 py-2.5">
-        <img src={shamanImg} alt="떠돌이 주술사" className="pixelated h-12 w-auto shrink-0 drop-shadow self-center" />
-        <div className="pixel-box flex-1 min-w-0 bg-background/90 p-2.5 text-xs leading-relaxed border border-border shadow-sm">
+      {/* Shaman Dialogue Card - guaranteed full width & no horizontal squeezing */}
+      <div className="flex items-start sm:items-center gap-3 border-b border-border bg-accent/15 px-3 py-2.5 w-full">
+        <img
+          src={shamanImg}
+          alt="떠돌이 주술사"
+          className="pixelated h-12 w-auto shrink-0 drop-shadow self-center"
+        />
+        <div className="pixel-box flex-1 min-w-[200px] w-full bg-background/95 p-2.5 text-xs leading-relaxed border border-border shadow-sm">
           <p className="font-bold text-amber-500 text-[10px] mb-0.5 flex items-center gap-1">
             <span>🧙</span>
             <span>떠돌이 주술사</span>
           </p>
-          <p className="text-foreground break-keep leading-snug">
+          <p className="text-foreground break-keep leading-snug whitespace-normal">
             {level >= 5 && !languageLearned
               ? '"이제 자네도 말을 좀 배워야 될것같네. 내 특별 과제를 마치면 다른 부족민·생존자들과 대화를 나눌 수 있다네!"'
               : activeQuest
@@ -222,15 +228,25 @@ export default function WanderingShamanModal({
       </div>
 
       {/* Shaman Quick Action Shortcuts Row */}
-      <div className="grid grid-cols-3 gap-1.5 border-b-2 border-border bg-card/60 px-3 py-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 border-b-2 border-border bg-card/60 px-3 py-2">
         {onOpenShamanQuest && (
           <Button
             type="button"
             size="sm"
             onClick={onOpenShamanQuest}
-            className="pixel-btn h-auto min-h-0 bg-primary hover:bg-primary/90 text-primary-foreground py-1.5 px-1 text-[11px] sm:text-xs font-bold truncate leading-tight"
+            className="pixel-btn h-auto min-h-0 bg-primary hover:bg-primary/90 text-primary-foreground py-1.5 px-1.5 text-[11px] sm:text-xs font-bold truncate leading-tight shadow-sm"
           >
             🔥 5단계 승급
+          </Button>
+        )}
+        {onOpenCuisine && (
+          <Button
+            type="button"
+            size="sm"
+            onClick={onOpenCuisine}
+            className="pixel-btn h-auto min-h-0 bg-amber-600 hover:bg-amber-700 text-white py-1.5 px-1.5 text-[11px] sm:text-xs font-bold truncate leading-tight shadow-sm"
+          >
+            🍲 주술 수라간
           </Button>
         )}
         {onOpenCivTech && (
@@ -239,7 +255,7 @@ export default function WanderingShamanModal({
             size="sm"
             variant="outline"
             onClick={onOpenCivTech}
-            className="pixel-btn h-auto min-h-0 py-1.5 px-1 text-[11px] sm:text-xs font-bold text-amber-500 border-amber-500/50 truncate leading-tight"
+            className="pixel-btn h-auto min-h-0 py-1.5 px-1.5 text-[11px] sm:text-xs font-bold text-amber-500 border-amber-500/50 truncate leading-tight"
           >
             🏛️ 문명 테크
           </Button>
@@ -250,7 +266,7 @@ export default function WanderingShamanModal({
             size="sm"
             variant="outline"
             onClick={onOpenWorkshop}
-            className="pixel-btn h-auto min-h-0 py-1.5 px-1 text-[11px] sm:text-xs font-bold truncate leading-tight"
+            className="pixel-btn h-auto min-h-0 py-1.5 px-1.5 text-[11px] sm:text-xs font-bold truncate leading-tight"
           >
             🪓 건축 공방
           </Button>
