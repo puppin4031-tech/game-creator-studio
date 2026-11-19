@@ -68,13 +68,14 @@ export type ExpeditionFocus = 'survival' | 'materials' | 'hunt';
 export const EXPEDITION_SCAN_M = 30;
 /** Chance a crew sidesteps a beast's counter-attack. */
 export const EXPEDITION_DODGE_CHANCE = 0.2;
-const SURVIVAL_NODES = new Set(['berry_bush', 'apple_tree', 'pear_tree', 'herb_patch']);
+const SURVIVAL_NODES = new Set(['berry_bush', 'apple_tree', 'pear_tree', 'herb_patch', 'fresh_spring']);
 export const FOCUS_LABEL: Record<ExpeditionFocus, string> = { survival: '생존필수품', materials: '재료', hunt: '사냥' };
 
 /** Whether an entity matches the expedition focus (and is level-one workable). */
 export function matchesFocus(e: WorldEntity, focus: ExpeditionFocus = 'materials') {
   if (e.kind === 'creature') return focus === 'hunt' && !creatureDef(e.type).boss;
   if (nodeDef(e.type).requires.tier > 1) return false;
+  // Hunters strictly hunt beasts and never gather nodes!
   if (focus === 'hunt') return false;
   return focus === 'survival' ? SURVIVAL_NODES.has(e.type) : !SURVIVAL_NODES.has(e.type);
 }
@@ -104,30 +105,37 @@ export function marchToward(pos: LatLng, destination: LatLng, elapsedMs: number,
   const ratio = Math.min(1, EXPEDITION_SPEED_MPS * speedMult * Math.max(0, elapsedMs) / 1000 / distance);
   return { lat: pos.lat + (destination.lat - pos.lat) * ratio, lng: pos.lng + (destination.lng - pos.lng) * ratio };
 }
-export function expeditionLoot(entity: WorldEntity, outdoor: boolean, random: () => number = Math.random): Stack[] {
+export function expeditionLoot(entity: WorldEntity, outdoor: boolean, focus?: ExpeditionFocus, random: () => number = Math.random): Stack[] {
   const def = entity.kind === 'node' ? nodeDef(entity.type) : creatureDef(entity.type);
+  const isSpecialized = !!(focus && matchesFocus(entity, focus));
+  const focusMult = isSpecialized ? 1.5 : 1; // +50% focus yield bonus!
   const loot = rollLoot(def.loot.map(entry => ({ ...entry, chance: entry.chance === undefined ? undefined : Math.min(1, entry.chance * (outdoor ? OUTDOOR_RARE_MULT : 1)) })), random)
-    .map(stack => ({ ...stack, count: stack.count * (outdoor ? OUTDOOR_YIELD : 1) }));
-  if (random() < BASE_RELIC_CHANCE * (outdoor ? OUTDOOR_RARE_MULT : 1)) loot.push({ itemId: 'ancient_fang', count: 1 });
+    .map(stack => ({ ...stack, count: Math.max(1, Math.round(stack.count * (outdoor ? OUTDOOR_YIELD : 1) * focusMult)) }));
+  if (random() < BASE_RELIC_CHANCE * (outdoor ? OUTDOOR_RARE_MULT : 1) * (isSpecialized ? 1.5 : 1)) loot.push({ itemId: 'ancient_fang', count: 1 });
   return loot;
 }
 
 /** Uses shared combat and geographic entities; does not move the player or grant walking distance. */
-/** Auto patrol priority: repel ambushing beasts, then focus matches, then any workable node nearby. */
+/** Auto patrol priority: repel ambushing beasts, then focus matches ONLY (no indiscriminate fallback!). */
 export function autoPatrolTarget(crew: ObservedExpedition, nearby: WorldEntity[]): WorldEntity | undefined {
   const cls = crew.tribeClass ? getTribeClass(crew.tribeClass) : null;
   const aggroRange = cls ? Math.max(EXPEDITION_RADIUS_M, cls.aggroRadiusM) : EXPEDITION_RADIUS_M;
   const reachRange = cls ? Math.max(EXPEDITION_RADIUS_M, cls.attackRangeM) : EXPEDITION_RADIUS_M;
   const sorted = [...nearby].sort((a, b) => distanceM(crew.pos, a) - distanceM(crew.pos, b));
-  const close = sorted.filter(e => distanceM(crew.pos, e) <= EXPEDITION_RADIUS_M);
+
+  // 1. Self-defense: always defend against aggressive beasts that strike the crew
   const aggroBeast = sorted.find(e => e.kind === 'creature' && !creatureDef(e.type).boss && creatureDef(e.type).temper === 'aggressive' && distanceM(crew.pos, e) <= aggroRange);
   if (aggroBeast) return aggroBeast;
+
+  // 2. Ranged archer hunt specialty
   if (cls?.id === 'ranged' && crew.focus === 'hunt') {
     const rangedTarget = sorted.find(e => e.kind === 'creature' && !creatureDef(e.type).boss && distanceM(crew.pos, e) <= reachRange);
     if (rangedTarget) return rangedTarget;
   }
-  return close.find(e => matchesFocus(e, crew.focus))
-    ?? close.find(e => e.kind === 'node' && (matchesFocus(e, 'survival') || matchesFocus(e, 'materials')));
+
+  // 3. Strict focus matching: ONLY engage entities strictly matching the selected focus!
+  const close = sorted.filter(e => distanceM(crew.pos, e) <= EXPEDITION_RADIUS_M);
+  return close.find(e => matchesFocus(e, crew.focus));
 }
 export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEntity[], now: number, outdoor: boolean, repeat: boolean, random: () => number = Math.random, sharedDamage?: Record<string, number>) {
   let crew = { ...previous, lastAt: now };
@@ -197,32 +205,41 @@ export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEnt
         text = `원정대 위기! HP ${crew.hp}/${max} · 안전 귀환 중`;
       } else if (crew.damage >= (target.kind === 'node' ? nodeDef(target.type).hp : creatureDef(target.type).hp)) {
         completed = target;
-        rewards.push(...expeditionLoot(target, outdoor, random));
+        rewards.push(...expeditionLoot(target, outdoor, crew.focus, random));
         crew = { ...crew, target: undefined, damage: 0 };
-        text = `원정대 ${target.kind === 'node' ? '채집' : '사냥'} 완료${outdoor ? ' · 친정 보상 2배' : ''}`;
+        const isSpecialized = matchesFocus(target, crew.focus);
+        const bonusTag = isSpecialized ? ' · 특화 +50%' : '';
+        text = target.kind === 'creature'
+          ? `원정대 맹수 사냥 완료!${bonusTag}${outdoor ? ' · 친정 보상 2배' : ''}`
+          : `원정대 ${crew.focus === 'survival' ? '생필품' : '자원'} 채집 완료${bonusTag}${outdoor ? ' · 친정 보상 2배' : ''}`;
       }
     }
   } else {
     const waypoint = crew.phase === 'outbound' ? crew.waypoints?.[0] : undefined;
+    const scanRadius = crew.focus === 'hunt' ? 65 : 45;
     // Detour toward the closest focus match spotted within scan range.
     const spotted = crew.phase === 'outbound' ? nearby
-      .filter(e => matchesFocus(e, crew.focus) && distanceM(crew.pos, e) <= EXPEDITION_SCAN_M)
+      .filter(e => matchesFocus(e, crew.focus) && distanceM(crew.pos, e) <= scanRadius)
       .sort((a, b) => distanceM(crew.pos, a) - distanceM(crew.pos, b))[0] : undefined;
     const destination = spotted ?? waypoint ?? (crew.phase === 'returning' ? crew.home : crew.destination);
     const before = crew.pos;
     crew.pos = marchToward(crew.pos, destination, elapsed, speedMult);
     if (Math.abs(crew.pos.lng - before.lng) > 1e-9) crew.facing = crew.pos.lng < before.lng ? -1 : 1;
-    // Gatherer class auto-sweeps nearby wood/ore/fruit nodes within autoGatherRadiusM while marching.
+    // Gatherer class auto-sweeps nearby nodes ONLY matching the current expedition focus!
     if (cls && cls.autoGatherRadiusM > 0) {
-      const autoNode = nearby.find((e): e is Extract<WorldEntity, { kind: 'node' }> => e.kind === 'node' && nodeDef(e.type).requires.tier <= 1 && distanceM(crew.pos, e) <= cls.autoGatherRadiusM);
+      const autoNode = nearby.find((e): e is Extract<WorldEntity, { kind: 'node' }> => e.kind === 'node' && matchesFocus(e, crew.focus) && nodeDef(e.type).requires.tier <= 1 && distanceM(crew.pos, e) <= cls.autoGatherRadiusM);
       if (autoNode && !completed) {
         completed = autoNode;
-        rewards.push(...expeditionLoot(autoNode, outdoor, random));
-        text = `파밍 부족 경로 자동 수거 · ${nodeDef(autoNode.type).name}`;
+        rewards.push(...expeditionLoot(autoNode, outdoor, crew.focus, random));
+        text = `파밍 부족 경로 전문 수거 · ${nodeDef(autoNode.type).name} (특화 +50%)`;
       }
     }
     if (spotted) {
-      if (!previous.target && distanceM(before, spotted) > EXPEDITION_RADIUS_M && !text) text = `${FOCUS_LABEL[crew.focus ?? 'materials']} 단서 포착 · ${spotted.kind === 'node' ? nodeDef(spotted.type).name : creatureDef(spotted.type).name} 쪽으로 이동`;
+      if (!previous.target && distanceM(before, spotted) > EXPEDITION_RADIUS_M && !text) {
+        text = crew.focus === 'hunt'
+          ? `🏹 [사냥 목표 포착] ${creatureDef(spotted.type).name} 추적 중!`
+          : `${FOCUS_LABEL[crew.focus ?? 'materials']} 단서 포착 · ${nodeDef(spotted.type).name} 쪽으로 이동`;
+      }
     } else if (waypoint && distanceM(crew.pos, waypoint) < 1) {
       crew.waypoints = crew.waypoints?.slice(1);
     } else if (!waypoint && distanceM(crew.pos, destination) < 1) {

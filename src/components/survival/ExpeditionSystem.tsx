@@ -68,6 +68,27 @@ interface Props {
 }
 export interface TribeInfo { count: number; trainLevel: number; ratio: number; maxHp: number; injured: boolean; starving: boolean; classId?: TribeClassId }
 
+const FOCUS_META: Record<ExpeditionFocus, { label: string; icon: string; short: string; detail: string }> = {
+  hunt: {
+    label: '사냥 (맹수)',
+    icon: '🍗',
+    short: '맹수 사냥',
+    detail: '맹수 레이더 65m 전용 추적 · 고기/가죽/뼈 +50% 특화 (잡목·잡석 채집 일체 배제)',
+  },
+  survival: {
+    label: '생존필수품',
+    icon: '🍎',
+    short: '식량·약초',
+    detail: '식량/샘물/약초 45m 집중 탐색 · 식량 수확량 +50% 특화',
+  },
+  materials: {
+    label: '건축·제작 재료',
+    icon: '🪵',
+    short: '목재·광석',
+    detail: '목재/석재/점토/광석 45m 집중 탐색 · 건축 자재 +50% 특화',
+  },
+};
+
 function fmtDuration(sec: number): string {
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
@@ -131,7 +152,31 @@ export default function ExpeditionSystem(p: Props) {
     </div>
     <TribeClassBadge selected={activeClass} />
     <div role="radiogroup" aria-label="원정 목표" className="grid grid-cols-3 gap-1">
-      {(Object.keys(FOCUS_LABEL) as ExpeditionFocus[]).map(f => <Button key={f} size="sm" role="radio" aria-checked={p.focus === f} variant={p.focus === f ? 'default' : 'outline'} disabled={!!p.crew} className={compactBtn} onClick={() => p.onFocus(f)}>{FOCUS_LABEL[f]}</Button>)}
+      {(Object.keys(FOCUS_META) as ExpeditionFocus[]).map(f => {
+        const meta = FOCUS_META[f];
+        return (
+          <Button
+            key={f}
+            size="sm"
+            role="radio"
+            aria-checked={p.focus === f}
+            variant={p.focus === f ? 'default' : 'outline'}
+            disabled={!!p.crew}
+            className={`${compactBtn} flex items-center justify-center gap-1 font-bold`}
+            onClick={() => p.onFocus(f)}
+          >
+            <span>{meta.icon}</span>
+            <span>{meta.short}</span>
+          </Button>
+        );
+      })}
+    </div>
+    {/* Focus detail banner */}
+    <div className="rounded border border-primary/30 bg-primary/10 px-2 py-1 text-[11px] leading-tight">
+      <span className="font-bold text-primary">
+        {FOCUS_META[p.focus].icon} [{FOCUS_META[p.focus].label} 특화]:{' '}
+      </span>
+      <span className="text-foreground">{FOCUS_META[p.focus].detail}</span>
     </div>
     {p.outdoor && <div role="status" className="flex items-center gap-1 bg-primary/15 px-2 py-1 font-bold text-foreground"><Flame className="!h-4 !w-4 shrink-0 text-primary" />족장 친정 · 채집량 200% · 희귀 유물 3배</div>}
     {/* Daily Auto-Expedition Remaining Limit Bar */}
