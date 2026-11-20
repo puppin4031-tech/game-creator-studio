@@ -48,24 +48,30 @@ export function ExpeditionMarker({ crew, project, members = 1, tribeClass }: { c
       transition={rapidStrike ? { duration: 0.42, times: [0, 0.25, 0.5, 0.75, 1] } : { duration: 0.65, times: [0, 0.23, 0.6, 1] }}>
       <div style={{ transform: (target ? dx < 0 : crew.facing === -1) ? 'scaleX(-1)' : undefined }} className="relative flex items-end justify-center">
         {/* 리더 부족민 (대장) */}
-        {crew.mercenary && <TribeSprite action={tribeAct} tribeClass={activeClassId} height={52} />}
+        {crew.mercenary && <TribeSprite action={tribeAct} tribeClass={activeClassId} height={52} frameOffset={0} />}
         {/* 분대 동행 부족민들: 각각 고유한 클래스와 엇박자 보행 움직임 부여 */}
-        {crew.mercenary && Array.from({ length: Math.min(4, members - 1) }, (_, k) => {
+        {crew.mercenary && Array.from({ length: Math.min(4, Math.max(2, members) - 1) }, (_, k) => {
           const squadClass = SQUAD_CLASSES[(k + (activeClassId === 'tank' ? 1 : 0)) % SQUAD_CLASSES.length];
           const followerAction = tribeAct === 'attack' ? (k % 2 === 1 ? 'attack' : 'idle') : tribeAct;
           const bobY = Math.sin((tick + k * 2) * 0.7) * 2;
+          const squadClsDef = getTribeClass(squadClass);
           return (
             <div
               key={k}
               aria-hidden
               className="pointer-events-none absolute bottom-0 opacity-95"
               style={{
-                left: -18 - k * 16,
+                left: k % 2 === 0 ? -18 - Math.floor(k / 2) * 16 : 18 + Math.floor(k / 2) * 16,
                 bottom: ((k + 1) % 2) * 3,
                 transform: `translateY(${bobY}px)`,
               }}
             >
-              <TribeSprite action={followerAction} tribeClass={squadClass} height={42} />
+              <div className="relative">
+                <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[9px] drop-shadow">
+                  {squadClsDef.icon}
+                </span>
+                <TribeSprite action={followerAction} tribeClass={squadClass} height={42} frameOffset={k + 1} />
+              </div>
             </div>
           );
         })}

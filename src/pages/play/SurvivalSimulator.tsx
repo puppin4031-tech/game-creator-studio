@@ -15,6 +15,7 @@ import CreatureSprite from '@/components/survival/CreatureSprite';
 import ExpeditionSystem, { ExpeditionMarker } from '@/components/survival/ExpeditionSystem';
 import OfflineReportModal, { type OfflineRewardItem } from '@/components/OfflineReportModal';
 import TribeCodexModal from '@/components/TribeCodexModal';
+import TribalHallModal from '@/components/survival/TribalHallModal';
 import { preloadCoreSprites } from '@/hooks/useSpriteAnimations';
 import { CombatImpact, CREATURE_RING_RADIUS_M, expeditionActorPoint, freshCombatHit, useExpeditionCombatSound, useMovementSound } from '@/components/survival/ExpeditionCombat';
 import type { ExpeditionFocus } from '@/lib/survival/expedition';
@@ -804,7 +805,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       if (!document.hidden) playSample('beastAttack');
       const def = creatureDef(near.e.type);
       w.takeDamage(def.atk, true);
-      toast.error(`💥 ${def.name}이(가) 회전 돌진 박치기로 공격했습니다! (-${def.atk})`);
+      toast.error(`💥 ${def.name}이(가) 공격했습니다! (-${def.atk})`, { id: 'beast-strike', duration: 1600 });
     }, 550);
     return () => window.clearInterval(id);
   }, [realGps]);
@@ -1014,16 +1015,27 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           </button>
           <button
             type="button"
-            onClick={() => {
-              setFieldExp(true);
-            }}
-            className="pixel-btn flex items-center gap-1.5 rounded border border-border bg-card px-2.5 py-2 text-xs text-foreground hover:bg-accent active:scale-95 shadow"
+            onClick={() => setTribeInfoModalOpen(true)}
+            className="pixel-btn flex items-center gap-1.5 rounded border-2 border-primary/50 bg-card px-2.5 py-1.5 text-xs text-foreground hover:bg-accent active:scale-95 shadow-md"
           >
-            <span className="text-sm">{activeTribeClass.icon}</span>
-            <span className="font-bold text-[11px] truncate max-w-[130px]">
-              {crew ? `${activeTribeClass.name} (HP ${crew.hp})` : `${activeTribeClass.name} 대기`}
-            </span>
-            <span className="text-[10px] text-muted-foreground font-semibold">정보 &gt;</span>
+            <div className="flex -space-x-1 items-center">
+              <span className="text-sm drop-shadow">{activeTribeClass.icon}</span>
+              {crew && (
+                <>
+                  <span className="text-[11px] drop-shadow">🎒</span>
+                  <span className="text-[11px] drop-shadow">🏹</span>
+                </>
+              )}
+            </div>
+            <div className="flex flex-col items-start leading-tight">
+              <span className="font-bold text-[11px] truncate max-w-[130px]">
+                {crew ? `${activeTribeClass.name} (HP ${crew.hp})` : `${activeTribeClass.name} Lv.${s.tribe?.level ?? 1}`}
+              </span>
+              <span className="text-[9px] text-muted-foreground">
+                {crew ? `원정 분대 (${s.tribe?.count ?? 3}명)` : `대기 중 · ${s.tribe?.count ?? 1}명`}
+              </span>
+            </div>
+            <span className="text-[10px] text-primary font-bold ml-1">정보 &gt;</span>
           </button>
         </div>
       </div>}
@@ -1506,7 +1518,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           {rightOpen && (
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex flex-col items-end gap-1">
               <MenuBtn icon={Backpack} label="배낭" onClick={() => setPanel('bag')} />
-              <MenuBtn icon={Zap} label={skillBarVisible ? '스킬 목록 접기' : '스킬들 목록'} onClick={() => setSkillBarVisible(v => !v)} />
+              <MenuBtn icon={Zap} label={skillBarVisible ? '스킬들 목록 접기' : '스킬들 목록 펼치기'} onClick={() => setSkillBarVisible(v => !v)} />
               <MenuBtn icon={Shield} label="상태창" onClick={() => setStatusModalOpen(true)} />
               <MenuBtn
                 icon={BookOpen}
@@ -1538,7 +1550,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         <AnimatePresence>
           {leftOpen && (
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex flex-col items-start gap-1">
-              {realGps && <MenuBtn icon={LocateFixed} label="GPS 갱신" onClick={gps.retry} />}
+              <MenuBtn icon={LocateFixed} label="GPS 갱신" onClick={gps.retry} />
               <MenuBtn icon={Lightbulb} label="기술" dot={techDone} onClick={() => setPanel('tech')} />
               <MenuBtn icon={ListChecks} label="생존 목표" onClick={() => setPanel('quests')} />
               <MenuBtn icon={MapIcon} label="맵" onClick={() => setRadarOpen(true)} />
@@ -1592,7 +1604,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   setPanel('none');
                   if (view === 'base') setView('user');
                 }}
-                className="relative z-50 flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border bg-card/90 text-foreground hover:bg-accent active:scale-95 shadow-md"
+                className="relative z-[90] pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-md border-2 border-foreground bg-card text-foreground hover:bg-accent active:scale-95 shadow-lg"
               >
                 <X className="!h-6 !w-6" />
               </button>
@@ -1960,6 +1972,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         onToggleFavorite={favs.toggle}
         onRemoveFavorite={favs.remove}
         onTrack={favs.setTrackedId}
+        onRefreshGps={gps.retry}
         onDispatchTo={(target, label) => {
           setExpeditionTarget(target);
           if (g.dispatchObserved(target, expeditionFocus, activeTribeClassId)) {
@@ -2055,6 +2068,25 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         open={codexModalOpen}
         onClose={() => setCodexModalOpen(false)}
         codex={g.codex}
+      />
+      <TribalHallModal
+        open={tribeInfoModalOpen}
+        onClose={() => setTribeInfoModalOpen(false)}
+        tribe={s.tribe}
+        storage={s.storage}
+        backpack={s.backpack}
+        playerLevel={s.level}
+        languageLearned={!!s.languageLearned}
+        onHireTribe={g.hireMerc}
+        onSelectTribeClass={g.selectTribeClass}
+        onTrainTribe={g.trainTribe}
+        onTreatTribe={g.treatTribe}
+        onToggleEscort={g.toggleEscort}
+        onOpenExpedition={() => {
+          setTribeInfoModalOpen(false);
+          setPanel('base');
+          setBaseTab('expedition');
+        }}
       />
     </div>
   </ContextThemeWrapper>

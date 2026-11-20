@@ -243,7 +243,7 @@ export const CREATURES = {
     biomes: { forest: 4, plains: 3, wetland: 4, rocky: 2 }, nightWeight: 0.8,
   },
   wolf: {
-    name: '회색 늑대', sprite: 'mob-wolf', hp: 24, atk: 5, temper: 'neutral', nightAggressive: true,
+    name: '회색 늑대', sprite: 'mob-wolf', hp: 24, atk: 5, temper: 'aggressive', nightAggressive: true,
     loot: [{ itemId: 'hide', min: 1, max: 2 }, { itemId: 'fur', min: 1, max: 1, chance: 0.45 }, { itemId: 'bone', min: 1, max: 2 }, { itemId: 'raw_meat', min: 1, max: 1 }], xp: 26,
     biomes: { forest: 3, rocky: 3, plains: 1 }, nightWeight: 2.5,
   },

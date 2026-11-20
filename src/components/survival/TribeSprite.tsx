@@ -18,6 +18,7 @@ export default function TribeSprite({
   height = 48,
   tribeClass,
   showBadge = true,
+  frameOffset = 0,
 }: {
   action?: SpriteAction;
   height?: number;
@@ -25,12 +26,13 @@ export default function TribeSprite({
   reaction?: 'hurt' | 'dodge' | null;
   tribeClass?: TribeClassId;
   showBadge?: boolean;
+  frameOffset?: number;
 }) {
   const classKey = tribeClass ? `tribe:${tribeClass}` : 'tribe';
   const { data: classSheets } = useSpriteAnimations(classKey);
   const { data: baseSheets } = useSpriteAnimations('tribe');
   const cls = tribeClass ? getTribeClass(tribeClass) : null;
-  const [frame, setFrame] = useState(0);
+  const [frame, setFrame] = useState(frameOffset);
 
   // Normalize action: preserve 'idle' so gathering/idling doesn't forcibly jump to walk
   const normalizedAction: 'idle' | 'walk' | 'attack' | 'gather' | 'chop' =
@@ -53,18 +55,20 @@ export default function TribeSprite({
     return () => window.clearInterval(timer);
   }, [normalizedAction, cls?.id, cls?.frameIntervalMs]);
 
+  const activeFrame = (frame + frameOffset) % 4;
+
   const src =
     normalizedAction === 'attack'
       ? cls?.id === 'assassin'
-        ? RAPID_ATTACK_FRAMES[frame % 4]
-        : RAPID_ATTACK_FRAMES[frame % 2 === 0 ? 1 : 0]
+        ? RAPID_ATTACK_FRAMES[activeFrame]
+        : RAPID_ATTACK_FRAMES[activeFrame % 2 === 0 ? 1 : 0]
       : normalizedAction === 'chop'
-        ? CHOP_FRAMES[frame % 4]
+        ? CHOP_FRAMES[activeFrame]
         : normalizedAction === 'gather'
-          ? GATHER_FRAMES[frame % 4]
+          ? GATHER_FRAMES[activeFrame]
           : normalizedAction === 'idle'
             ? idle
-            : WALK_FRAMES[frame % 4];
+            : WALK_FRAMES[activeFrame];
 
   const rapidOffset =
     normalizedAction === 'attack' && cls?.id === 'assassin'

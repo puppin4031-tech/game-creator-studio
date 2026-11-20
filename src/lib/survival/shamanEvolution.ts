@@ -444,7 +444,7 @@ export const SHAMAN_QUEST_STAGES: ShamanQuestStage[] = [
     title: '불씨의 기억',
     subtitle: '거점 Lv.1 → Lv.2 승급 조건',
     questName: '차가운 밤을 몰아내는 첫 번째 춤',
-    storyQuote: '내 뼈마디가 시린 걸 보니 곧 짐승들의 밤이 올 겐가. 모닥불만으론 부족하네. 나뭇가지와 부싯돌로 움막을 세우고, 암바초와 함께 첫 사냥을 다녀오게나.',
+    storyQuote: '곧 차가운 밤이 오네. 나뭇가지와 부싯돌로 움막을 세우고, 첫 사냥을 다녀오게나.',
     requiredMaterials: [
       { itemId: 'branch', count: 10, label: '나뭇가지 10개' },
       { itemId: 'flint', count: 5, label: '부싯돌 5개' },
@@ -465,7 +465,7 @@ export const SHAMAN_QUEST_STAGES: ShamanQuestStage[] = [
     title: '영혼을 담는 그릇',
     subtitle: '거점 Lv.2 → Lv.3 승급 조건',
     questName: '정령의 목소리가 닿는 돌',
-    storyQuote: '자네의 손재주가 예사롭지 않군. 땅속 깊은 곳에 잠든 흑요석과 공룡 뼈를 가져오게. 내 천막 옆에 고대 제단을 세우면 물질 속에 숨은 진짜 이치를 깨우칠 수 있을 걸세.',
+    storyQuote: '땅속 흑요석과 공룡 뼈로 천막 옆에 고대 제단을 세우면 새로운 이치를 깨우칠 걸세.',
     requiredMaterials: [
       { itemId: 'obsidian', count: 3, label: '흑요석 3개' },
       { itemId: 'bone', count: 5, label: '공룡 뼈 5개' },
@@ -486,7 +486,7 @@ export const SHAMAN_QUEST_STAGES: ShamanQuestStage[] = [
     title: '짐승의 발톱을 막아라',
     subtitle: '거점 Lv.3 → Lv.4 승급 조건',
     questName: '피 냄새를 맡은 어둠의 무리',
-    storyQuote: '마을에 고기 냄새가 진동하니 굶주린 랩터 떼가 몰려들고 있네! 건축공방에서 울타리와 망루를 세워 마을을 둘러싸게. 공룡 펫도 최소 2마리는 수호대로 세워야 안전할 걸세.',
+    storyQuote: '울타리와 망루를 세워 마을을 요새화하고, 공룡 펫 2마리를 수호대로 세우게!',
     requiredMaterials: [],
     minWalls: 8,
     minTowers: 1,
@@ -504,7 +504,7 @@ export const SHAMAN_QUEST_STAGES: ShamanQuestStage[] = [
     title: '잊혀진 시대의 유물',
     subtitle: '거점 Lv.4 → Lv.5 승급 조건',
     questName: '지평선 너머의 고대 거수',
-    storyQuote: '이제 자네 부족도 제법 꼴을 갖추었군. 진정한 시련은 마을 밖에 있네. 공룡 탐험대를 500m 이상 전진시키고, Lv.2 이상 합체 성장한 펫의 힘을 증명해 보이게!',
+    storyQuote: '공룡 탐험대를 500m 이상 전진시키고, Lv.2 이상 합체한 펫의 힘을 증명해 보이게!',
     requiredMaterials: [],
     minExpeditionDistanceM: 500,
     minMergedPetLevel: 2,
@@ -522,7 +522,7 @@ export const SHAMAN_STAGE_5_DESTINY = {
   title: '운명의 갈림길',
   subtitle: '4대 주술사 전직 의식',
   questName: '새로운 시대를 여는 길',
-  storyQuote: '허허, 이제 내가 가르칠 수 있는 원시의 지혜는 모두 전수했네. 이제 내 안의 잠든 영혼을 깨워 새로운 시대의 길을 열 차례야. 자네는 이 부족을 어떤 세계로 이끌고 싶은가?',
+  storyQuote: '원시의 지혜를 모두 전수했네. 이제 자네가 부족을 이끌 새로운 시대를 선택하게!',
   rewardsSummary: '4대 전직(공돌이·마법·흑마·정직) 선택 및 주술사 고유 외형/스킬/시설 활성화',
 };
 

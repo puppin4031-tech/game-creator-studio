@@ -99,6 +99,7 @@ interface Props {
   onRemoveFavorite: (id: string) => void;
   onTrack: (id: string | null) => void;
   onDispatchTo: (target: LatLng, label: string) => void;
+  onRefreshGps?: () => void;
 }
 
 maplibregl.setWorkerUrl(workerUrl);
@@ -147,6 +148,7 @@ export default function RadarMapModal({
   onRemoveFavorite,
   onTrack,
   onDispatchTo,
+  onRefreshGps,
 }: Props) {
   // Top 3 category toggles
   const [filters, setFilters] = useState<Record<RadarFilterKind, boolean>>({
@@ -651,6 +653,10 @@ export default function RadarMapModal({
               aria-label="유저 GPS 새로고침"
               onClick={() => {
                 setPanM({ x: 0, y: 0 });
+                if (mapRef.current) {
+                  mapRef.current.flyTo({ center: [pos.lng, pos.lat], zoom: 15, essential: true });
+                }
+                onRefreshGps?.();
                 toast.success('유저 GPS 위치로 지도를 재정렬했습니다.');
               }}
               className="pixel-btn flex h-8 items-center gap-1 px-2.5 rounded border-2 border-emerald-500 bg-[#142d1e] text-emerald-300 text-xs font-bold shadow hover:bg-[#1b3d29] active:scale-95"

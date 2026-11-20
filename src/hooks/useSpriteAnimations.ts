@@ -55,6 +55,7 @@ export type SpriteAnimationsData = Partial<Record<SpriteAction, SpriteAnimation>
 
 // Memory Cache to provide instant zero-delay render
 const MEMORY_CACHE = new Map<string, SpriteAnimationsData>();
+const CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000; // 12 hours max cache age for stored URLs
 
 function getLocalCachedAnimations(characterKey: string): SpriteAnimationsData | undefined {
   if (MEMORY_CACHE.has(characterKey)) return MEMORY_CACHE.get(characterKey);
@@ -63,8 +64,14 @@ function getLocalCachedAnimations(characterKey: string): SpriteAnimationsData | 
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
-        MEMORY_CACHE.set(characterKey, parsed);
-        return parsed;
+        // If envelope with cachedAt timestamp, check freshness
+        if (parsed._cachedAt && Date.now() - parsed._cachedAt > CACHE_MAX_AGE_MS) {
+          localStorage.removeItem(`survival_anim_cache_${characterKey}`);
+          return undefined;
+        }
+        const cleanData = parsed.data ?? parsed;
+        MEMORY_CACHE.set(characterKey, cleanData);
+        return cleanData;
       }
     }
   } catch {}
@@ -74,7 +81,11 @@ function getLocalCachedAnimations(characterKey: string): SpriteAnimationsData | 
 function setLocalCachedAnimations(characterKey: string, data: SpriteAnimationsData) {
   MEMORY_CACHE.set(characterKey, data);
   try {
-    localStorage.setItem(`survival_anim_cache_${characterKey}`, JSON.stringify(data));
+    const envelope = {
+      _cachedAt: Date.now(),
+      data,
+    };
+    localStorage.setItem(`survival_anim_cache_${characterKey}`, JSON.stringify(envelope));
   } catch {}
 }
 
@@ -131,12 +142,13 @@ export function useSpriteAnimations(characterKey = 'hunter') {
           // Ignore signed URL error and fall back to public URLs
         }
 
+        // Prefer permanent public URLs first (never expire, fully cacheable)
         const out: SpriteAnimationsData = { _scale: scale, scale };
         animRows.forEach(row => {
-          let url = signedMap.get(row.image_path);
+          const { data: pub } = supabase.storage.from(SPRITE_BUCKET).getPublicUrl(row.image_path);
+          let url = pub?.publicUrl;
           if (!url) {
-            const { data: pub } = supabase.storage.from(SPRITE_BUCKET).getPublicUrl(row.image_path);
-            url = pub?.publicUrl;
+            url = signedMap.get(row.image_path);
           }
           if (url) {
             out[row.action as SpriteAction] = {

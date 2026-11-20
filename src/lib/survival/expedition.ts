@@ -133,9 +133,9 @@ export function autoPatrolTarget(crew: ObservedExpedition, nearby: WorldEntity[]
       def.temper === 'aggressive' ||
       e.type === 'raptor' ||
       e.type === 'wolf' ||
-      (e.type === 'boar' && d <= 12) ||
-      (e.type === 'mammoth' && d <= 10);
-    return isHostile && d <= aggroRange;
+      (e.type === 'boar' && d <= 18) ||
+      (e.type === 'mammoth' && d <= 15);
+    return isHostile && d <= Math.max(aggroRange, 28);
   });
   if (aggroBeast) return aggroBeast;
 
