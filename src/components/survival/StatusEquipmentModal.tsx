@@ -185,6 +185,13 @@ export default function StatusEquipmentModal({
   };
 
   const handleStoreItem = (uid: string) => {
+    if (!canStoreInBase) {
+      toast.warning('거점 안에서만 창고에 보관할 수 있습니다.');
+      return;
+    }
+    if (targetSlot) {
+      onEquip(targetSlot, null);
+    }
     if (onStoreGear) {
       onStoreGear(uid);
       toast.success('거점 창고에 장비를 보관했습니다.');

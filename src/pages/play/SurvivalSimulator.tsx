@@ -745,7 +745,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     );
   const eggSpawns = useMemo(() => realGps && !g.inBase ? eggSpawnsNear(s.pos, s.depleted, Date.now()).filter(e => distanceM(s.pos, e) <= EGG_SPAWN_RADIUS_M) : [],
     [realGps, g.inBase, s.pos, s.depleted]); // eslint-disable-line react-hooks/exhaustive-deps
-  const readyEgg = (s.dinoEggs ?? []).find(e => eggReady(e, s.walkSteps ?? 0));
+  const hatchDiscount = g.codexProgress?.hatchDiscountPct ?? 0;
+  const readyEgg = (s.dinoEggs ?? []).find(e => eggReady(e, s.walkSteps ?? 0, hatchDiscount));
   useEffect(() => {
     if (!readyEgg || !g.inBase || hatched || (realGps && !gps.ready)) return;
     const baby = g.hatchEgg(readyEgg.id);
@@ -1058,7 +1059,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       {<TerrainMap center={viewFocus(view, baseSite, { pos: s.pos, base: s.base, outpost: s.outpost, crew: crew?.pos })} visionM={g.vision} explored={s.explored} onTap={onTap} zone={zone} onSurfaceZone={onSurfaceZone} onSurfacePark={onSurfacePark} onLandmarks={setLandmarks} bearing={compassOn && heading !== null ? heading : 0}>
         {(project, mpp) => (
           <>
-            {crew && <ExpeditionMarker crew={crew} project={project} members={s.tribe?.count ?? 1} tribeClass={activeTribeClassId} />}
+            {crew && <ExpeditionMarker crew={crew} project={project} members={Math.max(3, s.tribe?.count ?? 3)} tribeClass={activeTribeClassId} />}
             {crew && view === 'expedition' && <ExpeditionJoystick crew={crew} candidates={g.crewNearby} project={project} onManual={g.setCrewManual} onSteer={g.steerCrew} onCommand={g.commandCrew} onAct={g.crewAct} onHeal={g.healCrew} />}
             {view === 'user' && (
               <TutorialGroundBranches
@@ -1427,7 +1428,12 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
       {winterOn && <WinterThemeOverlay />}
       {!!s.dinoEggs?.length && <div className="pointer-events-none absolute bottom-[calc(7rem+env(safe-area-inset-bottom))] left-2 z-20 flex origin-bottom-left scale-[0.8] items-center gap-1 rounded bg-card/90 px-2 py-1 text-xs" aria-label="공룡 알 부화 진행">
-        <img src={eggArt(s.dinoEggs[0].id)} alt="" className="pixelated h-6 w-6 object-contain" />알 {s.dinoEggs.length}개 · {(() => { const e = [...s.dinoEggs].sort((a, b) => (eggNeedM(a) - eggWalkedM(a, s.walkSteps ?? 0)) - (eggNeedM(b) - eggWalkedM(b, s.walkSteps ?? 0)))[0]; return `${Math.min(eggNeedM(e), eggWalkedM(e, s.walkSteps ?? 0))}/${eggNeedM(e)}m`; })()}
+        <img src={eggArt(s.dinoEggs[0].id)} alt="" className="pixelated h-6 w-6 object-contain" />알 {s.dinoEggs.length}개 · {(() => {
+          const discount = g.codexProgress?.hatchDiscountPct ?? 0;
+          const e = [...s.dinoEggs].sort((a, b) => (eggNeedM(a, discount) - eggWalkedM(a, s.walkSteps ?? 0)) - (eggNeedM(b, discount) - eggWalkedM(b, s.walkSteps ?? 0)))[0];
+          const need = eggNeedM(e, discount);
+          return `${Math.min(need, eggWalkedM(e, s.walkSteps ?? 0))}/${need}m`;
+        })()}
         {readyEgg && !g.inBase && <b className="text-primary"> · 거점으로!</b>}</div>}
       <DinoEggHatchModal baby={hatched} onClose={() => setHatched(null)} />
       {/* Top HUD */}
@@ -1776,7 +1782,13 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   </>}
                   {baseTab === 'pets' && <PetPanel pets={s.pets ?? []} defense={s.petDefense} now={nowTick} ready={atWorkshop(s) && (!realGps || gps.ready || !gps.fix)} onFuse={g.mergePets} onDeploy={g.togglePetDeploy} onRole={g.assignPetRole} onFeed={g.feedPet} onLock={g.togglePetLock}
                     onOpenDinoExpedition={() => setDinoExpeditionOpen(true)}
-                    eggs={(s.dinoEggs ?? []).map(e => ({ id: e.id, name: '공룡 알', walked: eggWalkedM(e, s.walkSteps ?? 0), need: eggNeedM(e), ready: eggReady(e, s.walkSteps ?? 0) }))}
+                    eggs={(s.dinoEggs ?? []).map(e => ({
+                      id: e.id,
+                      name: '공룡 알',
+                      walked: eggWalkedM(e, s.walkSteps ?? 0),
+                      need: eggNeedM(e, g.codexProgress?.hatchDiscountPct ?? 0),
+                      ready: eggReady(e, s.walkSteps ?? 0, g.codexProgress?.hatchDiscountPct ?? 0),
+                    }))}
                     onHatch={(id) => { const baby = g.hatchEgg(id); if (baby) setHatched({ ...baby, eggId: id }); else toast.warning('거점 안에서 알이 배낭이나 창고에 있어야 부화해요'); }} />}
                   {baseTab === 'expedition' && <>
                   {realGps && expeditionControls}

@@ -423,9 +423,10 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const crew = p.observedExpedition;
       const crewPct = (regenPct > 0 ? regenPct : 0.02) * shelterMult;
       const crewHp = crew ? regenHp(crew.hp, crew.maxHp ?? 100, crewPct) : 0;
+      const codexHpBonus = computeCodexProgress(p.codex).petHpBonusPct ?? 0;
       const pets = shelterMult > 1 && p.pets?.length
         ? p.pets.map(pt => {
-            const max = petStats(pt.level).maxHp;
+            const max = Math.round(petStats(pt.level).maxHp * (1 + codexHpBonus / 100));
             return pt.hp < max ? { ...pt, hp: Math.min(max, pt.hp + 2) } : pt;
           })
         : p.pets;
@@ -1583,7 +1584,12 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const hatchEgg = useCallback((eggId: string) => {
     const p = ref.current;
     const egg = (p.dinoEggs ?? []).find(e => e.id === eggId);
-    if (!egg || !enabledRef.current || !atWorkshop(p) || !eggReady(egg, p.walkSteps ?? 0)) return null;
+    if (!egg) return null;
+    const codexProg = computeCodexProgress(p.codex);
+    const discount = codexProg.hatchDiscountPct ?? 0;
+    const needM = Math.round(eggNeedM(egg) * (1 - discount / 100));
+    const walked = eggWalkedM(egg, p.walkSteps ?? 0);
+    if (!enabledRef.current || !atWorkshop(p) || walked < needM) return null;
     const fromPack = removeStacks(p.backpack, [{ itemId: 'dino_egg', count: 1 }]);
     const fromStore = fromPack ? null : removeStacks(p.storage, [{ itemId: 'dino_egg', count: 1 }]);
     if (!fromPack && !fromStore) return null;
@@ -1659,13 +1665,18 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS]);
 
   const updatePetHp = useCallback((uid: string, hp: number) => {
-    setS(p => ({
-      ...p,
-      pets: (p.pets ?? []).map(pt =>
-        pt.uid === uid ? { ...pt, hp: Math.max(0, Math.min(petStats(pt.level).maxHp, hp)) } : pt
-      ),
-      lastTickAt: Date.now(),
-    }));
+    setS(p => {
+      const codexHpBonus = computeCodexProgress(p.codex).petHpBonusPct ?? 0;
+      return {
+        ...p,
+        pets: (p.pets ?? []).map(pt => {
+          if (pt.uid !== uid) return pt;
+          const maxHp = Math.round(petStats(pt.level).maxHp * (1 + codexHpBonus / 100));
+          return { ...pt, hp: Math.max(0, Math.min(maxHp, hp)) };
+        }),
+        lastTickAt: Date.now(),
+      };
+    });
   }, [setS]);
 
   const consumeDinoMeat = useCallback((): boolean => {
@@ -2575,9 +2586,12 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       lastTickAt: Date.now(),
     });
 
+    // Auto record newly discovered resources brought back by Ambacho into the Codex
+    items.forEach(st => recordCodexResource(st.itemId));
+
     toast.success(`🎒 암바초가 모은 보물 ${items.length}종을 거점 창고에 모두 보관했습니다!`);
     return true;
-  }, [setS]);
+  }, [setS, recordCodexResource]);
 
   const recordCodexResource = useCallback((itemId: ItemId) => {
     const p = ref.current;
