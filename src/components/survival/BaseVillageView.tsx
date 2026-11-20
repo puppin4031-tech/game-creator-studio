@@ -41,6 +41,7 @@ import ShamanQuestModal from './ShamanQuestModal';
 import ShamanEvolutionModal from './ShamanEvolutionModal';
 import CivilizationTechModal from './CivilizationTechModal';
 import ShamanCuisineModal from './ShamanCuisineModal';
+import { ShamanAuraWrapper, VillageAtmosphereOverlay } from './ShamanAuraWrapper';
 import { getCivilizationEraBadge } from '@/lib/survival/civilizationTech';
 import { type ShamanClassId, type ShamanLevel, SHAMAN_CLASSES } from '@/lib/survival/shamanEvolution';
 import SmokehouseTavernModal from './SmokehouseTavernModal';
@@ -1645,6 +1646,9 @@ export default function BaseVillageView({
             🌲 외곽 침입 경계림 ({villageGridSize + 4}×{villageGridSize + 4} 외곽 2칸 스폰 구역)
           </span>
 
+          {/* Shaman Evolution Village Atmosphere & Particles Overlay */}
+          <VillageAtmosphereOverlay shamanClass={vState.shamanClass ?? shamanClass} />
+
           {/* Inner Buildable Village Grid */}
           <div
             role="grid"
@@ -1829,26 +1833,28 @@ export default function BaseVillageView({
                   }}
                 >
                   {ag.kind === 'shaman' ? (
-                    <div className="flex flex-col items-center">
-                      <img
-                        src={shamanImg}
-                        alt="떠돌이 주술사"
-                        className={`pixelated h-8 w-auto object-contain ${
-                          vState.shamanClass === 'warlock'
-                            ? 'drop-shadow-[0_0_8px_rgba(168,85,247,0.9)]'
-                            : vState.shamanClass === 'mage'
-                              ? 'drop-shadow-[0_0_8px_rgba(59,130,246,0.9)]'
-                              : vState.shamanClass === 'engineer'
-                                ? 'drop-shadow-[0_0_8px_rgba(245,158,11,0.9)]'
-                                : vState.shamanClass === 'orthodox'
-                                  ? 'drop-shadow-[0_0_8px_rgba(234,179,8,0.9)]'
-                                  : 'drop-shadow'
-                        }`}
-                      />
-                      <span className="mt-0.5 whitespace-nowrap text-[8px] font-bold text-black drop-shadow-[0_1px_1px_rgba(255,255,255,0.95)] leading-none select-none">
-                        {vState.shamanClass ? SHAMAN_CLASSES[vState.shamanClass].name : '떠돌이 주술사'}
-                      </span>
-                    </div>
+                    <ShamanAuraWrapper shamanClass={vState.shamanClass ?? shamanClass}>
+                      <div className="flex flex-col items-center">
+                        <img
+                          src={shamanImg}
+                          alt="떠돌이 주술사"
+                          className={`pixelated h-8 w-auto object-contain ${
+                            vState.shamanClass === 'warlock' || vState.shamanClass === 'NECROMANCER'
+                              ? 'drop-shadow-[0_0_8px_rgba(168,85,247,0.9)]'
+                              : vState.shamanClass === 'mage' || vState.shamanClass === 'MAGE'
+                                ? 'drop-shadow-[0_0_8px_rgba(59,130,246,0.9)]'
+                                : vState.shamanClass === 'engineer' || vState.shamanClass === 'ENGINEER'
+                                  ? 'drop-shadow-[0_0_8px_rgba(245,158,11,0.9)]'
+                                  : vState.shamanClass === 'orthodox' || vState.shamanClass === 'HONEST'
+                                    ? 'drop-shadow-[0_0_8px_rgba(234,179,8,0.9)]'
+                                    : 'drop-shadow'
+                          }`}
+                        />
+                        <span className="mt-0.5 whitespace-nowrap text-[8px] font-bold text-black drop-shadow-[0_1px_1px_rgba(255,255,255,0.95)] leading-none select-none">
+                          {vState.shamanClass ? SHAMAN_CLASSES[vState.shamanClass]?.name : '떠돌이 주술사'}
+                        </span>
+                      </div>
+                    </ShamanAuraWrapper>
                   ) : ag.kind === 'hall' ? (
                     <div className="flex flex-col items-center">
                       <img
@@ -1861,19 +1867,23 @@ export default function BaseVillageView({
                       </span>
                     </div>
                   ) : ag.kind === 'tribe' || ag.kind === 'extra' ? (
-                    <TribeSprite
-                      action={ag.moving ? 'walk' : 'idle'}
-                      tribeClass={ag.tribeClass}
-                      height={ag.kind === 'extra' ? 25 : 30}
-                      showBadge={false}
-                    />
+                    <ShamanAuraWrapper shamanClass={vState.shamanClass ?? shamanClass}>
+                      <TribeSprite
+                        action={ag.moving ? 'walk' : 'idle'}
+                        tribeClass={ag.tribeClass}
+                        height={ag.kind === 'extra' ? 25 : 30}
+                        showBadge={false}
+                      />
+                    </ShamanAuraWrapper>
                   ) : (
                     <div className={ag.moving ? 'animate-bounce' : ''}>
-                      <PetSprite
-                        speciesId={ag.speciesId ?? 'baby_raptor'}
-                        name={ag.label}
-                        height={24}
-                      />
+                      <ShamanAuraWrapper shamanClass={vState.shamanClass ?? shamanClass}>
+                        <PetSprite
+                          speciesId={ag.speciesId ?? 'baby_raptor'}
+                          name={ag.label}
+                          height={24}
+                        />
+                      </ShamanAuraWrapper>
                     </div>
                   )}
                 </div>
