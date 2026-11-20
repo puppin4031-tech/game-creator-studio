@@ -13,6 +13,7 @@ import { EGG_SPAWN_RADIUS_M, eggNeedM, eggReady, eggSpawnsNear, eggWalkedM } fro
 import { useCustomCatalog } from '@/hooks/useCustomCatalog';
 import CreatureSprite from '@/components/survival/CreatureSprite';
 import ExpeditionSystem, { ExpeditionMarker } from '@/components/survival/ExpeditionSystem';
+import OfflineReportModal, { type OfflineRewardItem } from '@/components/OfflineReportModal';
 import { preloadCoreSprites } from '@/hooks/useSpriteAnimations';
 import { CombatImpact, CREATURE_RING_RADIUS_M, expeditionActorPoint, freshCombatHit, useExpeditionCombatSound, useMovementSound } from '@/components/survival/ExpeditionCombat';
 import type { ExpeditionFocus } from '@/lib/survival/expedition';
@@ -37,7 +38,7 @@ import { MAX_SKILL_LEVEL, skillLevel, skillUpgradeCost } from '@/lib/survival/sk
 import { type SpriteAction } from '@/hooks/useSpriteAnimations';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Backpack, Flame, Lightbulb, LocateFixed, X, Lock, ListChecks, Compass, ChevronUp, Star, MapPin, Navigation, Radar, Map as MapIcon } from 'lucide-react';
+import { Backpack, Flame, Lightbulb, LocateFixed, X, Lock, ListChecks, Compass, ChevronUp, Star, MapPin, Navigation, Radar, Map as MapIcon, FileText } from 'lucide-react';
 import { bearingDeg, useSurvivalFavorites } from '@/hooks/useSurvivalFavorites';
 import { useDeviceHeading } from '@/hooks/useDeviceHeading';
 import { useSurvivalGps } from '@/hooks/useSurvivalGps';
@@ -239,6 +240,47 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [skillBarVisible, setSkillBarVisible] = useState(true);
   const [tribeInfoModalOpen, setTribeInfoModalOpen] = useState(false);
+  const [offlineReportModalOpen, setOfflineReportModalOpen] = useState(false);
+  const [offlineElapsedMinutes, setOfflineElapsedMinutes] = useState(0);
+
+  // Track last active timestamp & auto-trigger Ambacho Offline Report if away >= 30m
+  useEffect(() => {
+    const LAST_ACTIVE_KEY = 'colonion_last_active_at';
+    const raw = localStorage.getItem(LAST_ACTIVE_KEY);
+    const now = Date.now();
+    if (raw) {
+      const lastTime = parseInt(raw, 10);
+      if (!isNaN(lastTime) && lastTime > 0) {
+        const diffMin = Math.floor((now - lastTime) / (60 * 1000));
+        if (diffMin >= 30) {
+          setOfflineElapsedMinutes(diffMin);
+          setOfflineReportModalOpen(true);
+        }
+      }
+    }
+    localStorage.setItem(LAST_ACTIVE_KEY, now.toString());
+
+    const timer = window.setInterval(() => {
+      localStorage.setItem(LAST_ACTIVE_KEY, Date.now().toString());
+    }, 15_000);
+
+    const onUnload = () => {
+      localStorage.setItem(LAST_ACTIVE_KEY, Date.now().toString());
+    };
+    window.addEventListener('beforeunload', onUnload);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('beforeunload', onUnload);
+    };
+  }, []);
+
+  const handleClaimOfflineReport = (items: OfflineRewardItem[], classResourceAmount?: number) => {
+    g.claimOfflineRewards(
+      items.map(it => ({ itemId: it.itemId, count: it.count })),
+      classResourceAmount
+    );
+    localStorage.setItem('colonion_last_active_at', Date.now().toString());
+  };
   const expeditionControls = <ExpeditionSystem crew={crew} logs={s.expeditionLogs ?? []} target={expeditionTarget} home={s.base} auto={!!s.expeditionAuto} pocket={g.pocketMode} outdoor={g.outdoorMoving && (g.pocketMode || (!!crew && distanceM(s.pos, crew.pos) <= 40))} watching={view === 'expedition'} gpsReady={gps.ready} canSend={canDispatch}
     focus={crew?.focus ?? expeditionFocus} onFocus={setExpeditionFocus}
     tribeClass={activeTribeClassId}
@@ -1464,6 +1506,14 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               <MenuBtn icon={Backpack} label="배낭" onClick={() => setPanel('bag')} />
               <MenuBtn icon={Zap} label={skillBarVisible ? '스킬 목록 접기' : '스킬들 목록'} onClick={() => setSkillBarVisible(v => !v)} />
               <MenuBtn icon={Shield} label="상태창" onClick={() => setStatusModalOpen(true)} />
+              <MenuBtn
+                icon={FileText}
+                label="밤사이 보고서 (테스트 2시간)"
+                onClick={() => {
+                  setOfflineElapsedMinutes(120);
+                  setOfflineReportModalOpen(true);
+                }}
+              />
             </motion.div>
           )}
         </AnimatePresence>
@@ -1980,6 +2030,15 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         onRemoveEvent={id => setCombatVfxEvents(prev => prev.filter(e => e.id !== id))}
         onRemoveDamage={id => setDamageNumbers(prev => prev.filter(d => d.id !== id))}
         onRemoveProjectile={id => setProjectiles(prev => prev.filter(p => p.id !== id))}
+      />
+      <OfflineReportModal
+        open={offlineReportModalOpen}
+        onClose={() => setOfflineReportModalOpen(false)}
+        elapsedMinutes={offlineElapsedMinutes}
+        playerLevel={s.level}
+        village={s.village}
+        shamanClass={s.shamanClass ?? s.village?.shamanClass}
+        onClaim={handleClaimOfflineReport}
       />
     </div>
   </ContextThemeWrapper>
