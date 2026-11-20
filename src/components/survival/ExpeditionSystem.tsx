@@ -11,11 +11,13 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { CombatImpact, expeditionActorPoint, freshCombatHit } from './ExpeditionCombat';
 
+const SQUAD_CLASSES: TribeClassId[] = ['tank', 'ranged', 'gatherer', 'support', 'assassin'];
+
 export function ExpeditionMarker({ crew, project, members = 1, tribeClass }: { crew: ObservedExpedition; project: (p: LatLng) => { x: number; y: number }; members?: number; tribeClass?: TribeClassId }) {
   const pos = expeditionActorPoint(crew, project);
   const hit = freshCombatHit(crew);
   const reduced = useReducedMotion();
-  const activeClassId = crew.tribeClass ?? tribeClass;
+  const activeClassId = crew.tribeClass ?? tribeClass ?? 'tank';
   const cls = activeClassId ? getTribeClass(activeClassId) : null;
   const target = crew.target?.kind === 'creature' ? project(crew.target) : hit ? project(hit.target) : null;
   const dx = target ? target.x - pos.x : 0, dy = target ? target.y - pos.y : 0;
@@ -34,16 +36,38 @@ export function ExpeditionMarker({ crew, project, members = 1, tribeClass }: { c
   const tribeAct = since < 220 ? 'attack' : crew.target && (!crew.manual || distanceM(crew.pos, crew.target) <= engageRadius) ? (crew.target.kind === 'node' ? 'gather' : 'attack') : 'walk';
   const rapidStrike = cls?.id === 'assassin';
   return <>
-  <div data-expedition-marker className={`pointer-events-none absolute z-10 flex w-24 -translate-x-1/2 -translate-y-full flex-col items-center ${target ? '' : 'transition-[left,top] duration-1000 ease-linear motion-reduce:transition-none'}`} style={{ left: pos.x, top: pos.y }}>
-    <span className="absolute -top-5 whitespace-nowrap rounded bg-card px-1 text-[10px]">{crew.mercenary ? `${cls ? `${cls.icon} ${cls.name}` : `부족민 ${crew.mercenary}`}` : '원정'} · HP {crew.hp}</span>
+  <div data-expedition-marker className={`pointer-events-none absolute z-10 flex w-28 -translate-x-1/2 -translate-y-full flex-col items-center ${target ? '' : 'transition-[left,top] duration-1000 ease-linear motion-reduce:transition-none'}`} style={{ left: pos.x, top: pos.y }}>
+    <span className="absolute -top-5 whitespace-nowrap rounded bg-card/90 border border-border px-1.5 py-0.5 text-[10px] font-bold shadow-sm">
+      {crew.mercenary ? `${cls ? `${cls.icon} ${cls.name}` : `부족민 ${crew.mercenary}`}` : '원정'} · HP {crew.hp}
+    </span>
     <motion.div key={hit?.at ?? 'march'} data-expedition-strike={hit?.at} className="relative" initial={false}
       animate={striking && !reduced ? (rapidStrike
         ? { x: [0, dx / length * 26, -dx / length * 6, dx / length * 28, 0], y: [0, dy / length * 26, -dy / length * 6, dy / length * 28, 0] }
         : { x: [0, dx / length * 28, -dx / length * 7, 0], y: [0, dy / length * 28, -dy / length * 7, 0] }) : { x: 0, y: 0 }}
       transition={rapidStrike ? { duration: 0.42, times: [0, 0.25, 0.5, 0.75, 1] } : { duration: 0.65, times: [0, 0.23, 0.6, 1] }}>
-      <div style={{ transform: (target ? dx < 0 : crew.facing === -1) ? 'scaleX(-1)' : undefined }}>
+      <div style={{ transform: (target ? dx < 0 : crew.facing === -1) ? 'scaleX(-1)' : undefined }} className="relative flex items-end justify-center">
+        {/* 리더 부족민 (대장) */}
         {crew.mercenary && <TribeSprite action={tribeAct} tribeClass={activeClassId} height={52} />}
-        {crew.mercenary && Array.from({ length: Math.min(4, members - 1) }, (_, k) => <div key={k} aria-hidden className="pointer-events-none absolute bottom-0 opacity-90" style={{ left: -20 - k * 18, bottom: (k % 2) * 5 }}><TribeSprite action={tribeAct} tribeClass={activeClassId} height={44} /></div>)}
+        {/* 분대 동행 부족민들: 각각 고유한 클래스와 엇박자 보행 움직임 부여 */}
+        {crew.mercenary && Array.from({ length: Math.min(4, members - 1) }, (_, k) => {
+          const squadClass = SQUAD_CLASSES[(k + (activeClassId === 'tank' ? 1 : 0)) % SQUAD_CLASSES.length];
+          const followerAction = tribeAct === 'attack' ? (k % 2 === 1 ? 'attack' : 'idle') : tribeAct;
+          const bobY = Math.sin((tick + k * 2) * 0.7) * 2;
+          return (
+            <div
+              key={k}
+              aria-hidden
+              className="pointer-events-none absolute bottom-0 opacity-95"
+              style={{
+                left: -18 - k * 16,
+                bottom: ((k + 1) % 2) * 3,
+                transform: `translateY(${bobY}px)`,
+              }}
+            >
+              <TribeSprite action={followerAction} tribeClass={squadClass} height={42} />
+            </div>
+          );
+        })}
         {crew.mercenary ? null : <CharacterSprite height={PLAYER_SPRITE_HEIGHT} action={hit ? 'attack' : crew.target ? crew.target.kind === 'node' ? 'chop' : 'attack' : 'walk'} />}
       </div>
       {hit && hit.counterDamage > 0 && <CombatImpact stamp={hit.at} damage={hit.counterDamage} />}

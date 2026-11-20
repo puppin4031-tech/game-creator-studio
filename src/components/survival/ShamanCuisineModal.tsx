@@ -107,10 +107,10 @@ export default function ShamanCuisineModal({
           <div>
             <b className="text-sm flex items-center gap-1.5">
               <span>🧙</span>
-              <span>주술 수라간 · 4대 요리 & 보약 가마솥</span>
+              <span>주술사의 요리비법 전수실 & 수라간</span>
             </b>
             <p className="text-[10px] text-muted-foreground">
-              기초 요리로 굶주림을 막고, 특별식 버프와 건강식(보약)으로 영구 스탯을 단련하세요
+              주술사에게 기초·일반·특별·보약 비법(자격)을 전수받고, 상점·사냥으로 획득한 조리법을 조리하세요
             </p>
           </div>
         </div>
@@ -123,11 +123,42 @@ export default function ShamanCuisineModal({
         </button>
       </div>
 
+      {/* Shaman's Qualification & Rule Banner */}
+      <div className="border-b border-border bg-accent/20 px-3 py-2 space-y-1.5">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-bold flex items-center gap-1.5 text-primary">
+            <span>📜</span>
+            <span>주술사 요리비법 전수 자격:</span>
+          </span>
+          <span className="text-[10px] text-muted-foreground">
+            * 주술사를 통해 자격을 습득해야 조리 가능 / 조리법은 상점·사냥에서 획득
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10px]">
+          <div className="flex items-center gap-1 rounded bg-background/80 p-1.5 border border-emerald-500/50 text-emerald-400">
+            <Check className="h-3 w-3 shrink-0" />
+            <span className="font-bold">1단계: 기초요리 비법</span>
+          </div>
+          <div className="flex items-center gap-1 rounded bg-background/80 p-1.5 border border-emerald-500/50 text-emerald-400">
+            <Check className="h-3 w-3 shrink-0" />
+            <span className="font-bold">2단계: 일반식 비법</span>
+          </div>
+          <div className="flex items-center gap-1 rounded bg-background/80 p-1.5 border border-primary/50 text-primary">
+            <Check className="h-3 w-3 shrink-0" />
+            <span className="font-bold">3단계: 특별식 연성</span>
+          </div>
+          <div className="flex items-center gap-1 rounded bg-background/80 p-1.5 border border-amber-500/50 text-amber-400">
+            <Check className="h-3 w-3 shrink-0" />
+            <span className="font-bold">4단계: 건강식·보약</span>
+          </div>
+        </div>
+      </div>
+
       {/* Shaman's Tip & Dialogue */}
-      <div className="flex items-center gap-3 border-b border-border bg-accent/15 px-3 py-2">
-        <span className="text-2xl shrink-0">🍲</span>
+      <div className="flex items-center gap-3 border-b border-border bg-accent/10 px-3 py-1.5">
+        <span className="text-xl shrink-0">🍲</span>
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] leading-snug break-keep text-foreground">
+          <p className="text-[11px] leading-snug break-keep text-foreground/90">
             {tab === 'tonic' &&
               '"건강식 보약은 온갖 희귀한 재료를 가마솥에 푹 고아내야 하네. 시간과 공이 들지만 한 모금만 넘겨도 자네의 육신이 영구히 강해질 걸세!"'}
             {tab === 'special' &&

@@ -123,8 +123,20 @@ export function autoPatrolTarget(crew: ObservedExpedition, nearby: WorldEntity[]
   const reachRange = cls ? Math.max(EXPEDITION_RADIUS_M, cls.attackRangeM) : EXPEDITION_RADIUS_M;
   const sorted = [...nearby].sort((a, b) => distanceM(crew.pos, a) - distanceM(crew.pos, b));
 
-  // 1. Self-defense: always defend against aggressive beasts that strike the crew
-  const aggroBeast = sorted.find(e => e.kind === 'creature' && !creatureDef(e.type).boss && creatureDef(e.type).temper === 'aggressive' && distanceM(crew.pos, e) <= aggroRange);
+  // 1. Self-defense & Ambush: raptors, hungry wolves, aggressive boars & predators strike the crew!
+  const aggroBeast = sorted.find(e => {
+    if (e.kind !== 'creature' || creatureDef(e.type).boss) return false;
+    const def = creatureDef(e.type);
+    const d = distanceM(crew.pos, e);
+    // Raptors ambush from distance; wolves attack in packs; boars charge when approached
+    const isHostile =
+      def.temper === 'aggressive' ||
+      e.type === 'raptor' ||
+      e.type === 'wolf' ||
+      (e.type === 'boar' && d <= 12) ||
+      (e.type === 'mammoth' && d <= 10);
+    return isHostile && d <= aggroRange;
+  });
   if (aggroBeast) return aggroBeast;
 
   // 2. Ranged archer hunt specialty

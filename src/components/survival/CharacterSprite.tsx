@@ -1,7 +1,7 @@
 import { useSpriteAnimations, type SpriteAction } from '@/hooks/useSpriteAnimations';
 import SpriteAnimator from './SpriteAnimator';
-import TribeSprite from './TribeSprite';
 import { heroSpriteKey } from '@/lib/survival/heroTier';
+import charHunterImg from '@/assets/survival/char-hunter.png';
 
 export default function CharacterSprite({
   height = 64,
@@ -29,13 +29,13 @@ export default function CharacterSprite({
   const currentScale = tierRemote?.scale ?? baseRemote?.scale ?? 1.0;
   const scaledHeight = Math.round(height * currentScale);
 
-  // Fallback to high-quality bundled TribeSprite when remote sheet is not yet loaded or missing
+  // Fallback to high-quality authentic Hunter sprite (NOT tribe mercenary)
   const fallback = (
-    <TribeSprite
-      action={action}
-      height={scaledHeight}
-      className={className}
-      showBadge={false}
+    <img
+      src={charHunterImg}
+      alt="Hunter"
+      className={`pixelated object-contain shrink-0 ${className}`}
+      style={{ height: scaledHeight }}
     />
   );
 

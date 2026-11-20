@@ -108,6 +108,7 @@ import PetPanel from '@/components/survival/PetPanel';
 import BaseVillageView from '@/components/survival/BaseVillageView';
 import RadarMapModal from '@/components/survival/RadarMapModal';
 import DinoExpeditionModal from '@/components/survival/DinoExpeditionModal';
+import StatusEquipmentModal from '@/components/survival/StatusEquipmentModal';
 import { atWorkshop } from '@/lib/survival/abilities';
 
 const START: LatLng = { lat: 37.748, lng: 126.7496 };
@@ -232,6 +233,9 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const canDispatch = !!s.base && (!realGps || !gps.ready || g.inBase || hasTribe);
   const [fieldExp, setFieldExp] = useState(false);
   const [radarOpen, setRadarOpen] = useState(false);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [skillBarVisible, setSkillBarVisible] = useState(true);
+  const [tribeInfoModalOpen, setTribeInfoModalOpen] = useState(false);
   const expeditionControls = <ExpeditionSystem crew={crew} logs={s.expeditionLogs ?? []} target={expeditionTarget} home={s.base} auto={!!s.expeditionAuto} pocket={g.pocketMode} outdoor={g.outdoorMoving && (g.pocketMode || (!!crew && distanceM(s.pos, crew.pos) <= 40))} watching={view === 'expedition'} gpsReady={gps.ready} canSend={canDispatch}
     focus={crew?.focus ?? expeditionFocus} onFocus={setExpeditionFocus}
     tribeClass={activeTribeClassId}
@@ -952,10 +956,29 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       <div className={`relative h-[100dvh] w-full overflow-hidden font-pixel ${shaking ? 'animate-combat-shake' : ''}`}>
       {view === 'expedition' && s.base && <div className="pointer-events-none fixed inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-30 flex flex-col items-center gap-1">
         {fieldExp && <div className="pixel-panel pointer-events-auto max-h-[44dvh] w-full max-w-md overflow-y-auto bg-card p-1.5">{expeditionControls}</div>}
-        <button type="button" onClick={() => setFieldExp(v => !v)} className="pixel-btn pointer-events-auto flex w-full max-w-md items-center justify-between gap-2 bg-primary py-1.5 px-2.5 text-xs text-primary-foreground">
-          <span className="flex items-center gap-1.5 truncate"><Compass className="!h-4 !w-4 shrink-0" /><b>{fieldExp ? '원정 접기' : crew ? '원정 지휘' : '원정 보내기'}</b></span>
-          <span className="truncate text-[11px] opacity-90">{crew ? `${activeTribeClass.icon} ${activeTribeClass.name} · HP ${crew.hp}/${crew.maxHp ?? 100}` : `${activeTribeClass.icon} ${activeTribeClass.name} 대기 중`}</span>
-        </button>
+        <div className="pointer-events-auto flex w-full max-w-md items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setFieldExp(v => !v)}
+            className="pixel-btn flex-1 flex items-center justify-center gap-1.5 bg-primary py-2 px-2.5 text-xs text-primary-foreground font-bold shadow"
+          >
+            <Compass className="!h-4 !w-4 shrink-0" />
+            <span>{fieldExp ? '원정 접기' : crew ? '원정 지휘' : '원정 보내기'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setFieldExp(true);
+            }}
+            className="pixel-btn flex items-center gap-1.5 rounded border border-border bg-card px-2.5 py-2 text-xs text-foreground hover:bg-accent active:scale-95 shadow"
+          >
+            <span className="text-sm">{activeTribeClass.icon}</span>
+            <span className="font-bold text-[11px] truncate max-w-[130px]">
+              {crew ? `${activeTribeClass.name} (HP ${crew.hp})` : `${activeTribeClass.name} 대기`}
+            </span>
+            <span className="text-[10px] text-muted-foreground font-semibold">정보 &gt;</span>
+          </button>
+        </div>
       </div>}
       <StoryTutorialModal
         open={showStoryTutorial}
@@ -1430,14 +1453,14 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       {/* Right drawer: survival actions */}
       <div className="absolute right-2 top-[calc(9.25rem+env(safe-area-inset-top))] z-20 flex flex-col items-end gap-1">
         <Button type="button" variant="outline" aria-expanded={rightOpen} aria-label={rightOpen ? '생존 메뉴 접기' : '생존 메뉴 펼치기'} onClick={() => setRightOpen((v) => !v)} className={`pixel-btn relative h-auto min-h-0 py-1.5 px-2.5 text-xs ${rightOpen ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
-          {rightOpen ? <ChevronUp className="!h-4 !w-4" /> : <Backpack className="!h-4 !w-4" />}{!rightOpen && baseDone && <RedDot />}
+          {rightOpen ? <ChevronUp className="!h-4 !w-4" /> : <Backpack className="!h-4 !w-4" />}
         </Button>
         <AnimatePresence>
           {rightOpen && (
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex flex-col items-end gap-1">
               <MenuBtn icon={Backpack} label="배낭" onClick={() => setPanel('bag')} />
-              <MenuBtn icon={Flame} label="거점" dot={baseDone} onClick={() => { setBaseTab('village'); setPanel('base'); }} />
-              {realGps && <MenuBtn icon={LocateFixed} label="GPS 갱신" onClick={gps.retry} />}
+              <MenuBtn icon={Zap} label={skillBarVisible ? '스킬 목록 접기' : '스킬들 목록'} onClick={() => setSkillBarVisible(v => !v)} />
+              <MenuBtn icon={Shield} label="상태창" onClick={() => setStatusModalOpen(true)} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -1451,6 +1474,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         <AnimatePresence>
           {leftOpen && (
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex flex-col items-start gap-1">
+              {realGps && <MenuBtn icon={LocateFixed} label="GPS 갱신" onClick={gps.retry} />}
               <MenuBtn icon={Lightbulb} label="기술" dot={techDone} onClick={() => setPanel('tech')} />
               <MenuBtn icon={ListChecks} label="생존 목표" onClick={() => setPanel('quests')} />
               <MenuBtn icon={MapIcon} label="맵" onClick={() => setRadarOpen(true)} />
@@ -1466,7 +1490,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         </div>
       )}
 
-      {view === 'user' && <SkillQuickBar known={s.techs} cooldowns={s.cooldowns} levels={s.skillLevels} ready={actionReady} onUse={(id) => activateSkill(id)} />}
+      {view === 'user' && skillBarVisible && <SkillQuickBar known={s.techs} cooldowns={s.cooldowns} levels={s.skillLevels} ready={actionReady} onUse={(id) => activateSkill(id)} />}
       {!realGps && s.base && <button type="button" onClick={() => setPanel('quests')} className="pixel-frame absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-2 z-20 flex max-w-[60%] items-center gap-1.5 bg-card py-1.5 px-2.5 text-left text-xs">
         <ListChecks className="!h-4 !w-4 shrink-0 text-primary" />
         <span className="min-w-0 truncate">
@@ -1504,7 +1528,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   setPanel('none');
                   if (view === 'base') setView('user');
                 }}
-                className="flex h-10 w-10 items-center justify-center"
+                className="relative z-50 flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border bg-card/90 text-foreground hover:bg-accent active:scale-95 shadow-md"
               >
                 <X className="!h-6 !w-6" />
               </button>
@@ -1834,6 +1858,22 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           onClose={() => setSelShrine(null)} />}
       </AnimatePresence>
       <DamageVignette hitKey={hit.n} />
+      <StatusEquipmentModal
+        open={statusModalOpen}
+        onClose={() => setStatusModalOpen(false)}
+        level={s.level}
+        gear={s.gear}
+        storedGear={s.storedGear}
+        loadout={g.loadout}
+        activeBuffs={s.activeBuffs}
+        pets={s.pets}
+        permanentStats={s.permanentStats}
+        onEquip={g.equip}
+        onDropGear={g.dropGear}
+        onStoreGear={g.storeGear}
+        onRetrieveGear={g.retrieveGear}
+        canStoreInBase={g.inBase}
+      />
       <RadarMapModal
         open={radarOpen}
         onClose={() => setRadarOpen(false)}

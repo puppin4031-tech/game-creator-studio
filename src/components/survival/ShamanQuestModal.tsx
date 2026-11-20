@@ -216,13 +216,13 @@ export default function ShamanQuestModal({
       <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         {isDestinyStage ? (
           <div className="space-y-4">
-            {/* Shaman Story Dialogue Box */}
-            <div className="rounded-lg border-2 border-purple-500/50 bg-card p-3.5 space-y-2.5">
+            {/* Shaman Story Dialogue Box (Clean & Non-duplicated) */}
+            <div className="rounded-lg border-2 border-purple-500/50 bg-card p-3.5 space-y-2">
               <div className="flex items-start gap-3">
                 <img
                   src={shamanImg}
                   alt="떠돌이 주술사"
-                  className="pixelated h-14 w-auto rounded border-2 border-purple-500 bg-background p-1"
+                  className="pixelated h-14 w-auto rounded border-2 border-purple-500 bg-background p-1 shrink-0"
                 />
                 <div className="space-y-1 min-w-0 flex-1">
                   <div className="flex items-center justify-between">
@@ -240,15 +240,6 @@ export default function ShamanQuestModal({
                     "{SHAMAN_STAGE_5_DESTINY.storyQuote}"
                   </p>
                 </div>
-              </div>
-
-              {/* Story Snippet */}
-              <div className="space-y-1 border-t border-border/80 pt-2 text-[11px] text-muted-foreground">
-                {SHAMAN_STAGE_5_DESTINY.storyDialogue.map((line, i) => (
-                  <p key={i} className="leading-snug">
-                    {line}
-                  </p>
-                ))}
               </div>
             </div>
 
@@ -329,20 +320,20 @@ export default function ShamanQuestModal({
           </div>
         ) : activeStage ? (
           <>
-            {/* Shaman Story Dialogue Box */}
-            <div className="rounded-lg border-2 border-primary/40 bg-card p-3.5 space-y-2.5">
+            {/* Shaman Story Dialogue Box (Clean & Non-duplicated) */}
+            <div className="rounded-lg border-2 border-primary/40 bg-card p-3.5 space-y-2">
               <div className="flex items-start gap-3">
                 <img
                   src={shamanImg}
                   alt="떠돌이 주술사"
-                  className="pixelated h-14 w-auto rounded border-2 border-foreground bg-background p-1"
+                  className="pixelated h-14 w-auto rounded border-2 border-foreground bg-background p-1 shrink-0"
                 />
                 <div className="space-y-1 min-w-0 flex-1">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-sm text-amber-400 flex items-center gap-1.5">
                       <span>🧙 떠돌이 주술사</span>
                       <span className="text-xs text-muted-foreground font-normal">
-                        [제{activeStage.toLevel - 1}막: {activeStage.title}] — 퀘스트명: {activeStage.questName}
+                        [제{activeStage.toLevel - 1}막: {activeStage.title}] — {activeStage.questName}
                       </span>
                     </span>
                     <span className="text-[10px] px-2 py-0.5 rounded bg-primary/20 text-primary border border-primary/40 font-mono font-bold">
@@ -353,15 +344,6 @@ export default function ShamanQuestModal({
                     "{activeStage.storyQuote}"
                   </p>
                 </div>
-              </div>
-
-              {/* Interactive Story Snippet */}
-              <div className="space-y-1 border-t border-border/80 pt-2 text-[11px] text-muted-foreground">
-                {activeStage.storyDialogue.map((line, i) => (
-                  <p key={i} className="leading-snug">
-                    {line}
-                  </p>
-                ))}
               </div>
             </div>
 

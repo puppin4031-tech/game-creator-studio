@@ -209,7 +209,8 @@ export default function RadarMapModal({
   const lastMousePosRef = useRef({ x: 0, y: 0 });
   const hasMouseDraggedRef = useRef(false);
 
-  const center = base ?? pos;
+  // User GPS position is the primary anchor center
+  const center = pos;
   const levelInfo = useMemo(
     () => computeExpeditionLevel(expeditionCount, totalDistanceM),
     [expeditionCount, totalDistanceM]
@@ -622,34 +623,50 @@ export default function RadarMapModal({
     >
       {/* ──────────────── TOP CONTROL BAR ──────────────── */}
       <div className="absolute inset-x-0 top-0 z-40 flex flex-col gap-2 p-2.5 bg-gradient-to-b from-[#080f0a]/95 via-[#080f0a]/85 to-transparent pb-6 pointer-events-none">
-        {/* Top Header: Title & Close Button */}
-        <div className="flex items-center justify-between pointer-events-auto">
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded border-2 border-emerald-500 bg-[#14231a] text-base shadow-md">
+        {/* Top Header: Title & GPS Refresh & Close Button */}
+        <div className="flex items-center justify-between pointer-events-auto gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded border-2 border-emerald-500 bg-[#14231a] text-base shadow-md">
               🗺️
             </span>
-            <div>
-              <b className="text-sm font-black text-emerald-300 drop-shadow">
-                광역 탐색 맵 & 지휘소
-              </b>
-              <span className="ml-2 text-[10px] text-emerald-200/80">
-                중심: {base ? '거점 모닥불' : '현재 위치'} (반경 {Math.round(currentScanRadius)}m)
-              </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <b className="text-sm font-black text-emerald-300 drop-shadow truncate">
+                  광역 탐색 맵
+                </b>
+                <span className="text-[10px] text-emerald-200/90 font-mono">
+                  (GPS 중심 · 반경 {Math.round(currentScanRadius)}m)
+                </span>
+              </div>
               {hasCompass && (
-                <span className="ml-1.5 rounded bg-amber-400/20 border border-amber-400/40 px-1 py-0.2 text-[9px] font-bold text-amber-300">
+                <span className="rounded bg-amber-400/20 border border-amber-400/40 px-1 py-0.2 text-[9px] font-bold text-amber-300">
                   🧭 자력 나침반 (3km 확장)
                 </span>
               )}
             </div>
           </div>
-          <button
-            type="button"
-            aria-label="지도 닫기"
-            onClick={onClose}
-            className="pixel-btn flex h-8 w-8 items-center justify-center rounded border-2 border-emerald-600 bg-[#162a1d] text-emerald-200 shadow-lg hover:bg-[#1f3827] active:scale-95"
-          >
-            <X className="!h-4 !w-4" />
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              aria-label="유저 GPS 새로고침"
+              onClick={() => {
+                setPanM({ x: 0, y: 0 });
+                toast.success('유저 GPS 위치로 지도를 재정렬했습니다.');
+              }}
+              className="pixel-btn flex h-8 items-center gap-1 px-2.5 rounded border-2 border-emerald-500 bg-[#142d1e] text-emerald-300 text-xs font-bold shadow hover:bg-[#1b3d29] active:scale-95"
+            >
+              <RefreshCw className="h-3.5 w-3.5 text-emerald-400" />
+              <span>새로고침</span>
+            </button>
+            <button
+              type="button"
+              aria-label="지도 닫기"
+              onClick={onClose}
+              className="pixel-btn flex h-8 w-8 items-center justify-center rounded border-2 border-emerald-600 bg-[#162a1d] text-emerald-200 shadow-lg hover:bg-[#1f3827] active:scale-95"
+            >
+              <X className="!h-4 !w-4" />
+            </button>
+          </div>
         </div>
 
         {/* Top Badges & Dropdown: 희귀광물 () | 공룡알 () | 우두머리 () | 찾는물품 v */}

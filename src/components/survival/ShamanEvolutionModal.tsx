@@ -25,9 +25,11 @@ import type { Stack } from '@/lib/survival/types';
 import type { OwnedPet } from '@/lib/survival/pets';
 import shamanImg from '@/assets/survival/npc-shaman.png';
 import {
+  BASE_SHAMAN_CLASSES,
   SHAMAN_CLASSES,
+  normalizeShamanClassId,
   type ShamanClassId,
-  type ShamanClassMeta,
+  type ShamanClassConfig,
 } from '@/lib/survival/shamanEvolution';
 import { toast } from 'sonner';
 
@@ -52,13 +54,16 @@ export default function ShamanEvolutionModal({
   onSelectShamanClass,
   onEvolvePetToSkullDragon,
 }: Props) {
-  const [selectedClassId, setSelectedClassId] = useState<ShamanClassId>(currentClass ?? 'engineer');
+  const canonicalCurrent = normalizeShamanClassId(currentClass);
+  const [selectedCanonical, setSelectedCanonical] = useState<'ENGINEER' | 'MAGE' | 'NECROMANCER' | 'HONEST'>(
+    canonicalCurrent ?? 'ENGINEER'
+  );
   const [confirmingClassId, setConfirmingClassId] = useState<ShamanClassId | null>(null);
 
   if (!open) return null;
 
-  const currentMeta = currentClass ? SHAMAN_CLASSES[currentClass] : null;
-  const viewingMeta = SHAMAN_CLASSES[selectedClassId];
+  const currentMeta = canonicalCurrent ? BASE_SHAMAN_CLASSES[canonicalCurrent] : null;
+  const viewingMeta = BASE_SHAMAN_CLASSES[selectedCanonical];
 
   // Eligible pets for Warlock's Skull Dragon dark ritual (level >= 4)
   const eligibleDragonPets = pets.filter(p => p.level >= 4 && p.speciesId !== 'skull_dragon');
@@ -68,7 +73,7 @@ export default function ShamanEvolutionModal({
     (backpack.find(s => s.itemId === 'bone')?.count ?? 0);
 
   const handleChooseClass = (classId: ShamanClassId) => {
-    if (currentClass === classId) return;
+    if (canonicalCurrent === normalizeShamanClassId(classId)) return;
     setConfirmingClassId(classId);
   };
 
@@ -95,10 +100,10 @@ export default function ShamanEvolutionModal({
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-sm font-bold text-foreground">
-                4대 주술사 전직 의식 (Shaman Evolution)
+                4대 주술사 전직 의식 & 고유 문명 시스템
               </h1>
-              {currentClass ? (
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${currentMeta?.borderClass} ${currentMeta?.textClass} bg-background`}>
+              {canonicalCurrent ? (
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${currentMeta?.borderColor} ${currentMeta?.themeColor} bg-background`}>
                   현재 전직: {currentMeta?.name}
                 </span>
               ) : (
@@ -108,7 +113,7 @@ export default function ShamanEvolutionModal({
               )}
             </div>
             <p className="text-[10px] text-muted-foreground">
-              각 전직의 고유 권능과 장단점을 비교하여 부족의 미래를 이끌 전직을 선택하세요
+              전직 시 고유 자원 메커니즘·전용 NPC·3단계 정밀 제조 트리 및 마을 환경이 변화합니다
             </p>
           </div>
         </div>
@@ -122,20 +127,20 @@ export default function ShamanEvolutionModal({
         </button>
       </div>
 
-      {/* 4 Class Cards Grid */}
+      {/* 4 Class Cards Selector */}
       <div className="grid grid-cols-2 md:grid-cols-4 border-b-2 border-border bg-card/60 p-2 gap-2">
-        {(Object.values(SHAMAN_CLASSES) as ShamanClassMeta[]).map(cls => {
-          const isSelected = selectedClassId === cls.id;
-          const isCurrentActive = currentClass === cls.id;
+        {(Object.values(BASE_SHAMAN_CLASSES) as ShamanClassConfig[]).map(cls => {
+          const isSelected = selectedCanonical === cls.canonicalId;
+          const isCurrentActive = canonicalCurrent === cls.canonicalId;
 
           return (
             <button
-              key={cls.id}
+              key={cls.canonicalId}
               type="button"
-              onClick={() => setSelectedClassId(cls.id)}
-              className={`flex flex-col items-center justify-center p-3 rounded-lg border text-center transition-all ${
+              onClick={() => setSelectedCanonical(cls.canonicalId)}
+              className={`flex flex-col items-center justify-center p-2.5 rounded-lg border text-center transition-all ${
                 isSelected
-                  ? `ring-2 ring-primary ${cls.borderClass} bg-card shadow-md`
+                  ? `ring-2 ring-primary ${cls.borderColor} bg-card shadow-md`
                   : 'border-border/60 bg-muted/20 hover:bg-muted/40 text-muted-foreground'
               }`}
             >
@@ -146,7 +151,7 @@ export default function ShamanEvolutionModal({
                   <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
                 )}
               </div>
-              <span className="text-[10px] opacity-80 mt-0.5">{cls.badge}</span>
+              <span className="text-[10px] opacity-80 mt-0.5 font-medium">{cls.title}</span>
               {isCurrentActive && (
                 <span className="mt-1 px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 text-[9px] font-bold">
                   활성 중
@@ -161,9 +166,9 @@ export default function ShamanEvolutionModal({
       <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         {/* Selected Class Highlight Card */}
         <div
-          className={`rounded-lg border-2 ${viewingMeta.borderClass} bg-gradient-to-br ${viewingMeta.bgGradient} p-4 space-y-3 shadow-lg`}
+          className={`rounded-lg border-2 ${viewingMeta.borderColor} bg-gradient-to-br ${viewingMeta.bgGradient} p-4 space-y-3 shadow-lg`}
         >
-          <div className="flex items-start justify-between gap-3 border-b border-border/80 pb-3">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/80 pb-3">
             <div className="flex items-center gap-3">
               <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-background/80 border-2 border-current text-2xl shadow">
                 {viewingMeta.icon}
@@ -173,11 +178,8 @@ export default function ShamanEvolutionModal({
                   <h2 className="text-base font-bold text-foreground">
                     {viewingMeta.name}
                   </h2>
-                  <span className="text-[10px] text-muted-foreground font-mono">
-                    {viewingMeta.appearance}
-                  </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-background/70 border border-current font-bold">
-                    {viewingMeta.badge}
+                  <span className={`text-[10px] px-2 py-0.5 rounded bg-background/80 border ${viewingMeta.borderColor} font-bold ${viewingMeta.themeColor}`}>
+                    {viewingMeta.title}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground italic mt-0.5">
@@ -186,7 +188,7 @@ export default function ShamanEvolutionModal({
               </div>
             </div>
 
-            {currentClass === viewingMeta.id ? (
+            {canonicalCurrent === viewingMeta.canonicalId ? (
               <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-xs font-bold flex items-center gap-1 shrink-0">
                 <Check className="h-4 w-4" />
                 <span>현재 선택된 전직</span>
@@ -194,10 +196,10 @@ export default function ShamanEvolutionModal({
             ) : (
               <Button
                 type="button"
-                onClick={() => handleChooseClass(viewingMeta.id)}
+                onClick={() => handleChooseClass(viewingMeta.canonicalId)}
                 className="pixel-btn h-9 px-4 bg-primary text-primary-foreground font-bold text-xs hover:bg-primary/90 shrink-0 shadow"
               >
-                <span>{currentClass ? '이 전직으로 변경하기' : '이 전직으로 진화하기'}</span>
+                <span>{canonicalCurrent ? '이 전직으로 변경하기' : '이 전직으로 진화하기'}</span>
               </Button>
             )}
           </div>
@@ -206,281 +208,177 @@ export default function ShamanEvolutionModal({
             {viewingMeta.desc}
           </p>
 
-          {/* Key Unlocks & Specs Banner */}
-          <div className="rounded-md border border-border/70 bg-background/60 p-2.5 space-y-1 text-xs">
-            {viewingMeta.facilitiesDesc && (
-              <div className="flex items-start gap-1.5">
-                <span className="font-bold text-amber-500 shrink-0">🏛️ 해금 시설:</span>
-                <span className="text-foreground/90">{viewingMeta.facilitiesDesc}</span>
-              </div>
-            )}
-            {viewingMeta.resourcesDesc && (
-              <div className="flex items-start gap-1.5">
-                <span className="font-bold text-amber-500 shrink-0">⛏️ 해금 자원:</span>
-                <span className="text-foreground/90">{viewingMeta.resourcesDesc}</span>
-              </div>
-            )}
-            {viewingMeta.skillsDesc && (
-              <div className="flex items-start gap-1.5">
-                <span className="font-bold text-purple-400 shrink-0">🔮 스킬 개발:</span>
-                <span className="text-foreground/90">{viewingMeta.skillsDesc}</span>
-              </div>
-            )}
-            {viewingMeta.featuresDesc && (
-              <div className="flex items-start gap-1.5">
-                <span className="font-bold text-sky-400 shrink-0">👑 특수 기능:</span>
-                <span className="text-foreground/90">{viewingMeta.featuresDesc}</span>
-              </div>
-            )}
+          {/* 1. 고유 메커니즘 자원 & 궁극기 박스 */}
+          <div className="rounded-md border border-border/70 bg-background/80 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-xs flex items-center gap-1.5 text-foreground">
+                <span className="text-base">{viewingMeta.resourceIcon}</span>
+                <span>고유 전용 자원: <b className={viewingMeta.themeColor}>{viewingMeta.resourceName} ({viewingMeta.resourceUnit})</b></span>
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-primary/10 border border-primary/30 font-bold text-primary">
+                궁극기: {viewingMeta.ultimateActionName} (소모: {viewingMeta.ultimateCost}{viewingMeta.resourceUnit})
+              </span>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {viewingMeta.ultimateDesc}
+            </p>
           </div>
 
-          {/* Pros & Cons Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-            {/* Pros */}
-            <div className="rounded-md border border-emerald-500/30 bg-background/70 p-3 space-y-1.5">
-              <span className="font-bold text-xs text-emerald-400 flex items-center gap-1.5">
+          {/* 2. 전용 NPC & 페이퍼돌 레이어 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* 전용 NPC */}
+            <div className="rounded-md border border-border/70 bg-background/70 p-3 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-xs flex items-center gap-1.5 text-amber-400">
+                  <span>🧑‍🌾 전용 마을 NPC:</span>
+                  <b className="text-foreground">{viewingMeta.npc.name}</b>
+                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                  {viewingMeta.npc.role}
+                </span>
+              </div>
+              <p className="text-[11px] italic text-foreground/80 bg-muted/40 p-1.5 rounded">
+                "{viewingMeta.npc.dialogue}"
+              </p>
+              <p className="text-[10px] font-bold text-emerald-400">
+                ✨ {viewingMeta.npc.tapRewardDesc}
+              </p>
+            </div>
+
+            {/* 비주얼 & 페이퍼돌 */}
+            <div className="rounded-md border border-border/70 bg-background/70 p-3 space-y-1.5">
+              <span className="font-bold text-xs flex items-center gap-1.5 text-sky-400">
                 <Sparkles className="h-3.5 w-3.5" />
-                <span>핵심 권능 및 특수 혜택 (장점)</span>
+                <span>마을 비주얼 & 부족민 페이퍼돌 장식</span>
               </span>
-              <ul className="space-y-1 text-[11px] text-foreground/90">
-                {viewingMeta.pros.map((pro, i) => (
-                  <li key={i} className="flex items-start gap-1.5">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    <span>{pro}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Cons */}
-            <div className="rounded-md border border-destructive/30 bg-background/70 p-3 space-y-1.5">
-              <span className="font-bold text-xs text-destructive flex items-center gap-1.5">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                <span>감수해야 할 제약 및 약점 (단점)</span>
-              </span>
-              <ul className="space-y-1 text-[11px] text-foreground/90">
-                {viewingMeta.cons.map((con, i) => (
-                  <li key={i} className="flex items-start gap-1.5">
-                    <span className="text-destructive font-bold">⚠️</span>
-                    <span>{con}</span>
-                  </li>
-                ))}
-              </ul>
+              <div className="space-y-1 text-[11px] text-foreground/90">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-muted-foreground">머리 장식:</span>
+                  <b className="text-primary">{viewingMeta.headgearLabel}</b>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-muted-foreground">발밑 오라:</span>
+                  <span>{viewingMeta.auraText}</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Specialized Interactive Section based on class */}
-        {/* 1. WARLOCK EXCLUSIVE: Skull Dragon Evolution Ritual */}
-        {selectedClassId === 'warlock' && (
-          <div className="rounded-lg border-2 border-emerald-600/50 bg-card p-4 space-y-3 shadow">
-            <div className="flex items-center justify-between border-b border-border/80 pb-2">
-              <div className="flex items-center gap-2">
-                <Skull className="h-5 w-5 text-emerald-400" />
-                <div>
-                  <h3 className="font-bold text-xs text-foreground">
-                    💀 암흑 강령 의식: [스컬 드래곤 (Skull Dragon)] 각성 진화
-                  </h3>
-                  <p className="text-[10px] text-muted-foreground">
-                    Lv.4 이상으로 성장한 공룡 펫에게 공룡 뼈 제물을 바쳐 불사의 스컬 드래곤으로 영구 진화시킵니다
+          {/* 3. 3단계 전용 건물 & 정밀 제조 트리 */}
+          <div className="space-y-2 pt-1">
+            <span className="font-bold text-xs flex items-center gap-1.5 text-foreground">
+              <Hammer className="h-4 w-4 text-primary" />
+              <span>단계별 전용 건물 & 정밀 제조 트리</span>
+            </span>
+
+            <div className="space-y-2">
+              {viewingMeta.tiers.map(tier => (
+                <div
+                  key={tier.tier}
+                  className="rounded-lg border border-border/80 bg-background/85 p-3 space-y-1.5"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-1 border-b border-border/60 pb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                        Lv.{tier.tier} 단계
+                      </span>
+                      <b className="text-xs text-foreground">{tier.buildingName}</b>
+                      <span className="text-[10px] text-muted-foreground">· {tier.recipeOrSkillName}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 text-[10px]">
+                    <span className="font-bold text-muted-foreground">필요 재료:</span>
+                    {tier.ingredients.map((ing, idx) => (
+                      <span
+                        key={idx}
+                        className="rounded bg-muted/60 px-1.5 py-0.5 text-foreground font-mono"
+                      >
+                        {ing.name} x{ing.count}
+                      </span>
+                    ))}
+                  </div>
+
+                  <p className="text-[11px] text-emerald-300 font-medium">
+                    ⚡ {tier.effectDesc}
                   </p>
                 </div>
-              </div>
-              <span className="text-[10px] font-mono text-muted-foreground">
-                제물 뼈 보유: {boneCount} / 5개
-              </span>
+              ))}
             </div>
+          </div>
 
-            {/* Existing Dragons */}
-            {existingDragons.length > 0 && (
-              <div className="p-2.5 rounded border border-emerald-500/40 bg-emerald-950/20 text-xs text-emerald-300 flex items-center justify-between">
-                <span>보유 중인 스컬 드래곤: {existingDragons.map(d => d.name).join(', ')}</span>
-                <span className="font-bold font-mono">체력 250 · 공격력 +45 · 불사 뼈방패</span>
+          {/* Warlock Special: Skull Dragon Dark Ritual Section */}
+          {viewingMeta.canonicalId === 'NECROMANCER' && (
+            <div className="rounded-lg border-2 border-purple-500 bg-purple-950/40 p-3.5 space-y-2.5">
+              <div className="flex items-center gap-2">
+                <Skull className="h-5 w-5 text-purple-400" />
+                <h3 className="font-bold text-xs text-purple-300">
+                  흑마술사 전용 의식: [스컬 드래곤] 암흑 연성 제단
+                </h3>
               </div>
-            )}
+              <p className="text-[11px] text-purple-200/90 leading-relaxed">
+                Lv.4 이상의 공룡 펫을 암흑 제단에 바쳐 전설 등급 [스컬 드래곤]으로 각성시킵니다. (체력/공격력 2.2배, 흡혈 15%, 사망 면제)
+              </p>
 
-            {/* Candidate Pets */}
-            {eligibleDragonPets.length > 0 ? (
-              <div className="space-y-2">
-                <span className="text-[11px] font-bold text-muted-foreground block">
-                  진화 가능한 Lv.4+ 공룡 펫 목록:
-                </span>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {eligibleDragonPets.map(pet => (
-                    <div
-                      key={pet.uid}
-                      className="flex items-center justify-between p-2.5 rounded border border-border bg-background"
-                    >
-                      <div>
-                        <div className="flex items-center gap-1.5 font-bold text-xs">
-                          <span>🦖</span>
-                          <span>{pet.name}</span>
-                          <span className="text-[10px] px-1 rounded bg-accent/20 text-primary">
-                            Lv.{pet.level}
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-muted-foreground">
-                          현재 HP {pet.hp} · 역할: {pet.role ?? '보초'}
-                        </span>
-                      </div>
+              {existingDragons.length > 0 && (
+                <div className="rounded bg-background/60 p-2 text-[11px] text-purple-300">
+                  보유 중인 스컬 드래곤: {existingDragons.map(d => `${d.nickname || d.name} (Lv.${d.level})`).join(', ')}
+                </div>
+              )}
 
-                      <Button
+              {eligibleDragonPets.length > 0 ? (
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-bold text-muted-foreground">
+                    진화 가능한 공룡 펫 (Lv.4 이상):
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {eligibleDragonPets.map(p => (
+                      <button
+                        key={p.uid}
                         type="button"
-                        disabled={boneCount < 5 || currentClass !== 'warlock'}
                         onClick={() => {
                           if (onEvolvePetToSkullDragon) {
-                            onEvolvePetToSkullDragon(pet.uid);
+                            const ok = onEvolvePetToSkullDragon(p.uid);
+                            if (ok) toast.success(`💀 ${p.name}이(가) 불사의 스컬 드래곤으로 각성했습니다!`);
                           }
                         }}
-                        className="pixel-btn h-8 px-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[10px]"
+                        className="pixel-btn flex items-center gap-1.5 bg-purple-900/80 hover:bg-purple-800 text-purple-100 py-1 px-2.5 text-xs rounded border border-purple-500/60"
                       >
-                        <Skull className="h-3 w-3 mr-1" />
-                        <span>스컬 드래곤 진화 (뼈 5개)</span>
-                      </Button>
-                    </div>
-                  ))}
+                        <Skull className="h-3.5 w-3.5 text-purple-300" />
+                        <span>{p.nickname || p.name} (Lv.{p.level}) 연성하기</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="p-3 rounded border border-border/80 bg-muted/20 text-center text-xs text-muted-foreground">
-                현재 Lv.4 이상의 공룡 펫이 없습니다. 펫 탭에서 합체 육성하여 Lv.4를 달성하면 스컬 드래곤으로 각성할 수 있습니다.
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 2. ENGINEER EXCLUSIVE: Turret & Metallurgy Info */}
-        {selectedClassId === 'engineer' && (
-          <div className="rounded-lg border border-amber-500/40 bg-card p-4 space-y-2.5">
-            <div className="flex items-center gap-2 border-b border-border/80 pb-2">
-              <Wrench className="h-5 w-5 text-amber-400" />
-              <div>
-                <h3 className="font-bold text-xs text-foreground">
-                  🔧 공돌이 전용 특권: 풀무 대장간 & 자동 방어 포탑
-                </h3>
-                <p className="text-[10px] text-muted-foreground">
-                  건축공방 및 무기제련소에서 포탑 및 3배 내구도 장비를 제작할 수 있습니다
+              ) : (
+                <p className="text-[10px] text-muted-foreground italic">
+                  * 현재 Lv.4 이상 진화 가능한 공룡 펫이 없습니다. 펫 합성으로 Lv.4를 달성하세요.
                 </p>
-              </div>
+              )}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
-              <div className="p-2 rounded border border-border bg-background">
-                <b className="text-amber-400 block mb-0.5">⚙️ 무기 내구도 3배</b>
-                <p className="text-[10px] text-muted-foreground">
-                  제작되는 모든 칼·창·활의 최대 내구도가 기존 60에서 180으로 300% 증가합니다.
-                </p>
-              </div>
-              <div className="p-2 rounded border border-border bg-background">
-                <b className="text-amber-400 block mb-0.5">🛡️ 자동 방어 포탑</b>
-                <p className="text-[10px] text-muted-foreground">
-                  마을 외곽에 설치 시 30m 내로 접근하는 맹수를 자동으로 감지해 요격 사격합니다.
-                </p>
-              </div>
-              <div className="p-2 rounded border border-border bg-background">
-                <b className="text-amber-400 block mb-0.5">🔩 신규 합금 제련</b>
-                <p className="text-[10px] text-muted-foreground">
-                  철광석과 석탄을 결합해 청동 및 강철 장비를 제련할 수 있습니다.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 3. MAGE EXCLUSIVE: Elemental Magic Grimoire */}
-        {selectedClassId === 'mage' && (
-          <div className="rounded-lg border border-violet-500/40 bg-card p-4 space-y-2.5">
-            <div className="flex items-center gap-2 border-b border-border/80 pb-2">
-              <Zap className="h-5 w-5 text-violet-400" />
-              <div>
-                <h3 className="font-bold text-xs text-foreground">
-                  🔮 원소 마법술사 그리모어: 4대 원소 주술
-                </h3>
-                <p className="text-[10px] text-muted-foreground">
-                  전투 시 무기 공격과 함께 강력한 원소 마법이 자동으로 발동합니다
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-              <div className="p-2 rounded border border-border bg-background">
-                <b className="text-orange-400 block mb-0.5">🔥 파이어볼</b>
-                <p className="text-[10px] text-muted-foreground">단일 대상 30 화염 피해 & 화상 지속 피해</p>
-              </div>
-              <div className="p-2 rounded border border-border bg-background">
-                <b className="text-cyan-400 block mb-0.5">❄️ 아이스볼</b>
-                <p className="text-[10px] text-muted-foreground">20 냉기 피해 & 이동속도/공격속도 50% 결빙 감속</p>
-              </div>
-              <div className="p-2 rounded border border-border bg-background">
-                <b className="text-yellow-400 block mb-0.5">⚡ 썬더볼트</b>
-                <p className="text-[10px] text-muted-foreground">35 뇌격 관통 피해 & 적 100% 충격 스턴</p>
-              </div>
-              <div className="p-2 rounded border border-border bg-background">
-                <b className="text-purple-400 block mb-0.5">🛡️ 마나 실드</b>
-                <p className="text-[10px] text-muted-foreground">다음 적 공격 3회를 완전 무효화하는 배리어</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 4. ORTHODOX EXCLUSIVE: Ancient Sage Blessing */}
-        {selectedClassId === 'orthodox' && (
-          <div className="rounded-lg border border-sky-500/40 bg-card p-4 space-y-2.5">
-            <div className="flex items-center gap-2 border-b border-border/80 pb-2">
-              <Crown className="h-5 w-5 text-sky-400" />
-              <div>
-                <h3 className="font-bold text-xs text-foreground">
-                  👑 정직한 대현자의 은총: 문명 번영 패시브
-                </h3>
-                <p className="text-[10px] text-muted-foreground">
-                  기본기를 극대화하여 부족 전체의 생산력과 전투력을 영구히 증폭시킵니다
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
-              <div className="p-2 rounded border border-border bg-background">
-                <b className="text-sky-400 block mb-0.5">💪 전원 영구 스탯 +20%</b>
-                <p className="text-[10px] text-muted-foreground">부족민 및 모든 펫의 공격력, 방어력, 체력이 상시 +20% 가산됩니다.</p>
-              </div>
-              <div className="p-2 rounded border border-border bg-background">
-                <b className="text-sky-400 block mb-0.5">🌾 채집 파밍량 +25%</b>
-                <p className="text-[10px] text-muted-foreground">나무, 돌, 약초 등 야외 자원 채집 시 추가 획득 확률이 대폭 상승합니다.</p>
-              </div>
-              <div className="p-2 rounded border border-border bg-background">
-                <b className="text-sky-400 block mb-0.5">💰 제작/건축 재료 -15% 절약</b>
-                <p className="text-[10px] text-muted-foreground">마을 건물 및 장비 제작 시 소모되는 재료가 영구 절약됩니다.</p>
-              </div>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Confirmation Modal Overlay */}
+      {/* Confirmation Modal */}
       {confirmingClassId && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/75 p-4">
-          <div className="pixel-frame w-full max-w-sm space-y-3 bg-card p-4 border-2 border-primary shadow-2xl">
-            <div className="flex items-center gap-2 border-b border-border pb-2">
-              <span className="text-2xl">{SHAMAN_CLASSES[confirmingClassId].icon}</span>
-              <div>
-                <b className="text-sm font-bold text-foreground">
-                  [{SHAMAN_CLASSES[confirmingClassId].name}] 전직 확인
-                </b>
-                <p className="text-[10px] text-muted-foreground">
-                  부족의 미래를 결정하는 중대한 의식입니다
-                </p>
-              </div>
-            </div>
-
-            <p className="text-xs leading-relaxed text-foreground/90">
-              정말로 <b>[{SHAMAN_CLASSES[confirmingClassId].name}]</b> 전직 의식을 거행하시겠습니까?
-              선택 시 주술사의 외형과 전용 권능이 즉시 활성화됩니다.
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4">
+          <div className="pixel-frame w-full max-w-sm bg-card p-4 space-y-3 border-2 border-primary">
+            <h3 className="font-bold text-sm text-foreground flex items-center gap-1.5">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span>전직 의식 확인</span>
+            </h3>
+            <p className="text-xs text-foreground/90 leading-relaxed">
+              <b>{SHAMAN_CLASSES[confirmingClassId]?.name}</b>(으)로 부족의 주술사를 전직하시겠습니까?
+              <br />
+              고유 자원 메커니즘과 전용 NPC, 3단계 테크트리가 활성화됩니다.
             </p>
-
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 pt-1">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => setConfirmingClassId(null)}
-                className="pixel-btn h-8 text-xs"
               >
                 취소
               </Button>
@@ -488,9 +386,9 @@ export default function ShamanEvolutionModal({
                 type="button"
                 size="sm"
                 onClick={handleConfirmEvolution}
-                className="pixel-btn h-8 bg-primary text-primary-foreground font-bold text-xs hover:bg-primary/90"
+                className="bg-primary text-primary-foreground font-bold"
               >
-                🔥 전직 의식 완수
+                전직 거행
               </Button>
             </div>
           </div>
