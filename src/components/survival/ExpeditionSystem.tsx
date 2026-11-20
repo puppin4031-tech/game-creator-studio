@@ -17,7 +17,8 @@ export function ExpeditionMarker({ crew, project, members = 1, tribeClass }: { c
   const pos = expeditionActorPoint(crew, project);
   const hit = freshCombatHit(crew);
   const reduced = useReducedMotion();
-  const activeClassId = crew.tribeClass ?? tribeClass ?? 'tank';
+  const isAmbacho = crew.mercenary === '암바초' || crew.mercenary?.includes('암바초');
+  const activeClassId = crew.tribeClass ?? (isAmbacho ? 'gatherer' : (tribeClass ?? 'gatherer'));
   const cls = activeClassId ? getTribeClass(activeClassId) : null;
   const target = crew.target?.kind === 'creature' ? project(crew.target) : hit ? project(hit.target) : null;
   const dx = target ? target.x - pos.x : 0, dy = target ? target.y - pos.y : 0;

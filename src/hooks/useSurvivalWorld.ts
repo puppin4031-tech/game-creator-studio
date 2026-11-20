@@ -161,21 +161,23 @@ function migrateTribeState(saved: Partial<WorldSave>): Partial<WorldSave> {
     const hasAmbacho = (saved.tribe?.classCounts?.gatherer ?? 0) > 0 || saved.mercenary?.name === '암바초';
     const tankCount = hasAmbacho ? Math.max(0, count - 1) : count;
     const classCounts: Partial<Record<TribeClassId, number>> = {
-      tank: tankCount,
       ...(hasAmbacho ? { gatherer: 1 } : {}),
+      tank: tankCount,
     };
+    // Ambacho received at game start MUST strictly remain as 'gatherer' (파밍 부족)
+    const effectiveClassId: TribeClassId = hasAmbacho ? 'gatherer' : (saved.tribe?.classId ?? 'tank');
     return {
       ...saved,
       tribe: {
         trainLevel: 0,
         ...saved.tribe,
         count,
-        classId: 'tank',
+        classId: effectiveClassId,
         classCounts,
       },
       mercenary: saved.mercenary ? {
         ...saved.mercenary,
-        classId: saved.mercenary.name === '암바초' ? 'gatherer' : 'tank',
+        classId: saved.mercenary.name === '암바초' ? 'gatherer' : (saved.mercenary.classId ?? 'tank'),
       } : saved.mercenary,
     };
   }

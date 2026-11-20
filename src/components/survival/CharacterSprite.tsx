@@ -15,15 +15,20 @@ export default function CharacterSprite({
   className?: string;
 }) {
   const tierKey = heroSpriteKey(level);
-  const { data: tierRemote } = useSpriteAnimations(tierKey);
+  const isCustomTier = tierKey !== 'hunter';
   const { data: baseRemote } = useSpriteAnimations('hunter');
+  const { data: tierRemote } = useSpriteAnimations(isCustomTier ? tierKey : 'hunter');
 
-  // Exact action priority: tier action -> base hunter action -> tier idle -> base hunter idle
+  // Exact action priority: tier action -> base hunter action -> intelligent action fallbacks -> idle -> walk
   const anim =
     tierRemote?.[action] ??
     baseRemote?.[action] ??
+    (action === 'chop' ? (tierRemote?.attack ?? baseRemote?.attack) : undefined) ??
+    (action === 'gather' ? (tierRemote?.walk ?? baseRemote?.walk) : undefined) ??
     tierRemote?.idle ??
-    baseRemote?.idle;
+    baseRemote?.idle ??
+    tierRemote?.walk ??
+    baseRemote?.walk;
 
   // Scale ratio configured from /admin/sprite studio
   const currentScale = tierRemote?.scale ?? baseRemote?.scale ?? 1.0;

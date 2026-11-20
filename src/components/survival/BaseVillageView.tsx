@@ -878,11 +878,15 @@ export default function BaseVillageView({
         for (let i = 0; i < n; i++) classPool.push(c.id);
       }
     }
-    const fallbackClasses: TribeClassId[] = ['tank', 'gatherer', 'ranged', 'assassin'];
+    const fallbackClasses: TribeClassId[] = ['gatherer', 'tank', 'ranged', 'assassin'];
+    const hasAmbachoInCounts = (tribe?.classCounts?.gatherer ?? 0) > 0;
     for (let i = 0; i < tribeCount; i++) {
-      const cid = classPool[i] ?? (i === 0 ? activeClass : fallbackClasses[i % fallbackClasses.length]);
+      // Index 0 is always Ambacho (fixed to 'gatherer' farming tribe) if player has Ambacho
+      const isAmbacho = i === 0 && (hasAmbachoInCounts || activeClass === 'gatherer');
+      const cid: TribeClassId = isAmbacho
+        ? 'gatherer'
+        : (classPool[i] ?? (i === 0 ? activeClass : fallbackClasses[i % fallbackClasses.length]));
       const cls = getTribeClass(cid);
-      const isAmbacho = i === 0 && cid === 'gatherer';
       const role: AgentRole =
         cid === 'tank' || cid === 'ranged'
           ? 'wall_patrol'

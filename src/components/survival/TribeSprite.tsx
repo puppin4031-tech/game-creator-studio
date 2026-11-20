@@ -32,15 +32,17 @@ export default function TribeSprite({
   const cls = tribeClass ? getTribeClass(tribeClass) : null;
   const [frame, setFrame] = useState(0);
 
-  // Normalize action to only walk ('walk') or active work/combat ('attack' | 'gather' | 'chop')
-  const normalizedAction: 'walk' | 'attack' | 'gather' | 'chop' =
-    action === 'attack'
-      ? 'attack'
-      : action === 'chop'
-        ? 'chop'
-        : action === 'gather'
-          ? 'gather'
-          : 'walk';
+  // Normalize action: preserve 'idle' so gathering/idling doesn't forcibly jump to walk
+  const normalizedAction: 'idle' | 'walk' | 'attack' | 'gather' | 'chop' =
+    action === 'idle'
+      ? 'idle'
+      : action === 'attack'
+        ? 'attack'
+        : action === 'chop'
+          ? 'chop'
+          : action === 'gather'
+            ? 'gather'
+            : 'walk';
 
   useEffect(() => {
     const interval =
@@ -60,7 +62,9 @@ export default function TribeSprite({
         ? CHOP_FRAMES[frame % 4]
         : normalizedAction === 'gather'
           ? GATHER_FRAMES[frame % 4]
-          : WALK_FRAMES[frame % 4];
+          : normalizedAction === 'idle'
+            ? idle
+            : WALK_FRAMES[frame % 4];
 
   const rapidOffset =
     normalizedAction === 'attack' && cls?.id === 'assassin'
@@ -73,19 +77,26 @@ export default function TribeSprite({
     (cls?.id === 'tank' ? height * 1.08 : height) * adminScale
   );
 
-  // Prefer class-specific admin sprite sheet (tribe:<classId>), then fallback to general 'tribe' admin sheet
+  // Exact Class-specific Sprite Priority (e.g. tribe:gatherer for Ambacho)
+  // 1. Direct action match
+  // 2. Intelligent semantic fallback (idle -> walk -> gather; chop -> chop -> attack; gather -> gather -> walk)
   const customClassSheet =
+    (normalizedAction === 'idle' ? (classSheets?.idle ?? classSheets?.walk ?? classSheets?.gather) : undefined) ??
     classSheets?.[normalizedAction] ??
     (normalizedAction === 'chop' ? (classSheets?.chop ?? classSheets?.attack) : undefined) ??
-    (normalizedAction === 'gather' ? classSheets?.attack : undefined) ??
+    (normalizedAction === 'gather' ? (classSheets?.gather ?? classSheets?.walk ?? classSheets?.attack) : undefined) ??
     classSheets?.walk ??
-    classSheets?.idle;
+    classSheets?.idle ??
+    classSheets?.gather;
+
   const fallbackAdminSheet =
+    (normalizedAction === 'idle' ? (baseSheets?.idle ?? baseSheets?.walk) : undefined) ??
     baseSheets?.[normalizedAction] ??
     (normalizedAction === 'chop' ? (baseSheets?.chop ?? baseSheets?.attack) : undefined) ??
-    (normalizedAction === 'gather' ? baseSheets?.attack : undefined) ??
+    (normalizedAction === 'gather' ? (baseSheets?.gather ?? baseSheets?.attack) : undefined) ??
     baseSheets?.walk ??
     baseSheets?.idle;
+
   const sheet = customClassSheet ?? fallbackAdminSheet;
   const hasCustomClassArt = !!customClassSheet;
 

@@ -13,6 +13,7 @@ import { EGG_SPAWN_RADIUS_M, eggNeedM, eggReady, eggSpawnsNear, eggWalkedM } fro
 import { useCustomCatalog } from '@/hooks/useCustomCatalog';
 import CreatureSprite from '@/components/survival/CreatureSprite';
 import ExpeditionSystem, { ExpeditionMarker } from '@/components/survival/ExpeditionSystem';
+import { preloadCoreSprites } from '@/hooks/useSpriteAnimations';
 import { CombatImpact, CREATURE_RING_RADIUS_M, expeditionActorPoint, freshCombatHit, useExpeditionCombatSound, useMovementSound } from '@/components/survival/ExpeditionCombat';
 import type { ExpeditionFocus } from '@/lib/survival/expedition';
 import BackpackDiscard from '@/components/survival/BackpackDiscard';
@@ -207,6 +208,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const g = useSurvivalWorld(START, { enabled: !realGps || gpsReady, saveKey: realGps ? 'survival-gps-world-v1' : 'survival-world-v1', cloudSync: realGps, indoor: realGps });
   const gps = useSurvivalGps(realGps, g.moveTo);
   useEffect(() => setGpsReady(gps.ready), [gps.ready]);
+  useEffect(() => { preloadCoreSprites(); }, []);
   const { state: s } = g;
   const [expeditionTarget, setExpeditionTarget] = useState<LatLng | null>(null);
   const [watchExpedition, setWatchExpedition] = useState(true);
@@ -228,7 +230,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   }, [nearbyBeast]);
   const expeditionDestination = expeditionTarget ?? offsetM(s.base ?? s.pos, 180, 0);
   const hasTribe = (s.tribe?.count ?? 0) > 0;
-  const activeTribeClassId = crew?.tribeClass ?? s.tribe?.classId ?? DEFAULT_TRIBE_CLASS;
+  const isAmbachoActive = s.mercenary?.name === '암바초' || (s.tribe?.classCounts?.gatherer ?? 0) > 0;
+  const activeTribeClassId: TribeClassId = crew?.tribeClass ?? (isAmbachoActive ? 'gatherer' : (s.tribe?.classId ?? DEFAULT_TRIBE_CLASS));
   const activeTribeClass = getTribeClass(activeTribeClassId);
   const canDispatch = !!s.base && (!realGps || !gps.ready || g.inBase || hasTribe);
   const [fieldExp, setFieldExp] = useState(false);

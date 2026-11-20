@@ -53,11 +53,37 @@ export type SpriteAnimationsData = Partial<Record<SpriteAction, SpriteAnimation>
   scale?: number;
 };
 
+// Memory Cache to provide instant zero-delay render
+const MEMORY_CACHE = new Map<string, SpriteAnimationsData>();
+
+function getLocalCachedAnimations(characterKey: string): SpriteAnimationsData | undefined {
+  if (MEMORY_CACHE.has(characterKey)) return MEMORY_CACHE.get(characterKey);
+  try {
+    const raw = localStorage.getItem(`survival_anim_cache_${characterKey}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        MEMORY_CACHE.set(characterKey, parsed);
+        return parsed;
+      }
+    }
+  } catch {}
+  return undefined;
+}
+
+function setLocalCachedAnimations(characterKey: string, data: SpriteAnimationsData) {
+  MEMORY_CACHE.set(characterKey, data);
+  try {
+    localStorage.setItem(`survival_anim_cache_${characterKey}`, JSON.stringify(data));
+  } catch {}
+}
+
 export function useSpriteAnimations(characterKey = 'hunter') {
   return useQuery({
     queryKey: ['sprite-animations', characterKey],
-    staleTime: 5_000, // Quick freshness check so admin studio changes reflect in-game promptly
-    refetchOnWindowFocus: true,
+    staleTime: 10 * 60 * 1000, // 10 minutes cache to avoid redundant flashing / fetching
+    refetchOnWindowFocus: false, // Prevent flickering when switching mobile apps or tabs
+    initialData: () => getLocalCachedAnimations(characterKey),
     queryFn: async (): Promise<SpriteAnimationsData> => {
       let cachedScale = 1.0;
       try {
@@ -72,7 +98,8 @@ export function useSpriteAnimations(characterKey = 'hunter') {
           .eq('character_key', characterKey);
 
         if (error || !data?.length) {
-          return { _scale: cachedScale, scale: cachedScale };
+          const fallbackData = getLocalCachedAnimations(characterKey) ?? { _scale: cachedScale, scale: cachedScale };
+          return fallbackData;
         }
 
         // Check scale configuration row
@@ -83,7 +110,11 @@ export function useSpriteAnimations(characterKey = 'hunter') {
         } catch {}
 
         const animRows = data.filter(d => d.action !== 'scale');
-        if (!animRows.length) return { _scale: scale, scale };
+        if (!animRows.length) {
+          const out = { _scale: scale, scale };
+          setLocalCachedAnimations(characterKey, out);
+          return out;
+        }
 
         // Attempt signed URLs with fallback to public URLs (crucial for mobile guests & public buckets)
         let signedMap = new Map<string, string>();
@@ -125,11 +156,29 @@ export function useSpriteAnimations(characterKey = 'hunter') {
             return Promise.resolve();
           })
         );
+        setLocalCachedAnimations(characterKey, out);
         return out;
       } catch (err) {
         console.warn(`[useSpriteAnimations] failed to load for ${characterKey}:`, err);
-        return { _scale: cachedScale, scale: cachedScale };
+        return getLocalCachedAnimations(characterKey) ?? { _scale: cachedScale, scale: cachedScale };
       }
     },
+  });
+}
+
+/** Preload all core player & tribe sprites in parallel at boot */
+export function preloadCoreSprites() {
+  const coreKeys = ['hunter', 'tribe:gatherer', 'tribe:tank', 'tribe:assassin', 'tribe'];
+  coreKeys.forEach(async key => {
+    try {
+      const cached = getLocalCachedAnimations(key);
+      if (cached) {
+        Object.values(cached).forEach(v => {
+          if (v && typeof v === 'object' && 'url' in v && 'frame_count' in v) {
+            preloadSpriteSheet((v as SpriteAnimation).url, (v as SpriteAnimation).frame_count);
+          }
+        });
+      }
+    } catch {}
   });
 }
