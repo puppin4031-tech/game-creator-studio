@@ -121,7 +121,8 @@ export interface WorldSave extends WorldProgress {
   languageLearned?: boolean;
   shamanQuestAcceptedIndex?: number;
   shamanLevel?: 1 | 2 | 3 | 4 | 5;
-  shamanClass?: 'engineer' | 'mage' | 'warlock' | 'orthodox' | null;
+  shamanClass?: ShamanClassId | null;
+  classResource?: number;
   civilizationTechs?: string[];
   smokeBatches?: SmokehouseBatch[];
   lastFreshnessCheckAt?: number;
@@ -151,7 +152,7 @@ export interface WorldSave extends WorldProgress {
 const fresh = (start: LatLng): WorldSave => ({
   ...freshProgress(),
   pos: start, hp: C.baseMaxHp, hunger: 100, backpack: [], storage: [], gear: [], base: null,
-  depleted: {}, damage: {}, gathered: {}, techs: [], explored: [start], terrainZones: {}, parkCells: {}, shamanLevel: 1, shamanClass: null, civilizationTechs: ['tech_fire_gathering'], lastTickAt: Date.now(),
+  depleted: {}, damage: {}, gathered: {}, techs: [], explored: [start], terrainZones: {}, parkCells: {}, shamanLevel: 1, shamanClass: 'NONE', classResource: 100, civilizationTechs: ['tech_fire_gathering'], lastTickAt: Date.now(),
 });
 
 function migrateTribeState(saved: Partial<WorldSave>): Partial<WorldSave> {
@@ -1943,16 +1944,49 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const nextV: VillageState = {
       ...v,
       shamanClass: classId,
+      classResource: 100,
     };
 
     setS({
       ...p,
       village: nextV,
       shamanClass: classId,
+      classResource: 100,
       lastTickAt: Date.now(),
     });
 
-    toast.success(`🎉 ${meta.icon} [${meta.name}] 전직 의식 완수! 새로운 전용 권능이 개방되었습니다!`);
+    toast.success(`🎉 ${meta.icon} [${meta.name}] 전직 의식 완수! 전속 NPC [${meta.npc.name}]이(가) 마을에 합류했습니다!`);
+    return true;
+  }, [setS]);
+
+  const triggerClassUltimate = useCallback((): boolean => {
+    const p = ref.current;
+    const rawClass = p.shamanClass ?? p.village?.shamanClass;
+    const meta = rawClass ? SHAMAN_CLASSES[rawClass] : null;
+    if (!meta) {
+      toast.warning('전직을 먼저 완료해야 전용 메커니즘 궁극기를 사용할 수 있습니다.');
+      return false;
+    }
+    const curResource = p.classResource ?? p.village?.classResource ?? 100;
+    if (curResource < meta.ultimateCost) {
+      toast.error(`${meta.resourceName}이(가) 부족합니다 (${curResource}/${meta.ultimateCost}${meta.resourceUnit}).`);
+      return false;
+    }
+
+    const nextResource = Math.max(0, curResource - meta.ultimateCost);
+    const nextV: VillageState = {
+      ...ensureVillageState(p.village, !!p.altar),
+      classResource: nextResource,
+    };
+
+    setS({
+      ...p,
+      village: nextV,
+      classResource: nextResource,
+      lastTickAt: Date.now(),
+    });
+
+    toast.success(`⚡ [${meta.ultimateActionName}] 발동! ${meta.ultimateDesc}`);
     return true;
   }, [setS]);
 
@@ -2467,7 +2501,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return true;
   }, [setS]);
 
-  return { researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
+  return { shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
     moveOutpost, petHits, mergePets, togglePetDeploy, assignPetRole, feedPet, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,

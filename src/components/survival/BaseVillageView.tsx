@@ -38,12 +38,18 @@ import PrimitiveArmoryModal from './PrimitiveArmoryModal';
 import AncientAltarModal from './AncientAltarModal';
 import WanderingShamanModal from './WanderingShamanModal';
 import ShamanQuestModal from './ShamanQuestModal';
-import ShamanEvolutionModal from './ShamanEvolutionModal';
+import { ShamanEvolutionModal, ShamanResourceHUD } from './ShamanEvolutionUI';
 import CivilizationTechModal from './CivilizationTechModal';
 import ShamanCuisineModal from './ShamanCuisineModal';
-import { ShamanAuraWrapper, VillageAtmosphereOverlay } from './ShamanAuraWrapper';
+import { ShamanAuraWrapper, VillageAtmosphereOverlay } from './ShamanVisualEffects';
 import { getCivilizationEraBadge } from '@/lib/survival/civilizationTech';
-import { type ShamanClassId, type ShamanLevel, SHAMAN_CLASSES } from '@/lib/survival/shamanEvolution';
+import {
+  type ShamanClassId,
+  type ShamanLevel,
+  SHAMAN_CLASSES,
+  BASE_SHAMAN_CLASSES,
+  normalizeShamanClassId,
+} from '@/lib/survival/shamanEvolution';
 import SmokehouseTavernModal from './SmokehouseTavernModal';
 import TribalHallModal from './TribalHallModal';
 import CulinaryDishIcon from './CulinaryDishIcon';
@@ -91,6 +97,9 @@ interface Props {
   playerLevel?: number;
   shamanLevel?: ShamanLevel;
   shamanClass?: ShamanClassId | null;
+  classResource?: number;
+  onTriggerUltimate?: () => void;
+  onSelectShamanClass?: (classId: ShamanClassId) => boolean;
   expeditionDistanceM?: number;
   civilizationTechs?: string[];
   languageLearned?: boolean;
@@ -179,11 +188,11 @@ interface Props {
   onReplayTutorial?: () => void;
 }
 
-type AgentRole = 'campfire_social' | 'shelter_rest' | 'wall_patrol' | 'hauler' | 'shaman';
+type AgentRole = 'campfire_social' | 'shelter_rest' | 'wall_patrol' | 'hauler' | 'shaman' | 'class_npc';
 
 interface LivingAgent {
   id: string;
-  kind: 'tribe' | 'pet' | 'shaman' | 'extra' | 'hall';
+  kind: 'tribe' | 'pet' | 'shaman' | 'extra' | 'hall' | 'class_npc';
   role: AgentRole;
   label: string;
   x: number;
@@ -201,6 +210,12 @@ interface LivingAgent {
   moveDurationMs: number;
   tribeClass?: TribeClassId;
   speciesId?: string;
+  classNpc?: {
+    name: string;
+    role: string;
+    dialogue: string;
+    tapRewardDesc: string;
+  };
 }
 
 interface PopFloat {
@@ -666,6 +681,9 @@ export default function BaseVillageView({
   playerLevel = 1,
   shamanLevel = 1,
   shamanClass = null,
+  classResource = 100,
+  onTriggerUltimate,
+  onSelectShamanClass,
   expeditionDistanceM = 0,
   civilizationTechs = ['tech_fire_gathering'],
   languageLearned = false,
@@ -727,6 +745,16 @@ export default function BaseVillageView({
 }: Props) {
   const vState = useMemo(() => ensureVillageState(village, hasAltar), [village, hasAltar]);
   const activeShamanLevel = (vState.shamanLevel ?? shamanLevel ?? 1) as ShamanLevel;
+  const effectiveClass = vState.shamanClass ?? shamanClass;
+  const canonicalClass = normalizeShamanClassId(effectiveClass);
+  const isClassChosen = canonicalClass !== null && canonicalClass !== undefined;
+
+  // Auto-open Shaman Evolution Modal when Shaman reaches Lv.5 and hasn't chosen a class yet
+  useEffect(() => {
+    if (activeShamanLevel >= 5 && !isClassChosen) {
+      setActiveModal('shaman_evolution');
+    }
+  }, [activeShamanLevel, isClassChosen]);
   const villageGridSize = getVillageGridSize(activeShamanLevel);
   const bonuses = useMemo(() => computeVillageBonuses(vState), [vState]);
   const popCap = useMemo(
@@ -898,8 +926,20 @@ export default function BaseVillageView({
         speciesId: pet.speciesId,
       });
     }
+    // Dedicated Shaman Class NPC (if evolved into one of the 4 paths)
+    if (canonicalClass && BASE_SHAMAN_CLASSES[canonicalClass]) {
+      const classCfg = BASE_SHAMAN_CLASSES[canonicalClass];
+      list.unshift({
+        id: `shaman-class-npc-${canonicalClass}`,
+        kind: 'class_npc',
+        role: 'campfire_social',
+        label: `${classCfg.npc.name} (${classCfg.npc.role})`,
+        classNpc: classCfg.npc,
+      });
+    }
+
     return list;
-  }, [tribe?.count, tribe?.classId, tribe?.classCounts, pets, popCap]);
+  }, [tribe?.count, tribe?.classId, tribe?.classCounts, pets, popCap, canonicalClass]);
 
   const [agents, setAgents] = useState<LivingAgent[]>([]);
 
@@ -1210,6 +1250,25 @@ export default function BaseVillageView({
       setActiveModal('tribal_hall');
       return;
     }
+    if (ag.kind === 'class_npc') {
+      const line = ag.classNpc?.dialogue ?? '안녕하세요, 족장님!';
+      setAgents(prev =>
+        prev.map(item =>
+          item.id === ag.id
+            ? {
+                ...item,
+                moving: false,
+                insideShelter: false,
+                jumpTick: Date.now(),
+                bubble: line,
+                restTicks: 8,
+              }
+            : item
+        )
+      );
+      setTalkingAgent({ ...ag, bubble: line });
+      return;
+    }
     const pool =
       languageLearned || playerLevel >= 5 ? TOUCH_GREETINGS_SPEAK : TOUCH_GREETINGS_PRIMITIVE;
     const line = pool[Math.floor(Math.random() * pool.length)];
@@ -1236,6 +1295,37 @@ export default function BaseVillageView({
 
   return (
     <div className="space-y-2 text-xs" data-village-view>
+      {/* Shaman Evolution Resource HUD Bar */}
+      {canonicalClass && (
+        <ShamanResourceHUD
+          shamanClass={canonicalClass}
+          value={classResource}
+          max={100}
+          onTriggerUltimate={onTriggerUltimate}
+          className="shadow-lg border-2"
+        />
+      )}
+
+      {/* Shaman Lv.5 Evolution Available Alert Banner */}
+      {activeShamanLevel >= 5 && !isClassChosen && (
+        <div className="flex items-center justify-between p-2.5 rounded bg-gradient-to-r from-amber-600/30 via-orange-600/30 to-purple-600/30 border-2 border-amber-400 shadow-md animate-pulse">
+          <div className="flex items-center gap-2 text-xs font-bold text-amber-200">
+            <span className="text-lg">⚡</span>
+            <div>
+              <div>주술사 Lv.5 승급 완수! [4대 주술사 운명의 전직] 개방</div>
+              <div className="text-[10px] text-amber-300/80 font-normal">공돌이 · 마법술사 · 흑마술사 · 정직한 주술사 중 선택</div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveModal('shaman_evolution')}
+            className="pixel-btn bg-amber-400 text-black hover:bg-amber-300 font-bold px-3 py-1.5 text-xs shadow"
+          >
+            전직 선택 ▶
+          </button>
+        </div>
+      )}
+
       {/* Top Status & Mode Bar */}
       <div className="pixel-frame flex flex-wrap items-center justify-between gap-1.5 bg-card p-2">
         <div className="space-y-0.5">
@@ -1866,6 +1956,27 @@ export default function BaseVillageView({
                         부족회관
                       </span>
                     </div>
+                  ) : ag.kind === 'class_npc' ? (
+                    <ShamanAuraWrapper shamanClass={effectiveClass}>
+                      <div className="flex flex-col items-center">
+                        <div className="relative">
+                          <img
+                            src={mercImg}
+                            alt={ag.label}
+                            className="pixelated h-9 w-auto object-contain drop-shadow-[0_0_6px_rgba(250,204,21,0.8)] filter brightness-110"
+                          />
+                          <span className="absolute -top-1 -right-1 text-xs">
+                            {canonicalClass === 'ENGINEER' && '🔧'}
+                            {canonicalClass === 'MAGE' && '🔮'}
+                            {canonicalClass === 'NECROMANCER' && '💀'}
+                            {canonicalClass === 'HONEST' && '🪶'}
+                          </span>
+                        </div>
+                        <span className="mt-0.5 whitespace-nowrap text-[8px] font-bold text-amber-300 bg-black/80 px-1 py-0.2 rounded leading-none select-none">
+                          {ag.classNpc?.name ?? ag.label}
+                        </span>
+                      </div>
+                    </ShamanAuraWrapper>
                   ) : ag.kind === 'tribe' || ag.kind === 'extra' ? (
                     <ShamanAuraWrapper shamanClass={vState.shamanClass ?? shamanClass}>
                       <TribeSprite
@@ -1914,7 +2025,33 @@ export default function BaseVillageView({
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2.5">
               <div className="flex h-12 w-12 items-center justify-center border-2 border-foreground bg-background">
-                {talkingAgent.kind === 'tribe' || talkingAgent.kind === 'extra' ? (
+                {talkingAgent.kind === 'class_npc' ? (
+            <div className="space-y-2 text-xs">
+              <div className="pixel-box bg-background p-2.5 space-y-1.5 border border-amber-500/50">
+                <div className="flex items-center justify-between font-bold text-amber-500">
+                  <span>⚡ 전속 NPC: {talkingAgent.classNpc?.name} ({talkingAgent.classNpc?.role})</span>
+                </div>
+                <p className="text-sm font-semibold text-foreground leading-relaxed">
+                  "{talkingAgent.classNpc?.dialogue}"
+                </p>
+                <div className="text-[11px] text-amber-300 bg-amber-950/40 p-2 rounded border border-amber-800/40 leading-snug">
+                  🎁 <b>터치 혜택:</b> {talkingAgent.classNpc?.tapRewardDesc}
+                </div>
+              </div>
+              <div className="flex justify-end gap-1.5">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    toast.success(`✨ [${talkingAgent.classNpc?.name}]의 축복을 받았습니다!`);
+                    setTalkingAgent(null);
+                  }}
+                  className="pixel-btn bg-amber-400 text-black hover:bg-amber-300 font-bold text-xs"
+                >
+                  축복 받기
+                </Button>
+              </div>
+            </div>
+          ) : talkingAgent.kind === 'tribe' || talkingAgent.kind === 'extra' ? (
                   <TribeSprite
                     action="walk"
                     tribeClass={talkingAgent.tribeClass}
@@ -1925,6 +2062,16 @@ export default function BaseVillageView({
                   <img src={mercImg} alt="부족회관" className="pixelated h-10 w-auto object-contain" />
                 ) : talkingAgent.kind === 'shaman' ? (
                   <img src={shamanImg} alt="떠돌이 주술사" className="pixelated h-10 w-auto object-contain" />
+                ) : talkingAgent.kind === 'class_npc' ? (
+                  <div className="relative flex items-center justify-center">
+                    <img src={mercImg} alt={talkingAgent.label} className="pixelated h-10 w-auto object-contain filter brightness-110" />
+                    <span className="absolute -top-1 -right-1 text-xs">
+                      {canonicalClass === 'ENGINEER' && '🔧'}
+                      {canonicalClass === 'MAGE' && '🔮'}
+                      {canonicalClass === 'NECROMANCER' && '💀'}
+                      {canonicalClass === 'HONEST' && '🪶'}
+                    </span>
+                  </div>
                 ) : (
                   <PetSprite
                     speciesId={talkingAgent.speciesId ?? 'baby_raptor'}
@@ -1962,7 +2109,33 @@ export default function BaseVillageView({
             </button>
           </div>
 
-          {talkingAgent.kind === 'tribe' || talkingAgent.kind === 'extra' ? (
+          {talkingAgent.kind === 'class_npc' ? (
+            <div className="space-y-2 text-xs">
+              <div className="pixel-box bg-background p-2.5 space-y-1.5 border border-amber-500/50">
+                <div className="flex items-center justify-between font-bold text-amber-500">
+                  <span>⚡ 전속 NPC: {talkingAgent.classNpc?.name} ({talkingAgent.classNpc?.role})</span>
+                </div>
+                <p className="text-sm font-semibold text-foreground leading-relaxed">
+                  "{talkingAgent.classNpc?.dialogue}"
+                </p>
+                <div className="text-[11px] text-amber-300 bg-amber-950/40 p-2 rounded border border-amber-800/40 leading-snug">
+                  🎁 <b>터치 혜택:</b> {talkingAgent.classNpc?.tapRewardDesc}
+                </div>
+              </div>
+              <div className="flex justify-end gap-1.5">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    toast.success(`✨ [${talkingAgent.classNpc?.name}]의 축복을 받았습니다!`);
+                    setTalkingAgent(null);
+                  }}
+                  className="pixel-btn bg-amber-400 text-black hover:bg-amber-300 font-bold text-xs"
+                >
+                  축복 받기
+                </Button>
+              </div>
+            </div>
+          ) : talkingAgent.kind === 'tribe' || talkingAgent.kind === 'extra' ? (
             (() => {
               const isAmbacho = talkingAgent.label.includes('암바초');
               const dlg = isAmbacho

@@ -1,4 +1,5 @@
 import type { Stack } from './types';
+import type { ShamanClassId } from './shamanEvolution';
 
 export const VILLAGE_GRID_SIZE_DEFAULT = 12;
 export const VILLAGE_GRID_SIZE = 12;
@@ -130,7 +131,8 @@ export interface VillageState {
   researchedBlueprints?: VillageBuildingId[];
   shamanSkills?: ShamanSkillMap;
   shamanLevel?: 1 | 2 | 3 | 4 | 5;
-  shamanClass?: 'engineer' | 'mage' | 'warlock' | 'orthodox' | null;
+  shamanClass?: ShamanClassId | null;
+  classResource?: number;
 }
 
 const S = (itemId: Stack['itemId'], count: number): Stack => ({ itemId, count });
@@ -684,7 +686,7 @@ export function createStarterVillage(hasAltar = false): VillageState {
   if (hasAltar) {
     buildings.push({ uid: 'starter-altar', buildingId: 'ancient_altar', x: 4, y: 0, hp: 900, maxHp: 900, lastHarvestAt: initialLastHarvest });
   }
-  return { buildings, initialized: true, shamanLevel: 1, shamanClass: null };
+  return { buildings, initialized: true, shamanLevel: 1, shamanClass: 'NONE', classResource: 100 };
 }
 
 export function ensureVillageState(state: VillageState | undefined, hasAltar = false): VillageState {
@@ -750,7 +752,8 @@ export function ensureVillageState(state: VillageState | undefined, hasAltar = f
       ...state,
       buildings: filteredBuildings,
       shamanLevel: state.shamanLevel ?? 1,
-      shamanClass: state.shamanClass ?? null,
+      shamanClass: state.shamanClass ?? 'NONE',
+      classResource: state.classResource ?? 100,
     };
   }
   return createStarterVillage(hasAltar);
