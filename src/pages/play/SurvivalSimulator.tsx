@@ -14,6 +14,7 @@ import { useCustomCatalog } from '@/hooks/useCustomCatalog';
 import CreatureSprite from '@/components/survival/CreatureSprite';
 import ExpeditionSystem, { ExpeditionMarker } from '@/components/survival/ExpeditionSystem';
 import OfflineReportModal, { type OfflineRewardItem } from '@/components/OfflineReportModal';
+import TribeCodexModal from '@/components/TribeCodexModal';
 import { preloadCoreSprites } from '@/hooks/useSpriteAnimations';
 import { CombatImpact, CREATURE_RING_RADIUS_M, expeditionActorPoint, freshCombatHit, useExpeditionCombatSound, useMovementSound } from '@/components/survival/ExpeditionCombat';
 import type { ExpeditionFocus } from '@/lib/survival/expedition';
@@ -38,7 +39,7 @@ import { MAX_SKILL_LEVEL, skillLevel, skillUpgradeCost } from '@/lib/survival/sk
 import { type SpriteAction } from '@/hooks/useSpriteAnimations';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Backpack, Flame, Lightbulb, LocateFixed, X, Lock, ListChecks, Compass, ChevronUp, Star, MapPin, Navigation, Radar, Map as MapIcon, FileText } from 'lucide-react';
+import { Backpack, Flame, Lightbulb, LocateFixed, X, Lock, ListChecks, Compass, ChevronUp, Star, MapPin, Navigation, Radar, Map as MapIcon, FileText, BookOpen } from 'lucide-react';
 import { bearingDeg, useSurvivalFavorites } from '@/hooks/useSurvivalFavorites';
 import { useDeviceHeading } from '@/hooks/useDeviceHeading';
 import { useSurvivalGps } from '@/hooks/useSurvivalGps';
@@ -242,6 +243,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [tribeInfoModalOpen, setTribeInfoModalOpen] = useState(false);
   const [offlineReportModalOpen, setOfflineReportModalOpen] = useState(false);
   const [offlineElapsedMinutes, setOfflineElapsedMinutes] = useState(0);
+  const [codexModalOpen, setCodexModalOpen] = useState(false);
 
   // Track last active timestamp & auto-trigger Ambacho Offline Report if away >= 30m
   useEffect(() => {
@@ -1507,6 +1509,15 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               <MenuBtn icon={Zap} label={skillBarVisible ? '스킬 목록 접기' : '스킬들 목록'} onClick={() => setSkillBarVisible(v => !v)} />
               <MenuBtn icon={Shield} label="상태창" onClick={() => setStatusModalOpen(true)} />
               <MenuBtn
+                icon={BookOpen}
+                label="부족 대도감"
+                dot={g.codex?.hasUnseenNew}
+                onClick={() => {
+                  setCodexModalOpen(true);
+                  g.markCodexSeen();
+                }}
+              />
+              <MenuBtn
                 icon={FileText}
                 label="밤사이 보고서 (테스트 2시간)"
                 onClick={() => {
@@ -2039,6 +2050,11 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         village={s.village}
         shamanClass={s.shamanClass ?? s.village?.shamanClass}
         onClaim={handleClaimOfflineReport}
+      />
+      <TribeCodexModal
+        open={codexModalOpen}
+        onClose={() => setCodexModalOpen(false)}
+        codex={g.codex}
       />
     </div>
   </ContextThemeWrapper>

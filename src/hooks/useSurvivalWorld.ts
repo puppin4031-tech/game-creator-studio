@@ -52,6 +52,15 @@ import { checkFacility, reforgePower, REFORGE_SLOTS, type InventionInput, type R
 import { equipInSlot, resolveLoadout, type Equipped, type GearSlot } from '@/lib/survival/equipment';
 import { type InventionCredits } from '@/lib/survival/inventionCredits';
 import { payAccessible } from '@/lib/survival/abilities';
+import {
+  type CodexState,
+  type CodexAiInvention,
+  defaultCodexState,
+  computeCodexProgress,
+  CODEX_RESOURCES,
+  CODEX_PETS,
+  CODEX_BOSSES,
+} from '@/lib/survival/codex';
 import type { GearInstance, LatLng, Stack, WorldEntity } from '@/lib/survival/types';
 
 import { advancePetDefense, deployPet, setPetRole, settlePetHunts, petRole, PET_GUARD_SLOTS, PET_FOLLOW_SLOTS, PET_FOLLOW_ATK, petStats, type PetRole, fusePets, hatchPet, migratePets, type OwnedPet, type PetDefense, type PetHit } from '@/lib/survival/pets';
@@ -146,13 +155,16 @@ export interface WorldSave extends WorldProgress {
   };
   /** Cooking cauldron ongoing jobs */
   cookingJobs?: CookingJob[];
+  codex?: CodexState;
   lastTickAt: number;
 }
 
 const fresh = (start: LatLng): WorldSave => ({
   ...freshProgress(),
   pos: start, hp: C.baseMaxHp, hunger: 100, backpack: [], storage: [], gear: [], base: null,
-  depleted: {}, damage: {}, gathered: {}, techs: [], explored: [start], terrainZones: {}, parkCells: {}, shamanLevel: 1, shamanClass: 'NONE', classResource: 100, civilizationTechs: ['tech_fire_gathering'], lastTickAt: Date.now(),
+  depleted: {}, damage: {}, gathered: {}, techs: [], explored: [start], terrainZones: {}, parkCells: {}, shamanLevel: 1, shamanClass: 'NONE', classResource: 100, civilizationTechs: ['tech_fire_gathering'],
+  codex: defaultCodexState(),
+  lastTickAt: Date.now(),
 });
 
 function migrateTribeState(saved: Partial<WorldSave>): Partial<WorldSave> {
@@ -1002,6 +1014,12 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         power = Math.round(power * (1 + activeFoodAtkBuff.effects.atkBonusPct / 100));
       }
 
+      // Codex Milestone Perk (10% progress -> +5% ATK)
+      const codexProgressAtk = computeCodexProgress(p.codex);
+      if (codexProgressAtk.atkBonusPct > 0) {
+        power = Math.round(power * (1 + codexProgressAtk.atkBonusPct / 100));
+      }
+
       const mobDist = distanceM(p.pos, e);
       // "원거리 무기의 특징은 몹이 가까이 다가올때까지 시간이 있다는거야."
       // If the creature is not in melee clash range (<= 1.8m), it cannot counterattack yet!
@@ -1111,16 +1129,30 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         got = got.map(g => ({ ...g, count: g.count + 1 }));
         toast.success('👑 정직한 대현자의 축복! 자원 채집량 +25% 추가 수확');
       }
+
+      // Codex Milestone Perk (30% progress -> +10% gathering yield)
+      const codexProgressGather = computeCodexProgress(p.codex);
+      if (codexProgressGather.gatherBonusPct > 0 && Math.random() < 0.25 && got.length > 0) {
+        got = got.map(g => ({ ...g, count: g.count + 1 }));
+      }
     }
     const free = capacity - stackWeight(next.backpack);
     const fits = stackWeight(got) <= free;
     next.backpack = fits ? addStacks(next.backpack, got) : next.backpack;
     next.depleted = { ...p.depleted, [e.id]: Date.now() };
     const gathered = { ...p.gathered };
-    if (fits) got.forEach((g) => { gathered[g.itemId] = (gathered[g.itemId] ?? 0) + g.count; });
+    if (fits) {
+      got.forEach((g) => {
+        gathered[g.itemId] = (gathered[g.itemId] ?? 0) + g.count;
+        recordCodexResource(g.itemId);
+      });
+    }
     next.gathered = gathered;
     next.kills = p.kills + (e.kind === 'creature' ? 1 : 0);
-    if (e.kind === 'creature' && creatureDef(e.type).boss) next.rescueTokens = Math.min(2, (p.rescueTokens ?? 0) + 1);
+    if (e.kind === 'creature' && creatureDef(e.type).boss) {
+      next.rescueTokens = Math.min(2, (p.rescueTokens ?? 0) + 1);
+      recordCodexBoss(e.type);
+    }
     next = gainXp(next, e.kind === 'node' ? nodeDef(e.type).xp : creatureDef(e.type).xp);
     if (e.kind === 'creature' && creatureDef(e.type).boss && fits) toast.success(`우두머리 처치! ${d0Name(e.type)}`, { description: `획득: ${fmt(got)}` });
     else if (fits) toast.success(`획득: ${fmt(got) || '없음'}`); else toast.warning('배낭이 너무 무겁습니다! 거점에 다녀오세요');
@@ -1558,8 +1590,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const baby = babyFor(egg);
     const pets = p.pets ?? [];
     setS({ ...p, backpack: fromPack ?? p.backpack, storage: fromStore ?? p.storage, dinoEggs: (p.dinoEggs ?? []).filter(e => e.id !== eggId), pets: [...pets, hatchPet(crypto.randomUUID(), baby.id, baby.name, pets)], babyDinos: [], lastTickAt: Date.now() });
+    recordCodexPet(baby.id);
     return baby;
-  }, [setS]);
+  }, [setS, recordCodexPet]);
   const petAccess = () => {
     const p = ref.current;
     if (!atWorkshop(p) || (!enabledRef.current && !options.indoor)) { toast.warning('거점 안에서 펫을 관리하세요'); return null; }
@@ -1570,6 +1603,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const result = fusePets(p.pets ?? [], first, second, crypto.randomUUID());
     if (!result) { toast.warning('잠금 해제된 같은 종류·같은 레벨 펫 두 마리가 필요합니다'); return false; }
     setS({ ...p, pets: result.pets, lastTickAt: Date.now() });
+    recordCodexPet(result.pet.speciesId);
     toast.success(`${result.pet.name} Lv.${result.pet.level} 합체 성공!`);
     return true;
   }, [setS, options.indoor]);
@@ -1733,9 +1767,18 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     });
     const hasPal = nextV.buildings.some(b => b.customMechanics?.includes('WALL_BLOCK') || VILLAGE_BUILDINGS[b.buildingId]?.category === 'wall');
     setS({ ...paid, village: nextV, palisade: p.palisade || hasPal, lastTickAt: Date.now() });
+    recordCodexAiInvention({
+      id: uid,
+      name: params.name,
+      kind: 'building',
+      description: params.desc,
+      discoveredAt: Date.now(),
+      physicalAttributes: params.physics,
+      mechanicTags: params.mechanics,
+    });
     toast.success(`🏛️ 「${params.name}」 맞춤 건축 완료! (마을 배치됨)`);
     return true;
-  }, [setS]);
+  }, [setS, recordCodexAiInvention]);
 
   const craftCustomGear = useCallback((params: {
     name: string;
@@ -1795,9 +1838,18 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       gear: nextGear,
       lastTickAt: Date.now(),
     });
+    recordCodexAiInvention({
+      id: inv.id,
+      name: params.name,
+      kind: params.category === 'armor' ? 'armor' : 'weapon',
+      description: params.desc,
+      discoveredAt: Date.now(),
+      physicalAttributes: params.physics,
+      mechanicTags: params.mechanics,
+    });
     toast.success(`⚔️ 「${params.name}」 제련 완료! (배낭 장비함에 보관됨)`);
     return true;
-  }, [setS]);
+  }, [setS, recordCodexAiInvention]);
 
   const moveVillageTile = useCallback((uid: string, toX: number, toY: number): boolean => {
     const p = ref.current;
@@ -2527,7 +2579,87 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return true;
   }, [setS]);
 
-  return { claimOfflineRewards, shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
+  const recordCodexResource = useCallback((itemId: ItemId) => {
+    const p = ref.current;
+    const curCodex = p.codex ?? defaultCodexState();
+    if (curCodex.discoveredResources.includes(itemId)) return;
+
+    const nextResources = [...curCodex.discoveredResources, itemId];
+    const itemDef = ITEMS[itemId];
+    const nextCodex: CodexState = {
+      ...curCodex,
+      discoveredResources: nextResources,
+      hasUnseenNew: true,
+    };
+
+    setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
+    toast.success(`📖 [도감 신규 등록!] 새로운 자원 [${itemDef?.name ?? itemId}]을(를) 도감에 기록했습니다!`);
+  }, [setS]);
+
+  const recordCodexPet = useCallback((speciesId: string) => {
+    const p = ref.current;
+    const curCodex = p.codex ?? defaultCodexState();
+    if (curCodex.discoveredPets.includes(speciesId)) return;
+
+    const nextPets = [...curCodex.discoveredPets, speciesId];
+    const petMeta = CODEX_PETS.find(pet => pet.id === speciesId);
+    const nextCodex: CodexState = {
+      ...curCodex,
+      discoveredPets: nextPets,
+      hasUnseenNew: true,
+    };
+
+    setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
+    toast.success(`📖 [도감 신규 등록!] 새로운 공룡 펫 [${petMeta?.name ?? speciesId}]을(를) 도감에 기록했습니다!`);
+  }, [setS]);
+
+  const recordCodexBoss = useCallback((bossId: string) => {
+    const p = ref.current;
+    const curCodex = p.codex ?? defaultCodexState();
+    if (curCodex.defeatedBosses.includes(bossId)) return;
+
+    const nextBosses = [...curCodex.defeatedBosses, bossId];
+    const bossMeta = CODEX_BOSSES.find(b => b.id === bossId);
+    const nextCodex: CodexState = {
+      ...curCodex,
+      defeatedBosses: nextBosses,
+      hasUnseenNew: true,
+    };
+
+    setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
+    toast.success(`📖 [도감 신규 등록!] 우두머리 [${bossMeta?.name ?? bossId}] 토벌 기록을 도감에 새겼습니다!`);
+  }, [setS]);
+
+  const recordCodexAiInvention = useCallback((entry: CodexAiInvention) => {
+    const p = ref.current;
+    const curCodex = p.codex ?? defaultCodexState();
+    const nextInventions = [entry, ...(curCodex.aiInventions ?? [])];
+    const nextCodex: CodexState = {
+      ...curCodex,
+      aiInventions: nextInventions,
+      hasUnseenNew: true,
+    };
+
+    setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
+    toast.success(`📖 [도감 신규 등록!] AI 맞춤 발명품 [${entry.name}]이(가) 도감에 영구 소장되었습니다!`);
+  }, [setS]);
+
+  const markCodexSeen = useCallback(() => {
+    const p = ref.current;
+    if (!p.codex?.hasUnseenNew) return;
+    setS({
+      ...p,
+      codex: {
+        ...(p.codex ?? defaultCodexState()),
+        hasUnseenNew: false,
+      },
+      lastTickAt: Date.now(),
+    });
+  }, [setS]);
+
+  const codexProgress = useMemo(() => computeCodexProgress(s.codex), [s.codex]);
+
+  return { codex: s.codex ?? defaultCodexState(), codexProgress, recordCodexResource, recordCodexPet, recordCodexBoss, recordCodexAiInvention, markCodexSeen, claimOfflineRewards, shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
     moveOutpost, petHits, mergePets, togglePetDeploy, assignPetRole, feedPet, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,
