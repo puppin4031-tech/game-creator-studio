@@ -9,16 +9,18 @@ import { HpBar } from './HitFeedback';
 import { eggArt } from './eggArt';
 import { fusionSpecies } from '@/lib/survival/pets';
 import { abilitiesFor, abilityText } from '@/lib/survival/petAbilities';
+import PetFusionModal, { type PetFusionResult } from './PetFusionModal';
 
 export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, onLock, onRole, onFeed, onOpenDinoExpedition, eggs = [], onHatch }: {
   onFeed?: (uid: string) => void;
   onOpenDinoExpedition?: () => void;
   eggs?: { id: string; name: string; walked: number; need: number; ready: boolean }[]; onHatch?: (id: string) => void;
   pets: OwnedPet[]; defense?: PetDefense; ready: boolean; now: number;
-  onFuse: (first: string, second: string) => boolean; onDeploy: (uid: string) => void; onLock: (uid: string) => void; onRole?: (uid: string, role: PetRole) => void;
+  onFuse: (first: string, second: string) => OwnedPet | boolean | null; onDeploy: (uid: string) => void; onLock: (uid: string) => void; onRole?: (uid: string, role: PetRole) => void;
 }) {
   const [pair, setPair] = useState<[string, string] | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [fusionResult, setFusionResult] = useState<PetFusionResult | null>(null);
   const effect: Record<PetRole, string> = { guard: '거점에 다가오는 맹수 자동 퇴치 · 전리품 창고로', hunt: `${PET_HUNT_MS / 60000}분마다 사냥 후 전리품 귀환`, follow: `함께 걸으며 공격 +${PET_FOLLOW_ATK}`, idle: '거점에서 휴식' };
   const first = pets.find(p => p.uid === pair?.[0]), second = pets.find(p => p.uid === pair?.[1]);
   const name = (p: OwnedPet) => petById(p.speciesId)?.name ?? p.name;
@@ -93,8 +95,35 @@ export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, 
       <AlertDialogContent className="max-w-sm">
         <AlertDialogHeader><AlertDialogTitle>Lv.{first ? first.level + 1 : 2} 펫으로 합체할까요?</AlertDialogTitle><AlertDialogDescription>{first && `${name(first)} Lv.${first.level} 두 마리가 하나로 합쳐집니다. 추가 비용 없이 반드시 성공하며, 되돌릴 수 없습니다.`}</AlertDialogDescription></AlertDialogHeader>
         {first && second && <div className="flex items-center justify-center gap-3 py-2"><PetSprite speciesId={first.speciesId} name={name(first)} height={64} /><Merge className="text-primary" /><PetSprite speciesId={second.speciesId} name={name(second)} height={64} /></div>}
-        <AlertDialogFooter><AlertDialogCancel className="min-h-11">취소</AlertDialogCancel><AlertDialogAction disabled={!ready} className="min-h-11" onClick={() => { if (pair) onFuse(pair[0], pair[1]); setPair(null); }}>합체하기</AlertDialogAction></AlertDialogFooter>
+        <AlertDialogFooter>
+          <AlertDialogCancel className="min-h-11">취소</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={!ready}
+            className="min-h-11"
+            onClick={() => {
+              if (pair && first && second) {
+                const fused = onFuse(pair[0], pair[1]);
+                if (fused) {
+                  const pet = typeof fused === 'object' ? fused : { ...first, level: first.level + 1 };
+                  setFusionResult({
+                    pet,
+                    prevLevel: first.level,
+                    firstPet: first,
+                    secondPet: second,
+                  });
+                }
+              }
+              setPair(null);
+            }}
+          >
+            합체하기
+          </AlertDialogAction>
+        </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+    <PetFusionModal
+      result={fusionResult}
+      onClose={() => setFusionResult(null)}
+    />
   </section>;
 }

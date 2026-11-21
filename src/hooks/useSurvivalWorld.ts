@@ -1604,15 +1604,14 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (!atWorkshop(p) || (!enabledRef.current && !options.indoor)) { toast.warning('거점 안에서 펫을 관리하세요'); return null; }
     return p;
   };
-  const mergePets = useCallback((first: string, second: string): boolean => {
-    const p = petAccess(); if (!p) return false;
+  const mergePets = useCallback((first: string, second: string): OwnedPet | null => {
+    const p = petAccess(); if (!p) return null;
     const result = fusePets(p.pets ?? [], first, second, crypto.randomUUID());
-    if (!result) { toast.warning('잠금 해제된 같은 종류·같은 레벨 펫 두 마리가 필요합니다'); return false; }
+    if (!result) { toast.warning('잠금 해제된 같은 종류·같은 레벨 펫 두 마리가 필요합니다'); return null; }
     setS({ ...p, pets: result.pets, lastTickAt: Date.now() });
     recordCodexPet(result.pet.speciesId);
-    toast.success(`${result.pet.name} Lv.${result.pet.level} 합체 성공!`);
-    return true;
-  }, [setS, options.indoor]);
+    return result.pet;
+  }, [setS, options.indoor, recordCodexPet]);
   const togglePetDeploy = useCallback((uid: string) => {
     const p = petAccess(); if (!p) return;
     const pets = deployPet(p.pets ?? [], uid);
