@@ -21,7 +21,13 @@ Deno.serve(async (request) => {
   const key = Deno.env.get('LOVABLE_API_KEY');
   const url = Deno.env.get('SUPABASE_URL');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const anon = Deno.env.get('SUPABASE_ANON_KEY');
   if (!key || !url || !serviceKey) return jsonError('AI 연결 설정이 준비되지 않았습니다.', 401);
+
+  const authed = createClient(url, anon ?? serviceKey, { global: { headers: { Authorization: request.headers.get('Authorization') ?? '' } } });
+  const { data: auth } = await authed.auth.getUser();
+  if (!auth.user) return jsonError('로그인 후 AI 생존 계획을 이용할 수 있습니다.', 401);
+
   const db = createClient(url, serviceKey, { auth: { persistSession: false } });
   const reportError = async (error: unknown) => {
     if (request.signal.aborted) return { status: 499, message: '계획 생성을 중단했습니다.' };
@@ -54,10 +60,8 @@ Deno.serve(async (request) => {
     const { data: blocked, error: blockError } = await db.from('survival_ai_access_state').select('status_code,message').eq('id', 'survival-plan').maybeSingle();
     if (blockError) return jsonError('AI 연결 상태를 확인하지 못했습니다.', 503);
     if (blocked) return jsonError(blocked.message, blocked.status_code);
-    // Guests retain access; throttle is server-controlled, not a client-selected ID.
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? request.headers.get('cf-connecting-ip') ?? 'shared-guest';
-    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${serviceKey}:${ip}`));
-    const clientHash = Array.from(new Uint8Array(digest), x => x.toString(16).padStart(2, '0')).join('');
+    // Authenticated user rate limiting and daily cap
+    const clientHash = `plan:${auth.user.id}`;
     const { data: claimed, error: claimError } = await db.rpc('claim_survival_ai_request', { p_client_hash: clientHash });
     if (claimError) return jsonError('AI 요청을 준비하지 못했습니다.', 503);
     if (!claimed) return jsonError('계획 요청이 너무 빠릅니다. 30초 후 다시 시도해 주세요.', 429);

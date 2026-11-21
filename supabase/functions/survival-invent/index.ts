@@ -35,7 +35,18 @@ Deno.serve(async (request) => {
     const parsed = Body.safeParse(JSON.parse(raw));
     if (!parsed.success) return json({ ok: false, message: '입력 형식이 올바르지 않습니다.' }, 400);
     const body = parsed.data;
-    if (body.action !== 'invent' && body.action !== 'reforge') { const r = await act(body.action); return json({ ok: !!r.ok, message: r.message, credits: credits(r) }); }
+    if (body.action !== 'invent' && body.action !== 'reforge') {
+      if (body.action === 'walk') {
+        const { data: save } = await db.from('survival_saves').select('payload').eq('user_id', auth.user.id).maybeSingle();
+        const payload = save?.payload as { walkSteps?: number; expeditionDistanceM?: number } | undefined;
+        const totalDistance = (payload?.walkSteps ?? 0) * 20 + (payload?.expeditionDistanceM ?? 0);
+        if (totalDistance < 200) {
+          return json({ ok: false, message: '최소 200m 이상 탐험한 기록이 있어야 탐험 발명 보상을 수령할 수 있습니다.' }, 400);
+        }
+      }
+      const r = await act(body.action);
+      return json({ ok: !!r.ok, message: r.message, credits: credits(r) });
+    }
     const { data: save } = await db.from('survival_saves').select('payload').eq('user_id', auth.user.id).maybeSingle();
     const payload = save?.payload as { altar?: boolean; base?: { level?: number } } | undefined;
     const altar = savedAltar(payload);
