@@ -1,5 +1,4 @@
 import type { ItemId } from './items';
-import type { SpriteKey } from './types';
 import type { PhysicalAttributes, BuildingMechanicTag, GearMechanicTag } from './intentCrafting';
 
 export interface CodexPetDef {
@@ -11,7 +10,7 @@ export interface CodexPetDef {
 }
 
 export interface CodexResourceDef {
-  id: ItemId;
+  id: ItemId | 'hematite';
   name: string;
   desc: string;
   icon: string;

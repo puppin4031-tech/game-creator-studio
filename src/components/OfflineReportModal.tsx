@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { ITEMS, type ItemId } from '@/lib/survival/items';
-import type { SpriteKey } from '@/lib/survival/types';
+import type { SpriteKey } from '@/lib/survival/spriteMeta';
 import type { ShamanClassId } from '@/lib/survival/shamanEvolution';
 import { BASE_SHAMAN_CLASSES, normalizeShamanClassId } from '@/lib/survival/shamanEvolution';
 import type { VillageState } from '@/lib/survival/village';

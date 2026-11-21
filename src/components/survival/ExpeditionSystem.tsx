@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { CombatImpact, expeditionActorPoint, freshCombatHit } from './ExpeditionCombat';
 
-const SQUAD_CLASSES: TribeClassId[] = ['tank', 'ranged', 'gatherer', 'support', 'assassin'];
+const SQUAD_CLASSES: TribeClassId[] = ['tank', 'ranged', 'gatherer', 'assassin'];
 
 export function ExpeditionMarker({ crew, project, members = 1, tribeClass }: { crew: ObservedExpedition; project: (p: LatLng) => { x: number; y: number }; members?: number; tribeClass?: TribeClassId }) {
   const pos = expeditionActorPoint(crew, project);

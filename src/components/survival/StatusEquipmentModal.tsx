@@ -105,7 +105,7 @@ export default function StatusEquipmentModal({
       if (it.trinket.lootBonus > 0) specialEffects.push(`전리품 +${Math.round(it.trinket.lootBonus * 100)}%`);
       if (it.trinket.xpBonus > 0) specialEffects.push(`경험치 +${Math.round(it.trinket.xpBonus * 100)}%`);
     }
-    if (g.quality === 'MASTERPIECE') specialEffects.push('명품 장인의 숨결 (+15% 위력)');
+    if (g.quality === 'MASTERWORK') specialEffects.push('명품 장인의 숨결 (+15% 위력)');
   }
 
   // 2. Extra bonus stats from buffs, pets, permanent stats
@@ -115,16 +115,13 @@ export default function StatusEquipmentModal({
 
   // Buffs
   for (const b of activeBuffs) {
-    if (b.effect.type === 'attack_boost') {
-      buffAtk += Math.round(b.effect.val);
+    if (b.effects.atkBonusPct) {
+      buffAtk += Math.round(gearAtk * b.effects.atkBonusPct / 100);
       specialEffects.push(`식사 버프: ${b.name}`);
-    } else if (b.effect.type === 'defense_boost') {
-      buffDef += Math.round(b.effect.val);
+    }
+    if (b.effects.defBonusPct) {
+      buffDef += Math.round(gearDef * b.effects.defBonusPct / 100);
       specialEffects.push(`식사 버프: ${b.name}`);
-    } else if (b.effect.type === 'crit_boost') {
-      specialEffects.push(`치명타 확률 +${Math.round(b.effect.val * 100)}%`);
-    } else if (b.effect.type === 'drain_life') {
-      specialEffects.push(`흡혈 타격 +${Math.round(b.effect.val * 100)}%`);
     }
   }
 

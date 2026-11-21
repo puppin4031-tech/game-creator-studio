@@ -1,5 +1,5 @@
 import { tribeRatio, tribeInjured } from '@/lib/survival/mercenaries';
-import { DEFAULT_TRIBE_CLASS, getTribeClass } from '@/data/tribeClasses';
+import { DEFAULT_TRIBE_CLASS, getTribeClass, type TribeClassId } from '@/data/tribeClasses';
 // @refresh reset
 // Custom GPS/world hook changes must remount this screen instead of reusing stale hook queues.
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -40,7 +40,7 @@ import { MAX_SKILL_LEVEL, skillLevel, skillUpgradeCost } from '@/lib/survival/sk
 import { type SpriteAction } from '@/hooks/useSpriteAnimations';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Backpack, Flame, Lightbulb, LocateFixed, X, Lock, ListChecks, Compass, ChevronUp, Star, MapPin, Navigation, Radar, Map as MapIcon, FileText, BookOpen } from 'lucide-react';
+import { Backpack, Flame, Lightbulb, LocateFixed, X, Lock, ListChecks, Compass, ChevronUp, Star, MapPin, Navigation, Radar, Map as MapIcon, FileText, BookOpen, Zap, Shield } from 'lucide-react';
 import { bearingDeg, useSurvivalFavorites } from '@/hooks/useSurvivalFavorites';
 import { useDeviceHeading } from '@/hooks/useDeviceHeading';
 import { useSurvivalGps } from '@/hooks/useSurvivalGps';
@@ -1030,7 +1030,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
             </div>
             <div className="flex flex-col items-start leading-tight">
               <span className="font-bold text-[11px] truncate max-w-[130px]">
-                {crew ? `${activeTribeClass.name} (HP ${crew.hp})` : `${activeTribeClass.name} Lv.${s.tribe?.level ?? 1}`}
+                {crew ? `${activeTribeClass.name} (HP ${crew.hp})` : `${activeTribeClass.name} Lv.${s.tribe?.trainLevel ?? 1}`}
               </span>
               <span className="text-[9px] text-muted-foreground">
                 {crew ? `원정 분대 (${s.tribe?.count ?? 3}명)` : `대기 중 · ${s.tribe?.count ?? 1}명`}
