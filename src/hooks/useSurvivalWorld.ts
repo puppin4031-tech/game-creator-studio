@@ -68,10 +68,13 @@ import type { GearInstance, LatLng, Stack, WorldEntity } from '@/lib/survival/ty
 import { advancePetDefense, deployPet, setPetRole, settlePetHunts, petRole, PET_GUARD_SLOTS, PET_FOLLOW_SLOTS, PET_FOLLOW_ATK, petStats, type PetRole, fusePets, hatchPet, migratePets, type OwnedPet, type PetDefense, type PetHit } from '@/lib/survival/pets';
 
 const SAVE_KEY = 'survival-world-v1';
+export const CURRENT_SAVE_VERSION = 2;
 const EXPLORE_STEP_M = 20;
 const MAX_EXPLORED = 3000;
 
 export interface WorldSave extends WorldProgress {
+  saveVersion?: number;
+  lastActiveAt?: number;
   pos: LatLng;
   hp: number;
   hunger: number;
@@ -164,10 +167,12 @@ export interface WorldSave extends WorldProgress {
 
 const fresh = (start: LatLng): WorldSave => ({
   ...freshProgress(),
+  saveVersion: CURRENT_SAVE_VERSION,
   pos: start, hp: C.baseMaxHp, hunger: 100, backpack: [], storage: [], gear: [], base: null,
   depleted: {}, damage: {}, gathered: {}, techs: [], explored: [start], terrainZones: {}, parkCells: {}, shamanLevel: 1, shamanClass: 'NONE', classResource: 100, civilizationTechs: ['tech_fire_gathering'],
   codex: defaultCodexState(),
   lastTickAt: Date.now(),
+  lastActiveAt: Date.now(),
 });
 
 function migrateTribeState(saved: Partial<WorldSave>): Partial<WorldSave> {
@@ -235,6 +240,54 @@ function isFreshOrEmptySave(w?: Partial<WorldSave> | null): boolean {
   return level <= 1 && xp <= 0 && petsCount === 0 && backpackCount === 0 && storageCount === 0 && techsCount === 0 && !hasBase;
 }
 
+export function migrateSaveData(raw: unknown, start: LatLng): WorldSave {
+  const baseFresh = fresh(start);
+  if (!raw || typeof raw !== 'object') {
+    return baseFresh;
+  }
+
+  const p = raw as Partial<WorldSave> & Record<string, unknown>;
+
+  // Run existing tribe and pet migrations
+  const tribeMigrated = migrateTribeState(p);
+  const petsMigrated = migratePets(
+    {
+      ...baseFresh,
+      ...tribeMigrated,
+      base: tribeMigrated.base ? { ...tribeMigrated.base, placedAt: tribeMigrated.base.placedAt ?? Date.now() } : null,
+    },
+    id => petById(id)?.name ?? id
+  );
+
+  const merged: WorldSave = {
+    ...baseFresh,
+    ...petsMigrated,
+    saveVersion: CURRENT_SAVE_VERSION,
+    backpack: Array.isArray(p.backpack) ? p.backpack : [],
+    storage: Array.isArray(p.storage) ? p.storage : [],
+    gear: Array.isArray(p.gear) ? p.gear : [],
+    storedGear: Array.isArray(p.storedGear) ? p.storedGear : [],
+    techs: Array.isArray(p.techs) ? p.techs : [],
+    techLevels: p.techLevels && typeof p.techLevels === 'object' ? p.techLevels : {},
+    civilizationTechs: Array.isArray(p.civilizationTechs) && p.civilizationTechs.length > 0 ? p.civilizationTechs : ['tech_fire_gathering'],
+    shamanClass: (p.shamanClass ?? 'NONE') as ShamanClassId,
+    classResource: typeof p.classResource === 'number' ? p.classResource : 100,
+    shamanLevel: (p.shamanLevel ?? 1) as 1 | 2 | 3 | 4 | 5,
+    activeBuffs: Array.isArray(p.activeBuffs) ? p.activeBuffs : [],
+    permanentStats: p.permanentStats && typeof p.permanentStats === 'object' ? p.permanentStats : {},
+    depleted: p.depleted && typeof p.depleted === 'object' ? p.depleted : {},
+    damage: p.damage && typeof p.damage === 'object' ? p.damage : {},
+    gathered: p.gathered && typeof p.gathered === 'object' ? p.gathered : {},
+    terrainZones: p.terrainZones && typeof p.terrainZones === 'object' ? p.terrainZones : {},
+    parkCells: p.parkCells && typeof p.parkCells === 'object' ? p.parkCells : {},
+    lastTickAt: typeof p.lastTickAt === 'number' ? p.lastTickAt : Date.now(),
+    lastActiveAt: typeof p.lastActiveAt === 'number' ? p.lastActiveAt : Date.now(),
+  };
+
+  merged.codex = syncCodexStateWithSave(merged);
+  return merged;
+}
+
 function load(start: LatLng, saveKey: string): WorldSave {
   try {
     let bestSaved: Partial<WorldSave> | null = null;
@@ -248,7 +301,7 @@ function load(start: LatLng, saveKey: string): WorldSave {
         bestSaved = parsed;
         bestScore = computeSaveScore(parsed);
       } catch (e) {
-        console.error('[survival] failed to parse target save', e);
+        console.warn('[survival] failed to parse target save', e);
       }
     }
 
@@ -278,9 +331,7 @@ function load(start: LatLng, saveKey: string): WorldSave {
     }
 
     if (bestSaved) {
-      const migrated = migrateTribeState(bestSaved);
-      const loaded = migratePets({ ...fresh(start), ...migrated, base: migrated.base ? { ...migrated.base, placedAt: migrated.base.placedAt ?? Date.now() } : null }, id => petById(id)?.name ?? id);
-      return { ...loaded, codex: syncCodexStateWithSave(loaded) };
+      return migrateSaveData(bestSaved, start);
     }
   } catch (e) {
     console.error('[survival] failed to load save', e);
@@ -409,18 +460,76 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   useEffect(() => { if (options.indoor) ensureStarterCamp(); }, [options.indoor, ensureStarterCamp]);
 
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(t); }, []);
-  useEffect(() => {
+  const [savedIndicator, setSavedIndicator] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const indicatorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedJsonRef = useRef<string>('');
+
+  const performWrite = useCallback((data: WorldSave) => {
     try {
-      localStorage.setItem(saveKey, JSON.stringify(s));
-      // Keep safety rolling backups if progress is present
-      if (!isFreshOrEmptySave(s)) {
-        localStorage.setItem(`${saveKey}_backup`, JSON.stringify(s));
-        localStorage.setItem('survival-world-v1', JSON.stringify(s));
+      const dataToSave = { ...data, saveVersion: CURRENT_SAVE_VERSION, lastActiveAt: Date.now() };
+      const json = JSON.stringify(dataToSave);
+      if (json === lastSavedJsonRef.current) return;
+      localStorage.setItem(saveKey, json);
+      if (!isFreshOrEmptySave(dataToSave)) {
+        localStorage.setItem(`${saveKey}_backup`, json);
+        localStorage.setItem('survival-world-v1', json);
       }
+      lastSavedJsonRef.current = json;
+
+      // Show tiny '저장됨 ✓' indicator for 1.5s
+      setSavedIndicator(true);
+      if (indicatorTimeoutRef.current) clearTimeout(indicatorTimeoutRef.current);
+      indicatorTimeoutRef.current = setTimeout(() => {
+        setSavedIndicator(false);
+      }, 1500);
     } catch {
-      toast.error('진행 상태를 기기에 저장하지 못했습니다. 저장 공간을 확인해 주세요.');
+      console.warn('[survival] failed to persist save to localStorage');
     }
-  }, [s, saveKey]);
+  }, [saveKey]);
+
+  // Debounced Save (1500ms) for routine state updates
+  useEffect(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      performWrite(s);
+    }, 1500);
+
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [s, performWrite]);
+
+  // Immediate Save (flush) function
+  const flushSave = useCallback(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    performWrite(ref.current);
+  }, [performWrite]);
+
+  // Flush on browser tab close / hide / visibilitychange
+  useEffect(() => {
+    const handleFlush = () => {
+      flushSave();
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        flushSave();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleFlush);
+    window.addEventListener('pagehide', handleFlush);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleFlush);
+      window.removeEventListener('pagehide', handleFlush);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (indicatorTimeoutRef.current) clearTimeout(indicatorTimeoutRef.current);
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [flushSave]);
 
   useEffect(() => {
     const t = ref.current.tribe;
@@ -799,9 +908,10 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       },
       expeditionLogs: appendLog(p, `${cls.icon} ${cls.name} 영입 · ${count + 1}/10명`, now),
     });
+    setTimeout(flushSave, 0);
     toast.success(`${cls.icon} ${cls.name} 영입 완료! (총 ${count + 1}명)`);
     return true;
-  }, [setS]);
+  }, [setS, flushSave]);
   const dismissTribe = useCallback((classId?: TribeClassId) => {
     const p = ref.current;
     const count = p.tribe?.count ?? 0;
@@ -834,13 +944,14 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         },
       },
     });
+    setTimeout(flushSave, 0);
 
     const cls = getTribeClass(finalClass);
     toast.success(`${cls.icon} ${cls.name} 부족민을 명예 제대/환급 처리했습니다.`, {
       description: `환급 자원: 구운 고기 3 · 가죽 2 · 부싯돌 3 · 조개 5 (거점 창고 지급)`,
     });
     return true;
-  }, [setS]);
+  }, [setS, flushSave]);
   const trainTribe = useCallback(() => {
     const p = ref.current; const t = p.tribe;
     if (!t?.count) { toast.warning('먼저 부족민을 영입하세요'); return false; }
@@ -1675,7 +1786,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const storage = removeStacks(p.storage, [{ itemId, count: 1 }]);
     if (!storage || stackWeight(p.backpack) + ITEMS[itemId].weight > capacity) return;
     setS({ ...p, storage, backpack: addStacks(p.backpack, [{ itemId, count: 1 }]), packedItems: [...new Set([...(p.packedItems ?? []), itemId])] });
-  }, [capacity, setS]);
+    setTimeout(flushSave, 0);
+  }, [capacity, setS, flushSave]);
 
   const storeOne = useCallback((itemId: ItemId, count = 1) => {
     const p = ref.current;
@@ -1683,8 +1795,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const moved = transferStack(p.backpack, p.storage, itemId, count);
     if (!moved) { toast.warning('보관할 수량을 다시 확인하세요'); return; }
     setS({ ...p, backpack: moved.source, storage: moved.destination });
+    setTimeout(flushSave, 0);
     toast.success(`${ITEMS[itemId].name} ${count}개를 창고로 옮겼습니다`);
-  }, [setS]);
+  }, [setS, flushSave]);
   const storePacked = useCallback(() => {
     if (!enabledRef.current || !atWorkshop(ref.current)) return;
     setS(p => ({ ...p, packedItems: [] }));
@@ -1842,7 +1955,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         equipped: Object.fromEntries(Object.entries(p.equipped ?? {}).filter(([_, v]) => v !== uid)),
       };
     });
-  }, [setS]);
+    setTimeout(flushSave, 0);
+  }, [setS, flushSave]);
 
   const retrieveGear = useCallback((uid: string) => {
     setS(p => {
@@ -1854,7 +1968,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         gear: [...p.gear, item],
       };
     });
-  }, [setS]);
+    setTimeout(flushSave, 0);
+  }, [setS, flushSave]);
 
   const pickEgg = useCallback((egg: EggSpawn) => {
     const p = ref.current;
@@ -1885,8 +2000,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const pets = p.pets ?? [];
     setS({ ...p, backpack: fromPack ?? p.backpack, storage: fromStore ?? p.storage, dinoEggs: (p.dinoEggs ?? []).filter(e => e.id !== eggId), pets: [...pets, hatchPet(crypto.randomUUID(), baby.id, baby.name, pets)], babyDinos: [], lastTickAt: Date.now() });
     recordCodexPet(baby.id);
+    setTimeout(flushSave, 0);
     return baby;
-  }, [setS, recordCodexPet]);
+  }, [setS, recordCodexPet, flushSave]);
   const petAccess = () => {
     const p = ref.current;
     if (!atWorkshop(p) || (!enabledRef.current && !options.indoor)) { toast.warning('거점 안에서 펫을 관리하세요'); return null; }
@@ -1898,8 +2014,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (!result) { toast.warning('잠금 해제된 같은 종류·같은 레벨 펫 두 마리가 필요합니다'); return null; }
     setS({ ...p, pets: result.pets, lastTickAt: Date.now() });
     recordCodexPet(result.pet.speciesId);
+    setTimeout(flushSave, 0);
     return result.pet;
-  }, [setS, options.indoor, recordCodexPet]);
+  }, [setS, options.indoor, recordCodexPet, flushSave]);
   const togglePetDeploy = useCallback((uid: string) => {
     const p = petAccess(); if (!p) return;
     const pets = deployPet(p.pets ?? [], uid);
@@ -2310,10 +2427,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       classResource: 100,
       lastTickAt: Date.now(),
     });
+    setTimeout(flushSave, 0);
 
     toast.success(`🎉 ${meta.icon} [${meta.name}] 전직 의식 완수! 전속 NPC [${meta.npc.name}]이(가) 마을에 합류했습니다!`);
     return true;
-  }, [setS]);
+  }, [setS, flushSave]);
 
   const triggerClassUltimate = useCallback((): boolean => {
     const p = ref.current;
@@ -2879,10 +2997,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
     // Auto record newly discovered resources brought back by Ambacho into the Codex
     items.forEach(st => recordCodexResource(st.itemId));
+    setTimeout(flushSave, 0);
 
     toast.success(`🎒 암바초가 모은 보물 ${items.length}종을 거점 창고에 모두 보관했습니다!`);
     return true;
-  }, [setS, recordCodexResource]);
+  }, [setS, recordCodexResource, flushSave]);
 
   const markCodexSeen = useCallback(() => {
     const p = ref.current;
@@ -2908,18 +3027,19 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const { data } = await supabase.from('survival_saves').select('payload').eq('user_id', userId).maybeSingle();
       const remote = data?.payload as Partial<WorldSave> | undefined;
       if (remote && computeSaveScore(remote) > computeSaveScore(chosen)) {
-        const migratedRemote = migrateTribeState(remote);
-        chosen = migratePets({ ...fresh(ref.current.pos), ...migratedRemote, base: migratedRemote.base ? { ...migratedRemote.base, placedAt: migratedRemote.base.placedAt ?? Date.now() } : null }, id => petById(id)?.name ?? id);
+        chosen = migrateSaveData(remote, ref.current.pos);
       }
     }
     setS(chosen);
+    setTimeout(flushSave, 0);
     toast.success('최고 진행도 저장 데이터를 성공적으로 복원했습니다!', {
       description: `레벨 ${chosen.level} / 공룡 펫 ${chosen.pets?.length ?? 0}마리 / 재료 ${chosen.backpack?.length ?? 0}종`,
     });
     return chosen;
-  }, [saveKey, userId, setS]);
+  }, [saveKey, userId, setS, flushSave]);
 
   return { codex: s.codex ?? defaultCodexState(), codexProgress, recordCodexResource, recordCodexPet, recordCodexBoss, recordCodexAiInvention, markCodexSeen, reloadSaveFromBestSource, claimOfflineRewards, shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, dismissTribe, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
+    savedIndicator, flushSave,
     moveOutpost, petHits, mergePets, togglePetDeploy, assignPetRole, feedPet, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,

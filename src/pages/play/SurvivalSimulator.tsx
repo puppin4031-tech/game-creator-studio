@@ -245,36 +245,62 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [offlineElapsedMinutes, setOfflineElapsedMinutes] = useState(0);
   const [codexModalOpen, setCodexModalOpen] = useState(false);
 
-  // Track last active timestamp & auto-trigger Ambacho Offline Report if away >= 30m
+  // Track last active timestamp, handle visibilitychange, and auto-trigger Ambacho Offline Report
   useEffect(() => {
     const LAST_ACTIVE_KEY = 'colonion_last_active_at';
-    const raw = localStorage.getItem(LAST_ACTIVE_KEY);
-    const now = Date.now();
-    if (raw) {
-      const lastTime = parseInt(raw, 10);
-      if (!isNaN(lastTime) && lastTime > 0) {
-        const diffMin = Math.floor((now - lastTime) / (60 * 1000));
-        if (diffMin >= 30) {
-          setOfflineElapsedMinutes(diffMin);
-          setOfflineReportModalOpen(true);
+
+    const checkAndTriggerOfflineReport = () => {
+      const raw = localStorage.getItem(LAST_ACTIVE_KEY);
+      const now = Date.now();
+      if (raw) {
+        const lastTime = parseInt(raw, 10);
+        if (!isNaN(lastTime) && lastTime > 0) {
+          const diffMin = Math.floor((now - lastTime) / (60 * 1000));
+          if (diffMin >= 30) {
+            setOfflineElapsedMinutes(diffMin);
+            setOfflineReportModalOpen(true);
+          }
         }
       }
-    }
-    localStorage.setItem(LAST_ACTIVE_KEY, now.toString());
+      localStorage.setItem(LAST_ACTIVE_KEY, now.toString());
+    };
+
+    // Check on mount
+    checkAndTriggerOfflineReport();
 
     const timer = window.setInterval(() => {
-      localStorage.setItem(LAST_ACTIVE_KEY, Date.now().toString());
+      if (!document.hidden) {
+        localStorage.setItem(LAST_ACTIVE_KEY, Date.now().toString());
+      }
     }, 15_000);
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        // App backgrounded or screen locked: stamp last active and flush auto-save
+        localStorage.setItem(LAST_ACTIVE_KEY, Date.now().toString());
+        g.flushSave();
+      } else {
+        // App resumed / tab focused: check if enough time passed for Offline Report
+        checkAndTriggerOfflineReport();
+      }
+    };
 
     const onUnload = () => {
       localStorage.setItem(LAST_ACTIVE_KEY, Date.now().toString());
+      g.flushSave();
     };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('beforeunload', onUnload);
+    window.addEventListener('pagehide', onUnload);
+
     return () => {
       window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('beforeunload', onUnload);
+      window.removeEventListener('pagehide', onUnload);
     };
-  }, []);
+  }, [g]);
 
   const handleClaimOfflineReport = (items: OfflineRewardItem[], classResourceAmount?: number) => {
     g.claimOfflineRewards(
@@ -644,6 +670,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   useEffect(() => {
     if (!autoOn && !gathererActive) return;
     const id = window.setInterval(() => {
+      if (document.hidden) return;
       const { g: w, ready } = autoRef.current;
       if (!ready || w.weight >= w.capacity) return;
       const p = w.state;
@@ -1596,6 +1623,21 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           )}
         </div>
       )}
+
+      {/* Top HUD Auto-Save Indicator */}
+      <AnimatePresence>
+        {g.savedIndicator && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: -4 }}
+            transition={{ duration: 0.2 }}
+            className="pixel-frame fixed top-[calc(0.75rem+env(safe-area-inset-top))] right-3 z-50 flex items-center gap-1 rounded bg-stone-900/95 border border-emerald-500/70 px-2 py-0.5 text-[10px] font-bold text-emerald-400 shadow-lg backdrop-blur pointer-events-none"
+          >
+            <span>저장됨 ✓</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {activeTarget && (() => {
         const d = distanceM(s.pos, activeTarget);
