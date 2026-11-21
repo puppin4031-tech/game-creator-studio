@@ -16,7 +16,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ITEMS, type ItemId } from '@/lib/survival/items';
 import type { Stack } from '@/lib/survival/types';
-import { countOf } from '@/lib/survival/inventory';
+import { addStacks, countOf } from '@/lib/survival/inventory';
 import {
   CIV_TECHS,
   checkCivTechStatus,
@@ -63,7 +63,7 @@ export default function CivilizationTechModal({
     [activeEra]
   );
 
-  const owned = useMemo(() => [...storage, ...backpack], [storage, backpack]);
+  const owned = useMemo(() => addStacks(storage, backpack), [storage, backpack]);
 
   if (!open) return null;
 

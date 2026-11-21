@@ -1,6 +1,6 @@
 import type { ItemId } from './items';
 import type { Stack } from './types';
-import { countOf } from './inventory';
+import { addStacks, countOf } from './inventory';
 import { CIVILIZATION_ERAS, type CivilizationEra, type EraTierInfo } from '@/data/resources';
 
 export interface CivTechDef {
@@ -275,7 +275,7 @@ export function checkCivTechStatus(
     return { tech, isUnlocked: true, canResearch: false, missingMaterials: [] };
   }
 
-  const owned = [...storage, ...backpack];
+  const owned = addStacks(storage, backpack);
   const missingMaterials: Stack[] = [];
 
   for (const c of tech.cost) {

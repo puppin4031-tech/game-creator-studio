@@ -1416,10 +1416,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (p.base.level === 1 && !p.techs.includes('hut_building')) { toast.error('움집 기술을 먼저 연구하세요'); return; }
     if (p.baseUpgrade) { toast.warning('이미 발전 공사 중입니다'); return; }
     const lv = (p.base.level + 1) as 2 | 3;
-    const left = removeStacks(p.storage, BASE_LEVELS[lv].cost);
-    if (!left) { toast.error('창고 재료가 부족합니다'); return; }
+    const paid = payCost(p, BASE_LEVELS[lv].cost);
+    if (!paid) { toast.error('재료가 부족합니다'); return; }
+    const left = paid.storage;
     const now = Date.now();
-    setS({ ...p, storage: left, baseUpgrade: { id: String(lv), startedAt: now, readyAt: now + BASE_UPGRADE_MS[lv] } });
+    setS({ ...p, storage: left, backpack: paid.backpack, baseUpgrade: { id: String(lv), startedAt: now, readyAt: now + BASE_UPGRADE_MS[lv] } });
     toast.success(`${BASE_LEVELS[lv].name} 공사를 시작했습니다`);
   }, []);
   /** Completes a finished base upgrade (no GPS needed: it was paid on site). */
@@ -1468,15 +1469,16 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (!isRecipeUnlocked(r, p.techs)) { toast.error('아직 제작법을 모릅니다'); return; }
     if ((r.minLevel ?? 1) > p.level) { toast.error(`족장 Lv.${r.minLevel}부터 만들 수 있어요`); return; }
     if (!p.base || p.base.level < r.baseLevel) { toast.error(`거점 ${r.baseLevel}단계 이상 필요`); return; }
-    const left = removeStacks(p.storage, r.ingredients);
-    if (!left) { toast.error('창고 재료가 부족합니다'); return; }
+    const paid = payCost(p, r.ingredients);
+    if (!paid) { toast.error('재료가 부족합니다'); return; }
+    const left = paid.storage;
     const it = ITEMS[r.result];
-    const next = { ...p, crafted: { ...p.crafted, [r.result]: (p.crafted[r.result] ?? 0) + r.count } };
+    const next = { ...p, backpack: paid.backpack, crafted: { ...p.crafted, [r.result]: (p.crafted[r.result] ?? 0) + r.count } };
     if (it.durability !== undefined) {
       const g: GearInstance = { uid: crypto.randomUUID(), itemId: r.result, quality: 'NORMAL', durability: it.durability, maxDurability: it.durability };
       setS({ ...next, storage: left, gear: [...p.gear, g] });
     } else if (r.result === 'arrow' || r.result === 'sling_stone' || (r.result as string) === 'javelin') {
-      setS({ ...next, storage: left, backpack: addStacks(p.backpack, [{ itemId: r.result, count: r.count }]) });
+      setS({ ...next, storage: left, backpack: addStacks(paid.backpack, [{ itemId: r.result, count: r.count }]) });
     } else {
       setS({ ...next, storage: addStacks(left, [{ itemId: r.result, count: r.count }]) });
     }
@@ -2820,7 +2822,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,
     quest, questProgress, canClaimQuest, claimQuest, nextLevelXp: xpToNext(s.level),
-    canAfford: (st: Stack[]) => hasAll(s.storage, st),
+    canAfford: (st: Stack[]) => hasAll(addStacks(s.storage, s.backpack), st),
     recipes: RECIPES, NODES, CREATURES,
   };
 }

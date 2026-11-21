@@ -709,10 +709,13 @@ export function ensureVillageState(state: VillageState | undefined, hasAltar = f
       const keepUid = halls[0].uid;
       filteredBuildings = filteredBuildings.filter(b => b.buildingId !== 'tribal_hall' || b.uid === keepUid);
     }
-    const shamans = filteredBuildings.filter(b => b.buildingId === 'wandering_shaman' || b.buildingId === 'shaman_tent');
-    if (shamans.length > 1) {
-      const keepUid = shamans[0].uid;
-      filteredBuildings = filteredBuildings.filter(b => (b.buildingId !== 'wandering_shaman' && b.buildingId !== 'shaman_tent') || b.uid === keepUid);
+    // Dedupe each shaman building id separately; a built tent must not be dropped for the starter shaman.
+    for (const sid of ['wandering_shaman', 'shaman_tent'] as const) {
+      const same = filteredBuildings.filter(b => b.buildingId === sid);
+      if (same.length > 1) {
+        const keepUid = same[0].uid;
+        filteredBuildings = filteredBuildings.filter(b => b.buildingId !== sid || b.uid === keepUid);
+      }
     }
 
     if (!filteredBuildings.some(b => b.buildingId === 'campfire')) {
