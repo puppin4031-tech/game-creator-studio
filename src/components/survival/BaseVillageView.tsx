@@ -1924,9 +1924,6 @@ export default function BaseVillageView({
                 )}
                 <div
                   className={ag.jumpTick && Date.now() - ag.jumpTick < 1500 ? 'animate-bounce' : ''}
-                  style={{
-                    transform: ag.facing === -1 ? 'scaleX(-1)' : undefined,
-                  }}
                 >
                   {ag.kind === 'shaman' ? (
                     <ShamanAuraWrapper shamanClass={vState.shamanClass ?? shamanClass}>
@@ -1934,6 +1931,9 @@ export default function BaseVillageView({
                         <img
                           src={shamanImg}
                           alt="떠돌이 주술사"
+                          style={{
+                            transform: ag.facing === -1 ? 'scaleX(-1)' : undefined,
+                          }}
                           className={`pixelated h-8 w-auto object-contain ${
                             vState.shamanClass === 'warlock' || vState.shamanClass === 'NECROMANCER'
                               ? 'drop-shadow-[0_0_8px_rgba(168,85,247,0.9)]'
@@ -1956,6 +1956,9 @@ export default function BaseVillageView({
                       <img
                         src={mercImg}
                         alt="부족회관"
+                        style={{
+                          transform: ag.facing === -1 ? 'scaleX(-1)' : undefined,
+                        }}
                         className="pixelated h-10 w-auto object-contain drop-shadow"
                       />
                       <span className="mt-0.5 whitespace-nowrap text-[8px] font-bold text-black drop-shadow-[0_1px_1px_rgba(255,255,255,0.95)] leading-none select-none">
@@ -1969,6 +1972,9 @@ export default function BaseVillageView({
                           <img
                             src={mercImg}
                             alt={ag.label}
+                            style={{
+                              transform: ag.facing === -1 ? 'scaleX(-1)' : undefined,
+                            }}
                             className="pixelated h-9 w-auto object-contain drop-shadow-[0_0_6px_rgba(250,204,21,0.8)] filter brightness-110"
                           />
                           <span className="absolute -top-1 -right-1 text-xs">
@@ -1990,16 +1996,19 @@ export default function BaseVillageView({
                         tribeClass={ag.tribeClass}
                         height={ag.kind === 'extra' ? 25 : 30}
                         showBadge={false}
+                        facing={ag.facing}
                       />
                     </ShamanAuraWrapper>
                   ) : (
                     <div className={ag.moving ? 'animate-bounce' : ''}>
                       <ShamanAuraWrapper shamanClass={vState.shamanClass ?? shamanClass}>
-                        <PetSprite
-                          speciesId={ag.speciesId ?? 'baby_raptor'}
-                          name={ag.label}
-                          height={24}
-                        />
+                        <div style={{ transform: ag.facing === -1 ? 'scaleX(-1)' : undefined }}>
+                          <PetSprite
+                            speciesId={ag.speciesId ?? 'baby_raptor'}
+                            name={ag.label}
+                            height={24}
+                          />
+                        </div>
                       </ShamanAuraWrapper>
                     </div>
                   )}

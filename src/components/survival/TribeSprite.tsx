@@ -13,12 +13,26 @@ const RAPID_ATTACK_FRAMES = [walk1, attack, walk2, attack];
 const GATHER_FRAMES = [gather, walk1, gather, walk2];
 const CHOP_FRAMES = [attack, walk1, attack, idle];
 
+const MEMBER_VARIATION_FILTERS = [
+  '', // Slot 0 (Ambacho / default)
+  'hue-rotate(-12deg) saturate(1.18) brightness(1.02)', // Slot 1: warm bronze warrior
+  'hue-rotate(24deg) saturate(1.12) brightness(0.98)',   // Slot 2: jungle scout
+  'brightness(0.92) contrast(1.14) saturate(1.08)',     // Slot 3: shadow stalker
+  'sepia(0.22) saturate(1.25) brightness(1.04)',        // Slot 4: sun-baked desert
+  'hue-rotate(42deg) saturate(1.15) brightness(1.0)',   // Slot 5: emerald hunter
+];
+
 export default function TribeSprite({
   action = 'walk',
   height = 48,
   tribeClass,
   showBadge = true,
   frameOffset = 0,
+  memberIndex,
+  speedMult = 1,
+  customFilter,
+  className = '',
+  facing = 1,
 }: {
   action?: SpriteAction;
   height?: number;
@@ -27,6 +41,11 @@ export default function TribeSprite({
   tribeClass?: TribeClassId;
   showBadge?: boolean;
   frameOffset?: number;
+  memberIndex?: number;
+  speedMult?: number;
+  customFilter?: string;
+  className?: string;
+  facing?: 1 | -1;
 }) {
   const classKey = tribeClass ? `tribe:${tribeClass}` : 'tribe';
   const { data: classSheets, isLoading: classLoading } = useSpriteAnimations(classKey);
@@ -47,13 +66,16 @@ export default function TribeSprite({
             : 'walk';
 
   useEffect(() => {
-    const interval =
+    const baseInterval =
       normalizedAction === 'attack' && cls?.id === 'assassin'
         ? 90
         : cls?.frameIntervalMs ?? 200;
+    // Desynchronize step intervals by member index and speedMult so members don't move in robotic lockstep
+    const desyncOffset = memberIndex !== undefined ? (((memberIndex + 1) * 31) % 50) - 25 : 0;
+    const interval = Math.max(70, Math.round((baseInterval + desyncOffset) / (speedMult || 1)));
     const timer = window.setInterval(() => setFrame(f => (f + 1) % 4), interval);
     return () => window.clearInterval(timer);
-  }, [normalizedAction, cls?.id, cls?.frameIntervalMs]);
+  }, [normalizedAction, cls?.id, cls?.frameIntervalMs, memberIndex, speedMult]);
 
   const activeFrame = (frame + frameOffset) % 4;
 
@@ -104,6 +126,9 @@ export default function TribeSprite({
   const sheet = customClassSheet ?? fallbackAdminSheet;
   const hasCustomClassArt = !!customClassSheet;
 
+  const memberFilter = memberIndex !== undefined ? MEMBER_VARIATION_FILTERS[memberIndex % MEMBER_VARIATION_FILTERS.length] : '';
+  const combinedFilter = [cls?.spriteFilter, memberFilter, customFilter].filter(Boolean).join(' ');
+
   const fallback = (
     <img
       src={src}
@@ -111,7 +136,7 @@ export default function TribeSprite({
       className="pixelated w-auto object-contain transition-transform duration-75"
       style={{
         height: scaledHeight,
-        filter: cls?.spriteFilter,
+        filter: combinedFilter || undefined,
         transform: rapidOffset ? `translateX(${rapidOffset}px)` : undefined,
       }}
     />
@@ -121,11 +146,12 @@ export default function TribeSprite({
     <span
       data-tribe-sprite={normalizedAction}
       data-tribe-class={tribeClass ?? 'default'}
-      className="relative inline-flex shrink-0 items-end"
+      className={`relative inline-flex shrink-0 items-end ${className}`}
     >
       <span
         style={{
-          filter: !hasCustomClassArt && sheet && cls ? cls.spriteFilter : undefined,
+          filter: !hasCustomClassArt && sheet ? combinedFilter || undefined : (memberFilter || customFilter || undefined),
+          transform: facing === -1 ? 'scaleX(-1)' : undefined,
         }}
       >
         {sheet ? (

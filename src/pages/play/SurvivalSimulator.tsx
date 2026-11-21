@@ -1223,7 +1223,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   </svg>
                   <motion.div
                     aria-hidden
-                    className="absolute flex items-center justify-center drop-shadow-[0_0_8px_rgba(250,204,21,0.85)]"
+                    className="absolute flex items-center justify-center drop-shadow-[0_0_10px_rgba(250,204,21,0.9)]"
                     style={{
                       left: fromPt.x,
                       top: fromPt.y - 12,
@@ -1232,25 +1232,35 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                     initial={{
                       x: 0,
                       y: 0,
-                      rotate: rangedProjectile.kind === 'stone' ? 0 : angleDeg,
                       scale: 0.9,
                       opacity: 1,
                     }}
                     animate={{
                       x: dx,
                       y: dy,
-                      rotate: rangedProjectile.kind === 'stone' ? 720 : angleDeg,
-                      scale: [0.9, 1.25, 1.1],
+                      scale: [0.9, 1.2, 1.05],
                       opacity: [1, 1, 0.9],
                     }}
                     transition={{ duration: durationSec, ease: 'easeOut' }}
                   >
-                    {rangedProjectile.kind === 'arrow' ? (
-                      <span className="inline-block -rotate-45 text-lg select-none">🏹</span>
-                    ) : rangedProjectile.kind === 'spear' ? (
-                      <span className="inline-block -rotate-45 text-lg select-none font-bold text-cyan-200">🗡️💨</span>
+                    {rangedProjectile.kind === 'spear' || rangedProjectile.kind === 'arrow' ? (
+                      <img
+                        src={url('item-flint-spear')}
+                        alt="투창/화살"
+                        className="pixelated h-8 w-8 object-contain drop-shadow-[0_0_8px_rgba(250,204,21,0.9)] filter brightness-110 select-none"
+                        style={{
+                          transform: `rotate(${angleDeg + 45}deg)`,
+                          transformOrigin: 'center center',
+                        }}
+                      />
                     ) : (
-                      <span className="inline-block text-lg select-none">🪨💨</span>
+                      <motion.img
+                        src={url('item-flint')}
+                        alt="부싯돌/돌멩이"
+                        animate={{ rotate: 720 }}
+                        transition={{ duration: durationSec, ease: 'linear' }}
+                        className="pixelated h-6 w-6 object-contain drop-shadow-[0_0_6px_rgba(255,255,255,0.85)] select-none"
+                      />
                     )}
                   </motion.div>
                 </div>
@@ -1404,24 +1414,46 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                                 </div>
                               </HitFlash>
                             </motion.div>
-                            {/* Escort tribes: remain stably anchored alongside player instead of being dragged */}
+                            {/* Escort tribes: individual classes, desynchronized animations and micro-actions */}
                             {escortReady(s.tribe, Date.now(), !!s.observedExpedition?.mercenary) && (
                               <>
                                 {Array.from({ length: Math.min(5, s.tribe?.count ?? 1) }, (_, k) => {
                                   const isAmbachoSlot = k === 0 && (s.mercenary?.name === '암바초' || (s.tribe?.classCounts?.gatherer ?? 0) > 0);
-                                  const escortClass = isAmbachoSlot ? 'gatherer' : (s.tribe?.classId ?? 'gatherer');
+                                  const classCycle: TribeClassId[] = ['gatherer', 'tank', 'ranged', 'assassin'];
+                                  const escortClass: TribeClassId = isAmbachoSlot
+                                    ? 'gatherer'
+                                    : (s.tribe?.classId && s.tribe.classId !== 'gatherer' && k === 1
+                                        ? s.tribe.classId
+                                        : classCycle[k % classCycle.length]);
+
+                                  // Independent micro-states: when player is idle, followers don't freeze in lockstep
+                                  const followerAction = action === 'walk'
+                                    ? 'walk'
+                                    : action === 'attack'
+                                      ? (k % 2 === 1 ? 'attack' : 'idle')
+                                      : (k === 0 && isAmbachoSlot ? 'gather' : (k % 3 === 2 ? 'chop' : 'idle'));
+
+                                  const speedMult = 0.92 + (k * 0.06);
+
                                   return (
                                     <div
                                       key={k}
                                       aria-label={k ? undefined : (isAmbachoSlot ? "동행 파밍 부족민 암바초" : "동행 부족민")}
-                                      className="pointer-events-none absolute bottom-0"
+                                      className="pointer-events-none absolute bottom-0 transition-transform duration-100"
                                       style={{
-                                        left: isFacingLeft ? 36 + k * 22 : -36 - k * 22,
-                                        bottom: (k % 2) * 6,
+                                        left: isFacingLeft ? 34 + k * 22 : -34 - k * 22,
+                                        bottom: (k % 2) * 5,
                                         transform: isFacingLeft ? 'scaleX(-1)' : undefined
                                       }}
                                     >
-                                      <TribeSprite action={action} height={48} tribeClass={escortClass} frameOffset={k} />
+                                      <TribeSprite
+                                        action={followerAction}
+                                        height={48 - (k === 0 ? 0 : 2)}
+                                        tribeClass={escortClass}
+                                        frameOffset={k * 2 + 1}
+                                        memberIndex={k}
+                                        speedMult={speedMult}
+                                      />
                                     </div>
                                   );
                                 })}

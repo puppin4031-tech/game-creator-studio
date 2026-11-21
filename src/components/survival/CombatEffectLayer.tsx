@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import flintSpearImg from '@/assets/survival/item-flint-spear.png';
+import flintImg from '@/assets/survival/item-flint.png';
 
 export type SkillVfxType =
   | 'fireball'
@@ -152,7 +154,7 @@ export function FloatingDamageNumber({
   );
 }
 
-/** Parabolic Ranged Projectile Arc (Arrow, Spear, Sling Stone) */
+/** Parabolic Ranged Projectile Arc (Arrow, Spear, Sling Stone) with calculated orientation */
 export function RangedProjectileArc({
   startX,
   startY,
@@ -173,22 +175,54 @@ export function RangedProjectileArc({
     return () => clearTimeout(t);
   }, [onHit]);
 
-  const icon = kind === 'arrow' ? '🏹' : kind === 'spear' ? '🗡️' : kind === 'fireball' ? '🔥' : kind === 'iceball' ? '❄️' : '🪨';
-  const rotation = kind === 'spear' || kind === 'arrow' ? 45 : 360;
+  const dx = targetX - startX;
+  const dy = targetY - startY;
+  const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+  // Natural sprite tip for item-flint-spear is at -45° (top-right); rotating by angleDeg + 45 aligns the sharp tip directly toward the target mob
+  const spearAngle = angleDeg + 45;
 
   return (
     <motion.div
-      initial={{ left: startX, top: startY, opacity: 1, rotate: 0 }}
+      initial={{ left: startX, top: startY, opacity: 1, scale: 0.9 }}
       animate={{
         left: targetX,
-        top: [startY, Math.min(startY, targetY) - 28, targetY],
-        rotate: [0, rotation],
-        opacity: [1, 1, 0],
+        top: [startY, Math.min(startY, targetY) - 24, targetY],
+        opacity: [1, 1, 0.9],
+        scale: [0.9, 1.15, 1.0],
       }}
-      transition={{ duration: 0.38, ease: 'easeInOut' }}
-      className="pointer-events-none absolute z-40 text-xl -translate-x-1/2 -translate-y-1/2 drop-shadow-md"
+      transition={{ duration: 0.38, ease: 'easeOut' }}
+      className="pointer-events-none absolute z-40 -translate-x-1/2 -translate-y-1/2 drop-shadow-md select-none"
     >
-      {icon}
+      {kind === 'spear' || kind === 'arrow' ? (
+        <img
+          src={flintSpearImg}
+          alt="투창/화살"
+          className="pixelated h-8 w-8 object-contain drop-shadow-[0_0_8px_rgba(250,204,21,0.85)] filter brightness-110"
+          style={{ transform: `rotate(${spearAngle}deg)`, transformOrigin: 'center center' }}
+        />
+      ) : kind === 'stone' ? (
+        <motion.img
+          src={flintImg}
+          alt="부싯돌/돌멩이"
+          animate={{ rotate: 720 }}
+          transition={{ duration: 0.38, ease: 'linear' }}
+          className="pixelated h-6 w-6 object-contain drop-shadow"
+        />
+      ) : kind === 'fireball' ? (
+        <span
+          className="inline-block text-2xl select-none"
+          style={{ transform: `rotate(${angleDeg}deg)` }}
+        >
+          🔥
+        </span>
+      ) : (
+        <span
+          className="inline-block text-2xl select-none"
+          style={{ transform: `rotate(${angleDeg}deg)` }}
+        >
+          ❄️
+        </span>
+      )}
     </motion.div>
   );
 }

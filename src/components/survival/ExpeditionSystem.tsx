@@ -10,6 +10,7 @@ import TribeSprite from './TribeSprite';
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { CombatImpact, expeditionActorPoint, freshCombatHit } from './ExpeditionCombat';
+import { bundledSpriteUrl } from '@/hooks/useItemCatalog';
 
 const SQUAD_CLASSES: TribeClassId[] = ['tank', 'ranged', 'gatherer', 'assassin'];
 
@@ -49,7 +50,7 @@ export function ExpeditionMarker({ crew, project, members = 1, tribeClass }: { c
       transition={rapidStrike ? { duration: 0.42, times: [0, 0.25, 0.5, 0.75, 1] } : { duration: 0.65, times: [0, 0.23, 0.6, 1] }}>
       <div style={{ transform: (target ? dx < 0 : crew.facing === -1) ? 'scaleX(-1)' : undefined }} className="relative flex items-end justify-center">
         {/* 리더 부족민 (대장) */}
-        {crew.mercenary && <TribeSprite action={tribeAct} tribeClass={activeClassId} height={52} frameOffset={0} />}
+        {crew.mercenary && <TribeSprite action={tribeAct} tribeClass={activeClassId} height={52} frameOffset={0} memberIndex={0} />}
         {/* 분대 동행 부족민들: 각각 고유한 클래스와 엇박자 보행 움직임 부여 */}
         {crew.mercenary && Array.from({ length: Math.min(4, Math.max(2, members) - 1) }, (_, k) => {
           const squadClass = SQUAD_CLASSES[(k + (activeClassId === 'tank' ? 1 : 0)) % SQUAD_CLASSES.length];
@@ -68,10 +69,20 @@ export function ExpeditionMarker({ crew, project, members = 1, tribeClass }: { c
               }}
             >
               <div className="relative">
-                <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[9px] drop-shadow">
+                <span
+                  style={{ transform: (target ? dx < 0 : crew.facing === -1) ? 'scaleX(-1)' : undefined }}
+                  className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[9px] drop-shadow inline-block"
+                >
                   {squadClsDef.icon}
                 </span>
-                <TribeSprite action={followerAction} tribeClass={squadClass} height={42} frameOffset={k + 1} />
+                <TribeSprite
+                  action={followerAction}
+                  tribeClass={squadClass}
+                  height={42}
+                  frameOffset={k + 1}
+                  memberIndex={k + 1}
+                  speedMult={0.92 + k * 0.06}
+                />
               </div>
             </div>
           );
@@ -390,7 +401,7 @@ export default function ExpeditionSystem(p: Props) {
                 >
                   {/* 스프라이트 아바타 */}
                   <div className="relative flex h-10 w-10 items-center justify-center rounded bg-muted/60 group-hover:bg-primary/10 transition-colors">
-                    <TribeSprite action={p.crew ? 'walk' : 'idle'} tribeClass={m.classId} height={32} frameOffset={idx} />
+                    <TribeSprite action={p.crew ? 'walk' : 'idle'} tribeClass={m.classId} height={32} frameOffset={idx} memberIndex={idx} />
                     <span className="absolute -top-1 -right-1 text-[10px] drop-shadow-sm">
                       {mCls.icon}
                     </span>
@@ -503,6 +514,36 @@ export default function ExpeditionSystem(p: Props) {
         const curHp = p.crew ? p.crew.hp : hp;
         const def = 3 + mCls.defBonus;
 
+        const memberEquip = {
+          weapon: {
+            name: mCls.weaponName,
+            iconKey: selectedMember.classId === 'gatherer'
+              ? 'item-flint-hatchet'
+              : selectedMember.classId === 'ranged'
+                ? 'item-flint-spear'
+                : selectedMember.classId === 'assassin'
+                  ? 'item-bone-dagger'
+                  : 'item-stone-maul',
+            stat: `공격 +${atk}`,
+          },
+          armor: {
+            name: `원시 부족 가죽옷 (Lv.${p.expeditionLevel ?? 1})`,
+            iconKey: 'item-fur-cloak',
+            stat: `방어 +${def}`,
+          },
+          tool: {
+            name: selectedMember.classId === 'gatherer'
+              ? '채집 망태 & 가죽 배낭'
+              : '수호의 뼈 부적',
+            iconKey: selectedMember.classId === 'gatherer'
+              ? 'item-digging-stick'
+              : 'item-bone-charm',
+            stat: selectedMember.classId === 'gatherer'
+              ? `운반 +${mCls.carryBonusKg}kg`
+              : '사기 +10%',
+          },
+        };
+
         return (
           <div
             className="fixed inset-0 z-[125] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
@@ -516,7 +557,7 @@ export default function ExpeditionSystem(p: Props) {
               <div className="flex items-start justify-between border-b border-border pb-2.5">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-primary/10 border border-primary/25">
-                    <TribeSprite action="walk" tribeClass={selectedMember.classId} height={46} />
+                    <TribeSprite action="walk" tribeClass={selectedMember.classId} height={46} memberIndex={memberIdx} />
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -575,6 +616,37 @@ export default function ExpeditionSystem(p: Props) {
                 <div className="pixel-box bg-card p-2 rounded">
                   <span className="text-[10px] text-muted-foreground block">동행 운반 보너스</span>
                   <span className="font-bold text-foreground text-xs">+{mCls.carryBonusKg}kg 보관</span>
+                </div>
+              </div>
+
+              {/* 개별 부족원 착용 장비 (무기, 방어구, 도구/부적 3슬롯) */}
+              <div className="space-y-1.5 pt-0.5">
+                <span className="text-[11px] font-bold text-foreground flex items-center gap-1">
+                  <span>🛡️</span>
+                  <span>부족원 착용 장비 (3슬롯)</span>
+                </span>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <div className="pixel-box bg-card p-1.5 rounded flex flex-col items-center text-center">
+                    <div className="h-8 w-8 flex items-center justify-center bg-muted/70 rounded mb-1">
+                      <img src={bundledSpriteUrl(memberEquip.weapon.iconKey) ?? ''} alt="" className="pixelated h-6 w-6 object-contain drop-shadow" />
+                    </div>
+                    <span className="text-[10px] font-bold truncate w-full text-foreground">{memberEquip.weapon.name}</span>
+                    <span className="text-[9px] text-amber-500 font-mono truncate w-full">{memberEquip.weapon.stat}</span>
+                  </div>
+                  <div className="pixel-box bg-card p-1.5 rounded flex flex-col items-center text-center">
+                    <div className="h-8 w-8 flex items-center justify-center bg-muted/70 rounded mb-1">
+                      <img src={bundledSpriteUrl(memberEquip.armor.iconKey) ?? ''} alt="" className="pixelated h-6 w-6 object-contain drop-shadow" />
+                    </div>
+                    <span className="text-[10px] font-bold truncate w-full text-foreground">{memberEquip.armor.name}</span>
+                    <span className="text-[9px] text-sky-400 font-mono truncate w-full">{memberEquip.armor.stat}</span>
+                  </div>
+                  <div className="pixel-box bg-card p-1.5 rounded flex flex-col items-center text-center">
+                    <div className="h-8 w-8 flex items-center justify-center bg-muted/70 rounded mb-1">
+                      <img src={bundledSpriteUrl(memberEquip.tool.iconKey) ?? ''} alt="" className="pixelated h-6 w-6 object-contain drop-shadow" />
+                    </div>
+                    <span className="text-[10px] font-bold truncate w-full text-foreground">{memberEquip.tool.name}</span>
+                    <span className="text-[9px] text-emerald-400 font-mono truncate w-full">{memberEquip.tool.stat}</span>
+                  </div>
                 </div>
               </div>
 

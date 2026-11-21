@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ITEMS, type ItemId } from '@/lib/survival/items';
+import { bundledSpriteUrl } from '@/hooks/useItemCatalog';
 import {
   GEAR_SLOTS,
   slotUnlocked,
@@ -200,22 +201,22 @@ export default function StatusEquipmentModal({
     <div
       role="dialog"
       aria-label="유저 캐릭터 상태창"
-      className="fixed inset-0 z-50 flex flex-col bg-background font-pixel text-xs"
+      className="fixed inset-0 z-50 flex flex-col bg-stone-950/98 text-stone-100 font-pixel text-xs"
     >
       {/* Top Header */}
-      <div className="flex items-center justify-between border-b-4 border-foreground bg-card px-4 py-2.5">
+      <div className="flex items-center justify-between border-b-4 border-stone-800 bg-stone-900 px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md border border-primary/40 bg-primary/20 text-primary">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-400">
             <Shield className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-sm font-bold text-foreground flex items-center gap-1.5">
+            <h1 className="text-sm font-bold text-stone-100 flex items-center gap-1.5">
               <span>내 상태창 & 착용 장비</span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-primary/20 text-primary font-bold">
+              <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold border border-amber-500/40">
                 Lv.{level}
               </span>
             </h1>
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-[10px] text-stone-400">
               장비 착용 스탯과 펫·버프 추가 능력치, 특수 효과를 확인하세요
             </p>
           </div>
@@ -223,7 +224,7 @@ export default function StatusEquipmentModal({
         <button
           type="button"
           onClick={onClose}
-          className="pixel-btn flex h-9 w-9 items-center justify-center rounded border border-border bg-card p-1 text-foreground"
+          className="pixel-btn flex h-9 w-9 items-center justify-center rounded border border-stone-700 bg-stone-800 p-1 text-stone-200 hover:text-white"
           aria-label="닫기"
         >
           <X className="!h-5 !w-5" />
@@ -233,26 +234,26 @@ export default function StatusEquipmentModal({
       {/* Main Body */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3.5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         {/* 1. 장비 능력치 (종합 스탯 + 초록색 추가치 + 특수효과) */}
-        <div className="rounded-lg border-2 border-border bg-card p-3 space-y-2 shadow-sm">
-          <div className="flex items-center justify-between border-b border-border/80 pb-1.5">
-            <span className="font-bold text-xs flex items-center gap-1 text-foreground">
-              <Sparkles className="h-4 w-4 text-primary" />
+        <div className="rounded-lg border-2 border-stone-700 bg-stone-900/90 p-3 space-y-2 shadow-sm">
+          <div className="flex items-center justify-between border-b border-stone-800 pb-1.5">
+            <span className="font-bold text-xs flex items-center gap-1 text-amber-400">
+              <Sparkles className="h-4 w-4 text-amber-400" />
               <span>장비 능력치 종합</span>
             </span>
-            <span className="text-[10px] text-muted-foreground font-mono">
+            <span className="text-[10px] text-stone-400 font-mono">
               초록색: 버프·펫·영구보약 상승치
             </span>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
             {/* 공격력 */}
-            <div className="rounded border border-border/80 bg-background/80 p-2 space-y-0.5">
-              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+            <div className="rounded border border-stone-800 bg-stone-950/80 p-2 space-y-0.5">
+              <span className="text-[10px] text-stone-400 flex items-center gap-1">
                 <Swords className="h-3 w-3 text-amber-500" />
                 <span>공격력</span>
               </span>
               <div className="flex items-baseline gap-1 font-bold">
-                <span className="text-sm text-foreground">{gearAtk}</span>
+                <span className="text-sm text-stone-100">{gearAtk}</span>
                 {buffAtk > 0 && (
                   <span className="text-xs text-emerald-400 font-mono font-bold">
                     (+{buffAtk})
@@ -262,13 +263,13 @@ export default function StatusEquipmentModal({
             </div>
 
             {/* 방어력 */}
-            <div className="rounded border border-border/80 bg-background/80 p-2 space-y-0.5">
-              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <Shield className="h-3 w-3 text-sky-500" />
+            <div className="rounded border border-stone-800 bg-stone-950/80 p-2 space-y-0.5">
+              <span className="text-[10px] text-stone-400 flex items-center gap-1">
+                <Shield className="h-3 w-3 text-sky-400" />
                 <span>방어력</span>
               </span>
               <div className="flex items-baseline gap-1 font-bold">
-                <span className="text-sm text-foreground">{gearDef}</span>
+                <span className="text-sm text-stone-100">{gearDef}</span>
                 {buffDef > 0 && (
                   <span className="text-xs text-emerald-400 font-mono font-bold">
                     (+{buffDef})
@@ -278,19 +279,19 @@ export default function StatusEquipmentModal({
             </div>
 
             {/* 채집 속도 */}
-            <div className="rounded border border-border/80 bg-background/80 p-2 space-y-0.5">
-              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <Pickaxe className="h-3 w-3 text-emerald-500" />
+            <div className="rounded border border-stone-800 bg-stone-950/80 p-2 space-y-0.5">
+              <span className="text-[10px] text-stone-400 flex items-center gap-1">
+                <Pickaxe className="h-3 w-3 text-emerald-400" />
                 <span>채집 속도</span>
               </span>
               <div className="flex items-baseline gap-1 font-bold">
-                <span className="text-sm text-foreground">+{gearGather.toFixed(1)}</span>
+                <span className="text-sm text-stone-100">+{gearGather.toFixed(1)}</span>
               </div>
             </div>
 
             {/* 체력 보너스 */}
-            <div className="rounded border border-border/80 bg-background/80 p-2 space-y-0.5">
-              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+            <div className="rounded border border-stone-800 bg-stone-950/80 p-2 space-y-0.5">
+              <span className="text-[10px] text-stone-400 flex items-center gap-1">
                 <Heart className="h-3 w-3 text-red-500" />
                 <span>추가 체력</span>
               </span>
@@ -303,8 +304,8 @@ export default function StatusEquipmentModal({
           </div>
 
           {/* 특수 효과 표기 */}
-          <div className="rounded bg-muted/40 p-2 text-[11px] space-y-1">
-            <span className="font-bold text-muted-foreground block text-[10px]">
+          <div className="rounded bg-stone-950/60 p-2 text-[11px] space-y-1 border border-stone-800">
+            <span className="font-bold text-stone-400 block text-[10px]">
               ⭐ 발동 중인 특수 효과:
             </span>
             {specialEffects.length > 0 ? (
@@ -312,21 +313,21 @@ export default function StatusEquipmentModal({
                 {specialEffects.map((eff, i) => (
                   <span
                     key={i}
-                    className="rounded bg-primary/10 border border-primary/30 px-2 py-0.5 text-primary font-medium"
+                    className="rounded bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 text-amber-300 font-medium"
                   >
                     {eff}
                   </span>
                 ))}
               </div>
             ) : (
-              <span className="text-muted-foreground">현재 활성화된 특수 효과가 없습니다.</span>
+              <span className="text-stone-500">현재 활성화된 특수 효과가 없습니다.</span>
             )}
           </div>
         </div>
 
-        {/* 2. 장비 목록 6슬롯 (무기, 방어구, 부적, 기타, 채집1, 채집2) */}
-        <div className="rounded-lg border-2 border-border bg-card p-3 space-y-2">
-          <span className="font-bold text-xs flex items-center gap-1.5 text-foreground">
+        {/* 2. 장비 목록 6슬롯 (무기, 방어구, 부적, 기타, 채집1, 채집2) - 픽셀 아이템 아이콘 일관 적용 */}
+        <div className="rounded-lg border-2 border-stone-700 bg-stone-900/90 p-3 space-y-2">
+          <span className="font-bold text-xs flex items-center gap-1.5 text-amber-400">
             <span>🛡️</span>
             <span>착용 장비 목록 (6슬롯)</span>
           </span>
@@ -344,36 +345,53 @@ export default function StatusEquipmentModal({
                   }}
                   className={`flex items-center gap-2 p-2 rounded-lg border-2 transition-all cursor-pointer ${
                     g
-                      ? 'border-primary/60 bg-primary/5 hover:bg-primary/10 active:scale-[0.98]'
-                      : 'border-dashed border-border bg-muted/20 text-muted-foreground'
+                      ? 'border-amber-500/60 bg-stone-950/80 hover:bg-stone-850 hover:border-amber-400 active:scale-[0.98]'
+                      : 'border-dashed border-stone-700 bg-stone-950/30 text-stone-500'
                   }`}
                 >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-background border border-border shadow-inner text-xl">
-                    {slot.id === 'weapon'
-                      ? '⚔️'
-                      : slot.id === 'armor'
-                      ? '🛡️'
-                      : slot.id === 'trinket'
-                      ? '🧿'
-                      : slot.id === 'extra'
-                      ? '💍'
-                      : '⛏️'}
+                  <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-stone-900 border-2 border-stone-700 shadow-inner">
+                    {it ? (
+                      <>
+                        <img
+                          src={bundledSpriteUrl(it.sprite) ?? it.sprite}
+                          alt={it.name}
+                          className="pixelated h-8 w-8 object-contain drop-shadow"
+                        />
+                        {g?.plus ? (
+                          <span className="absolute -bottom-1 -right-1 rounded bg-black/90 px-1 text-[9px] font-bold text-amber-400 border border-amber-500/40 font-mono">
+                            +{g.plus}
+                          </span>
+                        ) : null}
+                      </>
+                    ) : (
+                      <span className="text-base opacity-35 select-none">
+                        {slot.id === 'weapon'
+                          ? '⚔️'
+                          : slot.id === 'armor'
+                          ? '🛡️'
+                          : slot.id === 'trinket'
+                          ? '🧿'
+                          : slot.id === 'extra'
+                          ? '💍'
+                          : '⛏️'}
+                      </span>
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <span className="text-[10px] text-muted-foreground block">
+                    <span className="text-[10px] text-stone-400 block">
                       {slot.label}
                     </span>
                     {it ? (
                       <div>
-                        <b className="text-xs text-foreground truncate block">
+                        <b className="text-xs text-stone-100 truncate block">
                           {it.name}{g?.plus ? ` +${g.plus}` : ''}
                         </b>
-                        <span className="text-[10px] text-primary block truncate">
+                        <span className="text-[10px] text-amber-400 block truncate font-mono">
                           {it.weapon ? `공격 +${it.weapon.atk}` : it.armor ? `방어 +${it.armor.def}` : it.tool ? `채취 +${it.tool.power}` : '특수'}
                         </span>
                       </div>
                     ) : (
-                      <span className="text-[11px] text-muted-foreground italic">비어 있음</span>
+                      <span className="text-[11px] text-stone-500 italic">비어 있음</span>
                     )}
                   </div>
                 </div>
@@ -382,14 +400,14 @@ export default function StatusEquipmentModal({
           </div>
         </div>
 
-        {/* 3. 장비가능한 품목 (배낭 소지 장비: 아이콘과 이름만!) */}
-        <div className="rounded-lg border-2 border-border bg-card p-3 space-y-2">
+        {/* 3. 장비가능한 품목 (배낭 소지 장비: 픽셀 아이템 아이콘 일관 적용) */}
+        <div className="rounded-lg border-2 border-stone-700 bg-stone-900/90 p-3 space-y-2">
           <div className="flex items-center justify-between">
-            <span className="font-bold text-xs flex items-center gap-1.5 text-foreground">
+            <span className="font-bold text-xs flex items-center gap-1.5 text-stone-200">
               <Backpack className="h-4 w-4 text-emerald-400" />
               <span>장비 가능한 품목 (배낭 보관)</span>
             </span>
-            <span className="text-[10px] text-muted-foreground font-mono">
+            <span className="text-[10px] text-stone-400 font-mono">
               {carriedGear.length}개 보유
             </span>
           </div>
@@ -405,18 +423,21 @@ export default function StatusEquipmentModal({
                     key={g.uid}
                     type="button"
                     onClick={() => handleOpenActionPopup(g)}
-                    className="flex items-center gap-2 rounded-md border border-border/80 bg-background/80 p-2 text-left hover:border-primary transition-all active:scale-95 shadow-sm"
+                    className="flex items-center gap-2 rounded-md border border-stone-700 bg-stone-950/80 p-2 text-left hover:border-amber-500 hover:bg-stone-900 transition-all active:scale-95 shadow-sm"
                   >
-                    <span className="text-lg shrink-0">
-                      {it.category === 'weapon'
-                        ? '⚔️'
-                        : it.category === 'armor'
-                        ? '🛡️'
-                        : it.category === 'trinket'
-                        ? '🧿'
-                        : '⛏️'}
-                    </span>
-                    <span className="font-bold text-xs text-foreground truncate flex-1">
+                    <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded bg-stone-900 border border-stone-700">
+                      <img
+                        src={bundledSpriteUrl(it.sprite) ?? it.sprite}
+                        alt={it.name}
+                        className="pixelated h-6 w-6 object-contain drop-shadow"
+                      />
+                      {g.plus ? (
+                        <span className="absolute -bottom-1 -right-1 rounded bg-black/90 px-0.5 text-[8px] font-bold text-amber-400 font-mono">
+                          +{g.plus}
+                        </span>
+                      ) : null}
+                    </div>
+                    <span className="font-bold text-xs text-stone-200 truncate flex-1">
                       {it.name}{g.plus ? ` +${g.plus}` : ''}
                     </span>
                   </button>
@@ -424,7 +445,7 @@ export default function StatusEquipmentModal({
               })}
             </div>
           ) : (
-            <p className="text-[11px] text-muted-foreground italic py-2 text-center">
+            <p className="text-[11px] text-stone-500 italic py-2 text-center">
               배낭에 착용 가능한 여분의 장비가 없습니다.
             </p>
           )}
@@ -432,8 +453,8 @@ export default function StatusEquipmentModal({
 
         {/* 4. 거점 창고 보관 장비 (창고에 보관된 장비가 있을 경우) */}
         {storedGear && storedGear.length > 0 && (
-          <div className="rounded-lg border border-border bg-card/60 p-3 space-y-2">
-            <span className="font-bold text-xs flex items-center gap-1.5 text-foreground">
+          <div className="rounded-lg border border-stone-700 bg-stone-900/60 p-3 space-y-2">
+            <span className="font-bold text-xs flex items-center gap-1.5 text-stone-300">
               <Archive className="h-4 w-4 text-amber-500" />
               <span>거점 창고 보관 장비</span>
             </span>
@@ -452,10 +473,16 @@ export default function StatusEquipmentModal({
                         toast.success(`${it.name}을(를) 배낭으로 꺼냈습니다.`);
                       }
                     }}
-                    className="flex items-center gap-2 rounded border border-border bg-background p-1.5 text-left hover:border-amber-500 text-xs"
+                    className="flex items-center gap-2 rounded border border-stone-700 bg-stone-950 p-1.5 text-left hover:border-amber-500 text-xs"
                   >
-                    <span>📦</span>
-                    <span className="truncate">{it.name}{g.plus ? ` +${g.plus}` : ''}</span>
+                    <div className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded bg-stone-900 border border-stone-800">
+                      <img
+                        src={bundledSpriteUrl(it.sprite) ?? it.sprite}
+                        alt={it.name}
+                        className="pixelated h-5 w-5 object-contain drop-shadow"
+                      />
+                    </div>
+                    <span className="truncate text-stone-300">{it.name}{g.plus ? ` +${g.plus}` : ''}</span>
                   </button>
                 );
               })}
@@ -470,24 +497,29 @@ export default function StatusEquipmentModal({
         const isWorn = wornUids.has(selectedGear.uid);
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4">
-            <div className="pixel-frame w-full max-w-xs bg-card p-4 space-y-3 border-2 border-primary shadow-xl">
-              <div className="flex items-center justify-between border-b border-border/80 pb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">
-                    {it?.category === 'weapon'
-                      ? '⚔️'
-                      : it?.category === 'armor'
-                      ? '🛡️'
-                      : it?.category === 'trinket'
-                      ? '🧿'
-                      : '⛏️'}
-                  </span>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
+            <div className="pixel-frame w-full max-w-xs bg-stone-900 p-4 space-y-3 border-2 border-amber-500 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-stone-800 pb-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-stone-950 border-2 border-stone-700">
+                    {it && (
+                      <img
+                        src={bundledSpriteUrl(it.sprite) ?? it.sprite}
+                        alt={it.name}
+                        className="pixelated h-9 w-9 object-contain drop-shadow"
+                      />
+                    )}
+                    {selectedGear.plus ? (
+                      <span className="absolute -bottom-1 -right-1 rounded bg-black/90 px-1 text-[9px] font-bold text-amber-400 border border-amber-500/40 font-mono">
+                        +{selectedGear.plus}
+                      </span>
+                    ) : null}
+                  </div>
                   <div>
-                    <b className="text-sm text-foreground">
+                    <b className="text-sm text-stone-100">
                       {it?.name}{selectedGear.plus ? ` +${selectedGear.plus}` : ''}
                     </b>
-                    <span className="text-[10px] text-muted-foreground block">
+                    <span className="text-[10px] text-stone-400 block font-mono">
                       내구도: {selectedGear.durability}/{selectedGear.maxDurability}
                     </span>
                   </div>
@@ -495,13 +527,13 @@ export default function StatusEquipmentModal({
                 <button
                   type="button"
                   onClick={() => setSelectedGear(null)}
-                  className="pixel-btn p-1"
+                  className="pixel-btn p-1 text-stone-400 hover:text-white"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
 
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
+              <p className="text-[11px] text-stone-300 leading-relaxed bg-stone-950/60 p-2 rounded border border-stone-800">
                 {it?.desc}
               </p>
 
@@ -530,7 +562,7 @@ export default function StatusEquipmentModal({
                   type="button"
                   variant="outline"
                   onClick={() => handleStoreItem(selectedGear.uid)}
-                  className="pixel-btn w-full text-xs py-2 flex items-center justify-center gap-1.5"
+                  className="pixel-btn w-full text-xs py-2 flex items-center justify-center gap-1.5 border-stone-700 text-stone-200"
                 >
                   <Archive className="h-3.5 w-3.5 text-amber-500" />
                   <span>창고에 보관</span>
