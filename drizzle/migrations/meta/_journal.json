@@ -127,6 +127,13 @@
       "when": 1794720779985,
       "tag": "0017_guard_tag_team_assignments",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795235405236,
+      "tag": "0018_secure_treasure_items",
+      "breakpoints": true
     }
   ]
 }
