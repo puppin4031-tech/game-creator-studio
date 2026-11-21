@@ -1,4 +1,4 @@
-import { Flag, Flame, Home, Zap, Eye, Footprints, Pause, Play, X, ChevronRight } from 'lucide-react';
+import { Flag, Flame, Home, Zap, Eye, Footprints, Pause, Play, X, ChevronRight, ChevronLeft, Shield, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FOCUS_LABEL, type ExpeditionFocus, type ExpeditionLog, type ObservedExpedition } from '@/lib/survival/expedition';
 import { DEFAULT_TRIBE_CLASS, getTribeClass, TRIBE_CLASS_LIST, type TribeClassId } from '@/data/tribeClasses';
@@ -7,7 +7,7 @@ import { distanceM } from '@/lib/survival/geo';
 import { PLAYER_SPRITE_HEIGHT } from '@/lib/survival/spriteMeta';
 import CharacterSprite from './CharacterSprite';
 import TribeSprite from './TribeSprite';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { CombatImpact, expeditionActorPoint, freshCombatHit } from './ExpeditionCombat';
 
@@ -98,7 +98,125 @@ interface Props {
   autoRemainingSec?: number;
   autoLimitSec?: number;
 }
-export interface TribeInfo { count: number; trainLevel: number; ratio: number; maxHp: number; injured: boolean; starving: boolean; classId?: TribeClassId }
+export interface TribeInfo {
+  count: number;
+  trainLevel: number;
+  ratio: number;
+  maxHp: number;
+  injured: boolean;
+  starving: boolean;
+  classId?: TribeClassId;
+  classCounts?: Partial<Record<TribeClassId, number>>;
+  mercenaryName?: string;
+}
+
+export interface TribeMember {
+  id: string;
+  name: string;
+  title: string;
+  classId: TribeClassId;
+  roleDescription: string;
+  specialPerk: string;
+  slotIndex: number;
+}
+
+export function buildTribeMembers(tribe?: TribeInfo, activeTribeClass?: TribeClassId): TribeMember[] {
+  const count = Math.max(1, tribe?.count ?? 1);
+  const baseClass = activeTribeClass ?? tribe?.classId ?? DEFAULT_TRIBE_CLASS;
+  const counts = tribe?.classCounts ?? {};
+
+  const list: TribeMember[] = [];
+
+  // Slot 0 is strictly Ambacho (파밍 부족 / 채집가)
+  list.push({
+    id: 'member_0_ambacho',
+    name: '암바초',
+    title: '파밍 부족민 (1번째 동료)',
+    classId: 'gatherer',
+    roleDescription: '물자 탐색 및 자원 채집 특화',
+    specialPerk: '돌·나무·약초 채집 속도 +50%, 밤사이 오프라인 보고서 자동 채집 수행',
+    slotIndex: 0,
+  });
+
+  const ARCHETYPES: Record<TribeClassId, { names: string[]; titles: string[]; perks: string[] }> = {
+    tank: {
+      names: ['볼크', '타란', '고르', '바론', '두르'],
+      titles: ['바위의 수호자', '철벽의 방패병', '거점 수호대장', '대지의 전사', '불굴의 거인'],
+      perks: [
+        '선봉 방어 25% 피해 경감, 맹수 어그로 유인 및 아군 안전 확보',
+        '체력 +30%, 원정대 피격 시 반격 피해 40% 반사',
+        '주변 아군 방어력 +10% 오라 및 기절 저항',
+        '중장갑 방어 및 거점 방어 시 생존력 대폭 강화',
+        '도발 함성으로 맹수 시선 집중 및 피격 시 방어력 중첩',
+      ],
+    },
+    ranged: {
+      names: ['루카', '카이', '엘린', '샤야', '리안'],
+      titles: ['숲의 궁수', '바람의 사냥꾼', '매의 눈 정찰병', '깃털 저격수', '정밀 투창병'],
+      perks: [
+        '사거리 28m 원거리 저격, 맹수 접근 전 선제 타격 및 치명타 +30%',
+        '도망치는 맹수 추적 속도 +20%, 가죽·고기 획득량 +25%',
+        '시야 반경 +15m 확장, 미발견 자원 및 상자 탐지 확률 증가',
+        '원거리 맹수 급소 관통 타격 및 이동속도 저하',
+        '투사체 탄속 2배 및 맹수 저항 무시 관통 공격',
+      ],
+    },
+    assassin: {
+      names: ['시온', '레노', '카르', '제트', '블레이크'],
+      titles: ['그림자 척후병', '독니 암살자', '밤의 추적자', '질풍의 칼날', '은밀한 추적자'],
+      perks: [
+        '공격 속도 1.8배 가속, 기습 타격 시 맹수 출혈 피해 부여',
+        '첫 타격 200% 기습 대미지, 맹수 공격력 15% 약화',
+        '회피율 +20%, 신속한 이동으로 위험 상황 이탈',
+        '맹수 치명타 시 즉시 재공격 및 연속 연타',
+        '야간 전투 시 공격력 +35% 및 맹수 감지 범위 축소',
+      ],
+    },
+    gatherer: {
+      names: ['마야', '도리', '루나', '솔', '보리'],
+      titles: ['약초 채집사', '곡괭이 장인', '열매 수확가', '대지 탐험가', '풍요의 채집꾼'],
+      perks: [
+        '식량/약초 수확량 +50% 및 신선도 유지 시간 증가',
+        '목재 및 광석 채집 시 희귀 광석 추가 획득 확률 +20%',
+        '배낭 및 창고 보관 효율 증가 (+10kg 운반량)',
+        '주변 자원 재생 시간 20% 단축',
+        '모든 채집 행동의 스태미나 소모 25% 절감',
+      ],
+    },
+  };
+
+  for (let k = 1; k < count; k++) {
+    let memberClass: TribeClassId = baseClass;
+    if (counts.tank && k <= (counts.tank ?? 0)) {
+      memberClass = 'tank';
+    } else if (counts.ranged && k <= (counts.tank ?? 0) + (counts.ranged ?? 0)) {
+      memberClass = 'ranged';
+    } else if (counts.assassin && k <= (counts.tank ?? 0) + (counts.ranged ?? 0) + (counts.assassin ?? 0)) {
+      memberClass = 'assassin';
+    } else {
+      const classCycle: TribeClassId[] = ['tank', 'ranged', 'assassin', 'gatherer'];
+      memberClass = classCycle[(k - 1) % classCycle.length];
+    }
+
+    const archetype = ARCHETYPES[memberClass];
+    const nameIdx = (k - 1) % archetype.names.length;
+    const name = archetype.names[nameIdx];
+    const title = archetype.titles[nameIdx];
+    const specialPerk = archetype.perks[nameIdx];
+
+    list.push({
+      id: `member_${k}_${name}`,
+      name,
+      title: `${title} (${k + 1}번째 동료)`,
+      classId: memberClass,
+      roleDescription: getTribeClass(memberClass).perkSummary,
+      specialPerk,
+      slotIndex: k,
+    });
+  }
+
+  return list;
+}
 
 const FOCUS_META: Record<ExpeditionFocus, { label: string; icon: string; short: string; detail: string }> = {
   hunt: {
@@ -170,6 +288,7 @@ function TribeStats({ t, crew, selectedClass }: { t?: TribeInfo; crew?: Observed
 }
 export default function ExpeditionSystem(p: Props) {
   const [tribeDetailOpen, setTribeDetailOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<TribeMember | null>(null);
   const activeClass = p.crew?.tribeClass ?? p.tribeClass ?? p.tribe?.classId ?? DEFAULT_TRIBE_CLASS;
   const cls = getTribeClass(activeClass);
   const compactBtn = 'h-auto min-h-0 py-1.5 px-2 text-xs';
@@ -180,28 +299,128 @@ export default function ExpeditionSystem(p: Props) {
       ? `대기 중 · ${memberCount}명`
       : '영입 필요';
 
+  const memberList = useMemo(() => buildTribeMembers(p.tribe, activeClass), [p.tribe, activeClass]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    if (!scrollRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+    setCanScrollLeft(scrollLeft > 6);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 6);
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+  }, [memberList.length, checkScroll]);
+
+  const handleScrollLeft = () => {
+    if (!scrollRef.current) return;
+    const cardWidth = scrollRef.current.clientWidth / Math.min(4, memberList.length);
+    scrollRef.current.scrollBy({ left: -cardWidth * 2, behavior: 'smooth' });
+    setTimeout(checkScroll, 350);
+  };
+
+  const handleScrollRight = () => {
+    if (!scrollRef.current) return;
+    const cardWidth = scrollRef.current.clientWidth / Math.min(4, memberList.length);
+    scrollRef.current.scrollBy({ left: cardWidth * 2, behavior: 'smooth' });
+    setTimeout(checkScroll, 350);
+  };
+
   return (
     <section aria-label="원정대 관찰" className="space-y-1.5 border-t border-border bg-background/95 p-2 text-xs">
-      {/* 심플 부족민 카드: 디자인 스프라이트 / 이름 (클릭 시 상세 정보 팝업) */}
-      <button
-        type="button"
-        onClick={() => setTribeDetailOpen(true)}
-        className="flex w-full items-center gap-2 rounded-md border border-border/80 bg-card px-2.5 py-1.5 text-left transition-colors hover:bg-accent/30 active:scale-[0.99]"
-      >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-muted/60">
-          <TribeSprite action={p.crew ? 'walk' : 'idle'} tribeClass={activeClass} height={34} />
-        </div>
-        <div className="min-w-0 flex-1">
+      {/* 가로 최대 4명 부족원 배치 박스 (초과 시 좌우 화살표 스크롤, 클릭 시 개별 상세 팝업) */}
+      <div className="relative rounded-md border border-border/80 bg-card p-2 shadow-xs">
+        {/* 상단 헤더: 전체 요약 및 전체 정보 보기 */}
+        <div className="mb-1.5 flex items-center justify-between px-0.5">
           <div className="flex items-center gap-1.5">
-            <span className="font-bold text-foreground truncate">{cls.icon} {cls.name}</span>
-            <span className="rounded bg-primary/15 px-1.5 py-0.2 text-[10px] font-bold text-primary">Lv.{p.expeditionLevel ?? 1}</span>
+            <span className="font-bold text-foreground text-[11px]">부족원 목록</span>
+            <span className="rounded bg-primary/15 px-1.5 py-0.2 text-[10px] font-bold text-primary">
+              {memberList.length}명
+            </span>
           </div>
-          <p className="text-[11px] text-muted-foreground truncate">{statusText}</p>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-muted-foreground truncate max-w-[130px]">{statusText}</span>
+            <button
+              type="button"
+              onClick={() => setTribeDetailOpen(true)}
+              className="flex items-center gap-0.5 text-[10px] font-semibold text-primary hover:underline ml-1"
+            >
+              전체 정보 <ChevronRight className="h-3 w-3" />
+            </button>
+          </div>
         </div>
-        <span className="flex items-center gap-0.5 text-[10px] font-semibold text-muted-foreground shrink-0">
-          정보 <ChevronRight className="h-3.5 w-3.5" />
-        </span>
-      </button>
+
+        {/* 가로 4명 배치 트랙 & 좌우 스크롤 내비게이션 */}
+        <div className="relative flex items-center">
+          {memberList.length > 4 && (
+            <button
+              type="button"
+              onClick={handleScrollLeft}
+              disabled={!canScrollLeft}
+              aria-label="이전 부족원 보기"
+              className="absolute -left-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-background/95 border border-border shadow-md hover:bg-accent disabled:opacity-0 disabled:pointer-events-none transition-all"
+            >
+              <ChevronLeft className="h-3.5 w-3.5 text-foreground" />
+            </button>
+          )}
+
+          <div
+            ref={scrollRef}
+            onScroll={checkScroll}
+            className="flex w-full items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 px-0.5 scroll-smooth"
+            style={{ scrollSnapType: 'x mandatory' }}
+          >
+            {memberList.map((m, idx) => {
+              const mCls = getTribeClass(m.classId);
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setSelectedMember(m)}
+                  className="group relative flex flex-col items-center justify-between rounded-lg border border-border/80 bg-background/70 p-1.5 text-center transition-all hover:border-primary/70 hover:bg-accent/40 active:scale-95 shrink-0"
+                  style={{
+                    width: memberList.length <= 4 ? `calc((100% - ${(memberList.length - 1) * 6}px) / ${memberList.length})` : 'calc((100% - 18px) / 4)',
+                    minWidth: '66px',
+                    maxWidth: memberList.length === 1 ? '100%' : '84px',
+                    scrollSnapAlign: 'start',
+                  }}
+                >
+                  {/* 스프라이트 아바타 */}
+                  <div className="relative flex h-10 w-10 items-center justify-center rounded bg-muted/60 group-hover:bg-primary/10 transition-colors">
+                    <TribeSprite action={p.crew ? 'walk' : 'idle'} tribeClass={m.classId} height={32} frameOffset={idx} />
+                    <span className="absolute -top-1 -right-1 text-[10px] drop-shadow-sm">
+                      {mCls.icon}
+                    </span>
+                  </div>
+
+                  {/* 이름 & 병종 */}
+                  <span className="mt-1 w-full truncate text-[11px] font-bold text-foreground group-hover:text-primary">
+                    {m.name}
+                  </span>
+                  <span className="w-full truncate text-[9px] text-muted-foreground">
+                    {mCls.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {memberList.length > 4 && (
+            <button
+              type="button"
+              onClick={handleScrollRight}
+              disabled={!canScrollRight}
+              aria-label="다음 부족원 보기"
+              className="absolute -right-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-background/95 border border-border shadow-md hover:bg-accent disabled:opacity-0 disabled:pointer-events-none transition-all"
+            >
+              <ChevronRight className="h-3.5 w-3.5 text-foreground" />
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* 원정 목표 선택 (심플 3버튼) */}
       <div role="radiogroup" aria-label="원정 목표" className="grid grid-cols-3 gap-1">
@@ -273,7 +492,144 @@ export default function ExpeditionSystem(p: Props) {
         </Button>
       </div>
 
-      {/* 부족민 상세 정보 팝업 */}
+      {/* 개별 부족원 상세 정보 팝업 모달 */}
+      {selectedMember && (() => {
+        const mCls = getTribeClass(selectedMember.classId);
+        const memberIdx = memberList.findIndex(m => m.id === selectedMember.id);
+        const prevMember = memberIdx > 0 ? memberList[memberIdx - 1] : null;
+        const nextMember = memberIdx < memberList.length - 1 ? memberList[memberIdx + 1] : null;
+        const atk = Math.max(1, Math.round(12 * (p.tribe?.ratio ?? 1) * mCls.atkMult));
+        const hp = p.crew?.maxHp ?? Math.max(1, Math.round((p.tribe?.maxHp ?? 100) * mCls.hpMult));
+        const curHp = p.crew ? p.crew.hp : hp;
+        const def = 3 + mCls.defBonus;
+
+        return (
+          <div
+            className="fixed inset-0 z-[125] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+            onClick={() => setSelectedMember(null)}
+          >
+            <div
+              className="pixel-panel w-full max-w-sm space-y-3 bg-background p-4 shadow-2xl border border-primary/40 animate-in fade-in zoom-in-95 duration-150"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* 상단 헤더: 스프라이트 / 이름 / 병종 */}
+              <div className="flex items-start justify-between border-b border-border pb-2.5">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-primary/10 border border-primary/25">
+                    <TribeSprite action="walk" tribeClass={selectedMember.classId} height={46} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h3 className="text-base font-extrabold text-foreground truncate">{selectedMember.name}</h3>
+                      <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                        Lv.{p.expeditionLevel ?? 1}
+                      </span>
+                    </div>
+                    <p className="text-xs text-primary font-medium truncate">{selectedMember.title}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      {mCls.icon} {mCls.name} · 무기: {mCls.weaponName}
+                    </p>
+                  </div>
+                </div>
+                <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full shrink-0" onClick={() => setSelectedMember(null)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* 현재 상태 배너 */}
+              <div className="flex items-center justify-between rounded-md bg-muted/60 px-3 py-1.5 text-xs">
+                <span className="text-muted-foreground">현재 상태</span>
+                <span className="font-bold text-foreground">
+                  {p.crew
+                    ? `원정 수행 중 (HP ${curHp}/${hp})`
+                    : p.tribe?.injured
+                      ? '부상 치료 중'
+                      : '거점 대기 중 (출정 준비 완료)'}
+                </span>
+              </div>
+
+              {/* 핵심 능력치 4분할 그리드 */}
+              <div className="grid grid-cols-2 gap-1.5 text-xs">
+                <div className="pixel-box bg-card p-2 rounded">
+                  <span className="text-[10px] text-muted-foreground block">공격력 / 공격속도</span>
+                  <span className="font-bold text-foreground text-xs">
+                    {atk} 피해
+                    <span className="text-[10px] text-muted-foreground font-normal ml-1">
+                      ({(1 / mCls.attackIntervalMult).toFixed(1)}배속)
+                    </span>
+                  </span>
+                </div>
+                <div className="pixel-box bg-card p-2 rounded">
+                  <span className="text-[10px] text-muted-foreground block">방어력 / 사거리</span>
+                  <span className="font-bold text-foreground text-xs">
+                    방어 {def}
+                    <span className="text-[10px] text-muted-foreground font-normal ml-1">
+                      · {mCls.attackRangeM}m
+                    </span>
+                  </span>
+                </div>
+                <div className="pixel-box bg-card p-2 rounded">
+                  <span className="text-[10px] text-muted-foreground block">체력 (합산)</span>
+                  <span className="font-bold text-foreground text-xs">{curHp} / {hp}</span>
+                </div>
+                <div className="pixel-box bg-card p-2 rounded">
+                  <span className="text-[10px] text-muted-foreground block">동행 운반 보너스</span>
+                  <span className="font-bold text-foreground text-xs">+{mCls.carryBonusKg}kg 보관</span>
+                </div>
+              </div>
+
+              {/* 고유 특기 및 병종 패시브 */}
+              <div className="rounded-lg border border-primary/25 bg-primary/10 p-2.5 text-xs leading-relaxed space-y-1">
+                <div className="flex items-center gap-1 font-bold text-primary text-[11px]">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>고유 특기 및 역할:</span>
+                </div>
+                <p className="text-foreground text-[11px] font-medium">
+                  {selectedMember.specialPerk}
+                </p>
+                <p className="text-[10px] text-muted-foreground pt-1 border-t border-primary/15">
+                  {mCls.perkSummary}
+                </p>
+              </div>
+
+              {/* 하단 내비게이션 & 닫기 버튼 */}
+              <div className="flex items-center gap-2 pt-1">
+                {memberList.length > 1 && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 flex-1 text-xs"
+                      disabled={!prevMember}
+                      onClick={() => prevMember && setSelectedMember(prevMember)}
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5 mr-1" /> 이전 동료
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 flex-1 text-xs"
+                      disabled={!nextMember}
+                      onClick={() => nextMember && setSelectedMember(nextMember)}
+                    >
+                      다음 동료 <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                    </Button>
+                  </>
+                )}
+                <Button
+                  size="sm"
+                  className={`${memberList.length > 1 ? 'w-20' : 'w-full'} h-8 text-xs font-bold`}
+                  onClick={() => setSelectedMember(null)}
+                >
+                  확인
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 부족민 전체 요약 정보 팝업 */}
       {tribeDetailOpen && (
         <div
           className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
