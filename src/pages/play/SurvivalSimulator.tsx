@@ -186,7 +186,6 @@ const craftCatOf = (id: ItemId): CraftCat => {
 export default function SurvivalSimulator({ realGps = false }: { realGps?: boolean }) {
   // Opening now lives on the main page ("/"); first-time players see the 5-step story tutorial before entering the world.
   const [showOpening, setShowOpening] = useState(false);
-  const [showStoryTutorial, setShowStoryTutorial] = useState(() => !hasSeenStoryTutorial());
   const [chiefName, setChiefName] = useState(() => localStorage.getItem(PIONEER_NAME_KEY) ?? '');
   const enterWorld = (name: string) => {
     sessionStorage.setItem('colonion.openingSeen', '1');
@@ -297,9 +296,25 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [baseTab, setBaseTab] = useState<'village' | 'lab' | 'craft' | 'storage' | 'expedition' | 'pets'>('village');
   const [craftCat, setCraftCat] = useState<CraftCat>('all');
 
+  // Check if player is a starter / newcomer without an established base or who hasn't met the shaman yet
+  const isStarterPlayer = (!s.base || s.starterCampPending) || ((s.level ?? 1) <= 1 && (s.expeditionCount ?? 0) === 0 && !s.shamanMet);
+
+  const [showStoryTutorial, setShowStoryTutorial] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    // Show prologue story if brand new starter player who hasn't seen it in current session, or if never seen
+    if (isStarterPlayer && sessionStorage.getItem('colonion.storyTutorialSeenSession') !== '1') {
+      return true;
+    }
+    return !hasSeenStoryTutorial();
+  });
+
   // 3-Phase Interactive Survival Tutorial State
   const [tutorialStep, setTutorialStep] = useState<TutorialStep | null>(() => {
     if (typeof window === 'undefined') return null;
+    // If starter player without a placed base, auto-start Phase 1 tutorial regardless of stale browser localStorage
+    if (isStarterPlayer) {
+      return 'phase1_meet';
+    }
     const completed = localStorage.getItem(TUTORIAL_COMPLETED_KEY) === '1';
     return !completed && hasSeenStoryTutorial() ? 'phase1_meet' : null;
   });
@@ -308,8 +323,9 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
   const handleStoryTutorialDone = () => {
     setShowStoryTutorial(false);
+    sessionStorage.setItem('colonion.storyTutorialSeenSession', '1');
     const completed = localStorage.getItem(TUTORIAL_COMPLETED_KEY) === '1';
-    if (!completed) {
+    if (!completed || isStarterPlayer) {
       setTutorialStep('phase1_meet');
     }
   };
@@ -341,8 +357,14 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   };
 
   const handleReplayTutorial = () => {
+    try {
+      localStorage.removeItem(TUTORIAL_COMPLETED_KEY);
+      localStorage.removeItem(STORY_TUTORIAL_SEEN_KEY);
+      sessionStorage.removeItem('colonion.storyTutorialSeenSession');
+    } catch { /* ignore */ }
     setCollectedBranches(0);
     setTutorialBranches(generateTutorialGroundBranches(s.pos));
+    setShowStoryTutorial(true);
     setTutorialStep('phase1_meet');
     toast.info('📖 초보자 튜토리얼을 다시 시작합니다.');
   };
@@ -1047,7 +1069,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         finishLabel="콜로니온 월드 입장하기"
       />
       <SurvivalTutorialOverlay
-        open={tutorialStep !== null && tutorialStep !== 'completed'}
+        open={!showStoryTutorial && tutorialStep !== null && tutorialStep !== 'completed'}
         step={tutorialStep ?? 'phase1_meet'}
         collectedBranches={collectedBranches}
         onSetStep={setTutorialStep}

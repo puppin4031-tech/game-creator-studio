@@ -9,9 +9,10 @@ interface GameMenuProps {
   onExit?: () => void;
   onLogout?: () => Promise<void> | void;
   onRestoreSave?: () => Promise<void> | void;
+  onReplayTutorial?: () => void;
 }
 
-export function GameMenu({ onExit, onLogout, onRestoreSave }: GameMenuProps = {}) {
+export function GameMenu({ onExit, onLogout, onRestoreSave, onReplayTutorial }: GameMenuProps = {}) {
   const [open, setOpen] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const { user, profile, signOut } = useAuth();
@@ -134,6 +135,20 @@ export function GameMenu({ onExit, onLogout, onRestoreSave }: GameMenuProps = {}
               >
                 <span className="text-base">🔄</span>
                 {restoring ? '저장 데이터 복원 중...' : '저장 데이터 복원 (최고 진행도)'}
+              </Button>
+            )}
+
+            {onReplayTutorial && (
+              <Button
+                variant="outline"
+                className="justify-start gap-2 h-11 text-[13px] border-amber-500/40 text-amber-500 hover:bg-amber-500/10 my-1"
+                onClick={() => {
+                  onReplayTutorial();
+                  setOpen(false);
+                }}
+              >
+                <span className="text-base">📖</span>
+                초보자 튜토리얼 다시보기
               </Button>
             )}
 
