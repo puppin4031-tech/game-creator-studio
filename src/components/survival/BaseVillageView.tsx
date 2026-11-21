@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Hammer, Info, Lock, MessageSquare, Rotate3d, ShieldCheck, Sparkles, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
   buildingAtTile,
@@ -19,6 +20,7 @@ import {
   type PlacedVillageBuilding,
   type ShamanSkillId,
   type VillageBuildingId,
+  type VillageBuildingDef,
   type VillageState,
 } from '@/lib/survival/village';
 import { countSpoiledFood, type SmokehouseBatch } from '@/lib/survival/culinary';
@@ -2066,16 +2068,6 @@ export default function BaseVillageView({
                   <img src={mercImg} alt="부족회관" className="pixelated h-10 w-auto object-contain" />
                 ) : talkingAgent.kind === 'shaman' ? (
                   <img src={shamanImg} alt="떠돌이 주술사" className="pixelated h-10 w-auto object-contain" />
-                ) : talkingAgent.kind === 'class_npc' ? (
-                  <div className="relative flex items-center justify-center">
-                    <img src={mercImg} alt={talkingAgent.label} className="pixelated h-10 w-auto object-contain filter brightness-110" />
-                    <span className="absolute -top-1 -right-1 text-xs">
-                      {canonicalClass === 'ENGINEER' && '🔧'}
-                      {canonicalClass === 'MAGE' && '🔮'}
-                      {canonicalClass === 'NECROMANCER' && '💀'}
-                      {canonicalClass === 'HONEST' && '🪶'}
-                    </span>
-                  </div>
                 ) : (
                   <PetSprite
                     speciesId={talkingAgent.speciesId ?? 'baby_raptor'}
@@ -2585,7 +2577,6 @@ export default function BaseVillageView({
                       }`}
                     >
                       <span className="flex items-center gap-1 truncate">
-                        <span>{item?.icon ?? '📦'}</span>
                         <span className="truncate">{item?.name ?? c.itemId}</span>
                       </span>
                       <span className={`font-mono font-bold shrink-0 ${ok ? 'text-emerald-600' : 'text-destructive'}`}>

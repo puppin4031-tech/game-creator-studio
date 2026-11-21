@@ -248,7 +248,7 @@ export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEnt
     }
     if (spotted) {
       if (!previous.target && distanceM(before, spotted) > EXPEDITION_RADIUS_M && !text) {
-        text = crew.focus === 'hunt'
+        text = spotted.kind === 'creature'
           ? `🏹 [사냥 목표 포착] ${creatureDef(spotted.type).name} 추적 중!`
           : `${FOCUS_LABEL[crew.focus ?? 'materials']} 단서 포착 · ${nodeDef(spotted.type).name} 쪽으로 이동`;
       }

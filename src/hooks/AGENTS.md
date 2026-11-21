@@ -1,1 +1,2 @@
 - Survival `interact` returns whether the hit succeeded; automatic workers stop before animation/audio on rejection so failed tool, GPS, and cooldown checks cannot loop.
+- Initialize codex callbacks before gameplay callbacks that reference them in dependency arrays; why: const callbacks are unavailable before initialization during render.

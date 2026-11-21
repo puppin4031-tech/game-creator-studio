@@ -17,7 +17,7 @@ import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
 import { SURVIVAL_CONFIG as C } from '@/lib/survival/config';
 import { visionBonus, reachRadius, eggReachRadius, pocketBonusKg } from '@/lib/survival/utilitySkills';
 import { BASE_UPGRADE_MS, EXPEDITION_FOOD_COUNT, EXPEDITION_MS, expeditionRewards, mapFragments, payExpeditionFood, scoutReport, type Expedition, type ScoutTarget, type TimedJob } from '@/lib/survival/homeActivities';
-import { EGG_PICK_RADIUS_M, EGG_RESPAWN_MS, advanceEggs, babyFor, eggReady, newEgg, petById, type BabyDinoId, type CarriedEgg, type EggSpawn } from '@/lib/survival/dinoEggs';
+import { EGG_PICK_RADIUS_M, EGG_RESPAWN_MS, eggNeedM, eggWalkedM, advanceEggs, babyFor, eggReady, newEgg, petById, type BabyDinoId, type CarriedEgg, type EggSpawn } from '@/lib/survival/dinoEggs';
 import { ACTIVE_SKILLS, claimResearch, startResearch, atMainBase, atWorkshop, buildStructure, relocateOutpost, collectCompanionWork, prepareSkill, recruitCompanion, tameWolf, type ActiveSkill, type Companion } from '@/lib/survival/abilities';
 import { advanceSurvivalVitals } from '@/lib/survival/metabolism';
 import { distanceM } from '@/lib/survival/geo';
@@ -76,6 +76,7 @@ export interface WorldSave extends WorldProgress {
   backpack: Stack[];
   storage: Stack[];
   gear: GearInstance[];
+  storedGear?: GearInstance[];
   base: (LatLng & { level: 1 | 2 | 3; placedAt: number }) | null;
   depleted: Record<string, number>;
   damage: Record<string, number>;
@@ -240,6 +241,71 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     ref.current = value;
     setState(value);
   }, []);
+  const recordCodexResource = useCallback((itemId: ItemId) => {
+    const p = ref.current;
+    const curCodex = p.codex ?? defaultCodexState();
+    if (curCodex.discoveredResources.includes(itemId)) return;
+
+    const nextResources = [...curCodex.discoveredResources, itemId];
+    const itemDef = ITEMS[itemId];
+    const nextCodex: CodexState = {
+      ...curCodex,
+      discoveredResources: nextResources,
+      hasUnseenNew: true,
+    };
+
+    setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
+    toast.success(`📖 [도감 신규 등록!] 새로운 자원 [${itemDef?.name ?? itemId}]을(를) 도감에 기록했습니다!`);
+  }, [setS]);
+
+  const recordCodexPet = useCallback((speciesId: string) => {
+    const p = ref.current;
+    const curCodex = p.codex ?? defaultCodexState();
+    if (curCodex.discoveredPets.includes(speciesId)) return;
+
+    const nextPets = [...curCodex.discoveredPets, speciesId];
+    const petMeta = CODEX_PETS.find(pet => pet.id === speciesId);
+    const nextCodex: CodexState = {
+      ...curCodex,
+      discoveredPets: nextPets,
+      hasUnseenNew: true,
+    };
+
+    setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
+    toast.success(`📖 [도감 신규 등록!] 새로운 공룡 펫 [${petMeta?.name ?? speciesId}]을(를) 도감에 기록했습니다!`);
+  }, [setS]);
+
+  const recordCodexBoss = useCallback((bossId: string) => {
+    const p = ref.current;
+    const curCodex = p.codex ?? defaultCodexState();
+    if (curCodex.defeatedBosses.includes(bossId)) return;
+
+    const nextBosses = [...curCodex.defeatedBosses, bossId];
+    const bossMeta = CODEX_BOSSES.find(b => b.id === bossId);
+    const nextCodex: CodexState = {
+      ...curCodex,
+      defeatedBosses: nextBosses,
+      hasUnseenNew: true,
+    };
+
+    setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
+    toast.success(`📖 [도감 신규 등록!] 우두머리 [${bossMeta?.name ?? bossId}] 토벌 기록을 도감에 새겼습니다!`);
+  }, [setS]);
+
+  const recordCodexAiInvention = useCallback((entry: CodexAiInvention) => {
+    const p = ref.current;
+    const curCodex = p.codex ?? defaultCodexState();
+    const nextInventions = [entry, ...(curCodex.aiInventions ?? [])];
+    const nextCodex: CodexState = {
+      ...curCodex,
+      aiInventions: nextInventions,
+      hasUnseenNew: true,
+    };
+
+    setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
+    toast.success(`📖 [도감 신규 등록!] AI 맞춤 발명품 [${entry.name}]이(가) 도감에 영구 소장되었습니다!`);
+  }, [setS]);
+
   const [now, setNow] = useState(Date.now());
   const lastCreatureAttack = useRef(0);
   const [pocketMode, setPocketMode] = useState(false);
@@ -1780,11 +1846,13 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     recordCodexAiInvention({
       id: uid,
       name: params.name,
-      kind: 'building',
-      description: params.desc,
-      discoveredAt: Date.now(),
-      physicalAttributes: params.physics,
-      mechanicTags: params.mechanics,
+      type: 'architecture',
+      categoryLabel: params.category,
+      desc: params.desc,
+      createdAt: Date.now(),
+      physics: params.physics,
+      mechanics: params.mechanics,
+      materials: params.materials,
     });
     toast.success(`🏛️ 「${params.name}」 맞춤 건축 완료! (마을 배치됨)`);
     return true;
@@ -1851,11 +1919,13 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     recordCodexAiInvention({
       id: inv.id,
       name: params.name,
-      kind: params.category === 'armor' ? 'armor' : 'weapon',
-      description: params.desc,
-      discoveredAt: Date.now(),
-      physicalAttributes: params.physics,
-      mechanicTags: params.mechanics,
+      type: 'armory',
+      categoryLabel: params.category,
+      desc: params.desc,
+      createdAt: Date.now(),
+      physics: params.physics,
+      mechanics: params.mechanics,
+      materials: params.materials,
     });
     toast.success(`⚔️ 「${params.name}」 제련 완료! (배낭 장비함에 보관됨)`);
     return true;
@@ -2591,71 +2661,6 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     toast.success(`🎒 암바초가 모은 보물 ${items.length}종을 거점 창고에 모두 보관했습니다!`);
     return true;
   }, [setS, recordCodexResource]);
-
-  const recordCodexResource = useCallback((itemId: ItemId) => {
-    const p = ref.current;
-    const curCodex = p.codex ?? defaultCodexState();
-    if (curCodex.discoveredResources.includes(itemId)) return;
-
-    const nextResources = [...curCodex.discoveredResources, itemId];
-    const itemDef = ITEMS[itemId];
-    const nextCodex: CodexState = {
-      ...curCodex,
-      discoveredResources: nextResources,
-      hasUnseenNew: true,
-    };
-
-    setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
-    toast.success(`📖 [도감 신규 등록!] 새로운 자원 [${itemDef?.name ?? itemId}]을(를) 도감에 기록했습니다!`);
-  }, [setS]);
-
-  const recordCodexPet = useCallback((speciesId: string) => {
-    const p = ref.current;
-    const curCodex = p.codex ?? defaultCodexState();
-    if (curCodex.discoveredPets.includes(speciesId)) return;
-
-    const nextPets = [...curCodex.discoveredPets, speciesId];
-    const petMeta = CODEX_PETS.find(pet => pet.id === speciesId);
-    const nextCodex: CodexState = {
-      ...curCodex,
-      discoveredPets: nextPets,
-      hasUnseenNew: true,
-    };
-
-    setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
-    toast.success(`📖 [도감 신규 등록!] 새로운 공룡 펫 [${petMeta?.name ?? speciesId}]을(를) 도감에 기록했습니다!`);
-  }, [setS]);
-
-  const recordCodexBoss = useCallback((bossId: string) => {
-    const p = ref.current;
-    const curCodex = p.codex ?? defaultCodexState();
-    if (curCodex.defeatedBosses.includes(bossId)) return;
-
-    const nextBosses = [...curCodex.defeatedBosses, bossId];
-    const bossMeta = CODEX_BOSSES.find(b => b.id === bossId);
-    const nextCodex: CodexState = {
-      ...curCodex,
-      defeatedBosses: nextBosses,
-      hasUnseenNew: true,
-    };
-
-    setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
-    toast.success(`📖 [도감 신규 등록!] 우두머리 [${bossMeta?.name ?? bossId}] 토벌 기록을 도감에 새겼습니다!`);
-  }, [setS]);
-
-  const recordCodexAiInvention = useCallback((entry: CodexAiInvention) => {
-    const p = ref.current;
-    const curCodex = p.codex ?? defaultCodexState();
-    const nextInventions = [entry, ...(curCodex.aiInventions ?? [])];
-    const nextCodex: CodexState = {
-      ...curCodex,
-      aiInventions: nextInventions,
-      hasUnseenNew: true,
-    };
-
-    setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
-    toast.success(`📖 [도감 신규 등록!] AI 맞춤 발명품 [${entry.name}]이(가) 도감에 영구 소장되었습니다!`);
-  }, [setS]);
 
   const markCodexSeen = useCallback(() => {
     const p = ref.current;
