@@ -34,7 +34,7 @@ export function ExpeditionMarker({ crew, project, members = 1, tribeClass }: { c
   const last = trail.current[trail.current.length - 1];
   if (!last || distanceM(last, crew.pos) > 2) trail.current = [...trail.current, crew.pos].slice(-60);
   const engageRadius = cls ? Math.max(10, cls.attackRangeM) : 10;
-  const isWoodNode = crew.target?.kind === 'node' && (crew.target.type === 'oak' || crew.target.type === 'pine');
+  const isWoodNode = crew.target?.kind === 'node' && ((crew.target.type as string) === 'oak' || (crew.target.type as string) === 'pine');
   const tribeAct = since < 220 ? 'attack' : crew.target && (!crew.manual || distanceM(crew.pos, crew.target) <= engageRadius) ? (crew.target.kind === 'node' ? (isWoodNode ? 'chop' : 'gather') : 'attack') : 'walk';
   const rapidStrike = cls?.id === 'assassin';
   return <>

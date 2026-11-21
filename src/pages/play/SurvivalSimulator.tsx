@@ -9,7 +9,7 @@ import WinterThemeOverlay from '@/components/WinterThemeOverlay';
 import DinoEggHatchModal from '@/components/survival/DinoEggHatchModal';
 import { eggArt } from '@/components/survival/eggArt';
 import CulinaryDishIcon, { isCustomCulinaryItem } from '@/components/survival/CulinaryDishIcon';
-import { EGG_SPAWN_RADIUS_M, eggNeedM, eggReady, eggSpawnsNear, eggWalkedM } from '@/lib/survival/dinoEggs';
+import { EGG_SPAWN_RADIUS_M, eggNeedM, eggReady, eggSpawnsNear, eggWalkedM, type CarriedEgg } from '@/lib/survival/dinoEggs';
 import { useCustomCatalog } from '@/hooks/useCustomCatalog';
 import CreatureSprite from '@/components/survival/CreatureSprite';
 import ExpeditionSystem, { ExpeditionMarker } from '@/components/survival/ExpeditionSystem';

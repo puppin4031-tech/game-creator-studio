@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Switch } from '@/components/ui/switch';
 import { getSettings, saveSettings, subscribeSettings, playSfx, haptic, type GameSettings, type VolumeLevel } from '@/lib/survival/gameSettings';
 
-interface Props { onExit: () => void; onLogout: () => Promise<void> | void; loggedIn: boolean }
+interface Props { onExit: () => void; onLogout: () => Promise<void> | void; loggedIn: boolean; onRestoreSave?: () => Promise<unknown> }
 
 export function useGameSettings() {
   const [s, setS] = useState<GameSettings>(getSettings);

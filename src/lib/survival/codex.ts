@@ -212,8 +212,8 @@ export interface SaveLikeForCodex {
   base?: { level: number } | null;
   palisade?: boolean;
   altar?: boolean;
-  smokeBatches?: { rawItemId?: string; curedItemId?: string }[];
-  cookingJobs?: { outputItemId?: string }[];
+  smokeBatches?: { inputItemId?: string; outputItemId?: string }[];
+  cookingJobs?: { recipeId?: string }[];
   village?: {
     buildings?: {
       buildingId?: string;
@@ -262,11 +262,11 @@ export function collectOwnedAndPastCodex(save?: SaveLikeForCodex | null): {
 
   // 3. Ongoing smokehouse / cooking batches
   for (const b of save.smokeBatches ?? []) {
-    addRes(b?.rawItemId);
-    addRes(b?.curedItemId);
+    addRes(b?.inputItemId);
+    addRes(b?.outputItemId);
   }
   for (const c of save.cookingJobs ?? []) {
-    addRes(c?.outputItemId);
+    addRes(c?.recipeId);
   }
 
   // 4. Past gathered & packed items
@@ -281,19 +281,19 @@ export function collectOwnedAndPastCodex(save?: SaveLikeForCodex | null): {
   for (const [craftedId, cnt] of Object.entries(save.crafted ?? {})) {
     if ((cnt ?? 0) <= 0) continue;
     addRes(craftedId);
-    const recipe = RECIPES.find(r => r.id === craftedId || r.output.itemId === craftedId);
+    const recipe = RECIPES.find(r => r.id === craftedId || r.result === craftedId);
     if (recipe) {
-      addRes(recipe.output.itemId);
-      for (const c of recipe.cost) addRes(c.itemId);
+      addRes(recipe.result);
+      for (const c of recipe.ingredients) addRes(c.itemId);
     }
   }
 
   // 6. Owned gear (equipped/backpack/stored) implies player owned their crafting materials in the past
   for (const g of [...(save.gear ?? []), ...(save.storedGear ?? [])]) {
     if (!g?.itemId) continue;
-    const recipe = RECIPES.find(r => r.output.itemId === g.itemId);
+    const recipe = RECIPES.find(r => r.result === g.itemId);
     if (recipe) {
-      for (const c of recipe.cost) addRes(c.itemId);
+      for (const c of recipe.ingredients) addRes(c.itemId);
     }
   }
 
