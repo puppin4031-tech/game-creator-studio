@@ -30,9 +30,10 @@ import {
   TRIBE_TREAT_COST,
   type TribeState,
 } from '@/lib/survival/mercenaries';
-import { ITEMS } from '@/lib/survival/items';
+import { ITEMS, type ItemId } from '@/lib/survival/items';
 import { addStacks, hasAll } from '@/lib/survival/inventory';
-import type { Stack } from '@/lib/survival/types';
+import type { GearInstance, Stack } from '@/lib/survival/types';
+import type { Loadout } from '@/lib/survival/equipment';
 
 interface Props {
   open: boolean;
@@ -40,9 +41,13 @@ interface Props {
   tribe: TribeState | undefined;
   storage: Stack[];
   backpack: Stack[];
+  gear?: GearInstance[];
+  storedGear?: GearInstance[];
+  loadout?: Loadout;
   playerLevel?: number;
   languageLearned?: boolean;
   onHireTribe?: (classId: TribeClassId) => boolean;
+  onDismissTribe?: (classId: TribeClassId) => boolean;
   onSelectTribeClass?: (classId: TribeClassId) => void;
   onTrainTribe?: () => boolean;
   onTreatTribe?: () => boolean;
@@ -109,9 +114,13 @@ export default function TribalHallModal({
   tribe,
   storage,
   backpack,
+  gear = [],
+  storedGear = [],
+  loadout,
   playerLevel = 1,
   languageLearned = false,
   onHireTribe,
+  onDismissTribe,
   onSelectTribeClass,
   onTrainTribe,
   onTreatTribe,
@@ -130,7 +139,31 @@ export default function TribalHallModal({
   const trainCost = tribeTrainCost(trainLevel);
   const powerRatio = Math.round(tribeRatio(tribe) * 100);
 
-  const owned = useMemo(() => addStacks(storage, backpack), [storage, backpack]);
+  // Scan both materials (storage + backpack) AND unequipped equipment/tools across backpack & base storage
+  const equippedUids = useMemo(
+    () =>
+      new Set(
+        Object.values(loadout ?? {})
+          .filter((g): g is GearInstance => !!g)
+          .map(g => g.uid)
+      ),
+    [loadout]
+  );
+
+  const gearStacks = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const g of gear) {
+      if (!equippedUids.has(g.uid)) {
+        map[g.itemId] = (map[g.itemId] ?? 0) + 1;
+      }
+    }
+    for (const g of storedGear) {
+      map[g.itemId] = (map[g.itemId] ?? 0) + 1;
+    }
+    return Object.entries(map).map(([itemId, count]): Stack => ({ itemId: itemId as ItemId, count }));
+  }, [gear, storedGear, equippedUids]);
+
+  const owned = useMemo(() => addStacks(addStacks(storage, backpack), gearStacks), [storage, backpack, gearStacks]);
 
   const canAffordHire = hireCost ? hasAll(owned, hireCost) : false;
   const canAffordTrain = trainCost ? hasAll(owned, trainCost) : false;
@@ -258,7 +291,7 @@ export default function TribalHallModal({
           }`}
         >
           <UserPlus className="!h-3.5 !w-3.5" />
-          <span>용병 영입</span>
+          <span>용병 영입·환급</span>
         </button>
         <button
           type="button"
@@ -474,13 +507,13 @@ export default function TribalHallModal({
                       </div>
                     </div>
 
-                    {/* Hire Action */}
-                    <div className="pt-1">
+                    {/* Hire & Dismiss Action Buttons */}
+                    <div className="pt-1 flex gap-1.5">
                       <Button
                         type="button"
                         disabled={!hireCost || !canAffordHire}
                         onClick={() => handleHire(cls.id)}
-                        className="pixel-btn w-full py-2 text-xs font-bold"
+                        className="pixel-btn flex-1 py-2 text-xs font-bold"
                       >
                         {count >= TRIBE_MAX
                           ? '정원 마감 (10명)'
@@ -488,6 +521,17 @@ export default function TribalHallModal({
                             ? '재료 부족 (영입 불가)'
                             : `${cls.icon} ${cls.name} 영입하기`}
                       </Button>
+                      {classCount > 0 && count > 1 && onDismissTribe && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => onDismissTribe(cls.id)}
+                          className="pixel-btn py-2 px-2.5 text-xs font-bold border-destructive/50 text-destructive hover:bg-destructive/10 shrink-0"
+                          title="부족민 제대 / 환급: 구운 고기 3, 가죽 2, 부싯돌 3, 조개 5개 거점 창고 지급"
+                        >
+                          제대·환급
+                        </Button>
+                      )}
                     </div>
                   </div>
                 );

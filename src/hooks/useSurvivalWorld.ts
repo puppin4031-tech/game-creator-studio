@@ -718,15 +718,60 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (dispatchObserved(destination, focus)) setS(p => ({ ...p, expeditionAuto: true }));
   }, [dispatchObserved, setS]);
   const payCost = (p: WorldSave, cost: Stack[]) => {
-    // Storage first, then backpack, per item (mixed sources allowed).
-    let storage = p.storage, backpack = p.backpack;
+    // Storage first, then storedGear, then backpack, then unequipped gear (mixed sources allowed).
+    let storage = p.storage;
+    let backpack = p.backpack;
+    let gear = p.gear ?? [];
+    let storedGear = p.storedGear ?? [];
+    const equippedUids = new Set(Object.values(p.equipped ?? {}).filter(Boolean));
+
     for (const c of cost) {
+      let needed = c.count;
+
+      // 1. Storage stack
       const inStore = storage.find(x => x.itemId === c.itemId)?.count ?? 0;
-      const a = Math.min(inStore, c.count), b = c.count - a;
-      if (a) { const r = removeStacks(storage, [{ itemId: c.itemId, count: a }]); if (!r) return null; storage = r; }
-      if (b) { const r = removeStacks(backpack, [{ itemId: c.itemId, count: b }]); if (!r) return null; backpack = r; }
+      if (inStore > 0) {
+        const take = Math.min(inStore, needed);
+        storage = removeStacks(storage, [{ itemId: c.itemId, count: take }]) ?? storage;
+        needed -= take;
+      }
+
+      // 2. Base storage equipment / tools (storedGear)
+      if (needed > 0 && storedGear.length > 0) {
+        const matchingStored = storedGear.filter(g => g.itemId === c.itemId);
+        const take = Math.min(matchingStored.length, needed);
+        if (take > 0) {
+          const uidsToRemove = new Set(matchingStored.slice(0, take).map(g => g.uid));
+          storedGear = storedGear.filter(g => !uidsToRemove.has(g.uid));
+          needed -= take;
+        }
+      }
+
+      // 3. Backpack stack
+      if (needed > 0) {
+        const inBag = backpack.find(x => x.itemId === c.itemId)?.count ?? 0;
+        if (inBag > 0) {
+          const take = Math.min(inBag, needed);
+          backpack = removeStacks(backpack, [{ itemId: c.itemId, count: take }]) ?? backpack;
+          needed -= take;
+        }
+      }
+
+      // 4. Unequipped carried equipment / tools in backpack (gear)
+      if (needed > 0 && gear.length > 0) {
+        const matchingGear = gear.filter(g => g.itemId === c.itemId && !equippedUids.has(g.uid));
+        const take = Math.min(matchingGear.length, needed);
+        if (take > 0) {
+          const uidsToRemove = new Set(matchingGear.slice(0, take).map(g => g.uid));
+          gear = gear.filter(g => !uidsToRemove.has(g.uid));
+          needed -= take;
+        }
+      }
+
+      if (needed > 0) return null;
     }
-    return { storage, backpack };
+
+    return { storage, backpack, gear, storedGear };
   };
   const hireMerc = useCallback((classId?: TribeClassId) => {
     const p = ref.current; const now = Date.now();
@@ -755,6 +800,45 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       expeditionLogs: appendLog(p, `${cls.icon} ${cls.name} 영입 · ${count + 1}/10명`, now),
     });
     toast.success(`${cls.icon} ${cls.name} 영입 완료! (총 ${count + 1}명)`);
+    return true;
+  }, [setS]);
+  const dismissTribe = useCallback((classId?: TribeClassId) => {
+    const p = ref.current;
+    const count = p.tribe?.count ?? 0;
+    if (count <= 1) {
+      toast.warning('최소 1명의 동반 부족민(암바초)은 마을에 남아 있어야 합니다.');
+      return false;
+    }
+    const targetClass = classId ?? p.tribe?.classId ?? 'tank';
+    const prevCounts = p.tribe?.classCounts ?? {};
+    const curClassCount = prevCounts[targetClass] ?? 0;
+    const finalClass = curClassCount > 0 ? targetClass : (Object.keys(prevCounts).find(k => (prevCounts[k as TribeClassId] ?? 0) > 0) as TribeClassId ?? 'tank');
+
+    // Refund resources: food, leather, flint, and shells into base storage
+    const refund: Stack[] = [
+      { itemId: 'cooked_meat', count: 3 },
+      { itemId: 'leather', count: 2 },
+      { itemId: 'flint', count: 3 },
+      { itemId: 'shell', count: 5 },
+    ];
+
+    setS({
+      ...p,
+      storage: addStacks(p.storage, refund),
+      tribe: {
+        ...p.tribe,
+        count: Math.max(1, count - 1),
+        classCounts: {
+          ...prevCounts,
+          [finalClass]: Math.max(0, (prevCounts[finalClass] ?? 1) - 1),
+        },
+      },
+    });
+
+    const cls = getTribeClass(finalClass);
+    toast.success(`${cls.icon} ${cls.name} 부족민을 명예 제대/환급 처리했습니다.`, {
+      description: `환급 자원: 구운 고기 3 · 가죽 2 · 부싯돌 3 · 조개 5 (거점 창고 지급)`,
+    });
     return true;
   }, [setS]);
   const trainTribe = useCallback(() => {
@@ -1104,13 +1188,31 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return true;
   }, [capacity]);
 
-  const sellItem = useCallback((itemId: ItemId) => {
+  const sellItem = useCallback((itemId: ItemId, uid?: string) => {
     const p = ref.current;
     const price = sellPrice(itemId);
-    const left = price ? removeStacks(p.backpack, [{ itemId, count: 1 }]) : null;
+    if (!price) { toast.warning('판매할 수 없는 아이템입니다.'); return; }
+    if (uid) {
+      const g = p.gear.find(x => x.uid === uid);
+      if (!g) return;
+      const isEquipped = Object.values(p.equipped ?? {}).includes(uid);
+      if (isEquipped) {
+        toast.warning('착용 중인 장비는 먼저 해제해야 판매할 수 있습니다.');
+        return;
+      }
+      setS({
+        ...p,
+        gear: p.gear.filter(x => x.uid !== uid),
+        backpack: addStacks(p.backpack, [{ itemId: 'shell', count: price }]),
+      });
+      toast.success(`${ITEMS[itemId].name}을(를) 판매하여 조개 ${price}개를 획득했습니다!`);
+      return;
+    }
+    const left = removeStacks(p.backpack, [{ itemId, count: 1 }]);
     if (!left) return;
     setS({ ...p, backpack: addStacks(left, [{ itemId: 'shell', count: price }]) });
-  }, []);
+    toast.success(`${ITEMS[itemId].name}을(를) 판매하여 조개 ${price}개를 획득했습니다!`);
+  }, [setS]);
 
   const buyItem = useCallback((itemId: ItemId) => {
     const p = ref.current;
@@ -1476,11 +1578,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const next = { ...p, backpack: paid.backpack, crafted: { ...p.crafted, [r.result]: (p.crafted[r.result] ?? 0) + r.count } };
     if (it.durability !== undefined) {
       const g: GearInstance = { uid: crypto.randomUUID(), itemId: r.result, quality: 'NORMAL', durability: it.durability, maxDurability: it.durability };
-      setS({ ...next, storage: left, gear: [...p.gear, g] });
+      setS({ ...next, storage: left, gear: [...(paid.gear ?? p.gear), g], storedGear: paid.storedGear ?? p.storedGear });
     } else if (r.result === 'arrow' || r.result === 'sling_stone' || (r.result as string) === 'javelin') {
-      setS({ ...next, storage: left, backpack: addStacks(paid.backpack, [{ itemId: r.result, count: r.count }]) });
+      setS({ ...next, storage: left, backpack: addStacks(paid.backpack, [{ itemId: r.result, count: r.count }]), gear: paid.gear ?? p.gear, storedGear: paid.storedGear ?? p.storedGear });
     } else {
-      setS({ ...next, storage: addStacks(left, [{ itemId: r.result, count: r.count }]) });
+      setS({ ...next, storage: addStacks(left, [{ itemId: r.result, count: r.count }]), gear: paid.gear ?? p.gear, storedGear: paid.storedGear ?? p.storedGear });
     }
     toast.success(`${it.name} 제작 완료!`, { description: it.durability !== undefined || r.result === 'arrow' || r.result === 'sling_stone' || (r.result as string) === 'javelin' ? '배낭에 담았어요' : '창고에 넣었어요' });
   }, []);
@@ -2817,12 +2919,20 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return chosen;
   }, [saveKey, userId, setS]);
 
-  return { codex: s.codex ?? defaultCodexState(), codexProgress, recordCodexResource, recordCodexPet, recordCodexBoss, recordCodexAiInvention, markCodexSeen, reloadSaveFromBestSource, claimOfflineRewards, shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
+  return { codex: s.codex ?? defaultCodexState(), codexProgress, recordCodexResource, recordCodexPet, recordCodexBoss, recordCodexAiInvention, markCodexSeen, reloadSaveFromBestSource, claimOfflineRewards, shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, dismissTribe, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
     moveOutpost, petHits, mergePets, togglePetDeploy, assignPetRole, feedPet, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,
     quest, questProgress, canClaimQuest, claimQuest, nextLevelXp: xpToNext(s.level),
-    canAfford: (st: Stack[]) => hasAll(addStacks(s.storage, s.backpack), st),
+    canAfford: (st: Stack[]) => {
+      const equippedUids = new Set(Object.values(s.equipped ?? {}).filter(Boolean));
+      const unequippedGearStacks: Stack[] = (s.gear ?? [])
+        .filter(g => !equippedUids.has(g.uid))
+        .map(g => ({ itemId: g.itemId, count: 1 }));
+      const storedGearStacks: Stack[] = (s.storedGear ?? []).map(g => ({ itemId: g.itemId, count: 1 }));
+      const allOwned = addStacks(addStacks(addStacks(s.storage, s.backpack), unequippedGearStacks), storedGearStacks);
+      return hasAll(allOwned, st);
+    },
     recipes: RECIPES, NODES, CREATURES,
   };
 }

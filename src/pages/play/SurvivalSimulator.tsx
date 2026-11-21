@@ -1698,17 +1698,23 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               {panel === 'bag' && (
                 <>
                   <InventoryMaterials
-                    stacks={s.backpack.filter(st => !isGearItem(st.itemId))}
+                    stacks={s.backpack}
+                    gear={s.gear}
+                    loadout={g.loadout}
                     location="backpack"
                     canTransfer={g.inBase}
                     ready={actionReady}
                     onTransfer={g.storeOne}
+                    onTransferGear={g.storeGear}
                     onDrop={g.dropItems}
+                    onDropGear={g.dropGear}
                     onUse={g.eat}
+                    onEquip={g.equip}
+                    onSell={g.sellItem}
                     icon={inventoryIcon}
                   />
                   <BackpackDiscard
-                    backpack={s.backpack.filter(st => !isGearItem(st.itemId))}
+                    backpack={s.backpack}
                     onDrop={g.dropItems}
                   />
                   <div className="space-y-2 border-t border-border pt-3">
@@ -1885,8 +1891,45 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   )}
                   </>}
                   {baseTab === 'storage' && <>
-                  <div><b className="text-sm">배낭</b><div className="mt-1"><InventoryMaterials stacks={s.backpack} location="backpack" canTransfer={g.inBase} ready={actionReady} onTransfer={g.storeOne} onDrop={g.dropItems} onUse={g.eat} icon={inventoryIcon} /></div></div>
-                  <div><b className="text-sm">창고</b><div className="mt-1"><InventoryMaterials stacks={s.storage} location="storage" canTransfer={g.inBase} ready={actionReady} onTransfer={g.withdraw} onUse={g.eat} icon={inventoryIcon} /></div></div>
+                  <div>
+                    <b className="text-sm">배낭 소지품</b>
+                    <div className="mt-1">
+                      <InventoryMaterials
+                        stacks={s.backpack}
+                        gear={s.gear}
+                        loadout={g.loadout}
+                        location="backpack"
+                        canTransfer={g.inBase}
+                        ready={actionReady}
+                        onTransfer={g.storeOne}
+                        onTransferGear={g.storeGear}
+                        onDrop={g.dropItems}
+                        onDropGear={g.dropGear}
+                        onUse={g.eat}
+                        onEquip={g.equip}
+                        onSell={g.sellItem}
+                        icon={inventoryIcon}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <b className="text-sm">거점 창고 보관품</b>
+                    <div className="mt-1">
+                      <InventoryMaterials
+                        stacks={s.storage}
+                        gear={s.storedGear ?? []}
+                        loadout={g.loadout}
+                        location="storage"
+                        canTransfer={g.inBase}
+                        ready={actionReady}
+                        onTransfer={g.withdraw}
+                        onTransferGear={g.retrieveGear}
+                        onUse={g.eat}
+                        onSell={g.sellItem}
+                        icon={inventoryIcon}
+                      />
+                    </div>
+                  </div>
                   </>}
                   {baseTab === 'pets' && <PetPanel pets={s.pets ?? []} defense={s.petDefense} now={nowTick} ready={atWorkshop(s) && (!realGps || gps.ready || !gps.fix)} onFuse={g.mergePets} onDeploy={g.togglePetDeploy} onRole={g.assignPetRole} onFeed={g.feedPet} onLock={g.togglePetLock}
                     onOpenDinoExpedition={() => setDinoExpeditionOpen(true)}
@@ -2196,9 +2239,13 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         tribe={s.tribe}
         storage={s.storage}
         backpack={s.backpack}
+        gear={s.gear}
+        storedGear={s.storedGear}
+        loadout={g.loadout}
         playerLevel={s.level}
         languageLearned={!!s.languageLearned}
         onHireTribe={g.hireMerc}
+        onDismissTribe={g.dismissTribe}
         onSelectTribeClass={g.selectTribeClass}
         onTrainTribe={g.trainTribe}
         onTreatTribe={g.treatTribe}

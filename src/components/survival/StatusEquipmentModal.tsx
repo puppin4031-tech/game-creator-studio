@@ -405,7 +405,7 @@ export default function StatusEquipmentModal({
           <div className="flex items-center justify-between">
             <span className="font-bold text-xs flex items-center gap-1.5 text-stone-200">
               <Backpack className="h-4 w-4 text-emerald-400" />
-              <span>장비 가능한 품목 (배낭 보관)</span>
+              <span>착용 가능한 장비 (배낭 소지)</span>
             </span>
             <span className="text-[10px] text-stone-400 font-mono">
               {carriedGear.length}개 보유
