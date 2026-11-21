@@ -40,7 +40,7 @@ import { MAX_SKILL_LEVEL, skillLevel, skillUpgradeCost } from '@/lib/survival/sk
 import { type SpriteAction } from '@/hooks/useSpriteAnimations';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Backpack, Flame, Lightbulb, LocateFixed, X, Lock, ListChecks, Compass, ChevronUp, Star, MapPin, Navigation, Radar, Map as MapIcon, FileText, BookOpen, Zap, Shield } from 'lucide-react';
+import { Backpack, Flame, Lightbulb, LocateFixed, X, Lock, ListChecks, Compass, ChevronUp, Star, MapPin, Navigation, Radar, Map as MapIcon, FileText, BookOpen, Zap, Shield, Home, Radio, RefreshCw } from 'lucide-react';
 import { bearingDeg, useSurvivalFavorites } from '@/hooks/useSurvivalFavorites';
 import { useDeviceHeading } from '@/hooks/useDeviceHeading';
 import { useSurvivalGps } from '@/hooks/useSurvivalGps';
@@ -208,8 +208,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const navigate = useNavigate();
   const [gpsReady, setGpsReady] = useState(false);
   const g = useSurvivalWorld(START, { enabled: !realGps || gpsReady, saveKey: realGps ? 'survival-gps-world-v1' : 'survival-world-v1', cloudSync: realGps, indoor: realGps });
-  const gps = useSurvivalGps(realGps, g.moveTo);
-  useEffect(() => setGpsReady(gps.ready), [gps.ready]);
+  const gps = useSurvivalGps(realGps, g.moveTo, g.state.base ?? g.state.pos ?? START);
+  useEffect(() => setGpsReady(gps.ready || gps.isIndoor), [gps.ready, gps.isIndoor]);
   useEffect(() => { preloadCoreSprites(); }, []);
   const { state: s } = g;
   const [expeditionTarget, setExpeditionTarget] = useState<LatLng | null>(null);
@@ -235,7 +235,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const isAmbachoActive = s.mercenary?.name === '암바초' || (s.tribe?.classCounts?.gatherer ?? 0) > 0;
   const activeTribeClassId: TribeClassId = crew?.tribeClass ?? (isAmbachoActive ? 'gatherer' : (s.tribe?.classId ?? DEFAULT_TRIBE_CLASS));
   const activeTribeClass = getTribeClass(activeTribeClassId);
-  const canDispatch = !!s.base && (!realGps || !gps.ready || g.inBase || hasTribe);
+  const canDispatch = !!s.base && (!realGps || gps.ready || gps.isIndoor || g.inBase || hasTribe);
   const [fieldExp, setFieldExp] = useState(false);
   const [radarOpen, setRadarOpen] = useState(false);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
@@ -283,7 +283,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     );
     localStorage.setItem('colonion_last_active_at', Date.now().toString());
   };
-  const expeditionControls = <ExpeditionSystem crew={crew} logs={s.expeditionLogs ?? []} target={expeditionTarget} home={s.base} auto={!!s.expeditionAuto} pocket={g.pocketMode} outdoor={g.outdoorMoving && (g.pocketMode || (!!crew && distanceM(s.pos, crew.pos) <= 40))} watching={view === 'expedition'} gpsReady={gps.ready} canSend={canDispatch}
+  const expeditionControls = <ExpeditionSystem crew={crew} logs={s.expeditionLogs ?? []} target={expeditionTarget} home={s.base} auto={!!s.expeditionAuto} pocket={g.pocketMode} outdoor={g.outdoorMoving && (g.pocketMode || (!!crew && distanceM(s.pos, crew.pos) <= 40))} watching={view === 'expedition'} gpsReady={gps.ready || gps.isIndoor} canSend={canDispatch}
     focus={crew?.focus ?? expeditionFocus} onFocus={setExpeditionFocus}
     tribeClass={activeTribeClassId}
     expeditionLevel={g.expeditionLevelInfo.level}
@@ -419,12 +419,16 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   };
 
   const tapEntity = (e: WorldEntity) => {
-    if (realGps && !gps.ready) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return; }
     const dist = distanceM(s.pos, e);
     const rangedInfo = computeRangedReach(g.weapon, s.level);
     const isRangedWeapon = e.kind === 'creature' && !!rangedInfo.category;
     const reachBonus = s.techs.includes('long_reach') ? longReachBonus(techLevel(s.techLevels, 'long_reach')) : 0;
     const effectiveReach = isRangedWeapon ? Math.max(g.reach, rangedInfo.rangeM + reachBonus) : g.reach;
+    if (realGps && !gps.ready && !gps.isIndoor) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return; }
+    if (realGps && gps.isIndoor && dist > effectiveReach) {
+      toast.info('실내 모드에서는 원정대를 파견하여 채집하거나, 야외 이동 시 직접 채집할 수 있습니다.');
+      return;
+    }
     if (!realGps && dist > effectiveReach) { g.moveTo({ lat: e.lat, lng: e.lng }); return; }
     if (auto.job?.id === e.id) { auto.stop(); toast('작업을 멈췄습니다'); return; }
     if (dist > effectiveReach) { g.interact(e); return; }
@@ -630,7 +634,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const zone = s.terrainZones[zoneCellKey(s.pos)] ?? 'plains';
   const onSurfaceZone = (c: LatLng, z: typeof zone) => g.recordTerrainZone(zoneCellKey(c), z);
   const onSurfacePark = (c: LatLng, park: boolean) => g.recordPark(zoneCellKey(c), park);
-  const actionReady = !realGps || gps.ready;
+  const actionReady = !realGps || gps.ready || gps.isIndoor;
   const gpsReadyRef = useRef(actionReady); gpsReadyRef.current = actionReady;
   // Auto pickup tech: gather one hand-gatherable node within 10m every few seconds.
   const autoRef = useRef({ g, ready: actionReady });
@@ -770,10 +774,10 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const hatchDiscount = g.codexProgress?.hatchDiscountPct ?? 0;
   const readyEgg = (s.dinoEggs ?? []).find(e => eggReady(e, s.walkSteps ?? 0, hatchDiscount));
   useEffect(() => {
-    if (!readyEgg || !g.inBase || hatched || (realGps && !gps.ready)) return;
+    if (!readyEgg || !g.inBase || hatched || (realGps && !gps.ready && !gps.isIndoor)) return;
     const baby = g.hatchEgg(readyEgg.id);
     if (baby) setHatched({ ...baby, eggId: readyEgg.id });
-  }, [readyEgg?.id, g.inBase, hatched, gps.ready]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [readyEgg?.id, g.inBase, hatched, gps.ready, gps.isIndoor]); // eslint-disable-line react-hooks/exhaustive-deps
   const [beastStrike, setBeastStrike] = useState<{ id: string; at: number } | null>(null);
   const [rangedProjectile, setRangedProjectile] = useState<{ id: string; from: LatLng; to: LatLng; kind: 'arrow' | 'stone' | 'spear' } | null>(null);
   const [mobPositions, setMobPositions] = useState<Record<string, LatLng>>({});
@@ -911,7 +915,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       // Auto-complete if we already proposed to them.
     }
   };
-  const presence = useSurvivalPresence(realGps ? gps.ready : true, s.pos, s.level, onPeerEvent, chiefName, s.base);
+  const presence = useSurvivalPresence(realGps ? (gps.ready || gps.isIndoor) : true, s.pos, s.level, onPeerEvent, chiefName, s.base);
   peersRef.current = presence.peers;
   const selPeer = presence.peers.find(p => p.id === selPeerId) ?? null;
 
@@ -1553,7 +1557,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           <b>전진기지</b>
           <button
             type="button"
-            disabled={!actionReady || (realGps && !gps.ready)}
+            disabled={!actionReady || (realGps && !gps.ready && !gps.isIndoor)}
             className="pixel-btn bg-primary py-1.5 px-2.5 text-xs text-primary-foreground disabled:opacity-40"
             onClick={g.moveOutpost}
           >
@@ -1561,10 +1565,37 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           </button>
         </div>
       )}
-      {realGps && <div className="absolute left-2 right-16 top-[calc(7.25rem+env(safe-area-inset-top))] z-20 flex items-center gap-1.5">
-        <span className="min-w-0 truncate rounded bg-background/80 px-2 py-1 text-[10px]" role="status">{!gps.ready ? '실내 원정 가능 · 야외 GPS 대기' : `GPS ±${Math.round(gps.fix?.accuracy ?? 0)}m`}</span>
-        {!gps.ready && <Button variant="outline" size="sm" className="h-auto shrink-0 py-1.5 px-2.5 text-xs" onClick={gps.retry}>재시도</Button>}
-      </div>}
+      {realGps && (
+        <div className="absolute left-2 top-[calc(7.25rem+env(safe-area-inset-top))] z-20 flex items-center gap-1.5 pointer-events-auto">
+          {gps.isIndoor ? (
+            <button
+              type="button"
+              onClick={gps.retry}
+              className="pixel-frame flex items-center gap-1.5 rounded-full border border-amber-500/80 bg-stone-900/95 py-1 px-2.5 text-[11px] font-bold text-amber-300 shadow-lg backdrop-blur hover:border-amber-400 active:scale-95 transition-all cursor-pointer"
+              title="실내 모드 활성화 (거점·원정·제작 100% 가능) · 터치하여 GPS 재시도"
+            >
+              <Home className="!h-3.5 !w-3.5 text-amber-400 shrink-0" />
+              <span>실내 모드 · GPS 재시도</span>
+              <RefreshCw className="!h-3 !w-3 text-amber-400/80 shrink-0" />
+            </button>
+          ) : gps.ready ? (
+            <div className="pixel-frame flex items-center gap-1.5 rounded-full border border-emerald-500/60 bg-stone-900/90 py-1 px-2.5 text-[11px] font-medium text-emerald-300 shadow-md backdrop-blur">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <span>GPS ±{Math.round(gps.fix?.accuracy ?? 0)}m</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={gps.switchToIndoor}
+              className="pixel-frame flex items-center gap-1.5 rounded-full border border-stone-600 bg-stone-900/90 py-1 px-2.5 text-[11px] text-stone-300 shadow-md backdrop-blur hover:border-stone-500 active:scale-95 transition-all cursor-pointer"
+              title="GPS 신호 탐색 중 · 클릭하여 즉시 실내 모드로 전환"
+            >
+              <Radio className="!h-3.5 !w-3.5 text-stone-400 animate-pulse shrink-0" />
+              <span>GPS 검색 중 (실내 전환)</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {activeTarget && (() => {
         const d = distanceM(s.pos, activeTarget);
@@ -1634,7 +1665,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       {!s.base && (
         <div className="absolute inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 pixel-frame bg-card p-2 text-xs">
           나뭇가지 {countOf(s.backpack, 'branch')}/{CAMP_COST[0].count}개를 모아 모닥불 거점을 세우세요.
-          <Button type="button" disabled={realGps && !gps.ready} onClick={g.placeBase} className="pixel-btn mt-1.5 h-auto min-h-0 w-full py-1.5 px-2.5 text-xs">여기에 모닥불 세우기</Button>
+          <Button type="button" disabled={realGps && !gps.ready && !gps.isIndoor} onClick={g.placeBase} className="pixel-btn mt-1.5 h-auto min-h-0 w-full py-1.5 px-2.5 text-xs">여기에 모닥불 세우기</Button>
         </div>
       )}
 
@@ -1685,7 +1716,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               {panel === 'quests' && (
                 <SurvivalObjectives
                   state={{ ...s, storedGear: [], stats: { gathered: s.gathered, crafted: s.crafted, kills: s.kills, deposits: s.deposits } }}
-                  canClaim={g.inBase && (!realGps || gps.ready)}
+                  canClaim={g.inBase && (!realGps || gps.ready || gps.isIndoor)}
                   onClaim={g.claimQuest}
                   languageQuestAccepted={!!s.languageQuestAccepted}
                   languageLearned={!!s.languageLearned}
@@ -1774,7 +1805,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       languageQuestAccepted={!!s.languageQuestAccepted}
                       shamanQuestAcceptedIndex={s.shamanQuestAcceptedIndex}
                       questState={{ ...s, storedGear: [], stats: { gathered: s.gathered, crafted: s.crafted, kills: s.kills, deposits: s.deposits } }}
-                      canClaimQuest={g.inBase && (!realGps || gps.ready) && g.canClaimQuest}
+                      canClaimQuest={g.inBase && (!realGps || gps.ready || gps.isIndoor) && g.canClaimQuest}
                       onClaimQuest={g.claimQuest}
                       onAcceptShamanQuest={g.acceptShamanQuest}
                       onAcceptLanguageQuest={g.acceptLanguageQuest}
@@ -1931,7 +1962,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                     </div>
                   </div>
                   </>}
-                  {baseTab === 'pets' && <PetPanel pets={s.pets ?? []} defense={s.petDefense} now={nowTick} ready={atWorkshop(s) && (!realGps || gps.ready || !gps.fix)} onFuse={g.mergePets} onDeploy={g.togglePetDeploy} onRole={g.assignPetRole} onFeed={g.feedPet} onLock={g.togglePetLock}
+                  {baseTab === 'pets' && <PetPanel pets={s.pets ?? []} defense={s.petDefense} now={nowTick} ready={atWorkshop(s) && (!realGps || gps.ready || gps.isIndoor || !gps.fix)} onFuse={g.mergePets} onDeploy={g.togglePetDeploy} onRole={g.assignPetRole} onFeed={g.feedPet} onLock={g.togglePetLock}
                     onOpenDinoExpedition={() => setDinoExpeditionOpen(true)}
                     eggs={(s.dinoEggs ?? []).map(e => ({
                       id: e.id,
@@ -1953,7 +1984,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
               {panel === 'favs' && (
                 <>
-                  <Button type="button" variant="outline" className="pixel-btn h-11 w-full" disabled={realGps && !gps.ready}
+                  <Button type="button" variant="outline" className="pixel-btn h-11 w-full" disabled={realGps && !gps.ready && !gps.isIndoor}
                     onClick={() => { favs.toggle({ id: `pin-${Date.now()}`, name: `내 표시 ${favs.favorites.filter((f) => f.id.startsWith('pin-')).length + 1}`, lat: s.pos.lat, lng: s.pos.lng }); toast('지금 위치를 즐겨찾기에 등록했어요'); }}>
                     <MapPin className="!h-5 !w-5" />지금 위치 등록
                   </Button>
@@ -2030,7 +2061,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       <p>현재 위치에 모닥불 거점을 세웁니다. 거점 안에서는 짐승이 나타나지 않습니다.</p>
                       {s.base?.level === 1 && s.techs.includes('hut_building') && <p className="font-bold text-primary">움집 기술 습득 완료! 거점 안에서 [거점] 메뉴 → '뼈 움막으로 발전'을 눌러야 모닥불이 움막으로 바뀝니다. (창고: 통나무 12·날가죽 4·노끈 4·뼈 6)</p>}
                       <p>필요: 나뭇가지 {countOf(s.backpack, 'branch')}/{CAMP_COST[0].count}</p>
-                      <button type="button" disabled={(realGps && !gps.ready) || countOf(s.backpack, 'branch') < CAMP_COST[0].count} onClick={g.placeBase}
+                      <button type="button" disabled={(realGps && !gps.ready && !gps.isIndoor) || countOf(s.backpack, 'branch') < CAMP_COST[0].count} onClick={g.placeBase}
                         className="pixel-btn h-11 w-full bg-primary text-primary-foreground disabled:opacity-40">{s.base ? '현재 위치로 거점 옮기기' : '여기에 거점 건설'}</button>
                     </div>
                   )}
@@ -2084,7 +2115,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           onAttack={attackPeer} />}
       </AnimatePresence>
       <AnimatePresence>
-        {selLandmark && <LandmarkSheet landmark={selLandmark} inRange={distanceM(s.pos, selLandmark) <= g.reach && (!realGps || gps.ready)}
+        {selLandmark && <LandmarkSheet landmark={selLandmark} inRange={distanceM(s.pos, selLandmark) <= g.reach && (!realGps || gps.ready || gps.isIndoor)}
           claims={s.landmarkClaims} backpack={s.backpack} words={shamanWords}
           onVisit={() => { const w = g.visitLandmark(selLandmark); if (w) { setShamanWords(w); playAction('talk', 900); } }}
           onSell={g.sellItem} onBuy={g.buyItem} onClose={() => setSelLandmark(null)}
@@ -2093,7 +2124,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       </AnimatePresence>
       <AnimatePresence>
         {selShrine && <ShrineSheet shrine={selShrine} state={s.shrines ?? emptyShrineState()} pos={s.pos} backpack={s.backpack} words={shrineWords}
-          inRange={distanceM(s.pos, selShrine) <= g.reach && (!realGps || gps.ready)}
+          inRange={distanceM(s.pos, selShrine) <= g.reach && (!realGps || gps.ready || gps.isIndoor)}
           onAwaken={() => { const w = g.awakenShrine(selShrine); if (w) { setShrineWords(w); playAction('talk', 900); } }}
           onRite={(id) => { if (g.shrineRite(selShrine, id)) playAction('gather', 900); }}
           onBless={() => { if (g.shrineBless(selShrine)) playAction('talk', 900); }}

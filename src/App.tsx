@@ -41,6 +41,7 @@ import TreasureSimulator from "./pages/play/TreasureSimulator";
 import SurvivalSimulator from "./pages/play/SurvivalSimulator";
 import SurvivalCheck from "./pages/dev/SurvivalCheck";
 import MobileFrame from "./layouts/MobileFrame";
+import PwaInstallBanner from "./components/pwa/PwaInstallBanner";
 
 const queryClient = new QueryClient();
 
@@ -120,6 +121,7 @@ const App = () => (
           }}
         />
         <BrowserRouter>
+          <PwaInstallBanner />
           <AuthProvider>
             <Routes>
               <Route path="/" element={<LandingPage />} />

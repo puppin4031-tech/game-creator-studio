@@ -65,7 +65,7 @@ export default function TreasureSetup({ treasures, onAdd, onRemove }: Props) {
     navigator.geolocation?.getCurrentPosition(
       (pos) => setMapCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       () => {},
-      { enableHighAccuracy: true }
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
     );
   }, []);
 

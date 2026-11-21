@@ -1,56 +1,166 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { acceptGpsFix, smoothGpsFix, shouldReanchor, GPS_JUMP_LOCK_MS, GPS_STALE_MS, type GpsFix } from '@/lib/survival/gps';
 import type { LatLng } from '@/lib/survival/types';
 
-export function useSurvivalGps(enabled: boolean, onPosition: (pos: LatLng) => void) {
+export interface SurvivalGpsReturn {
+  fix: GpsFix | null;
+  ready: boolean;
+  isIndoor: boolean;
+  error: string | null;
+  retry: () => void;
+  switchToIndoor: () => void;
+}
+
+export function useSurvivalGps(
+  enabled: boolean,
+  onPosition: (pos: LatLng) => void,
+  fallbackPos?: LatLng | null
+): SurvivalGpsReturn {
   const [fix, setFix] = useState<GpsFix | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isIndoor, setIsIndoor] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [attempt, setAttempt] = useState(0);
   const [lockedUntil, setLockedUntil] = useState(0);
-  const retry = useCallback(() => setAttempt(x => x + 1), []);
+
+  const fallbackRef = useRef<LatLng | null | undefined>(fallbackPos);
+  fallbackRef.current = fallbackPos;
+
+  const gotFirstFix = useRef(false);
+  const wasIndoorRef = useRef(false);
+
+  const switchToIndoor = useCallback(() => {
+    setIsIndoor(true);
+    setError(null);
+    if (fallbackRef.current) {
+      onPosition(fallbackRef.current);
+    }
+  }, [onPosition]);
+
+  const retry = useCallback(() => {
+    setAttempt(x => x + 1);
+    toast.info('GPS 위치 신호를 다시 요청합니다...');
+  }, []);
+
   useEffect(() => {
     if (!enabled) return;
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [enabled]);
+
   useEffect(() => {
     if (!enabled) return;
-    setFix(null); setError(null);
-    if (!navigator.geolocation) { setError('이 기기는 GPS 위치 기능을 지원하지 않습니다.'); return; }
+
+    gotFirstFix.current = false;
+    setError(null);
+
+    // If geolocation API is missing on device, immediately fall back to Indoor Mode
+    if (!navigator.geolocation) {
+      setIsIndoor(true);
+      if (fallbackRef.current) {
+        onPosition(fallbackRef.current);
+      }
+      return;
+    }
+
+    // Graceful indoor fallback timer: if no GPS fix within 6 seconds, activate Indoor Mode automatically
+    const indoorGraceTimer = setTimeout(() => {
+      if (!gotFirstFix.current) {
+        setIsIndoor(true);
+        if (fallbackRef.current) {
+          onPosition(fallbackRef.current);
+        }
+      }
+    }, 6000);
+
     let lastRaw: GpsFix | null = null;
     let lastFiltered: GpsFix | null = null;
     let variance = 100;
     let rejects = 0;
-    const watch = navigator.geolocation.watchPosition(p => {
-      const candidate: GpsFix = { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy, timestamp: p.timestamp };
-      if (!acceptGpsFix(candidate, lastRaw)) {
-        if (candidate.accuracy <= 25) rejects += 1;
-        if (lastRaw && shouldReanchor(rejects, candidate)) {
-          // Re-anchor at the new place but lock interactions so a spoofed jump yields nothing immediately.
-          rejects = 0; lastRaw = candidate; lastFiltered = candidate; variance = Math.max(1, candidate.accuracy ** 2);
-          setLockedUntil(Date.now() + GPS_JUMP_LOCK_MS);
-          setFix(candidate); setNow(Date.now()); setError(null); onPosition(candidate);
+
+    const watch = navigator.geolocation.watchPosition(
+      p => {
+        clearTimeout(indoorGraceTimer);
+        const candidate: GpsFix = {
+          lat: p.coords.latitude,
+          lng: p.coords.longitude,
+          accuracy: p.coords.accuracy,
+          timestamp: p.timestamp,
+        };
+
+        if (!acceptGpsFix(candidate, lastRaw)) {
+          if (candidate.accuracy <= 25) rejects += 1;
+          if (lastRaw && shouldReanchor(rejects, candidate)) {
+            rejects = 0;
+            lastRaw = candidate;
+            lastFiltered = candidate;
+            variance = Math.max(1, candidate.accuracy ** 2);
+            setLockedUntil(Date.now() + GPS_JUMP_LOCK_MS);
+            setFix(candidate);
+            setNow(Date.now());
+            setError(null);
+            setIsIndoor(false);
+            onPosition(candidate);
+            return;
+          }
+          // Do not hard-block indoors on moderate accuracy
+          if (candidate.accuracy > 40) {
+            setIsIndoor(true);
+            if (fallbackRef.current) onPosition(fallbackRef.current);
+          }
           return;
         }
-        setError(candidate.accuracy > 25 ? `GPS 오차 ±${Math.round(candidate.accuracy)}m · 더 정확한 신호를 기다립니다.` : '급격한 위치 변화 감지 · GPS를 다시 확인합니다.');
-        return;
-      }
-      rejects = 0;
-      const filtered = smoothGpsFix(candidate, lastFiltered, variance);
-      lastRaw = candidate; lastFiltered = filtered.fix; variance = filtered.variance;
-      setFix(filtered.fix); setNow(Date.now()); setError(null); onPosition(filtered.fix);
-    }, e => {
-      const message = e.code === 1 ? '위치 권한이 꺼져 있습니다. 브라우저 설정에서 위치를 허용해 주세요.' : 'GPS 신호를 가져오지 못했습니다. 야외에서 다시 시도해 주세요.';
-      setError(message); toast.error(message);
-    }, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
-    return () => navigator.geolocation.clearWatch(watch);
+
+        rejects = 0;
+        const filtered = smoothGpsFix(candidate, lastFiltered, variance);
+        lastRaw = candidate;
+        lastFiltered = filtered.fix;
+        variance = filtered.variance;
+
+        gotFirstFix.current = true;
+        setFix(filtered.fix);
+        setNow(Date.now());
+        setError(null);
+
+        if (wasIndoorRef.current) {
+          toast.success(`GPS 신호 연결됨 (오차 ±${Math.round(filtered.fix.accuracy)}m)`);
+          wasIndoorRef.current = false;
+        }
+        setIsIndoor(false);
+        onPosition(filtered.fix);
+      },
+      e => {
+        clearTimeout(indoorGraceTimer);
+        // On error (permission denied, timeout, unavailable), switch gracefully to Indoor Mode without blocking
+        setIsIndoor(true);
+        wasIndoorRef.current = true;
+        setError(null);
+        if (fallbackRef.current) {
+          onPosition(fallbackRef.current);
+        }
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 8000 }
+    );
+
+    return () => {
+      clearTimeout(indoorGraceTimer);
+      navigator.geolocation.clearWatch(watch);
+    };
   }, [enabled, attempt, onPosition]);
+
   const locked = now < lockedUntil;
   const ready = enabled && !!fix && !error && !locked && now - fix.timestamp <= GPS_STALE_MS;
   const lockMessage = locked ? `급격한 이동 감지 · ${Math.ceil((lockedUntil - now) / 1000)}초 후 활동할 수 있습니다.` : null;
-  return { fix, ready, error: error ?? lockMessage ?? (fix && !ready && enabled ? 'GPS 신호가 오래되었습니다. 위치를 다시 확인합니다.' : null), retry };
+
+  return {
+    fix,
+    ready,
+    isIndoor,
+    error: error ?? lockMessage ?? (fix && !ready && enabled && !isIndoor ? 'GPS 신호가 오래되었습니다. 위치를 다시 확인합니다.' : null),
+    retry,
+    switchToIndoor,
+  };
 }
-// Hook order can change across modules during edits; force a full reload instead of hot patching.
+
 if (import.meta.hot) import.meta.hot.accept(() => window.location.reload());
