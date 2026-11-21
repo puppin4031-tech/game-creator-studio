@@ -74,10 +74,12 @@ export function advanceEggs(eggs: CarriedEgg[], meters: number, elapsedMs: numbe
   return eggs.map(e => e.walkedM === undefined || kmh > Math.max(minLimitKmh, e.maxKmh ?? MAX_WALK_KMH) ? e : { ...e, walkedM: e.walkedM + WALK_STEP_M });
 }
 
-export const eggNeedM = (egg: CarriedEgg, discountPct = 0) =>
-  Math.max(100, Math.round((egg.needM ?? EGG_HATCH_M) * (1 - (discountPct ?? 0) / 100)));
-export const eggWalkedM = (egg: CarriedEgg, walkSteps: number) => egg.walkedM ?? Math.max(0, walkSteps - egg.startSteps) * WALK_STEP_M;
-export const eggReady = (egg: CarriedEgg, walkSteps: number, discountPct = 0) => eggWalkedM(egg, walkSteps) >= eggNeedM(egg, discountPct);
+export const eggNeedM = (egg?: CarriedEgg | null, discountPct = 0) =>
+  egg ? Math.max(100, Math.round((egg.needM ?? EGG_HATCH_M) * (1 - (discountPct ?? 0) / 100))) : EGG_HATCH_M;
+export const eggWalkedM = (egg?: CarriedEgg | null, walkSteps = 0) =>
+  egg ? (egg.walkedM ?? Math.max(0, walkSteps - (egg.startSteps ?? 0)) * WALK_STEP_M) : 0;
+export const eggReady = (egg?: CarriedEgg | null, walkSteps = 0, discountPct = 0) =>
+  egg ? eggWalkedM(egg, walkSteps) >= eggNeedM(egg, discountPct) : false;
 export const babyFor = (egg: CarriedEgg): PetDef => egg.petId
   ? petById(egg.petId) ?? { id: egg.petId, name: '신비한 펫', custom: true, needM: egg.needM ?? EGG_HATCH_M, maxKmh: egg.maxKmh ?? MAX_WALK_KMH, weight: 0 }
   : BABY_DINOS[Math.floor(hash01(egg.id.length, [...egg.id].reduce((a, c) => a + c.charCodeAt(0), 0), SALT) * BABY_DINOS.length)];

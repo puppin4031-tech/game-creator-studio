@@ -240,6 +240,84 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     ref.current = value;
     setState(value);
   }, []);
+
+  const recordCodexResource = useCallback((itemId: ItemId) => {
+    const p = ref.current;
+    const curCodex = p.codex ?? defaultCodexState();
+    if (curCodex.discoveredResources.includes(itemId)) return;
+
+    const nextResources = [...curCodex.discoveredResources, itemId];
+    const itemDef = ITEMS[itemId];
+    const nextCodex: CodexState = {
+      ...curCodex,
+      discoveredResources: nextResources,
+      hasUnseenNew: true,
+    };
+
+    setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
+    toast.success(`📖 [도감 신규 등록!] 새로운 자원 [${itemDef?.name ?? itemId}]을(를) 도감에 기록했습니다!`);
+  }, [setS]);
+
+  const recordCodexPet = useCallback((speciesId: string) => {
+    const p = ref.current;
+    const curCodex = p.codex ?? defaultCodexState();
+    if (curCodex.discoveredPets.includes(speciesId)) return;
+
+    const nextPets = [...curCodex.discoveredPets, speciesId];
+    const petMeta = CODEX_PETS.find(pet => pet.id === speciesId);
+    const nextCodex: CodexState = {
+      ...curCodex,
+      discoveredPets: nextPets,
+      hasUnseenNew: true,
+    };
+
+    setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
+    toast.success(`📖 [도감 신규 등록!] 새로운 공룡 펫 [${petMeta?.name ?? speciesId}]을(를) 도감에 기록했습니다!`);
+  }, [setS]);
+
+  const recordCodexBoss = useCallback((bossId: string) => {
+    const p = ref.current;
+    const curCodex = p.codex ?? defaultCodexState();
+    if (curCodex.defeatedBosses.includes(bossId)) return;
+
+    const nextBosses = [...curCodex.defeatedBosses, bossId];
+    const bossMeta = CODEX_BOSSES.find(b => b.id === bossId);
+    const nextCodex: CodexState = {
+      ...curCodex,
+      defeatedBosses: nextBosses,
+      hasUnseenNew: true,
+    };
+
+    setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
+    toast.success(`📖 [도감 신규 등록!] 우두머리 [${bossMeta?.name ?? bossId}] 토벌 기록을 도감에 새겼습니다!`);
+  }, [setS]);
+
+  const recordCodexAiInvention = useCallback((entry: CodexAiInvention) => {
+    const p = ref.current;
+    const curCodex = p.codex ?? defaultCodexState();
+    const nextInventions = [entry, ...(curCodex.aiInventions ?? [])];
+    const nextCodex: CodexState = {
+      ...curCodex,
+      aiInventions: nextInventions,
+      hasUnseenNew: true,
+    };
+
+    setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
+    toast.success(`📖 [도감 신규 등록!] AI 맞춤 발명품 [${entry.name}]이(가) 도감에 영구 소장되었습니다!`);
+  }, [setS]);
+
+  const markCodexSeen = useCallback(() => {
+    const p = ref.current;
+    if (!p.codex?.hasUnseenNew) return;
+    setS({
+      ...p,
+      codex: {
+        ...(p.codex ?? defaultCodexState()),
+        hasUnseenNew: false,
+      },
+      lastTickAt: Date.now(),
+    });
+  }, [setS]);
   const [now, setNow] = useState(Date.now());
   const lastCreatureAttack = useRef(0);
   const [pocketMode, setPocketMode] = useState(false);
@@ -2591,84 +2669,6 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     toast.success(`🎒 암바초가 모은 보물 ${items.length}종을 거점 창고에 모두 보관했습니다!`);
     return true;
   }, [setS, recordCodexResource]);
-
-  const recordCodexResource = useCallback((itemId: ItemId) => {
-    const p = ref.current;
-    const curCodex = p.codex ?? defaultCodexState();
-    if (curCodex.discoveredResources.includes(itemId)) return;
-
-    const nextResources = [...curCodex.discoveredResources, itemId];
-    const itemDef = ITEMS[itemId];
-    const nextCodex: CodexState = {
-      ...curCodex,
-      discoveredResources: nextResources,
-      hasUnseenNew: true,
-    };
-
-    setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
-    toast.success(`📖 [도감 신규 등록!] 새로운 자원 [${itemDef?.name ?? itemId}]을(를) 도감에 기록했습니다!`);
-  }, [setS]);
-
-  const recordCodexPet = useCallback((speciesId: string) => {
-    const p = ref.current;
-    const curCodex = p.codex ?? defaultCodexState();
-    if (curCodex.discoveredPets.includes(speciesId)) return;
-
-    const nextPets = [...curCodex.discoveredPets, speciesId];
-    const petMeta = CODEX_PETS.find(pet => pet.id === speciesId);
-    const nextCodex: CodexState = {
-      ...curCodex,
-      discoveredPets: nextPets,
-      hasUnseenNew: true,
-    };
-
-    setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
-    toast.success(`📖 [도감 신규 등록!] 새로운 공룡 펫 [${petMeta?.name ?? speciesId}]을(를) 도감에 기록했습니다!`);
-  }, [setS]);
-
-  const recordCodexBoss = useCallback((bossId: string) => {
-    const p = ref.current;
-    const curCodex = p.codex ?? defaultCodexState();
-    if (curCodex.defeatedBosses.includes(bossId)) return;
-
-    const nextBosses = [...curCodex.defeatedBosses, bossId];
-    const bossMeta = CODEX_BOSSES.find(b => b.id === bossId);
-    const nextCodex: CodexState = {
-      ...curCodex,
-      defeatedBosses: nextBosses,
-      hasUnseenNew: true,
-    };
-
-    setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
-    toast.success(`📖 [도감 신규 등록!] 우두머리 [${bossMeta?.name ?? bossId}] 토벌 기록을 도감에 새겼습니다!`);
-  }, [setS]);
-
-  const recordCodexAiInvention = useCallback((entry: CodexAiInvention) => {
-    const p = ref.current;
-    const curCodex = p.codex ?? defaultCodexState();
-    const nextInventions = [entry, ...(curCodex.aiInventions ?? [])];
-    const nextCodex: CodexState = {
-      ...curCodex,
-      aiInventions: nextInventions,
-      hasUnseenNew: true,
-    };
-
-    setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
-    toast.success(`📖 [도감 신규 등록!] AI 맞춤 발명품 [${entry.name}]이(가) 도감에 영구 소장되었습니다!`);
-  }, [setS]);
-
-  const markCodexSeen = useCallback(() => {
-    const p = ref.current;
-    if (!p.codex?.hasUnseenNew) return;
-    setS({
-      ...p,
-      codex: {
-        ...(p.codex ?? defaultCodexState()),
-        hasUnseenNew: false,
-      },
-      lastTickAt: Date.now(),
-    });
-  }, [setS]);
 
   const codexProgress = useMemo(() => computeCodexProgress(s.codex), [s.codex]);
 
