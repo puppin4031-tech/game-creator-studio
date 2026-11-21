@@ -19,20 +19,32 @@ export function preloadSpriteSheet(url: string, frames: number): Promise<void> {
   if (loaded.has(url)) return Promise.resolve();
   return new Promise(resolve => {
     const img = new Image();
+    let settled = false;
+    const finish = () => {
+      if (!settled) {
+        settled = true;
+        resolve();
+      }
+    };
+    // 3.5s timeout safety for mobile networks so failing image never stalls the app
+    const timer = setTimeout(finish, 3500);
     img.crossOrigin = 'anonymous';
     img.onload = () => {
+      clearTimeout(timer);
       const done = () => {
         loaded.set(url, img.naturalWidth / frames / img.naturalHeight || 1);
-        resolve();
+        finish();
       };
-      // decode() guarantees the bitmap is ready before we swap, avoiding a blank paint.
       if (img.decode) {
         img.decode().then(done).catch(done);
       } else {
         done();
       }
     };
-    img.onerror = () => resolve();
+    img.onerror = () => {
+      clearTimeout(timer);
+      finish();
+    };
     img.src = url;
   });
 }

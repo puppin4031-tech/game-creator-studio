@@ -1385,20 +1385,24 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                             {/* Escort tribes: remain stably anchored alongside player instead of being dragged */}
                             {escortReady(s.tribe, Date.now(), !!s.observedExpedition?.mercenary) && (
                               <>
-                                {Array.from({ length: Math.min(5, s.tribe?.count ?? 1) }, (_, k) => (
-                                  <div
-                                    key={k}
-                                    aria-label={k ? undefined : "동행 부족민"}
-                                    className="pointer-events-none absolute bottom-0"
-                                    style={{
-                                      left: isFacingLeft ? 36 + k * 22 : -36 - k * 22,
-                                      bottom: (k % 2) * 6,
-                                      transform: isFacingLeft ? 'scaleX(-1)' : undefined
-                                    }}
-                                  >
-                                    <TribeSprite action={action} height={48} tribeClass={s.tribe?.classId} />
-                                  </div>
-                                ))}
+                                {Array.from({ length: Math.min(5, s.tribe?.count ?? 1) }, (_, k) => {
+                                  const isAmbachoSlot = k === 0 && (s.mercenary?.name === '암바초' || (s.tribe?.classCounts?.gatherer ?? 0) > 0);
+                                  const escortClass = isAmbachoSlot ? 'gatherer' : (s.tribe?.classId ?? 'gatherer');
+                                  return (
+                                    <div
+                                      key={k}
+                                      aria-label={k ? undefined : (isAmbachoSlot ? "동행 파밍 부족민 암바초" : "동행 부족민")}
+                                      className="pointer-events-none absolute bottom-0"
+                                      style={{
+                                        left: isFacingLeft ? 36 + k * 22 : -36 - k * 22,
+                                        bottom: (k % 2) * 6,
+                                        transform: isFacingLeft ? 'scaleX(-1)' : undefined
+                                      }}
+                                    >
+                                      <TribeSprite action={action} height={48} tribeClass={escortClass} frameOffset={k} />
+                                    </div>
+                                  );
+                                })}
                               </>
                             )}
                             {/* Companion pets: remain stably anchored alongside player */}
@@ -1427,10 +1431,14 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       </TerrainMap>}
 
       {winterOn && <WinterThemeOverlay />}
-      {!!s.dinoEggs?.length && <div className="pointer-events-none absolute bottom-[calc(7rem+env(safe-area-inset-bottom))] left-2 z-20 flex origin-bottom-left scale-[0.8] items-center gap-1 rounded bg-card/90 px-2 py-1 text-xs" aria-label="공룡 알 부화 진행">
-        <img src={eggArt(s.dinoEggs[0].id)} alt="" className="pixelated h-6 w-6 object-contain" />알 {s.dinoEggs.length}개 · {(() => {
+      {!!s.dinoEggs?.length && s.dinoEggs[0] && <div className="pointer-events-none absolute bottom-[calc(7rem+env(safe-area-inset-bottom))] left-2 z-20 flex origin-bottom-left scale-[0.8] items-center gap-1 rounded bg-card/90 px-2 py-1 text-xs" aria-label="공룡 알 부화 진행">
+        <img src={eggArt(s.dinoEggs[0]?.id ?? 'egg')} alt="" className="pixelated h-6 w-6 object-contain" />알 {s.dinoEggs.length}개 · {(() => {
           const discount = g.codexProgress?.hatchDiscountPct ?? 0;
-          const e = [...s.dinoEggs].sort((a, b) => (eggNeedM(a, discount) - eggWalkedM(a, s.walkSteps ?? 0)) - (eggNeedM(b, discount) - eggWalkedM(b, s.walkSteps ?? 0)))[0];
+          const valid = (s.dinoEggs ?? []).filter((x): x is CarriedEgg => !!x);
+          if (!valid.length) return '';
+          const sorted = [...valid].sort((a, b) => (eggNeedM(a, discount) - eggWalkedM(a, s.walkSteps ?? 0)) - (eggNeedM(b, discount) - eggWalkedM(b, s.walkSteps ?? 0)));
+          const e = sorted[0];
+          if (!e) return '';
           const need = eggNeedM(e, discount);
           return `${Math.min(need, eggWalkedM(e, s.walkSteps ?? 0))}/${need}m`;
         })()}
