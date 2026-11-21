@@ -4,15 +4,39 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Menu, X, LogIn, LogOut, Settings, HelpCircle, User, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-export function GameMenu() {
+interface GameMenuProps {
+  loggedIn?: boolean;
+  onExit?: () => void;
+  onLogout?: () => Promise<void> | void;
+  onRestoreSave?: () => Promise<void> | void;
+}
+
+export function GameMenu({ onExit, onLogout, onRestoreSave }: GameMenuProps = {}) {
   const [open, setOpen] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    await signOut();
+    if (onLogout) {
+      await onLogout();
+    } else {
+      await signOut();
+    }
     setOpen(false);
   };
+
+  const handleRestore = async () => {
+    if (!onRestoreSave) return;
+    setRestoring(true);
+    try {
+      await onRestoreSave();
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const isGuest = !user || user.is_anonymous;
 
   return (
     <>
@@ -37,7 +61,7 @@ export function GameMenu() {
       >
         <div className="flex flex-col h-full pt-18 px-5 pb-6">
           {/* Profile section */}
-          {user ? (
+          {!isGuest && user ? (
             <div className="mb-6 p-4 rounded-xl bg-muted/50 border border-border">
               <div className="flex items-center gap-3 mb-2">
                 <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
@@ -58,22 +82,33 @@ export function GameMenu() {
               )}
             </div>
           ) : (
-            <div className="mb-6 p-4 rounded-xl bg-muted/50 border border-border text-center">
-              <User className="h-9 w-9 text-muted-foreground mx-auto mb-2" />
-              <p className="text-[15px] text-muted-foreground">로그인하여 게임 진행을 저장하세요</p>
+            <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-left">
+              <div className="flex items-center gap-2 mb-1.5 text-amber-500 font-bold text-[14px]">
+                <User className="h-4 w-4" /> 게스트(비회원) 모드
+              </div>
+              <p className="text-[12px] text-muted-foreground leading-relaxed mb-3">
+                현재 임시 게스트 상태입니다. 기존 <b>puppin4031@gmail.com</b> 등 저장된 데이터로 플레이하시려면 정식 로그인해 주세요.
+              </p>
+              <Button
+                size="sm"
+                className="w-full bg-primary text-primary-foreground font-semibold"
+                onClick={() => { navigate('/login?returnTo=/world'); setOpen(false); }}
+              >
+                <LogIn className="h-4 w-4 mr-1.5" /> 계정 로그인하기
+              </Button>
             </div>
           )}
 
           {/* Menu items */}
           <nav className="flex flex-col gap-1 flex-1">
-            {!user ? (
+            {isGuest ? (
               <Button
                 variant="ghost"
                 className="justify-start gap-3 h-12 text-[15px] text-foreground"
-                onClick={() => { navigate('/login'); setOpen(false); }}
+                onClick={() => { navigate('/login?returnTo=/world'); setOpen(false); }}
               >
                 <LogIn className="h-5 w-5" />
-                로그인 / 회원가입
+                로그인 / 계정 전환
               </Button>
             ) : (
               <>
@@ -88,6 +123,18 @@ export function GameMenu() {
                   </Button>
                 )}
               </>
+            )}
+
+            {onRestoreSave && (
+              <Button
+                variant="outline"
+                className="justify-start gap-2 h-11 text-[13px] border-primary/40 text-primary hover:bg-primary/10 my-1"
+                onClick={handleRestore}
+                disabled={restoring}
+              >
+                <span className="text-base">🔄</span>
+                {restoring ? '저장 데이터 복원 중...' : '저장 데이터 복원 (최고 진행도)'}
+              </Button>
             )}
 
             <Button

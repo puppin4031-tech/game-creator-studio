@@ -199,12 +199,86 @@ function migrateTribeState(saved: Partial<WorldSave>): Partial<WorldSave> {
   return saved;
 }
 
+function computeSaveScore(w?: Partial<WorldSave> | null): number {
+  if (!w) return 0;
+  const level = w.level ?? 1;
+  const xp = w.xp ?? 0;
+  const petsCount = w.pets?.length ?? 0;
+  const backpackCount = (w.backpack ?? []).reduce((acc, item) => acc + (item.count || 1), 0);
+  const storageCount = (w.storage ?? []).reduce((acc, item) => acc + (item.count || 1), 0);
+  const techsCount = (w.techs ?? []).length;
+  const baseLevel = w.base?.level ?? 0;
+  const villageBuildings = Object.keys(w.village?.buildings ?? {}).length;
+  const discoveries = (w.codex?.discoveredResources?.length ?? 0) + (w.codex?.discoveredPets?.length ?? 0);
+
+  return (
+    level * 100_000_000 +
+    xp * 100 +
+    baseLevel * 10_000_000 +
+    petsCount * 1_000_000 +
+    techsCount * 100_000 +
+    villageBuildings * 500_000 +
+    (backpackCount + storageCount) * 10 +
+    discoveries * 1_000
+  );
+}
+
+function isFreshOrEmptySave(w?: Partial<WorldSave> | null): boolean {
+  if (!w) return true;
+  const level = w.level ?? 1;
+  const xp = w.xp ?? 0;
+  const petsCount = w.pets?.length ?? 0;
+  const backpackCount = w.backpack?.length ?? 0;
+  const storageCount = w.storage?.length ?? 0;
+  const techsCount = w.techs?.length ?? 0;
+  const hasBase = !!w.base;
+  return level <= 1 && xp <= 0 && petsCount === 0 && backpackCount === 0 && storageCount === 0 && techsCount === 0 && !hasBase;
+}
+
 function load(start: LatLng, saveKey: string): WorldSave {
   try {
-    const raw = localStorage.getItem(saveKey);
-    if (raw) {
-      const saved = JSON.parse(raw) as Partial<WorldSave>;
-      const migrated = migrateTribeState(saved);
+    let bestSaved: Partial<WorldSave> | null = null;
+    let bestScore = -1;
+
+    // 1. Primary target key
+    const rawTarget = localStorage.getItem(saveKey);
+    if (rawTarget) {
+      try {
+        const parsed = JSON.parse(rawTarget) as Partial<WorldSave>;
+        bestSaved = parsed;
+        bestScore = computeSaveScore(parsed);
+      } catch (e) {
+        console.error('[survival] failed to parse target save', e);
+      }
+    }
+
+    // 2. Cross-key fallback and safety backup scan
+    // If target is empty or fresh (level 1 with 0 progress), scan related keys
+    const fallbackKeys = [
+      `${saveKey}_backup`,
+      saveKey !== 'survival-world-v1' ? 'survival-world-v1' : 'survival-gps-world-v1',
+      'survival-world-v1_backup',
+      'survival-gps-world-v1_backup',
+    ];
+
+    for (const fbKey of fallbackKeys) {
+      const raw = localStorage.getItem(fbKey);
+      if (!raw) continue;
+      try {
+        const parsed = JSON.parse(raw) as Partial<WorldSave>;
+        const score = computeSaveScore(parsed);
+        if (score > bestScore && !isFreshOrEmptySave(parsed)) {
+          console.info(`[survival] Auto-recovered higher progress save from ${fbKey} (score: ${score} vs ${bestScore})`);
+          bestSaved = parsed;
+          bestScore = score;
+        }
+      } catch {
+        // ignore malformed candidate
+      }
+    }
+
+    if (bestSaved) {
+      const migrated = migrateTribeState(bestSaved);
       const loaded = migratePets({ ...fresh(start), ...migrated, base: migrated.base ? { ...migrated.base, placedAt: migrated.base.placedAt ?? Date.now() } : null }, id => petById(id)?.name ?? id);
       return { ...loaded, codex: syncCodexStateWithSave(loaded) };
     }
@@ -336,8 +410,16 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(t); }, []);
   useEffect(() => {
-    try { localStorage.setItem(saveKey, JSON.stringify(s)); }
-    catch { toast.error('진행 상태를 기기에 저장하지 못했습니다. 저장 공간을 확인해 주세요.'); }
+    try {
+      localStorage.setItem(saveKey, JSON.stringify(s));
+      // Keep safety rolling backups if progress is present
+      if (!isFreshOrEmptySave(s)) {
+        localStorage.setItem(`${saveKey}_backup`, JSON.stringify(s));
+        localStorage.setItem('survival-world-v1', JSON.stringify(s));
+      }
+    } catch {
+      toast.error('진행 상태를 기기에 저장하지 못했습니다. 저장 공간을 확인해 주세요.');
+    }
   }, [s, saveKey]);
 
   useEffect(() => {
@@ -375,17 +457,32 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       if (error) { console.error('[survival] cloud load failed', error); cloudReadyRef.current = true; return; }
       const remote = data?.payload as Partial<WorldSave> | undefined;
       const local = ref.current;
-      // A fresh device save (lower progress) must never overwrite a more advanced cloud save.
-      const progress = (w: Partial<WorldSave>) => (w.level ?? 1) * 1e9 + (w.xp ?? 0);
-      const remoteAhead = remote && (progress(remote) !== progress(local)
-        ? progress(remote) > progress(local)
-        : (remote.lastTickAt ?? 0) > local.lastTickAt);
-      if (remote && remoteAhead) {
+
+      const remoteScore = computeSaveScore(remote);
+      const localScore = computeSaveScore(local);
+      const remoteFresh = isFreshOrEmptySave(remote);
+      const localFresh = isFreshOrEmptySave(local);
+
+      // Determine which save has actual higher progress
+      let useRemote = false;
+      if (remote && !remoteFresh) {
+        if (localFresh) {
+          // Local is completely blank (e.g. newly opened browser), remote has real progress: ALWAYS restore remote!
+          useRemote = true;
+        } else if (remoteScore > localScore) {
+          useRemote = true;
+        } else if (remoteScore === localScore) {
+          useRemote = (remote.lastTickAt ?? 0) > (local.lastTickAt ?? 0);
+        }
+      }
+
+      if (remote && useRemote) {
         skipNextUploadRef.current = true;
         const migratedRemote = migrateTribeState(remote);
         setS(migratePets({ ...fresh(local.pos), ...migratedRemote, base: migratedRemote.base ? { ...migratedRemote.base, placedAt: migratedRemote.base.placedAt ?? Date.now() } : null }, id => petById(id)?.name ?? id));
-        toast.success('클라우드에 저장된 생존 진행도를 불러왔습니다.');
-      } else {
+        toast.success('클라우드에 저장된 생존 진행도를 복원했습니다.');
+      } else if (!localFresh) {
+        // Only upload to cloud if local is NOT a blank/empty save (prevents accidental wiping on blank browser)
         const { error: upErr } = await supabase.from('survival_saves').upsert({ user_id: userId, payload: local as unknown as Json, updated_at: new Date().toISOString() });
         if (upErr) console.error('[survival] cloud save failed', upErr);
       }
@@ -2698,7 +2795,27 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
   const codexProgress = useMemo(() => computeCodexProgress(s.codex), [s.codex]);
 
-  return { codex: s.codex ?? defaultCodexState(), codexProgress, recordCodexResource, recordCodexPet, recordCodexBoss, recordCodexAiInvention, markCodexSeen, claimOfflineRewards, shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
+  const reloadSaveFromBestSource = useCallback(async () => {
+    // 1. Check local storage keys
+    const best = load(ref.current.pos, saveKey);
+    let chosen: WorldSave = best;
+    // 2. Check cloud if logged in
+    if (userId) {
+      const { data } = await supabase.from('survival_saves').select('payload').eq('user_id', userId).maybeSingle();
+      const remote = data?.payload as Partial<WorldSave> | undefined;
+      if (remote && computeSaveScore(remote) > computeSaveScore(chosen)) {
+        const migratedRemote = migrateTribeState(remote);
+        chosen = migratePets({ ...fresh(ref.current.pos), ...migratedRemote, base: migratedRemote.base ? { ...migratedRemote.base, placedAt: migratedRemote.base.placedAt ?? Date.now() } : null }, id => petById(id)?.name ?? id);
+      }
+    }
+    setS(chosen);
+    toast.success('최고 진행도 저장 데이터를 성공적으로 복원했습니다!', {
+      description: `레벨 ${chosen.level} / 공룡 펫 ${chosen.pets?.length ?? 0}마리 / 재료 ${chosen.backpack?.length ?? 0}종`,
+    });
+    return chosen;
+  }, [saveKey, userId, setS]);
+
+  return { codex: s.codex ?? defaultCodexState(), codexProgress, recordCodexResource, recordCodexPet, recordCodexBoss, recordCodexAiInvention, markCodexSeen, reloadSaveFromBestSource, claimOfflineRewards, shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
     moveOutpost, petHits, mergePets, togglePetDeploy, assignPetRole, feedPet, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
     moveTo, interact, eat, placeBase, upgradeBase, claimBaseUpgrade, research, claimTech, startExpedition, claimExpedition, craft, reset, dropItems,

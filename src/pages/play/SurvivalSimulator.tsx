@@ -1446,8 +1446,12 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       <DinoEggHatchModal baby={hatched} onClose={() => setHatched(null)} />
       {/* Top HUD */}
       <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-background/80 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur">
-        <GameMenu loggedIn={!!user} onExit={() => navigate(realGps ? '/' : '/play')}
-          onLogout={async () => { try { await signOut(); navigate('/login'); } catch { toast.error('로그아웃에 실패했어요. 다시 시도해 주세요'); } }} />
+        <GameMenu
+          loggedIn={!!user}
+          onExit={() => navigate(realGps ? '/' : '/play')}
+          onLogout={async () => { try { await signOut(); navigate('/login'); } catch { toast.error('로그아웃에 실패했어요. 다시 시도해 주세요'); } }}
+          onRestoreSave={g.reloadSaveFromBestSource}
+        />
         <div className="flex-1 space-y-1 text-xs">
           <div className="flex items-center gap-1">체력<HpBar value={s.hp} max={g.maxHp} />{s.hp}/{g.maxHp}</div>
           <div className="flex items-center gap-1">허기<div className="h-2.5 flex-1 border border-foreground bg-muted"><div className="h-full bg-primary" style={{ width: `${s.hunger}%` }} /></div>{s.hunger}</div>
