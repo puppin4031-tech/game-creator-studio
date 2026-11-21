@@ -95,11 +95,11 @@ describe('building and field inventory', () => {
     expect(relocateOutpost({ ...moving(), pos: offset(229) }, true).ok).toBe(false);
     expect(relocateOutpost({ ...moving(), pos: offset(231) }, true).ok).toBe(true);
   });
-  test('relocation cannot charge remote storage or move without materials', () => {
-    const p = { ...moving(), backpack: [], storage: OUTPOST_COST };
-    expect(relocateOutpost(p, true).ok).toBe(false);
-    expect(p.outpost).toEqual(moving().outpost);
-    expect(p.storage).toEqual(OUTPOST_COST);
+  test('relocation pays from storage first and fails without materials', () => {
+    const r = relocateOutpost({ ...moving(), backpack: [], storage: OUTPOST_COST }, true);
+    if (r.ok === false) throw new Error(r.reason);
+    expect(r.state.storage).toEqual([]);
+    expect(relocateOutpost({ ...moving(), backpack: [], storage: [] }, true).ok).toBe(false);
   });
   test('palisade costs 8 logs and 3 cordage and cannot be duplicated', () => {
     expect(PALISADE_COST).toEqual([{ itemId: 'log', count: 8 }, { itemId: 'cordage', count: 3 }]);

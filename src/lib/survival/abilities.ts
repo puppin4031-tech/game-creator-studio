@@ -80,8 +80,8 @@ export function researchTechnology<T extends AbilitySave>(p: T, id: string, gpsR
   if (!atWorkshop(p)) return { ok: false, reason: '거점 안에서 연구하세요' };
   if (!t?.research || p.techs.includes(id)) return { ok: false, reason: '이미 배웠거나 연구할 수 없는 기술입니다' };
   if (!prerequisitesMet(t, p.techs)) return { ok: false, reason: '선행 기술을 먼저 배우세요' };
-  const storage = removeStacks(p.storage, t.research);
-  return storage ? { ok: true, state: { ...p, storage, techs: [...p.techs, id] } } : { ok: false, reason: '창고의 연구 재료가 부족합니다' };
+  const paid = payStored(p, t.research);
+  return paid ? { ok: true, state: { ...paid, techs: [...p.techs, id] } } : { ok: false, reason: '연구 재료가 부족합니다' };
 }
 type ResearchSave = AbilitySave & { researching?: TimedJob | null; researchJobs?: TimedJob[] };
 /** All running research jobs, including a legacy single `researching` entry. */
@@ -99,10 +99,10 @@ export function startResearch<T extends ResearchSave>(p: T, id: string, gpsReady
     if (!cost) return { ok: false, reason: '더 이상 강화할 수 없는 기술입니다' };
     if (!gpsReady) return { ok: false, reason: '정확한 GPS 신호가 필요합니다' };
     if (!atWorkshop(p)) return { ok: false, reason: '거점 안에서 연구하세요' };
-    const storage = removeStacks(p.storage, cost);
-    if (!storage) return { ok: false, reason: '창고의 연구 재료가 부족합니다' };
+    const paid = payStored(p, cost);
+    if (!paid) return { ok: false, reason: '연구 재료가 부족합니다' };
     const job: TimedJob = { id, startedAt: now, readyAt: now + researchDurationMs(cost), level: level + 1 };
-    return { ok: true, state: { ...p, storage, researching: null, researchJobs: [...jobs, job] } };
+    return { ok: true, state: { ...paid, researching: null, researchJobs: [...jobs, job] } };
   }
   const r = researchTechnology(p, id, gpsReady);
   if (r.ok === false) return r;
