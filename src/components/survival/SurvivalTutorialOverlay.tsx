@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import shamanArt from '@/assets/survival/npc-shaman.png';
 import mercArt from '@/assets/survival/npc-mercenary.png';
 import TribeSprite from './TribeSprite';
+import CharacterSprite from './CharacterSprite';
 import { toast } from 'sonner';
 import type { LatLng } from '@/lib/survival/types';
 
@@ -205,7 +206,7 @@ export function SurvivalTutorialOverlay({
               {/* Hero / Player */}
               <div className="flex items-center gap-3">
                 <div className="flex flex-col items-center justify-center rounded border border-sky-500/40 bg-sky-950/20 p-1.5 shrink-0">
-                  <TribeSprite action="walk" height={52} />
+                  <CharacterSprite action="idle" height={52} />
                   <span className="text-[10px] font-bold text-sky-400">나 (생존자)</span>
                 </div>
                 <div className="pixel-box flex-1 min-w-0 bg-sky-950/20 border border-sky-500/30 p-2.5 text-xs">

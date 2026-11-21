@@ -57,6 +57,8 @@ import {
   type CodexAiInvention,
   defaultCodexState,
   computeCodexProgress,
+  normalizeCodexPetId,
+  syncCodexStateWithSave,
   CODEX_RESOURCES,
   CODEX_PETS,
   CODEX_BOSSES,
@@ -203,7 +205,8 @@ function load(start: LatLng, saveKey: string): WorldSave {
     if (raw) {
       const saved = JSON.parse(raw) as Partial<WorldSave>;
       const migrated = migrateTribeState(saved);
-      return migratePets({ ...fresh(start), ...migrated, base: migrated.base ? { ...migrated.base, placedAt: migrated.base.placedAt ?? Date.now() } : null }, id => petById(id)?.name ?? id);
+      const loaded = migratePets({ ...fresh(start), ...migrated, base: migrated.base ? { ...migrated.base, placedAt: migrated.base.placedAt ?? Date.now() } : null }, id => petById(id)?.name ?? id);
+      return { ...loaded, codex: syncCodexStateWithSave(loaded) };
     }
   } catch (e) {
     console.error('[survival] failed to load save', e);
@@ -237,7 +240,18 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
   const setS = useCallback((next: WorldSave | ((previous: WorldSave) => WorldSave)) => {
-    const value = typeof next === 'function' ? next(ref.current) : next;
+    const raw = typeof next === 'function' ? next(ref.current) : next;
+    const prevCodex = ref.current?.codex;
+    const syncedCodex = syncCodexStateWithSave(raw);
+    const hadNewRes = syncedCodex.discoveredResources.length > (prevCodex?.discoveredResources?.length ?? 0);
+    const hadNewPet = syncedCodex.discoveredPets.length > (prevCodex?.discoveredPets?.length ?? 0);
+    const value: WorldSave = {
+      ...raw,
+      codex: {
+        ...syncedCodex,
+        hasUnseenNew: raw.codex?.hasUnseenNew ?? ((hadNewRes || hadNewPet) ? true : (prevCodex?.hasUnseenNew ?? false)),
+      },
+    };
     ref.current = value;
     setState(value);
   }, []);
@@ -260,12 +274,13 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS]);
 
   const recordCodexPet = useCallback((speciesId: string) => {
+    const canonicalId = normalizeCodexPetId(speciesId);
     const p = ref.current;
     const curCodex = p.codex ?? defaultCodexState();
-    if (curCodex.discoveredPets.includes(speciesId)) return;
+    if (curCodex.discoveredPets.map(normalizeCodexPetId).includes(canonicalId)) return;
 
-    const nextPets = [...curCodex.discoveredPets, speciesId];
-    const petMeta = CODEX_PETS.find(pet => pet.id === speciesId);
+    const nextPets = [...curCodex.discoveredPets.map(normalizeCodexPetId), canonicalId];
+    const petMeta = CODEX_PETS.find(pet => pet.id === canonicalId) ?? petById(canonicalId) ?? petById(speciesId);
     const nextCodex: CodexState = {
       ...curCodex,
       discoveredPets: nextPets,
@@ -273,7 +288,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     };
 
     setS({ ...p, codex: nextCodex, lastTickAt: Date.now() });
-    toast.success(`📖 [도감 신규 등록!] 새로운 공룡 펫 [${petMeta?.name ?? speciesId}]을(를) 도감에 기록했습니다!`);
+    toast.success(`📖 [도감 신규 등록!] 새로운 공룡 펫 [${petMeta?.name ?? canonicalId}]을(를) 도감에 기록했습니다!`);
   }, [setS]);
 
   const recordCodexBoss = useCallback((bossId: string) => {
@@ -327,20 +342,24 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
   useEffect(() => {
     const t = ref.current.tribe;
-    if (t && t.count > 0 && (t.classId !== 'tank' || !t.classCounts?.tank)) {
+    if (t && t.count > 0) {
       const hasAmbacho = (t.classCounts?.gatherer ?? 0) > 0 || ref.current.mercenary?.name === '암바초';
       const tankCount = hasAmbacho ? Math.max(0, t.count - 1) : t.count;
-      setS(p => ({
-        ...p,
-        tribe: {
-          ...p.tribe!,
-          classId: 'tank',
-          classCounts: {
-            tank: tankCount,
-            ...(hasAmbacho ? { gatherer: 1 } : {}),
+      const expectedClassId: TribeClassId = hasAmbacho ? 'gatherer' : (t.classId ?? 'tank');
+      if (t.classId !== expectedClassId || (hasAmbacho && !t.classCounts?.gatherer)) {
+        setS(p => ({
+          ...p,
+          tribe: {
+            ...p.tribe!,
+            classId: expectedClassId,
+            classCounts: {
+              ...p.tribe?.classCounts,
+              tank: tankCount,
+              ...(hasAmbacho ? { gatherer: Math.max(1, p.tribe?.classCounts?.gatherer ?? 1) } : {}),
+            },
           },
-        },
-      }));
+        }));
+      }
     }
   }, [setS]);
 
@@ -577,7 +596,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (!raw) { toast.warning('거점에서 10~1,500m 이내 목표를 선택하세요'); return false; }
     const tribeReady = (p.tribe?.count ?? 0) > 0 && !tribeInjured(p.tribe, Date.now());
     const merc = tribeReady && mercActive(p.mercenary, Date.now()) ? p.mercenary!.name : undefined;
-    const chosenClass = classId ?? p.tribe?.classId ?? DEFAULT_TRIBE_CLASS;
+    const hasAmbacho = merc === '암바초' || (p.tribe?.classCounts?.gatherer ?? 0) > 0;
+    const chosenClass: TribeClassId = classId ?? (hasAmbacho ? 'gatherer' : (p.tribe?.classId ?? DEFAULT_TRIBE_CLASS));
     const cls = getTribeClass(chosenClass);
     const ratio = tribeRatio(p.tribe);
     const members = Math.max(1, p.tribe?.count ?? 1);

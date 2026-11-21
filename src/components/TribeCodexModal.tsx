@@ -1,37 +1,119 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  CODEX_PETS,
-  CODEX_RESOURCES,
   CODEX_BOSSES,
   computeCodexProgress,
+  getAllCodexPets,
+  getAllCodexResources,
+  normalizeCodexPetId,
+  syncCodexStateWithSave,
   type CodexState,
   type CodexAiInvention,
+  type SaveLikeForCodex,
 } from '@/lib/survival/codex';
-import { X, CheckCircle2, Lock, Sparkles, BookOpen } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import PetSprite from './survival/PetSprite';
+import { useCustomCatalog } from '@/hooks/useCustomCatalog';
+import { bundledSpriteUrl, useItemCatalog } from '@/hooks/useItemCatalog';
 
 interface TribeCodexModalProps {
   open: boolean;
   onClose: () => void;
   codex: Partial<CodexState>;
+  save?: SaveLikeForCodex;
 }
 
 type CodexTab = 'pets' | 'resources' | 'inventions' | 'bosses';
+type ResourceFilter = 'all' | 'material' | 'ore' | 'food' | 'processed';
+
+const CATEGORY_LABELS: Record<Exclude<ResourceFilter, 'all'>, string> = {
+  material: '기초 재료',
+  ore: '광물·보석',
+  food: '식량·요리',
+  processed: '가공·비전',
+};
 
 export const TribeCodexModal: React.FC<TribeCodexModalProps> = ({
   open,
   onClose,
   codex,
+  save,
 }) => {
   const [tab, setTab] = useState<CodexTab>('pets');
-  const progress = computeCodexProgress(codex);
+  const [resFilter, setResFilter] = useState<ResourceFilter>('all');
+
+  const { data: customCatalog } = useCustomCatalog();
+  const { data: itemCatalog } = useItemCatalog();
+
+  const allPets = useMemo(
+    () => getAllCodexPets(customCatalog?.pets),
+    [customCatalog?.pets]
+  );
+
+  const allResources = useMemo(
+    () => getAllCodexResources(itemCatalog),
+    [itemCatalog]
+  );
+
+  // Merge codex state with live save (currently owned + historically owned items & pets)
+  const effectiveCodex = useMemo(() => {
+    if (save) {
+      return syncCodexStateWithSave({ ...save, codex });
+    }
+    return {
+      discoveredResources: codex.discoveredResources ?? [],
+      discoveredPets: (codex.discoveredPets ?? []).map(normalizeCodexPetId),
+      aiInventions: codex.aiInventions ?? [],
+      defeatedBosses: codex.defeatedBosses ?? [],
+      hasUnseenNew: codex.hasUnseenNew ?? false,
+    };
+  }, [codex, save]);
+
+  const progress = useMemo(
+    () => computeCodexProgress(effectiveCodex, allPets, allResources),
+    [effectiveCodex, allPets, allResources]
+  );
+
+  // Live current ownership lookup (backpack + storage for items, pets[] for dinos)
+  const currentOwnedItemCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const st of save?.backpack ?? []) {
+      if (st && st.count > 0) map.set(st.itemId, (map.get(st.itemId) ?? 0) + st.count);
+    }
+    for (const st of save?.storage ?? []) {
+      if (st && st.count > 0) map.set(st.itemId, (map.get(st.itemId) ?? 0) + st.count);
+    }
+    return map;
+  }, [save?.backpack, save?.storage]);
+
+  const currentOwnedPetLevels = useMemo(() => {
+    const map = new Map<string, { count: number; maxLevel: number }>();
+    for (const p of save?.pets ?? []) {
+      if (!p?.speciesId) continue;
+      const cid = normalizeCodexPetId(p.speciesId);
+      const prev = map.get(cid);
+      map.set(cid, {
+        count: (prev?.count ?? 0) + 1,
+        maxLevel: Math.max(prev?.maxLevel ?? 0, p.level ?? 1),
+      });
+    }
+    return map;
+  }, [save?.pets]);
 
   if (!open) return null;
 
-  const discoveredPets = new Set(codex.discoveredPets ?? []);
-  const discoveredResources = new Set(codex.discoveredResources ?? []);
-  const defeatedBosses = new Set(codex.defeatedBosses ?? []);
-  const aiInventions: CodexAiInvention[] = codex.aiInventions ?? [];
+  const discoveredPets = new Set(effectiveCodex.discoveredPets.map(normalizeCodexPetId));
+  const discoveredResources = new Set(effectiveCodex.discoveredResources);
+  const defeatedBosses = new Set(effectiveCodex.defeatedBosses);
+  const aiInventions: CodexAiInvention[] = effectiveCodex.aiInventions ?? [];
+
+  const unlockedPetCount = allPets.filter(p => discoveredPets.has(p.id)).length;
+  const unlockedResCount = allResources.filter(r => discoveredResources.has(r.id)).length;
+  const unlockedBossCount = CODEX_BOSSES.filter(b => defeatedBosses.has(b.id)).length;
+
+  const filteredResources =
+    resFilter === 'all'
+      ? allResources
+      : allResources.filter(r => r.category === resFilter);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-3 font-pixel">
@@ -42,13 +124,15 @@ export const TribeCodexModal: React.FC<TribeCodexModalProps> = ({
             <span className="text-xl">📖</span>
             <div>
               <h2 className="text-base font-bold text-amber-300">부족 대도감 (Tribe Codex)</h2>
-              <p className="text-[10px] text-stone-400">수집 달성률에 따라 영구 패시브 버프가 강화됩니다.</p>
+              <p className="text-[10px] text-stone-400">
+                현재 보유 중이거나 과거에 획득했던 모든 재료·공룡 펫이 자동 해금되며 영구 버프를 부여합니다.
+              </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-xs text-stone-400 hover:text-white px-2 py-1 border border-stone-700 bg-stone-900 rounded"
+            className="text-xs text-stone-400 hover:text-white px-2 py-1 border border-stone-700 bg-stone-900 rounded shrink-0"
           >
             [닫기]
           </button>
@@ -110,7 +194,7 @@ export const TribeCodexModal: React.FC<TribeCodexModalProps> = ({
                 : 'border-transparent text-stone-400 hover:text-stone-200'
             }`}
           >
-            🦖 공룡 펫 ({discoveredPets.size}/{CODEX_PETS.length})
+            🦖 공룡 펫 ({unlockedPetCount}/{allPets.length})
           </button>
           <button
             type="button"
@@ -121,7 +205,7 @@ export const TribeCodexModal: React.FC<TribeCodexModalProps> = ({
                 : 'border-transparent text-stone-400 hover:text-stone-200'
             }`}
           >
-            💎 자원 ({discoveredResources.size}/{CODEX_RESOURCES.length})
+            💎 재료 ({unlockedResCount}/{allResources.length})
           </button>
           <button
             type="button"
@@ -143,17 +227,18 @@ export const TribeCodexModal: React.FC<TribeCodexModalProps> = ({
                 : 'border-transparent text-stone-400 hover:text-stone-200'
             }`}
           >
-            👑 우두머리 ({defeatedBosses.size}/{CODEX_BOSSES.length})
+            👑 우두머리 ({unlockedBossCount}/{CODEX_BOSSES.length})
           </button>
         </div>
 
         {/* 탭 내용 영역 */}
-        <div className="space-y-2 min-h-[220px]">
-          {/* 1. 공룡 펫 탭 */}
+        <div className="space-y-2 min-h-[240px]">
+          {/* 1. 공룡 펫 탭 (저장된 모든 공룡 펫 & 관리자 지정 스프라이트 표시) */}
           {tab === 'pets' && (
             <div className="grid grid-cols-2 gap-2">
-              {CODEX_PETS.map((pet) => {
+              {allPets.map((pet) => {
                 const isFound = discoveredPets.has(pet.id);
+                const livePet = currentOwnedPetLevels.get(pet.id);
                 return (
                   <div
                     key={pet.id}
@@ -165,21 +250,41 @@ export const TribeCodexModal: React.FC<TribeCodexModalProps> = ({
                   >
                     <div className="flex items-center gap-2 mb-1.5">
                       <div
-                        className={`w-9 h-9 rounded flex items-center justify-center text-xl shrink-0 ${
+                        className={`w-11 h-11 rounded flex items-center justify-center shrink-0 overflow-hidden ${
                           isFound
                             ? 'bg-amber-950/40 border border-amber-600/40'
-                            : 'bg-stone-900 border border-stone-800 brightness-0 opacity-40'
+                            : 'bg-stone-900 border border-stone-800'
                         }`}
                       >
-                        {pet.icon}
+                        <div className={isFound ? '' : 'brightness-0 opacity-40 pointer-events-none select-none'}>
+                          <PetSprite speciesId={pet.id} name={isFound ? pet.name : '???'} height={36} />
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <span className="font-bold text-xs block truncate">
-                          {isFound ? pet.name : '??? (미발견 공룡)'}
-                        </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-bold text-xs block truncate">
+                            {isFound ? pet.name : '??? (미발견 공룡)'}
+                          </span>
+                          {isFound && (
+                            <span
+                              className={`text-[9px] px-1 py-0.2 rounded font-mono shrink-0 ${
+                                livePet
+                                  ? 'bg-emerald-950 border border-emerald-600/60 text-emerald-300'
+                                  : 'bg-stone-800 text-amber-300'
+                              }`}
+                            >
+                              {livePet ? `보유 Lv.${livePet.maxLevel}` : '수집됨'}
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[10px] text-stone-400 block truncate">
                           서식지: {isFound ? pet.habitat : '???'}
                         </span>
+                        {isFound && pet.abilitySummary && (
+                          <span className="text-[9px] text-amber-300 block truncate font-semibold">
+                            ★ {pet.abilitySummary}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <p className="text-[10px] text-stone-400 leading-snug line-clamp-2">
@@ -191,45 +296,109 @@ export const TribeCodexModal: React.FC<TribeCodexModalProps> = ({
             </div>
           )}
 
-          {/* 2. 자원 탭 */}
+          {/* 2. 재료·자원 탭 (저장된 모든 비장비 재료/광물/식량/가공품 표시) */}
           {tab === 'resources' && (
-            <div className="grid grid-cols-2 gap-2">
-              {CODEX_RESOURCES.map((res) => {
-                const isFound = discoveredResources.has(res.id);
-                return (
-                  <div
-                    key={res.id}
-                    className={`p-2.5 rounded border transition-all ${
-                      isFound
-                        ? 'bg-stone-900/90 border-stone-700 text-white'
-                        : 'bg-black/60 border-stone-800/80 text-stone-500'
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-1">
+                {(
+                  [
+                    ['all', `전체 (${allResources.length})`],
+                    ['material', '기초 재료'],
+                    ['ore', '광물·보석'],
+                    ['food', '식량·요리'],
+                    ['processed', '가공·비전'],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setResFilter(key)}
+                    className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors ${
+                      resFilter === key
+                        ? 'bg-amber-500/20 border-amber-400 text-amber-200'
+                        : 'bg-stone-900 border-stone-800 text-stone-400 hover:text-stone-200'
                     }`}
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <div
-                        className={`w-8 h-8 rounded flex items-center justify-center text-lg shrink-0 ${
-                          isFound
-                            ? 'bg-stone-800 border border-stone-600'
-                            : 'bg-stone-900 border border-stone-800 brightness-0 opacity-40'
-                        }`}
-                      >
-                        {res.icon}
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {filteredResources.map((res) => {
+                  const isFound = discoveredResources.has(res.id);
+                  const ownedCount = currentOwnedItemCounts.get(res.id) ?? 0;
+                  const spriteSrc = res.imageUrl ?? bundledSpriteUrl(res.spriteKey);
+                  return (
+                    <div
+                      key={res.id}
+                      className={`p-2.5 rounded border transition-all ${
+                        isFound
+                          ? 'bg-stone-900/90 border-stone-700 text-white'
+                          : 'bg-black/60 border-stone-800/80 text-stone-500'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <div
+                          className={`w-9 h-9 rounded flex items-center justify-center text-lg shrink-0 ${
+                            isFound
+                              ? 'bg-stone-800 border border-stone-600'
+                              : 'bg-stone-900 border border-stone-800'
+                          }`}
+                        >
+                          {spriteSrc ? (
+                            <img
+                              src={spriteSrc}
+                              alt={isFound ? res.name : '???'}
+                              className={`pixelated h-7 w-7 object-contain ${
+                                isFound ? '' : 'brightness-0 opacity-40 select-none'
+                              }`}
+                            />
+                          ) : (
+                            <span className={isFound ? '' : 'brightness-0 opacity-40 select-none'}>
+                              {res.icon}
+                            </span>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="font-bold text-xs block truncate">
+                              {isFound ? res.name : '??? (미발견 재료)'}
+                            </span>
+                            {isFound && (
+                              <span
+                                className={`text-[9px] px-1 py-0.2 rounded font-mono shrink-0 ${
+                                  ownedCount > 0
+                                    ? 'bg-emerald-950 border border-emerald-600/60 text-emerald-300'
+                                    : 'bg-stone-800 text-stone-300'
+                                }`}
+                              >
+                                {ownedCount > 0 ? `보유 ×${ownedCount}` : '수집됨'}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[9px] text-amber-400 block truncate">
+                            {isFound
+                              ? `${CATEGORY_LABELS[res.category] ?? '재료'} · ${
+                                  res.rarity === 'epic'
+                                    ? '★ 전설'
+                                    : res.rarity === 'rare'
+                                      ? '◆ 희귀'
+                                      : res.rarity === 'uncommon'
+                                        ? '▲ 고급'
+                                        : '일반'
+                                }`
+                              : '미탐색'}
+                          </span>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <span className="font-bold text-xs block truncate">
-                          {isFound ? res.name : '??? (미지의 자원)'}
-                        </span>
-                        <span className="text-[9px] text-amber-400 block">
-                          {isFound ? (res.rarity === 'epic' ? '★ 에픽 자원' : res.rarity === 'rare' ? '◆ 희귀 광물' : '일반 자원') : '미탐색'}
-                        </span>
-                      </div>
+                      <p className="text-[10px] text-stone-400 leading-snug line-clamp-2">
+                        {isFound ? res.desc : '채집, 사냥, 원정 또는 제작을 통해 획득하면 도감에 해금됩니다.'}
+                      </p>
                     </div>
-                    <p className="text-[10px] text-stone-400 leading-snug line-clamp-2">
-                      {isFound ? res.desc : '필드 탐색과 채광, 벌목을 통해 처음으로 채집하면 도감에 등록됩니다.'}
-                    </p>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
 

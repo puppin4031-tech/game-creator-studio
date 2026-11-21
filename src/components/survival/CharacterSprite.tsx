@@ -26,20 +26,24 @@ export default function CharacterSprite({
 }) {
   const tierKey = heroSpriteKey(level);
   const isCustomTier = tierKey !== 'hunter';
-  const { data: baseRemote } = useSpriteAnimations('hunter');
-  const { data: tierRemote } = useSpriteAnimations(isCustomTier ? tierKey : 'hunter');
+  const { data: baseRemote, isLoading: baseLoading } = useSpriteAnimations('hunter');
+  const { data: tierRemote, isLoading: tierLoading } = useSpriteAnimations(isCustomTier ? tierKey : 'hunter');
   const [frame, setFrame] = useState(0);
 
   // Exact action priority: tier action -> base hunter action -> intelligent action fallbacks -> idle -> walk
   const anim =
     tierRemote?.[action] ??
     baseRemote?.[action] ??
-    (action === 'chop' ? (tierRemote?.attack ?? baseRemote?.attack) : undefined) ??
-    (action === 'gather' ? (tierRemote?.walk ?? baseRemote?.walk) : undefined) ??
+    (action === 'chop' ? (tierRemote?.attack ?? baseRemote?.attack ?? tierRemote?.gather ?? baseRemote?.gather) : undefined) ??
+    (action === 'gather' ? (tierRemote?.chop ?? baseRemote?.chop ?? tierRemote?.walk ?? baseRemote?.walk) : undefined) ??
     tierRemote?.idle ??
     baseRemote?.idle ??
     tierRemote?.walk ??
-    baseRemote?.walk;
+    baseRemote?.walk ??
+    tierRemote?.gather ??
+    baseRemote?.gather ??
+    tierRemote?.attack ??
+    baseRemote?.attack;
 
   // Scale ratio configured from /admin/sprite studio
   const currentScale = tierRemote?.scale ?? baseRemote?.scale ?? 1.0;
@@ -89,7 +93,6 @@ export default function CharacterSprite({
     >
       {anim ? (
         <SpriteAnimator
-          key={`${anim.action}-${anim.url}`}
           url={anim.url}
           frames={anim.frame_count}
           fps={anim.fps}
@@ -105,6 +108,8 @@ export default function CharacterSprite({
             action === 'hurt'
           }
         />
+      ) : (baseLoading || tierLoading) ? (
+        <div aria-hidden style={{ width: Math.round(scaledHeight * 0.85), height: scaledHeight }} />
       ) : (
         fallback
       )}

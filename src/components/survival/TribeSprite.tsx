@@ -29,8 +29,8 @@ export default function TribeSprite({
   frameOffset?: number;
 }) {
   const classKey = tribeClass ? `tribe:${tribeClass}` : 'tribe';
-  const { data: classSheets } = useSpriteAnimations(classKey);
-  const { data: baseSheets } = useSpriteAnimations('tribe');
+  const { data: classSheets, isLoading: classLoading } = useSpriteAnimations(classKey);
+  const { data: baseSheets, isLoading: baseLoading } = useSpriteAnimations('tribe');
   const cls = tribeClass ? getTribeClass(tribeClass) : null;
   const [frame, setFrame] = useState(frameOffset);
 
@@ -140,6 +140,8 @@ export default function TribeSprite({
             height={scaledHeight}
             fallback={fallback}
           />
+        ) : (classLoading || baseLoading) ? (
+          <span aria-hidden className="inline-block" style={{ width: Math.round(scaledHeight * 0.85), height: scaledHeight }} />
         ) : (
           fallback
         )}

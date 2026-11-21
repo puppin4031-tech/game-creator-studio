@@ -14,31 +14,32 @@ interface Props {
 
 // Cache of decoded sheet aspect ratios so switching actions never shows an empty frame.
 const loaded = new Map<string, number>();
+const inflight = new Map<string, Promise<void>>();
 
 export function preloadSpriteSheet(url: string, frames: number): Promise<void> {
-  if (loaded.has(url)) return Promise.resolve();
-  return new Promise(resolve => {
+  if (!url || loaded.has(url)) return Promise.resolve();
+  const existing = inflight.get(url);
+  if (existing) return existing;
+
+  const p = new Promise<void>(resolve => {
     const img = new Image();
     let settled = false;
     const finish = () => {
       if (!settled) {
         settled = true;
+        inflight.delete(url);
         resolve();
       }
     };
-    // 3.5s timeout safety for mobile networks so failing image never stalls the app
-    const timer = setTimeout(finish, 3500);
-    img.crossOrigin = 'anonymous';
+    const timer = setTimeout(finish, 15000);
     img.onload = () => {
       clearTimeout(timer);
-      const done = () => {
-        loaded.set(url, img.naturalWidth / frames / img.naturalHeight || 1);
-        finish();
-      };
+      const ratio = img.naturalWidth / Math.max(1, frames) / Math.max(1, img.naturalHeight) || 1;
+      loaded.set(url, ratio);
       if (img.decode) {
-        img.decode().then(done).catch(done);
+        img.decode().then(finish).catch(finish);
       } else {
-        done();
+        finish();
       }
     };
     img.onerror = () => {
@@ -47,6 +48,9 @@ export function preloadSpriteSheet(url: string, frames: number): Promise<void> {
     };
     img.src = url;
   });
+
+  inflight.set(url, p);
+  return p;
 }
 
 interface Shown {
@@ -116,7 +120,8 @@ export default function SpriteAnimator({
     return () => window.clearInterval(id);
   }, [shown, fps, playing, once]);
 
-  if (hasError || !shown) return <>{fallback ?? null}</>;
+  if (hasError) return <>{fallback ?? null}</>;
+  if (!shown) return <div aria-hidden style={{ width: Math.round(height * 0.85), height }} />;
 
   const width = height * shown.ratio;
   const f = Math.min(frame, shown.frames - 1);

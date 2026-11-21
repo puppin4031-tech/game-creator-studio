@@ -72,7 +72,7 @@ import { toast } from 'sonner';
 import TerrainMap from '@/components/survival/TerrainMap';
 import { useSurvivalWorld } from '@/hooks/useSurvivalWorld';
 import { zoneCellKey } from '@/lib/survival/terrainZone';
-import { gearEffect, ITEMS, requiredRangedAmmo, findAvailableAmmo, computeRangedReach, type ItemId } from '@/lib/survival/items';
+import { gearEffect, isGearItem, ITEMS, requiredRangedAmmo, findAvailableAmmo, computeRangedReach, type ItemId } from '@/lib/survival/items';
 import { nodeDef, creatureDef, BOSS_TYPES } from '@/lib/survival/entities';
 import { PLAYER_SPRITE_HEIGHT, SPRITE_META, type SpriteKey } from '@/lib/survival/spriteMeta';
 import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
@@ -1532,7 +1532,6 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           {rightOpen && (
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex flex-col items-end gap-1">
               <MenuBtn icon={Backpack} label="배낭" onClick={() => setPanel('bag')} />
-              <MenuBtn icon={Zap} label={skillBarVisible ? '스킬들 목록 접기' : '스킬들 목록 펼치기'} onClick={() => setSkillBarVisible(v => !v)} />
               <MenuBtn icon={Shield} label="상태창" onClick={() => setStatusModalOpen(true)} />
               <MenuBtn
                 icon={BookOpen}
@@ -1543,6 +1542,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   g.markCodexSeen();
                 }}
               />
+              <MenuBtn icon={Zap} label={skillBarVisible ? '스킬들 목록 접기' : '스킬들 목록 펼치기'} onClick={() => setSkillBarVisible(v => !v)} />
               <MenuBtn
                 icon={FileText}
                 label="밤사이 보고서 (테스트 2시간)"
@@ -1639,9 +1639,51 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               )}
               {panel === 'bag' && (
                 <>
-                  <InventoryMaterials stacks={s.backpack} location="backpack" canTransfer={g.inBase} ready={actionReady} onTransfer={g.storeOne} onDrop={g.dropItems} onUse={g.eat} icon={inventoryIcon} />
-                  <EquipmentSlots gear={s.gear} loadout={g.loadout} level={s.level} onEquip={g.equip} icon={(x) => <Sprite k={ITEMS[x.itemId].sprite} scale={0.75} />} />
-                  <BackpackDiscard backpack={s.backpack} onDrop={g.dropItems} />
+                  <InventoryMaterials
+                    stacks={s.backpack.filter(st => !isGearItem(st.itemId))}
+                    location="backpack"
+                    canTransfer={g.inBase}
+                    ready={actionReady}
+                    onTransfer={g.storeOne}
+                    onDrop={g.dropItems}
+                    onUse={g.eat}
+                    icon={inventoryIcon}
+                  />
+                  <BackpackDiscard
+                    backpack={s.backpack.filter(st => !isGearItem(st.itemId))}
+                    onDrop={g.dropItems}
+                  />
+                  <div className="space-y-2 border-t border-border pt-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setStatusModalOpen(true)}
+                      className="pixel-btn flex w-full items-center justify-between py-2.5 px-3 text-xs font-bold"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Shield className="!h-4 !w-4 text-primary" />
+                        <span>상태창 · 장비 및 착용 능력치 관리</span>
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">열기 &gt;</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setCodexModalOpen(true);
+                        g.markCodexSeen();
+                      }}
+                      className="pixel-btn flex w-full items-center justify-between py-2.5 px-3 text-xs font-bold"
+                    >
+                      <span className="flex items-center gap-2">
+                        <BookOpen className="!h-4 !w-4 text-amber-500" />
+                        <span>부족 대도감 · 모든 재료 및 공룡 펫 도감</span>
+                      </span>
+                      <span className="text-[10px] text-primary font-mono">
+                        {g.codexProgress.percentage}% 달성 &gt;
+                      </span>
+                    </Button>
+                  </div>
                 </>
               )}
 
@@ -2088,6 +2130,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         open={codexModalOpen}
         onClose={() => setCodexModalOpen(false)}
         codex={g.codex}
+        save={s}
       />
       <TribalHallModal
         open={tribeInfoModalOpen}

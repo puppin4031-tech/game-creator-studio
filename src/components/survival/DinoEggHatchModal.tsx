@@ -9,8 +9,17 @@ import baby_ptera from '@/assets/survival/dinos/baby_ptera.png';
 import SpriteAnimator from './SpriteAnimator';
 import { useSpriteAnimations } from '@/hooks/useSpriteAnimations';
 import { haptic, playSfx } from '@/lib/survival/gameSettings';
+import { fusionSpecies } from '@/lib/survival/pets';
 
-export const BABY_ART: Record<string, string> = { baby_raptor, mini_triceratops, baby_stego, baby_ptera };
+export const BABY_ART: Record<string, string> = {
+  baby_raptor,
+  mini_triceratops,
+  baby_stego,
+  baby_ptera,
+  terranox01: baby_raptor,
+  keratupsgt: mini_triceratops,
+  stagogon85: baby_stego,
+};
 export const EGG_ART = EGG_ARTS[0];
 
 const BURST_AT = 4;
@@ -22,9 +31,10 @@ const SHELLS = [{ x: -60, y: -40, r: -70 }, { x: 62, y: -30, r: 80 }, { x: -40, 
 export default function DinoEggHatchModal({ baby, onClose }: { baby: { id: string; name: string; custom?: boolean; eggId?: string } | null; onClose: () => void }) {
   const egg = eggArt(baby?.eggId ?? baby?.id ?? 'egg');
   const reduced = useReducedMotion();
-  const { data: art } = useSpriteAnimations(baby?.custom ? `pet:${baby.id}` : 'none');
-  const sheet = baby && !BABY_ART[baby.id] ? art?.idle : undefined;
-  const babySrc = baby ? BABY_ART[baby.id] ?? egg : egg;
+  const canonicalId = baby ? fusionSpecies(baby.id) : 'none';
+  const { data: art } = useSpriteAnimations(baby ? `pet:${canonicalId}` : 'none');
+  const sheet = baby ? (art?.idle ?? art?.walk) : undefined;
+  const babySrc = baby ? BABY_ART[baby.id] ?? BABY_ART[canonicalId] ?? egg : egg;
 
   useEffect(() => {
     if (!baby) return;
