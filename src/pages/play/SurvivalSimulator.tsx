@@ -46,7 +46,7 @@ import { useDeviceHeading } from '@/hooks/useDeviceHeading';
 import { useSurvivalGps } from '@/hooks/useSurvivalGps';
 import { Button } from '@/components/ui/button';
 import { ColonionOpening, PIONEER_NAME_KEY } from '@/components/survival/ColonionOpening';
-import { hasSeenStoryTutorial, StoryTutorialModal } from '@/components/survival/StoryTutorial';
+import { hasSeenStoryTutorial, STORY_TUTORIAL_SEEN_KEY, StoryTutorialModal } from '@/components/survival/StoryTutorial';
 import { ContextThemeWrapper, type ContextMode } from '@/components/survival/ContextThemeWrapper';
 import {
   CombatEffectLayer,
