@@ -141,6 +141,13 @@
       "when": 1795364610173,
       "tag": "0019_harden_roles_missions_tag_spawns_credits",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795384642029,
+      "tag": "0020_scope_survival_catalog_reads",
+      "breakpoints": true
     }
   ]
 }
