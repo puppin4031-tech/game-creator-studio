@@ -461,8 +461,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(t); }, []);
   const [savedIndicator, setSavedIndicator] = useState(false);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const indicatorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const indicatorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedJsonRef = useRef<string>('');
 
   const performWrite = useCallback((data: WorldSave) => {

@@ -539,7 +539,7 @@ export default function ExpeditionSystem(p: Props) {
               ? 'item-digging-stick'
               : 'item-bone-charm',
             stat: selectedMember.classId === 'gatherer'
-              ? `운반 +${mCls.carryBonusKg}kg`
+              ? `운반 +${Math.round(mCls.carryBonusRatio * 100)}%`
               : '사기 +10%',
           },
         };
@@ -615,7 +615,7 @@ export default function ExpeditionSystem(p: Props) {
                 </div>
                 <div className="pixel-box bg-card p-2 rounded">
                   <span className="text-[10px] text-muted-foreground block">동행 운반 보너스</span>
-                  <span className="font-bold text-foreground text-xs">+{mCls.carryBonusKg}kg 보관</span>
+                  <span className="font-bold text-foreground text-xs">+{Math.round(mCls.carryBonusRatio * 100)}% 운반</span>
                 </div>
               </div>
 
