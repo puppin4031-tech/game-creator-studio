@@ -16,6 +16,12 @@ import { RECIPES, type Recipe } from '@/lib/survival/recipes';
 import { BASE_LEVELS, CAMP_COST } from '@/lib/survival/bases';
 import { SURVIVAL_CONFIG as C } from '@/lib/survival/config';
 import { visionBonus, reachRadius, eggReachRadius, pocketBonusKg } from '@/lib/survival/utilitySkills';
+import {
+  ALL_CLASS_SKILL_NODES,
+  checkSkillUnlockRequirements,
+  getPlayerSpeedLimitKmh,
+  getPlayerReachBonusM,
+} from '@/data/classSkillTrees';
 import { BASE_UPGRADE_MS, EXPEDITION_FOOD_COUNT, EXPEDITION_MS, expeditionRewards, mapFragments, payExpeditionFood, scoutReport, type Expedition, type ScoutTarget, type TimedJob } from '@/lib/survival/homeActivities';
 import { EGG_PICK_RADIUS_M, EGG_RESPAWN_MS, eggNeedM, eggWalkedM, advanceEggs, babyFor, eggReady, newEgg, petById, type BabyDinoId, type CarriedEgg, type EggSpawn } from '@/lib/survival/dinoEggs';
 import { ACTIVE_SKILLS, claimResearch, startResearch, atMainBase, atWorkshop, buildStructure, relocateOutpost, collectCompanionWork, prepareSkill, recruitCompanion, tameWolf, type ActiveSkill, type Companion } from '@/lib/survival/abilities';
@@ -138,6 +144,7 @@ export interface WorldSave extends WorldProgress {
   shamanLevel?: 1 | 2 | 3 | 4 | 5;
   shamanClass?: ShamanClassId | null;
   classResource?: number;
+  classSkills?: string[];
   civilizationTechs?: string[];
   smokeBatches?: SmokehouseBatch[];
   lastFreshnessCheckAt?: number;
@@ -169,7 +176,7 @@ const fresh = (start: LatLng): WorldSave => ({
   ...freshProgress(),
   saveVersion: CURRENT_SAVE_VERSION,
   pos: start, hp: C.baseMaxHp, hunger: 100, backpack: [], storage: [], gear: [], base: null,
-  depleted: {}, damage: {}, gathered: {}, techs: [], explored: [start], terrainZones: {}, parkCells: {}, shamanLevel: 1, shamanClass: 'NONE', classResource: 100, civilizationTechs: ['tech_fire_gathering'],
+  depleted: {}, damage: {}, gathered: {}, techs: [], explored: [start], terrainZones: {}, parkCells: {}, shamanLevel: 1, shamanClass: 'NONE', classResource: 100, classSkills: [], civilizationTechs: ['tech_fire_gathering'],
   codex: defaultCodexState(),
   lastTickAt: Date.now(),
   lastActiveAt: Date.now(),
@@ -272,6 +279,7 @@ export function migrateSaveData(raw: unknown, start: LatLng): WorldSave {
     civilizationTechs: Array.isArray(p.civilizationTechs) && p.civilizationTechs.length > 0 ? p.civilizationTechs : ['tech_fire_gathering'],
     shamanClass: (p.shamanClass ?? 'NONE') as ShamanClassId,
     classResource: typeof p.classResource === 'number' ? p.classResource : 100,
+    classSkills: Array.isArray(p.classSkills) ? p.classSkills : [],
     shamanLevel: (p.shamanLevel ?? 1) as 1 | 2 | 3 | 4 | 5,
     activeBuffs: Array.isArray(p.activeBuffs) ? p.activeBuffs : [],
     permanentStats: p.permanentStats && typeof p.permanentStats === 'object' ? p.permanentStats : {},
@@ -651,7 +659,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       ),
     [s.expeditionCount, s.expeditionDistanceM, s.walkSteps]
   );
-  const reach = reachRadius(s.techs, s.techLevels);
+  const reach = reachRadius(s.techs, s.techLevels) + getPlayerReachBonusM(s.classSkills);
   const baseDef = s.base ? BASE_LEVELS[s.base.level] : null;
   const [sanctuaries, setSanctuaries] = useState<LatLng[]>([]);
   const sanctuariesRef = useRef(sanctuaries);
@@ -660,10 +668,13 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const inBase = atWorkshop(s);
   const weight = stackWeight(s.backpack);
   const baseCapacity = C.baseCarryKg + (s.level - 1) * C.carryPerLevelKg + ((s.base?.level ?? 0) >= 2 ? 10 : 0) + pocketBonusKg(s.techs) + villageBonuses.carryBonusKg;
-  const capacity =
-    baseCapacity +
-    tribeCarryBonusKg(baseCapacity, s.tribe?.count ?? 0, s.tribe?.classId) +
-    (s.permanentStats?.carryBonus ?? 0);
+  const sledMult = s.classSkills?.includes('wooden_sled') ? 1.2 : 1;
+  const capacity = Math.round(
+    (baseCapacity +
+      tribeCarryBonusKg(baseCapacity, s.tribe?.count ?? 0, s.tribe?.classId) +
+      (s.permanentStats?.carryBonus ?? 0)) *
+      sledMult
+  );
   const questState: QuestState = { ...s, storedGear: [], stats: { gathered: s.gathered, crafted: s.crafted, kills: s.kills, deposits: s.deposits } };
   const quest = currentQuest(questState);
   const questProgress = quest?.progress(questState) ?? null;
@@ -771,9 +782,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const last = p.explored[p.explored.length - 1];
       const explored = !last || distanceM(last, pos) >= EXPLORE_STEP_M ? [...p.explored, pos].slice(-MAX_EXPLORED) : p.explored;
       const grew = explored !== p.explored;
-      // Reward walking only counts new steps taken at <= 13 km/h.
-      const walkLimit = walkLimitKmh(activePetAbilities(p.pets ?? []), MAX_WALK_KMH);
+      // Reward walking counts new steps taken within speed limit (unlocked by Engineer vehicles).
+      const speedLimit = getPlayerSpeedLimitKmh(p.classSkills);
+      const walkLimit = Math.max(speedLimit, walkLimitKmh(activePetAbilities(p.pets ?? []), MAX_WALK_KMH));
       const walking = grew && prevAt > 0 && isWalkingPace(distanceM(p.pos, pos), now - prevAt, walkLimit);
+      const eggDistMult = p.classSkills?.includes('straw_sandals') ? 1.25 : 1;
       if (options.indoor && prevAt > 0 && isPocketMovement(distanceM(p.pos, pos), now - prevAt)) {
         outdoorMovingRef.current = now + 10_000;
         setMovingUntil(now + 10_000);
@@ -782,7 +795,19 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         setMovingUntil(0);
       }
       const anchor = p.starterCampPending && p.base && !p.observedExpedition;
-      return { ...p, pos, base: anchor ? { ...p.base, ...pos } : p.base, starterCampPending: anchor ? false : p.starterCampPending, explored, exploredTotal: (p.exploredTotal ?? p.explored.length) + (grew ? 1 : 0), walkSteps: (p.walkSteps ?? 0) + (walking ? 1 : 0), dinoEggs: walking && p.dinoEggs?.length ? advanceEggs(p.dinoEggs, distanceM(p.pos, pos), now - prevAt, walkLimit) : p.dinoEggs };
+      return {
+        ...p,
+        pos,
+        base: anchor ? { ...p.base, ...pos } : p.base,
+        starterCampPending: anchor ? false : p.starterCampPending,
+        explored,
+        exploredTotal: (p.exploredTotal ?? p.explored.length) + (grew ? 1 : 0),
+        walkSteps: (p.walkSteps ?? 0) + (walking ? 1 : 0),
+        dinoEggs:
+          walking && p.dinoEggs?.length
+            ? advanceEggs(p.dinoEggs, distanceM(p.pos, pos) * eggDistMult, now - prevAt, walkLimit)
+            : p.dinoEggs,
+      };
     });
   }, [setS, options.indoor]);
 
@@ -1226,7 +1251,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const visitLandmark = useCallback((l: Landmark): string | null => {
     const p = ref.current;
     if (!enabledRef.current) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return null; }
-    const r = reachRadius(p.techs, p.techLevels);
+    const r = reachRadius(p.techs, p.techLevels) + getPlayerReachBonusM(p.classSkills);
     if (distanceM(p.pos, l) > r) { toast.warning(`${r}m 안으로 다가가세요`); return null; }
     const now = Date.now();
     const check = canClaimLandmark(p.landmarkClaims, l.id, now);
@@ -1258,7 +1283,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const shrineGate = (sh: Shrine): WorldSave | null => {
     const p = ref.current;
     if (!enabledRef.current) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return null; }
-    const r = reachRadius(p.techs, p.techLevels);
+    const r = reachRadius(p.techs, p.techLevels) + getPlayerReachBonusM(p.classSkills);
     if (distanceM(p.pos, sh) > r) { toast.warning(`${r}m 안으로 다가가세요`); return null; }
     return p;
   };
@@ -1352,7 +1377,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const { category: rangedCat, rangeM: rangedReach } = computeRangedReach(weapon, p.level);
     const isRangedWeapon = e.kind === 'creature' && !!rangedCat;
     const reachBonus = p.techs.includes('long_reach') ? longReachBonus(techLevel(p.techLevels, 'long_reach')) : 0;
-    const r = isRangedWeapon ? Math.max(reachRadius(p.techs, p.techLevels), rangedReach + reachBonus) : reachRadius(p.techs, p.techLevels);
+    const extraReach = getPlayerReachBonusM(p.classSkills);
+    const baseReach = reachRadius(p.techs, p.techLevels) + extraReach;
+    const r = isRangedWeapon ? Math.max(baseReach, rangedReach + reachBonus + extraReach) : baseReach;
     if (distanceM(p.pos, e) > r) { toast.warning(`${r}m 안으로 다가가세요`); return false; }
     if (e.kind === 'creature') {
       const at = Date.now();
@@ -1387,7 +1414,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const d = creatureDef(e.type);
       label = d.name; need = d.hp; loot = d.loot;
       // Ranged weapons (bow / sling / spear) require 1 matching ammo in the backpack per shot
-      if (isRangedWeapon && distanceM(p.pos, e) > reachRadius(p.techs, p.techLevels)) {
+      if (isRangedWeapon && distanceM(p.pos, e) > baseReach) {
         const ammo = findAvailableAmmo(p.backpack, weapon?.itemId);
         if (!ammo) {
           const ammoLabel = rangedCat === 'bow' ? '화살(🏹)' : '돌멩이 탄환(🪨)이나 부싯돌';
@@ -1515,6 +1542,12 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       return true;
     }
     delete next.damage[e.id];
+    if (e.kind === 'creature' && p.classSkills?.includes('soul_harvest')) {
+      const heal = Math.max(3, Math.round(creatureDef(e.type).hp * 0.1));
+      hp = Math.min(maxHpOf(p), hp + heal);
+      next.hp = hp;
+      toast.info(`💀 영혼 수확! 생명력 +${heal} 흡수`);
+    }
     let got = options.indoor && Date.now() < outdoorMovingRef.current ? expeditionLoot(e, true) : rollLoot(loot);
     if (e.kind === 'node') {
       const hasGatherBoost = weapon?.mechanics?.includes('GATHER_BOOST') || ITEMS[weapon?.itemId ?? '']?.mechanics?.includes('GATHER_BOOST');
@@ -1523,9 +1556,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         toast.success('🌾 풍요로운 수확! 자원 획득량 +1개 추가');
       }
       const shamanClass = p.shamanClass ?? p.village?.shamanClass;
-      if (shamanClass === 'orthodox' && Math.random() < 0.25 && got.length > 0) {
+      if ((shamanClass === 'orthodox' || p.classSkills?.includes('natures_blessing')) && Math.random() < 0.25 && got.length > 0) {
         got = got.map(g => ({ ...g, count: g.count + 1 }));
-        toast.success('👑 정직한 대현자의 축복! 자원 채집량 +25% 추가 수확');
+        toast.success('🌿 대자연의 은혜! 자원 채집량 2배 추가 수확');
       }
 
       // Codex Milestone Perk (30% progress -> +10% gathering yield)
@@ -1976,7 +2009,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (!enabledRef.current) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return false; }
     const now = Date.now();
     if (now - (p.depleted[egg.id] ?? -Infinity) < EGG_RESPAWN_MS) { toast.info('이 자리의 알은 이미 주웠어요. 내일 다시 와 보세요.'); return false; }
-    const allowedDist = eggReachRadius(p.techs, p.techLevels);
+    const allowedDist = eggReachRadius(p.techs, p.techLevels) + getPlayerReachBonusM(p.classSkills);
     if (distanceM(p.pos, egg) > allowedDist) { toast.warning(`${allowedDist}m 안으로 다가가세요`); return false; }
     setS({ ...p, backpack: addStacks(p.backpack, [{ itemId: 'dino_egg', count: 1 }]), depleted: { ...p.depleted, [egg.id]: now },
       dinoEggs: [...(p.dinoEggs ?? []), newEgg(`${egg.id}:${now}`, p.walkSteps ?? 0, Math.random())] });
@@ -1989,7 +2022,8 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const egg = (p.dinoEggs ?? []).find(e => e.id === eggId);
     if (!egg) return null;
     const codexProg = computeCodexProgress(p.codex);
-    const discount = codexProg.hatchDiscountPct ?? 0;
+    const sandalsDiscount = p.classSkills?.includes('straw_sandals') ? 20 : 0;
+    const discount = (codexProg.hatchDiscountPct ?? 0) + sandalsDiscount;
     const needM = Math.round(eggNeedM(egg) * (1 - discount / 100));
     const walked = eggWalkedM(egg, p.walkSteps ?? 0);
     if (!enabledRef.current || !atWorkshop(p) || walked < needM) return null;
@@ -2430,6 +2464,47 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     setTimeout(flushSave, 0);
 
     toast.success(`🎉 ${meta.icon} [${meta.name}] 전직 의식 완수! 전속 NPC [${meta.npc.name}]이(가) 마을에 합류했습니다!`);
+    return true;
+  }, [setS, flushSave]);
+
+  const learnClassSkill = useCallback((skillId: string): boolean => {
+    const skill = ALL_CLASS_SKILL_NODES[skillId];
+    if (!skill) return false;
+    const p = ref.current;
+    const learned = p.classSkills ?? [];
+    const totalOwned = addStacks(p.storage, p.backpack);
+    const check = checkSkillUnlockRequirements(skill, p.level, learned, totalOwned);
+    if (!check.isUnlockable) {
+      toast.error(check.missingRequirements[0] ?? '습득 조건을 만족하지 못했습니다.');
+      return false;
+    }
+    // Deduct costs: prioritize backpack, then storage
+    let bp = [...p.backpack];
+    let st = [...p.storage];
+    for (const cost of skill.costItems) {
+      let needed = cost.count;
+      const bpIndex = bp.findIndex(x => x.itemId === cost.itemId);
+      if (bpIndex >= 0) {
+        const take = Math.min(needed, bp[bpIndex].count);
+        bp = removeStacks(bp, [{ itemId: cost.itemId, count: take }]);
+        needed -= take;
+      }
+      if (needed > 0) {
+        st = removeStacks(st, [{ itemId: cost.itemId, count: needed }]);
+      }
+    }
+    const nextSkills = [...learned, skillId];
+    setS(prev => ({
+      ...prev,
+      backpack: bp,
+      storage: st,
+      classSkills: nextSkills,
+      lastTickAt: Date.now(),
+    }));
+    setTimeout(flushSave, 0);
+    toast.success(`✨ [${skill.name}] 기술을 성공적으로 습득했습니다!`, {
+      description: skill.desc,
+    });
     return true;
   }, [setS, flushSave]);
 
@@ -3038,7 +3113,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return chosen;
   }, [saveKey, userId, setS, flushSave]);
 
-  return { codex: s.codex ?? defaultCodexState(), codexProgress, recordCodexResource, recordCodexPet, recordCodexBoss, recordCodexAiInvention, markCodexSeen, reloadSaveFromBestSource, claimOfflineRewards, shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, dismissTribe, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
+  return { codex: s.codex ?? defaultCodexState(), codexProgress, recordCodexResource, recordCodexPet, recordCodexBoss, recordCodexAiInvention, markCodexSeen, reloadSaveFromBestSource, claimOfflineRewards, shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, classSkills: s.classSkills ?? [], learnClassSkill, maxSpeedKmh: getPlayerSpeedLimitKmh(s.classSkills), triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, dismissTribe, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
     savedIndicator, flushSave,
     moveOutpost, petHits, mergePets, togglePetDeploy, assignPetRole, feedPet, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),

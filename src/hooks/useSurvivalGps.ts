@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { acceptGpsFix, smoothGpsFix, shouldReanchor, GPS_JUMP_LOCK_MS, GPS_STALE_MS, type GpsFix } from '@/lib/survival/gps';
+import { acceptGpsFix, smoothGpsFix, shouldReanchor, GPS_JUMP_LOCK_MS, GPS_STALE_MS, GPS_MAX_SPEED_MPS, type GpsFix } from '@/lib/survival/gps';
 import type { LatLng } from '@/lib/survival/types';
 
 export interface SurvivalGpsReturn {
@@ -15,7 +15,8 @@ export interface SurvivalGpsReturn {
 export function useSurvivalGps(
   enabled: boolean,
   onPosition: (pos: LatLng) => void,
-  fallbackPos?: LatLng | null
+  fallbackPos?: LatLng | null,
+  maxSpeedKmh?: number
 ): SurvivalGpsReturn {
   const [fix, setFix] = useState<GpsFix | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +27,9 @@ export function useSurvivalGps(
 
   const fallbackRef = useRef<LatLng | null | undefined>(fallbackPos);
   fallbackRef.current = fallbackPos;
+
+  const maxSpeedKmhRef = useRef<number | undefined>(maxSpeedKmh);
+  maxSpeedKmhRef.current = maxSpeedKmh;
 
   const gotFirstFix = useRef(false);
   const wasIndoorRef = useRef(false);
@@ -89,7 +93,10 @@ export function useSurvivalGps(
           timestamp: p.timestamp,
         };
 
-        if (!acceptGpsFix(candidate, lastRaw)) {
+        const speedKmh = maxSpeedKmhRef.current ?? 13;
+        const maxSpeedMps = Math.max(GPS_MAX_SPEED_MPS, (speedKmh * 1000) / 3600);
+
+        if (!acceptGpsFix(candidate, lastRaw, maxSpeedMps)) {
           if (candidate.accuracy <= 25) rejects += 1;
           if (lastRaw && shouldReanchor(rejects, candidate)) {
             rejects = 0;

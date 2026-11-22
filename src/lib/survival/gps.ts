@@ -6,11 +6,11 @@ export const GPS_MAX_ACCURACY_M = 25;
 export const GPS_MAX_SPEED_MPS = 15;
 export const GPS_STALE_MS = 15000;
 
-export function acceptGpsFix(fix: GpsFix, previous: GpsFix | null): boolean {
+export function acceptGpsFix(fix: GpsFix, previous: GpsFix | null, maxSpeedMps = GPS_MAX_SPEED_MPS): boolean {
   if (![fix.lat, fix.lng, fix.accuracy, fix.timestamp].every(Number.isFinite) || Math.abs(fix.lat) > 90 || Math.abs(fix.lng) > 180 || fix.accuracy < 0 || fix.accuracy > GPS_MAX_ACCURACY_M) return false;
   if (!previous) return true;
   const seconds = (fix.timestamp - previous.timestamp) / 1000;
-  return seconds > 0 && distanceM(previous, fix) / seconds <= GPS_MAX_SPEED_MPS;
+  return seconds > 0 && distanceM(previous, fix) / seconds <= maxSpeedMps;
 }
 
 /** Filter in metre space: degrees cannot share the GPS accuracy covariance. */

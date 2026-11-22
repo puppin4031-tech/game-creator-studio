@@ -40,7 +40,7 @@ import { MAX_SKILL_LEVEL, skillLevel, skillUpgradeCost } from '@/lib/survival/sk
 import { type SpriteAction } from '@/hooks/useSpriteAnimations';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Backpack, Flame, Lightbulb, LocateFixed, X, Lock, ListChecks, Compass, ChevronUp, Star, MapPin, Navigation, Radar, Map as MapIcon, FileText, BookOpen, Zap, Shield, Home, Radio, RefreshCw } from 'lucide-react';
+import { Backpack, Flame, Lightbulb, LocateFixed, X, Lock, ListChecks, Compass, ChevronUp, Star, MapPin, Navigation, Radar, Map as MapIcon, FileText, BookOpen, Zap, Shield, Home, Radio, RefreshCw, Sparkles } from 'lucide-react';
 import { bearingDeg, useSurvivalFavorites } from '@/hooks/useSurvivalFavorites';
 import { useDeviceHeading } from '@/hooks/useDeviceHeading';
 import { useSurvivalGps } from '@/hooks/useSurvivalGps';
@@ -113,6 +113,7 @@ import BaseVillageView from '@/components/survival/BaseVillageView';
 import RadarMapModal from '@/components/survival/RadarMapModal';
 import DinoExpeditionModal from '@/components/survival/DinoExpeditionModal';
 import StatusEquipmentModal from '@/components/survival/StatusEquipmentModal';
+import SkillTreeModal from '@/components/survival/SkillTreeModal';
 import { atWorkshop } from '@/lib/survival/abilities';
 
 const START: LatLng = { lat: 37.748, lng: 126.7496 };
@@ -208,7 +209,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const navigate = useNavigate();
   const [gpsReady, setGpsReady] = useState(false);
   const g = useSurvivalWorld(START, { enabled: !realGps || gpsReady, saveKey: realGps ? 'survival-gps-world-v1' : 'survival-world-v1', cloudSync: realGps, indoor: realGps });
-  const gps = useSurvivalGps(realGps, g.moveTo, g.state.base ?? g.state.pos ?? START);
+  const gps = useSurvivalGps(realGps, g.moveTo, g.state.base ?? g.state.pos ?? START, g.maxSpeedKmh);
   useEffect(() => setGpsReady(gps.ready || gps.isIndoor), [gps.ready, gps.isIndoor]);
   useEffect(() => { preloadCoreSprites(); }, []);
   const { state: s } = g;
@@ -244,6 +245,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [offlineReportModalOpen, setOfflineReportModalOpen] = useState(false);
   const [offlineElapsedMinutes, setOfflineElapsedMinutes] = useState(0);
   const [codexModalOpen, setCodexModalOpen] = useState(false);
+  const [skillTreeModalOpen, setSkillTreeModalOpen] = useState(false);
 
   // Track last active timestamp, handle visibilitychange, and auto-trigger Ambacho Offline Report
   useEffect(() => {
@@ -1697,6 +1699,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex flex-col items-start gap-1">
               <MenuBtn icon={LocateFixed} label="GPS 갱신" onClick={gps.retry} />
               <MenuBtn icon={Lightbulb} label="기술" dot={techDone} onClick={() => setPanel('tech')} />
+              <MenuBtn icon={Sparkles} label="심화 스킬트리" onClick={() => setSkillTreeModalOpen(true)} />
               <MenuBtn icon={ListChecks} label="생존 목표" onClick={() => setPanel('quests')} />
               <MenuBtn icon={MapIcon} label="맵" onClick={() => setRadarOpen(true)} />
             </motion.div>
@@ -2048,6 +2051,23 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               )}
               {panel === 'tech' && (
                 <div className="space-y-2">
+                  <div className="flex items-center justify-between p-2 rounded bg-amber-950/40 border border-amber-600/40 text-xs shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">📜</span>
+                      <div>
+                        <div className="font-bold text-amber-200">4대 주술사 심화 스킬트리</div>
+                        <div className="text-[11px] text-stone-400">GPS 속도 제한 완화 & 고유 테크</div>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => setSkillTreeModalOpen(true)}
+                      className="pixel-btn h-8 px-2.5 text-xs bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold"
+                    >
+                      스킬창 열기
+                    </Button>
+                  </div>
                   <div className="sticky top-0 z-10 -mx-3 -mt-3 flex gap-1 overflow-x-auto bg-background px-3 py-2" role="tablist">
                     {TECH_CATEGORIES.map((c) => (
                       <button key={c.id} type="button" role="tab" aria-selected={techTab === c.id} onClick={() => setTechTab(c.id)}
@@ -2328,6 +2348,15 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           setPanel('base');
           setBaseTab('expedition');
         }}
+      />
+      <SkillTreeModal
+        open={skillTreeModalOpen}
+        onClose={() => setSkillTreeModalOpen(false)}
+        shamanClass={s.shamanClass ?? s.village?.shamanClass}
+        playerLevel={s.level}
+        classSkills={g.classSkills}
+        ownedStacks={addStacks(s.storage, s.backpack)}
+        onLearnSkill={g.learnClassSkill}
       />
     </div>
   </ContextThemeWrapper>
