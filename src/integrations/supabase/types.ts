@@ -566,10 +566,12 @@ export type Database = {
           fragments: number
           free_left: number
           invite_claimed: boolean
+          last_walk_claim_at: string | null
           reservation: string | null
           reserved_at: string | null
           timer_started_at: string | null
           user_id: string
+          walk_claims: number
           walk_mark: number
         }
         Insert: {
@@ -578,10 +580,12 @@ export type Database = {
           fragments?: number
           free_left?: number
           invite_claimed?: boolean
+          last_walk_claim_at?: string | null
           reservation?: string | null
           reserved_at?: string | null
           timer_started_at?: string | null
           user_id: string
+          walk_claims?: number
           walk_mark?: number
         }
         Update: {
@@ -590,10 +594,12 @@ export type Database = {
           fragments?: number
           free_left?: number
           invite_claimed?: boolean
+          last_walk_claim_at?: string | null
           reservation?: string | null
           reserved_at?: string | null
           timer_started_at?: string | null
           user_id?: string
+          walk_claims?: number
           walk_mark?: number
         }
         Relationships: []

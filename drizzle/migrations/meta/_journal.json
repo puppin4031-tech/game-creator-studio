@@ -134,6 +134,13 @@
       "when": 1795235405236,
       "tag": "0018_secure_treasure_items",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795364610173,
+      "tag": "0019_harden_roles_missions_tag_spawns_credits",
+      "breakpoints": true
     }
   ]
 }
