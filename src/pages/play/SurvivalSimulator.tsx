@@ -23,7 +23,6 @@ import BackpackDiscard from '@/components/survival/BackpackDiscard';
 import InventoryMaterials from '@/components/survival/InventoryMaterials';
 import { BaseFortressOverlay } from '@/components/survival/BaseFortressOverlay';
 import PetSprite from '@/components/survival/PetSprite';
-import WorldViewTabs from '@/components/survival/WorldViewTabs';
 import { viewFocus, type BaseSite, type WorldView } from '@/lib/survival/worldView';
 import ExpeditionJoystick from '@/components/survival/ExpeditionJoystick';
 import TribeSprite from '@/components/survival/TribeSprite';
