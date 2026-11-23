@@ -1597,43 +1597,43 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           role="button"
           tabIndex={0}
           onClick={() => setStatusModalOpen(true)}
-          className="pixelated flex items-center gap-2 rounded border-3 border-[#2b1d14] bg-[#8b5a2b] p-1.5 shadow-[3px_3px_0_0_#2b1d14] hover:bg-[#9d6732] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer transition-all font-pixel text-xs"
+          className="pixelated flex items-center gap-2.5 rounded-2xl border-4 border-[#2b1d14] bg-[#9e6738] p-2 shadow-[3px_3px_0_0_#2b1d14] hover:bg-[#aa7240] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer transition-all font-pixel text-xs"
           title="족장 상태·장비·스킬 확인 (터치하여 열기)"
         >
           {/* Square carved-stone portrait */}
-          <div className="h-10 w-10 shrink-0 overflow-hidden rounded border-2 border-[#2b1d14] bg-[#5c544a] flex items-center justify-center shadow-inner relative">
-            <CharacterSprite height={32} action="idle" level={s.level} />
+          <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl border-2 border-[#2b1d14] bg-[#6e6356] flex items-center justify-center shadow-inner relative">
+            <CharacterSprite height={34} action="idle" level={s.level} />
           </div>
 
           {/* Right Column: Lv badge + Sleek HP & Hunger bars */}
-          <div className="flex flex-col gap-1 min-w-[95px]">
+          <div className="flex flex-col gap-1.5 min-w-[105px]">
             <div className="flex items-center justify-between gap-1 leading-none">
-              <span className="rounded bg-[#2b1d14] px-1 py-0.5 text-[9px] font-bold text-amber-300">
+              <span className="rounded bg-[#2b1d14] px-1.5 py-0.5 text-[9px] font-bold text-amber-300">
                 Lv.{s.level}
               </span>
-              <span className="text-[10px] font-bold text-amber-100 truncate max-w-[65px]">
+              <span className="text-[10px] font-bold text-amber-100 truncate max-w-[70px]">
                 {presence.name}
               </span>
             </div>
 
-            {/* Sleek red HP bar */}
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] leading-none shrink-0">❤️</span>
-              <div className="h-2 flex-1 rounded-xs bg-[#2b1d14] p-[1px] border border-[#2b1d14]">
+            {/* Sleek red HP pill bar */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] leading-none shrink-0 drop-shadow-xs">❤️</span>
+              <div className="h-3 flex-1 rounded-full bg-[#2b1d14] p-[1.5px] border border-[#1a110b] overflow-hidden">
                 <div
-                  className="h-full rounded-xs bg-red-500 transition-all duration-300"
+                  className="h-full rounded-full bg-gradient-to-r from-red-600 via-rose-500 to-red-400 transition-all duration-300 shadow-sm"
                   style={{ width: `${Math.min(100, Math.max(0, (s.hp / Math.max(1, g.maxHp)) * 100))}%` }}
                 />
               </div>
             </div>
 
-            {/* Sleek green/yellow Hunger bar */}
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] leading-none shrink-0">🍖</span>
-              <div className="h-2 flex-1 rounded-xs bg-[#2b1d14] p-[1px] border border-[#2b1d14]">
+            {/* Sleek green/yellow Hunger pill bar */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] leading-none shrink-0 drop-shadow-xs">🍖</span>
+              <div className="h-3 flex-1 rounded-full bg-[#2b1d14] p-[1.5px] border border-[#1a110b] overflow-hidden">
                 <div
-                  className={`h-full rounded-xs transition-all duration-300 ${
-                    s.hunger <= 25 ? 'bg-orange-500 animate-pulse' : 'bg-amber-400'
+                  className={`h-full rounded-full transition-all duration-300 ${
+                    s.hunger <= 25 ? 'bg-orange-500 animate-pulse' : 'bg-gradient-to-r from-lime-500 to-amber-300'
                   }`}
                   style={{ width: `${Math.min(100, Math.max(0, s.hunger))}%` }}
                 />
@@ -1653,7 +1653,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 else if (!gps.ready) gps.switchToIndoor();
                 else gps.retry();
               }}
-              className="pixelated flex items-center gap-1 rounded border-2 border-[#2b1d14] bg-[#7a7267] px-2 py-0.5 text-[9px] font-bold text-amber-200 shadow-[1px_1px_0_0_#2b1d14] hover:bg-[#8e8578] active:translate-x-[1px] active:translate-y-[1px]"
+              className="pixelated flex items-center gap-1.5 rounded-xl border-2 border-[#2b1d14] bg-[#7a7267] px-2.5 py-0.5 text-[9px] font-bold text-amber-200 shadow-[2px_2px_0_0_#2b1d14] hover:bg-[#8e8578] active:translate-x-[1px] active:translate-y-[1px]"
               title={gps.isIndoor ? '실내 모드 · 터치하여 GPS 재시도' : gps.ready ? `GPS ±${Math.round(gps.fix?.accuracy ?? 0)}m` : 'GPS 탐색 중 · 터치하여 실내 전환'}
             >
               {gps.isIndoor ? (
@@ -1700,7 +1700,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         <button
           type="button"
           onClick={() => setQuickMenuOpen(v => !v)}
-          className="pixelated relative w-10 h-10 rounded-full border-3 border-[#2b1d14] bg-[#8b5a2b] text-amber-200 shadow-[3px_3px_0_0_#2b1d14] hover:bg-[#9d6732] active:translate-x-[1px] active:translate-y-[1px] flex items-center justify-center font-bold cursor-pointer"
+          className="pixelated relative w-11 h-11 rounded-full border-3 border-[#2b1d14] bg-[#9e6738] text-[#f4e2ce] shadow-[3px_3px_0_0_#2b1d14] hover:bg-[#aa7240] active:translate-x-[1px] active:translate-y-[1px] flex items-center justify-center font-bold cursor-pointer"
           aria-expanded={quickMenuOpen}
           aria-label={quickMenuOpen ? '메뉴 닫기' : '간편 메뉴 열기'}
         >
@@ -1886,7 +1886,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
             aria-label="생존 및 거점 관리 도크"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
-            className="fixed inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-25 flex items-center justify-between gap-1.5 rounded-t-lg rounded-b border-3 border-[#2b1d14] bg-[#5c3a1e]/95 p-1.5 shadow-[0_-2px_12px_rgba(0,0,0,0.5)] backdrop-blur-md font-pixel select-none"
+            className="fixed inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-25 flex flex-col rounded-2xl border-4 border-[#2b1d14] bg-[#9e9589] p-1.5 shadow-[0_-4px_16px_rgba(0,0,0,0.6)] font-pixel select-none"
           >
             {/* Top Center Handle (— ▲) */}
             <button
@@ -1895,95 +1895,98 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 setPanel('base');
                 setBaseTab('village');
               }}
-              className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 px-3 py-0.5 rounded-t border-t-2 border-x-2 border-[#2b1d14] bg-[#8b5a2b] text-amber-200 text-[10px] font-bold shadow hover:bg-[#9d6732] active:translate-y-[1px] cursor-pointer"
+              className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-4 py-0.5 rounded-t-xl border-t-2 border-x-2 border-[#2b1d14] bg-[#9e9589] text-[#2b1d14] text-[10px] font-black shadow hover:bg-[#aba296] active:translate-y-[1px] cursor-pointer"
               aria-label="통합 관리 도크 열기"
             >
-              <span className="w-3.5 h-0.5 bg-amber-300 rounded" />
+              <span className="w-3.5 h-0.5 bg-[#2b1d14] rounded" />
               <span>▲</span>
             </button>
 
-            {/* Left square stone slot: [🔍 탐색] */}
-            <button
-              type="button"
-              onClick={() => setRadarOpen(true)}
-              className="pixelated w-11 h-11 shrink-0 rounded border-2 border-[#2b1d14] bg-[#7a7267] text-amber-200 hover:bg-[#8e8578] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex flex-col items-center justify-center cursor-pointer"
-              aria-label="주변 탐색 레이더 열기"
-            >
-              <Search className="h-4 w-4 text-amber-200" />
-              <span className="text-[9px] font-bold">탐색</span>
-            </button>
-
-            {/* Center horizontal pixel progress bar: Backpack weight */}
-            <div
-              onClick={() => setPanel('bag')}
-              className="flex-1 min-w-0 px-2 flex flex-col justify-center cursor-pointer"
-              title="배낭 열기"
-            >
-              <div className="flex justify-between items-center text-[10px] text-amber-200/90 font-mono mb-0.5">
-                <span className="font-pixel text-[10px]">배낭</span>
-                <span className={`font-bold ${isBagHeavy ? 'text-red-400 font-extrabold animate-pulse' : 'text-amber-100'}`}>
-                  {g.weight}/{g.capacity}kg ({weightPct}%)
-                </span>
-              </div>
-              <div className="h-2 w-full rounded bg-[#2b1d14] border border-[#2b1d14] overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-300 ${
-                    isBagHeavy ? 'bg-red-500 animate-pulse' : 'bg-amber-400'
-                  }`}
-                  style={{ width: `${Math.min(100, weightPct)}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Right 3 square wooden icon slots: [🎒 배낭], [🥚 펫], [🔥 거점] */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              {/* [🎒 배낭] */}
+            {/* Inner warm-wood plate inlay */}
+            <div className="w-full rounded-xl border-2 border-[#2b1d14] bg-[#8a572c] p-1.5 flex items-center justify-between gap-2 shadow-inner">
+              {/* Left square stone slot: [🔍 탐색] */}
               <button
                 type="button"
+                onClick={() => setRadarOpen(true)}
+                className="pixelated w-11 h-11 shrink-0 rounded-xl border-2 border-[#2b1d14] bg-[#7a7267] text-amber-100 hover:bg-[#8e8578] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex flex-col items-center justify-center cursor-pointer"
+                aria-label="주변 탐색 레이더 열기"
+              >
+                <Search className="h-4 w-4 text-amber-200" />
+                <span className="text-[9px] font-bold">탐색</span>
+              </button>
+
+              {/* Center sunken groove progress bar: Backpack weight */}
+              <div
                 onClick={() => setPanel('bag')}
-                className="pixelated relative w-11 h-11 rounded border-2 border-[#2b1d14] bg-[#8b5a2b] text-amber-100 hover:bg-[#9d6732] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex flex-col items-center justify-center cursor-pointer"
-                aria-label="배낭 열기"
+                className="flex-1 min-w-0 px-1 flex flex-col justify-center cursor-pointer"
+                title="배낭 열기"
               >
-                <Backpack className="h-4 w-4" />
-                <span className="text-[9px] font-bold">배낭</span>
-                {isBagHeavy && (
-                  <span className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-red-500 animate-ping" />
-                )}
-              </button>
+                <div className="flex justify-between items-center text-[10px] text-amber-100/90 font-mono mb-0.5">
+                  <span className="font-pixel text-[10px]">배낭</span>
+                  <span className={`font-bold ${isBagHeavy ? 'text-red-300 font-extrabold animate-pulse' : 'text-amber-100'}`}>
+                    {g.weight}/{g.capacity}kg ({weightPct}%)
+                  </span>
+                </div>
+                <div className="h-5 w-full rounded-lg bg-[#2b1d14] border border-[#1a110b] p-0.5 overflow-hidden flex items-center shadow-inner">
+                  <div
+                    className={`h-full rounded-md transition-all duration-300 ${
+                      isBagHeavy ? 'bg-red-500 animate-pulse' : 'bg-gradient-to-r from-amber-500 to-yellow-300'
+                    }`}
+                    style={{ width: `${Math.min(100, weightPct)}%` }}
+                  />
+                </div>
+              </div>
 
-              {/* [🥚 펫] */}
-              <button
-                type="button"
-                onClick={() => {
-                  setPanel('base');
-                  setBaseTab('pets');
-                }}
-                className="pixelated relative w-11 h-11 rounded border-2 border-[#2b1d14] bg-[#8b5a2b] text-amber-100 hover:bg-[#9d6732] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex flex-col items-center justify-center cursor-pointer"
-                aria-label="펫 관리 열기"
-              >
-                <Egg className="h-4 w-4" />
-                <span className="text-[9px] font-bold">펫</span>
-                {readyEgg && (
-                  <span className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-emerald-400 animate-bounce" />
-                )}
-              </button>
+              {/* Right 3 square wooden icon slots: [🎒 배낭], [🥚 펫], [🔥 거점] */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {/* [🎒 배낭] */}
+                <button
+                  type="button"
+                  onClick={() => setPanel('bag')}
+                  className="pixelated relative w-11 h-11 rounded-xl border-2 border-[#2b1d14] bg-[#71431e] text-amber-100 hover:bg-[#855127] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex flex-col items-center justify-center cursor-pointer"
+                  aria-label="배낭 열기"
+                >
+                  <Backpack className="h-4 w-4" />
+                  <span className="text-[9px] font-bold">배낭</span>
+                  {isBagHeavy && (
+                    <span className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-red-500 animate-ping" />
+                  )}
+                </button>
 
-              {/* [🔥 거점] */}
-              <button
-                type="button"
-                onClick={() => {
-                  setPanel('base');
-                  setBaseTab('village');
-                }}
-                className="pixelated relative w-11 h-11 rounded border-2 border-[#2b1d14] bg-[#8b5a2b] text-amber-100 hover:bg-[#9d6732] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex flex-col items-center justify-center cursor-pointer"
-                aria-label="거점 마을 열기"
-              >
-                <Flame className="h-4 w-4 text-amber-300" />
-                <span className="text-[9px] font-bold">거점</span>
-                {s.baseUpgrade && nowTick >= s.baseUpgrade.readyAt && (
-                  <span className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-orange-400 animate-ping" />
-                )}
-              </button>
+                {/* [🥚 펫] */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPanel('base');
+                    setBaseTab('pets');
+                  }}
+                  className="pixelated relative w-11 h-11 rounded-xl border-2 border-[#2b1d14] bg-[#71431e] text-amber-100 hover:bg-[#855127] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex flex-col items-center justify-center cursor-pointer"
+                  aria-label="펫 관리 열기"
+                >
+                  <Egg className="h-4 w-4" />
+                  <span className="text-[9px] font-bold">펫</span>
+                  {readyEgg && (
+                    <span className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-emerald-400 animate-bounce" />
+                  )}
+                </button>
+
+                {/* [🔥 거점] */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPanel('base');
+                    setBaseTab('village');
+                  }}
+                  className="pixelated relative w-11 h-11 rounded-xl border-2 border-[#2b1d14] bg-[#71431e] text-amber-100 hover:bg-[#855127] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex flex-col items-center justify-center cursor-pointer"
+                  aria-label="거점 마을 열기"
+                >
+                  <Flame className="h-4 w-4 text-amber-300" />
+                  <span className="text-[9px] font-bold">거점</span>
+                  {s.baseUpgrade && nowTick >= s.baseUpgrade.readyAt && (
+                    <span className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-orange-400 animate-ping" />
+                  )}
+                </button>
+              </div>
             </div>
           </aside>
         );
