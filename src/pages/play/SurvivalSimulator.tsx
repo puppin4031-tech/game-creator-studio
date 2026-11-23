@@ -71,6 +71,7 @@ import {
 import SurvivalObjectives from '@/components/survival/SurvivalObjectives';
 import { toast } from 'sonner';
 import TerrainMap from '@/components/survival/TerrainMap';
+import { MapFoliageOverlay } from '@/components/survival/MapFoliageOverlay';
 import { useSurvivalWorld } from '@/hooks/useSurvivalWorld';
 import { zoneCellKey } from '@/lib/survival/terrainZone';
 import { gearEffect, isGearItem, ITEMS, requiredRangedAmmo, findAvailableAmmo, computeRangedReach, type ItemId } from '@/lib/survival/items';
@@ -1168,6 +1169,12 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       {<TerrainMap center={viewFocus(view, baseSite, { pos: s.pos, base: s.base, outpost: s.outpost, crew: crew?.pos })} visionM={g.vision} explored={s.explored} onTap={onTap} zone={zone} onSurfaceZone={onSurfaceZone} onSurfacePark={onSurfacePark} onLandmarks={setLandmarks} bearing={compassOn && heading !== null ? heading : 0}>
         {(project, mpp) => (
           <>
+            <MapFoliageOverlay
+              center={viewFocus(view, baseSite, { pos: s.pos, base: s.base, outpost: s.outpost, crew: crew?.pos })}
+              basePos={s.base}
+              project={project}
+              metersPerPx={mpp}
+            />
             {crew && <ExpeditionMarker crew={crew} project={project} members={Math.max(3, s.tribe?.count ?? 3)} tribeClass={activeTribeClassId} />}
             {crew && view === 'expedition' && <ExpeditionJoystick crew={crew} candidates={g.crewNearby} project={project} onManual={g.setCrewManual} onSteer={g.steerCrew} onCommand={g.commandCrew} onAct={g.crewAct} onHeal={g.healCrew} />}
             {view === 'user' && (

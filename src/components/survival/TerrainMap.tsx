@@ -295,7 +295,10 @@ export default function TerrainMap({ center, visionM, explored, onTap, zone = 'p
 
   return (
     <div className="absolute inset-0 overflow-hidden bg-muted">
-      <div ref={box} className="absolute inset-0" />
+      <div
+        ref={box}
+        className="absolute inset-0 [filter:saturate(1.18)_hue-rotate(-8deg)_contrast(1.02)]"
+      />
       <canvas ref={scenery} aria-hidden="true" data-terrain-scenery className="pointer-events-none absolute inset-0 h-full w-full" />
       <canvas ref={fog} className="pointer-events-none absolute inset-0 h-full w-full" />
       <div className="pointer-events-none absolute inset-0">{map && children(project, metersPerPx(map))}</div>
