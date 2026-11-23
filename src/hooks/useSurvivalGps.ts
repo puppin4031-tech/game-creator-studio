@@ -28,6 +28,9 @@ export function useSurvivalGps(
   const fallbackRef = useRef<LatLng | null | undefined>(fallbackPos);
   fallbackRef.current = fallbackPos;
 
+  const onPositionRef = useRef(onPosition);
+  onPositionRef.current = onPosition;
+
   const maxSpeedKmhRef = useRef<number | undefined>(maxSpeedKmh);
   maxSpeedKmhRef.current = maxSpeedKmh;
 
@@ -38,9 +41,9 @@ export function useSurvivalGps(
     setIsIndoor(true);
     setError(null);
     if (fallbackRef.current) {
-      onPosition(fallbackRef.current);
+      onPositionRef.current(fallbackRef.current);
     }
-  }, [onPosition]);
+  }, []);
 
   const retry = useCallback(() => {
     setAttempt(x => x + 1);
@@ -63,7 +66,7 @@ export function useSurvivalGps(
     if (!navigator.geolocation) {
       setIsIndoor(true);
       if (fallbackRef.current) {
-        onPosition(fallbackRef.current);
+        onPositionRef.current(fallbackRef.current);
       }
       return;
     }
@@ -73,7 +76,7 @@ export function useSurvivalGps(
       if (!gotFirstFix.current) {
         setIsIndoor(true);
         if (fallbackRef.current) {
-          onPosition(fallbackRef.current);
+          onPositionRef.current(fallbackRef.current);
         }
       }
     }, 6000);
@@ -108,13 +111,13 @@ export function useSurvivalGps(
             setNow(Date.now());
             setError(null);
             setIsIndoor(false);
-            onPosition(candidate);
+            onPositionRef.current(candidate);
             return;
           }
           // Do not hard-block indoors on moderate accuracy
           if (candidate.accuracy > 40) {
             setIsIndoor(true);
-            if (fallbackRef.current) onPosition(fallbackRef.current);
+            if (fallbackRef.current) onPositionRef.current(fallbackRef.current);
           }
           return;
         }
@@ -135,7 +138,7 @@ export function useSurvivalGps(
           wasIndoorRef.current = false;
         }
         setIsIndoor(false);
-        onPosition(filtered.fix);
+        onPositionRef.current(filtered.fix);
       },
       e => {
         clearTimeout(indoorGraceTimer);
@@ -144,7 +147,7 @@ export function useSurvivalGps(
         wasIndoorRef.current = true;
         setError(null);
         if (fallbackRef.current) {
-          onPosition(fallbackRef.current);
+          onPositionRef.current(fallbackRef.current);
         }
       },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 8000 }
@@ -154,7 +157,7 @@ export function useSurvivalGps(
       clearTimeout(indoorGraceTimer);
       navigator.geolocation.clearWatch(watch);
     };
-  }, [enabled, attempt, onPosition]);
+  }, [enabled, attempt]);
 
   const locked = now < lockedUntil;
   const ready = enabled && !!fix && !error && !locked && now - fix.timestamp <= GPS_STALE_MS;

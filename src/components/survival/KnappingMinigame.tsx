@@ -57,14 +57,14 @@ export default function KnappingMinigame({ recipe, onDone, onCancel }: Props) {
   return (
     <div className="absolute inset-0 z-[1500] flex items-center justify-center bg-black/70 p-4 font-pixel">
       <motion.div animate={shake} className="pixel-frame w-full max-w-sm bg-stone-200 p-4 text-stone-900">
-        <h3 className="mb-2 text-center text-lg">석기 타격 · {ITEMS[recipe.resultItemId].name}</h3>
+        <h3 className="mb-2 text-center text-lg">석기 타격 · {ITEMS[recipe.resultItemId]?.name ?? recipe.resultItemId}</h3>
 
         <div className="relative mx-auto my-4 flex h-32 w-32 items-center justify-center">
           <div
             className="pixelated"
             style={{
               width: 96 - chipped * 14, height: 80 - chipped * 10,
-              background: done ? ITEMS[recipe.resultItemId].color : '#57534e',
+              background: done ? (ITEMS[recipe.resultItemId]?.color ?? '#57534e') : '#57534e',
               boxShadow: done && quality === 'MASTERWORK' ? '0 0 0 4px #d4a843, 0 0 24px 8px #d4a843' : '4px 4px 0 0 #000',
               transition: 'all 120ms steps(3)',
             }}

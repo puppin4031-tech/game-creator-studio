@@ -409,7 +409,7 @@ export default function SmokehouseTavernModal({
                       ) : (
                         <span>🍖</span>
                       )}
-                      <span>{ITEMS[id].name}</span>
+                      <span>{ITEMS[id]?.name ?? id}</span>
                       <b>×{cnt}</b>
                     </button>
                   );

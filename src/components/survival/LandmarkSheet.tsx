@@ -52,7 +52,7 @@ export default function LandmarkSheet({ landmark, inRange, claims, backpack, wor
               <div className="mt-1 grid grid-cols-2 gap-1.5">
                 {TRADER_STOCK.map((o) => (
                   <button key={o.itemId} type="button" disabled={!inRange || shells < o.price} onClick={() => onBuy(o.itemId)}
-                    className="pixel-frame min-h-11 bg-card px-2 py-1 text-left text-xs disabled:opacity-40">{ITEMS[o.itemId].name} · 조개 {o.price}</button>
+                    className="pixel-frame min-h-11 bg-card px-2 py-1 text-left text-xs disabled:opacity-40">{ITEMS[o.itemId]?.name ?? o.itemId} · 조개 {o.price}</button>
                 ))}
               </div>
             </div>
@@ -61,7 +61,7 @@ export default function LandmarkSheet({ landmark, inRange, claims, backpack, wor
               <div className="mt-1 grid grid-cols-2 gap-1.5">
                 {backpack.filter((s) => sellPrice(s.itemId) > 0).map((s) => (
                   <button key={s.itemId} type="button" disabled={!inRange} onClick={() => onSell(s.itemId)}
-                    className="pixel-frame min-h-11 bg-card px-2 py-1 text-left text-xs disabled:opacity-40">{ITEMS[s.itemId].name} ×{s.count} → 조개 {sellPrice(s.itemId)}</button>
+                    className="pixel-frame min-h-11 bg-card px-2 py-1 text-left text-xs disabled:opacity-40">{ITEMS[s.itemId]?.name ?? s.itemId} ×{s.count} → 조개 {sellPrice(s.itemId)}</button>
                 ))}
               </div>
             </div>

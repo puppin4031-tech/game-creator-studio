@@ -570,7 +570,18 @@ export function getBuiltinMobSprite(
   canvas.height = totalHeight;
   const ctx = canvas.getContext('2d');
   if (!ctx) {
-    throw new Error('Canvas 2D context unavailable');
+    console.warn('[mobSpriteFactory] Canvas 2D context unavailable, returning 1x1 fallback');
+    const fallback: MobSpriteDef = {
+      url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAA',
+      frames: frameCount,
+      fps: normAction === 'attack' ? 10 : 6,
+      width: totalWidth,
+      height: totalHeight,
+      cellWidth: cellW,
+      cellHeight: cellH,
+      action: normAction,
+    };
+    return fallback;
   }
 
   ctx.imageSmoothingEnabled = false;

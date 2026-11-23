@@ -18,7 +18,7 @@ export default function BackpackDiscard({ backpack, onDrop }: { backpack: Stack[
     return next;
   });
   const drops = (Object.entries(picked) as [ItemId, number][]).filter(([id, n]) => n > 0 && held(id) > 0).map(([itemId, count]) => ({ itemId, count: Math.min(count, held(itemId)) }));
-  const kg = drops.reduce((w, d) => w + ITEMS[d.itemId].weight * d.count, 0);
+  const kg = drops.reduce((w, d) => w + (ITEMS[d.itemId]?.weight ?? 0.1) * d.count, 0);
   const total = drops.reduce((n, d) => n + d.count, 0);
 
   if (!backpack.length) return null;
@@ -35,7 +35,7 @@ export default function BackpackDiscard({ backpack, onDrop }: { backpack: Stack[
             <li key={s.itemId} className="flex min-h-11 items-center gap-2 text-xs">
               <label className="flex flex-1 items-center gap-2">
                 <Checkbox checked={on} onCheckedChange={() => toggle(s.itemId)} className="h-5 w-5" />
-                <span>{ITEMS[s.itemId].name} <span className="text-muted-foreground">(보유 {s.count})</span></span>
+                <span>{ITEMS[s.itemId]?.name ?? s.itemId} <span className="text-muted-foreground">(보유 {s.count})</span></span>
               </label>
               {on && (
                 <div className="flex items-center gap-1">

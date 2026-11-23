@@ -363,7 +363,7 @@ function load(start: LatLng, saveKey: string): WorldSave {
   return fresh(start);
 }
 
-const fmt = (st: Stack[]) => st.map((s) => `${ITEMS[s.itemId].name} ×${s.count}`).join(', ');
+const fmt = (st: Stack[]) => st.map((s) => `${ITEMS[s.itemId]?.name ?? s.itemId} ×${s.count}`).join(', ');
 
 /** Max HP grows with giant_heart tech level + permanent health tonic bonus (+10 per tonic). */
 const maxHpOf = (p: {

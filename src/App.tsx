@@ -42,6 +42,7 @@ import SurvivalSimulator from "./pages/play/SurvivalSimulator";
 import SurvivalCheck from "./pages/dev/SurvivalCheck";
 import MobileFrame from "./layouts/MobileFrame";
 import PwaInstallBanner from "./components/pwa/PwaInstallBanner";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
@@ -123,49 +124,51 @@ const App = () => (
         <BrowserRouter>
           <PwaInstallBanner />
           <AuthProvider>
-            <Routes>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/home" element={<LandingPage />} />
-              <Route path="/world" element={<ProtectedRoute><SurvivalSimulator realGps /></ProtectedRoute>} />
-              <Route path="/exodus" element={<Index />} />
-              <Route element={<MobileFrame />}>
-                <Route path="/play" element={<Lobby />} />
-                <Route path="/play/:roomCode" element={<GameRoom />} />
-                <Route path="/play/puzzle-sim" element={<PuzzleSimulator />} />
-                <Route path="/play/tag-sim" element={<TagSimulator />} />
-                <Route path="/play/treasure-sim" element={<TreasureSimulator />} />
-                <Route path="/play/survival-sim" element={<SurvivalSimulator />} />
-                <Route path="/play/survival" element={<SurvivalSimulator realGps />} />
-              </Route>
-              <Route path="/dev/survival-check" element={<SurvivalCheck />} />
-              <Route path="/login" element={<Login />} />
-              <Route
-                path="/admin/exodus"
-                element={
-                  <ProtectedRoute>
-                    <ExodusLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route index element={<ExodusDashboard />} />
-                <Route path="stages" element={<StagesTimeline />} />
-                <Route path="npcs" element={<NPCEncyclopedia />} />
-                <Route path="items" element={<ItemPresets />} />
-                <Route path="puzzle-maker" element={<PuzzleQuizMaker />} />
-                <Route path="spots" element={<SpotManagement />} />
-              </Route>
-              <Route
-                path="/admin/*"
-                element={
-                  <ProtectedRoute>
-                    <AdminLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route path="*" element={<AdminRoutes />} />
-              </Route>
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <ErrorBoundary>
+              <Routes>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/home" element={<LandingPage />} />
+                <Route path="/world" element={<ProtectedRoute><SurvivalSimulator realGps /></ProtectedRoute>} />
+                <Route path="/exodus" element={<Index />} />
+                <Route element={<MobileFrame />}>
+                  <Route path="/play" element={<Lobby />} />
+                  <Route path="/play/:roomCode" element={<GameRoom />} />
+                  <Route path="/play/puzzle-sim" element={<PuzzleSimulator />} />
+                  <Route path="/play/tag-sim" element={<TagSimulator />} />
+                  <Route path="/play/treasure-sim" element={<TreasureSimulator />} />
+                  <Route path="/play/survival-sim" element={<SurvivalSimulator />} />
+                  <Route path="/play/survival" element={<SurvivalSimulator realGps />} />
+                </Route>
+                <Route path="/dev/survival-check" element={<SurvivalCheck />} />
+                <Route path="/login" element={<Login />} />
+                <Route
+                  path="/admin/exodus"
+                  element={
+                    <ProtectedRoute>
+                      <ExodusLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route index element={<ExodusDashboard />} />
+                  <Route path="stages" element={<StagesTimeline />} />
+                  <Route path="npcs" element={<NPCEncyclopedia />} />
+                  <Route path="items" element={<ItemPresets />} />
+                  <Route path="puzzle-maker" element={<PuzzleQuizMaker />} />
+                  <Route path="spots" element={<SpotManagement />} />
+                </Route>
+                <Route
+                  path="/admin/*"
+                  element={
+                    <ProtectedRoute>
+                      <AdminLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route path="*" element={<AdminRoutes />} />
+                </Route>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </ErrorBoundary>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>

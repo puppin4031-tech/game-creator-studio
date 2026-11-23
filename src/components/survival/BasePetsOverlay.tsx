@@ -11,11 +11,12 @@ export default function BasePetsOverlay({ base, radius, pets, hits, project }: {
   const reduced = useReducedMotion();
   const [now, setNow] = useState(Date.now());
   const previous = useRef<Record<string, number>>({});
+  const hasDeployed = pets.some(p => p.deployed);
   useEffect(() => {
-    if (reduced || !pets.some(p => p.deployed)) return;
+    if (reduced || !hasDeployed) return;
     const timer = window.setInterval(() => { if (!document.hidden) setNow(Date.now()); }, 700);
     return () => window.clearInterval(timer);
-  }, [reduced, pets.some(p => p.deployed)]);
+  }, [reduced, hasDeployed]);
   useEffect(() => {
     if (!hits.length || document.hidden) return;
     playSample('strike'); haptic(60);

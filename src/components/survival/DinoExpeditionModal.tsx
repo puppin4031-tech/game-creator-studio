@@ -324,6 +324,9 @@ export default function DinoExpeditionModal({
   const [floats, setFloats] = useState<FloatingDmg[]>([]);
   const [combatLogs, setCombatLogs] = useState<string[]>([]);
 
+  const playerLevelRef = useRef(playerLevel);
+  playerLevelRef.current = playerLevel;
+
   const nextSpawnDistRef = useRef(18);
   const lastDinoStrikeRef = useRef(0);
   const lastEnemyStrikeRef = useRef(0);
@@ -424,7 +427,8 @@ export default function DinoExpeditionModal({
           setEncounter(prev => (prev ? { ...prev, xPct: Math.max(42, prev.xPct - 4.5) } : null));
         } else if (nextDist >= nextSpawnDistRef.current) {
           // Spawn a new wild resource node or hostile beast from off-screen right
-          const maxAllowed = playerLevel >= 30 ? ENCOUNTER_TEMPLATES.length : playerLevel >= 20 ? 11 : playerLevel >= 11 ? 9 : 6;
+          const currentLvl = playerLevelRef.current;
+          const maxAllowed = currentLvl >= 30 ? ENCOUNTER_TEMPLATES.length : currentLvl >= 20 ? 11 : currentLvl >= 11 ? 9 : 6;
           const tierCap = Math.min(maxAllowed, nextDist < 50 ? 4 : nextDist < 110 ? Math.min(6, maxAllowed) : maxAllowed);
           const tpl = ENCOUNTER_TEMPLATES[Math.floor(Math.random() * Math.max(4, tierCap))];
           const distScale = 1 + Math.floor(nextDist / 60) * 0.2;

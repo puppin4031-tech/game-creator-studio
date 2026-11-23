@@ -993,7 +993,7 @@ export default function BaseVillageView({
         };
       });
     });
-  }, [desiredAgents, occupiedTileSet]);
+  }, [desiredAgents, occupiedTileSet, villageGridSize]);
 
   // Organic Asynchronous AI Loop: Each resident decides & strolls on their own independent timer
   // with smooth sub-tile coordinates (0.35~0.85 tile steps) instead of rigid 1-tile synchronous grid jumps.
@@ -1166,7 +1166,7 @@ export default function BaseVillageView({
       });
     }, 280);
     return () => window.clearInterval(timer);
-  }, [agents.length, vState.buildings, occupiedTileSet]);
+  }, [agents.length, vState.buildings, occupiedTileSet, villageGridSize]);
 
   const handleBuildingPress = (placed: PlacedVillageBuilding) => {
     if (buildMode) {

@@ -195,7 +195,7 @@ export default function SurvivalObjectives({
                   <p className="text-muted-foreground">
                     보상: 경험치 {quest.reward.xp}
                     {quest.reward.stacks
-                      .map(stack => ` · ${ITEMS[stack.itemId].name} ×${stack.count}`)
+                      .map(stack => ` · ${ITEMS[stack.itemId]?.name ?? stack.itemId} ×${stack.count}`)
                       .join('')}
                   </p>
                   <Button

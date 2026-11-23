@@ -68,7 +68,7 @@ export default function ShrineSheet({ shrine, state, pos, inRange, backpack, wor
                   <div key={r.id} className="pixel-frame flex items-center gap-2 p-2">
                     <div className="min-w-0 flex-1">
                       <p className="font-bold">{r.name} <span className="text-primary">+{r.sacred}</span></p>
-                      <p className="text-[11px] text-muted-foreground">{r.cost.map((c) => `${ITEMS[c.itemId].name} ${countOf(backpack, c.itemId)}/${c.count}`).join(' · ')}{r.reward ? ` → ${r.reward.map((x) => `${ITEMS[x.itemId].name}×${x.count}`).join(', ')}` : ''}</p>
+                      <p className="text-[11px] text-muted-foreground">{r.cost.map((c) => `${ITEMS[c.itemId]?.name ?? c.itemId} ${countOf(backpack, c.itemId)}/${c.count}`).join(' · ')}{r.reward ? ` → ${r.reward.map((x) => `${ITEMS[x.itemId]?.name ?? x.itemId}×${x.count}`).join(', ')}` : ''}</p>
                     </div>
                     <button type="button" disabled={!inRange || !ok} onClick={() => onRite(r.id)} className="pixel-btn min-h-11 shrink-0 px-3 disabled:opacity-50">바치기</button>
                   </div>

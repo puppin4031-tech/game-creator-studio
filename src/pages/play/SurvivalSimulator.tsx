@@ -48,6 +48,7 @@ import { Button } from '@/components/ui/button';
 import { ColonionOpening, PIONEER_NAME_KEY } from '@/components/survival/ColonionOpening';
 import { hasSeenStoryTutorial, STORY_TUTORIAL_SEEN_KEY, StoryTutorialModal } from '@/components/survival/StoryTutorial';
 import { ContextThemeWrapper, type ContextMode } from '@/components/survival/ContextThemeWrapper';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import {
   CombatEffectLayer,
   HitReactionWrapper,
@@ -143,11 +144,18 @@ function Sprite({ k, scale = 1, className = '' }: { k: SpriteKey; scale?: number
 }
 
 function Stacks({ stacks, onUse, have }: { stacks: Stack[]; onUse?: (id: ItemId) => void; have?: Stack[] }) {
-  if (!stacks.length) return <p className="text-sm text-muted-foreground">비어 있음</p>;
+  if (!stacks?.length) return <p className="text-sm text-muted-foreground">비어 있음</p>;
   return (
     <div className="flex flex-wrap gap-1.5">
       {stacks.map((s) => {
         const it = ITEMS[s.itemId];
+        if (!it) {
+          return (
+            <div key={s.itemId} className="pixel-frame flex min-h-11 items-center gap-1 bg-muted px-1.5 py-1 text-xs text-muted-foreground">
+              <span>{s.itemId}</span><b>×{s.count}</b>
+            </div>
+          );
+        }
         const short = have && countOf(have, s.itemId) < s.count;
         const usable = onUse && (it.food || it.heal || it.book);
         return (
@@ -257,6 +265,9 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [codexModalOpen, setCodexModalOpen] = useState(false);
   const [skillTreeModalOpen, setSkillTreeModalOpen] = useState(false);
 
+  const stateRef = useRef(s);
+  stateRef.current = s;
+
   // Track last active timestamp, handle visibilitychange, and auto-trigger Ambacho Offline Report
   useEffect(() => {
     const LAST_ACTIVE_KEY = 'colonion_last_active_at';
@@ -266,9 +277,10 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       const now = Date.now();
 
       // BLOCK OfflineReportModal on fresh start or before tutorial is completed
+      const currentSave = stateRef.current;
       const isCompleted =
-        s.shamanMet ||
-        s.tutorialCompleted ||
+        currentSave.shamanMet ||
+        currentSave.tutorialCompleted ||
         localStorage.getItem(TUTORIAL_COMPLETED_KEY) === '1';
       if (!isCompleted || !raw) {
         localStorage.setItem(LAST_ACTIVE_KEY, now.toString());
@@ -1035,7 +1047,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         const rows = (got ?? []).filter(r => r.item_id in ITEMS);
         if (!cancelled && rows.length) {
           gRef.current.adjustStorage(rows.map(r => ({ itemId: r.item_id as ItemId, count: r.count })));
-          rows.forEach(r => toast.success(`부하 ${r.vassal_name}이(가) ${ITEMS[r.item_id as ItemId].name} ${r.count}개를 거점에 상납했습니다`));
+          rows.forEach(r => toast.success(`부하 ${r.vassal_name}이(가) ${ITEMS[r.item_id as ItemId]?.name ?? r.item_id} ${r.count}개를 거점에 상납했습니다`));
           playSfx('notify'); haptic(80);
         }
       } catch (err) { console.warn('[survivalTribute]', err); }
@@ -1066,7 +1078,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   };
   const attackPeer = () => {
     if (!selPeer || duelWith !== selPeer.id) return;
-    const dmg = PVP_BASE_DAMAGE + (g.weapon ? ITEMS[g.weapon.itemId].weapon?.atk ?? 0 : 0);
+    const dmg = PVP_BASE_DAMAGE + (g.weapon ? ITEMS[g.weapon.itemId]?.weapon?.atk ?? 0 : 0);
     presence.send({ type: 'attack', to: selPeer.id, dmg });
     setActorTarget({ lat: selPeer.lat, lng: selPeer.lng, anchor: s.pos });
     playAction('attack', 900);
@@ -1077,7 +1089,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   };
 
   return (
-    <ContextThemeWrapper
+    <ErrorBoundary fallbackTitle="선사시대 월드 시뮬레이터 (오류 방어)">
+      <ContextThemeWrapper
       mode={contextMode}
       onSelectMode={handleSelectContextMode}
       hp={s.hp}
@@ -2430,8 +2443,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                         <p>{t.desc}</p>
                         {t.requires.length > 0 && <p className="text-muted-foreground">선행: {t.requires.map((r) => TECHS.find((x) => x.id === r)?.name).join(', ')}</p>}
                         {t.bookOnly && !known && <p className="text-primary">공원 우두머리 전리품 스킬북을 읽어 습득</p>}
-                        <p>제작법: {t.recipes.map(id => { const r = g.recipes.find(x => x.id === id); return r ? ITEMS[r.result].name : ''; }).join(', ')}</p>
-                        {!known && t.inspire && <p className="mt-1">깨달음: {ITEMS[t.inspire.itemId].name} {Math.min(s.gathered[t.inspire.itemId] ?? 0, t.inspire.count)}/{t.inspire.count}개 채집</p>}
+                        <p>제작법: {t.recipes.map(id => { const r = g.recipes.find(x => x.id === id); return r ? (ITEMS[r.result]?.name ?? r.result) : ''; }).join(', ')}</p>
+                        {!known && t.inspire && <p className="mt-1">깨달음: {ITEMS[t.inspire.itemId]?.name ?? t.inspire.itemId} {Math.min(s.gathered[t.inspire.itemId] ?? 0, t.inspire.count)}/{t.inspire.count}개 채집</p>}
                         {!known && t.research && (
                           <div className="mt-1">
                             <Stacks stacks={t.research} have={s.storage} />
@@ -2472,7 +2485,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   {techTab === 'special' && <SkillControls known={s.techs} cooldowns={s.cooldowns} ready={actionReady} onUse={activateSkill} />}
                   {techTab === 'special' && (Object.keys(ACTIVE_SKILLS) as ActiveSkill[]).filter(id => s.techs.includes(id)).map(id => {
                     const lv = skillLevel(s.skillLevels, id); const cost = skillUpgradeCost(lv);
-                    return <div key={`up-${id}`} className="flex items-center gap-2 text-xs"><span className="flex-1">{ACTIVE_SKILLS[id].name} Lv.{lv}/{MAX_SKILL_LEVEL}{cost ? ` · 강화: ${cost.map(c => `${ITEMS[c.itemId].name} ${c.count}`).join(' · ')}` : ''}</span>
+                    return <div key={`up-${id}`} className="flex items-center gap-2 text-xs"><span className="flex-1">{ACTIVE_SKILLS[id].name} Lv.{lv}/{MAX_SKILL_LEVEL}{cost ? ` · 강화: ${cost.map(c => `${ITEMS[c.itemId]?.name ?? c.itemId} ${c.count}`).join(' · ')}` : ''}</span>
                       <Button size="sm" variant="outline" className="h-11" disabled={!cost} onClick={() => g.upgradeSkill(id)}>{cost ? '강화' : '최고'}</Button></div>;
                   })}
                   {techTab === 'build' && <ConstructionControls known={s.techs} palisade={s.palisade} outpost={!!s.outpost} ready={actionReady} onBuild={g.construct} onMoveOutpost={g.moveOutpost} />}
@@ -2701,7 +2714,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         onLearnSkill={g.learnClassSkill}
       />
     </div>
-  </ContextThemeWrapper>
+      </ContextThemeWrapper>
+    </ErrorBoundary>
   );
 }
 

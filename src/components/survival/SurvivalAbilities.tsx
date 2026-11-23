@@ -7,7 +7,7 @@ import { OUTPOST_COST } from '@/lib/survival/bases';
 import { ITEMS } from '@/lib/survival/items';
 import type { Stack } from '@/lib/survival/types';
 
-const materials = (cost: Stack[]) => cost.map(s => `${ITEMS[s.itemId].name} ${s.count}`).join(' · ');
+const materials = (cost: Stack[]) => cost.map(s => `${ITEMS[s.itemId]?.name ?? s.itemId} ${s.count}`).join(' · ');
 const icons = { stone_barrage: Zap, roar: Volume2, ember_scatter: Flame };
 export function SkillControls({ known, cooldowns, ready, onUse }: { known: string[]; cooldowns?: Record<string, number>; ready: boolean; onUse: (id: ActiveSkill) => void }) {
   const [now, setNow] = useState(Date.now());
