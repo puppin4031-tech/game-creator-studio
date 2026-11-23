@@ -207,8 +207,17 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     }
   };
   const navigate = useNavigate();
+  const isLocalTutorialDone = typeof window !== 'undefined' && (
+    localStorage.getItem(TUTORIAL_COMPLETED_KEY) === '1' ||
+    localStorage.getItem('colonion.tutorialCompleted.v2') === '1'
+  );
   const [gpsReady, setGpsReady] = useState(false);
-  const g = useSurvivalWorld(START, { enabled: !realGps || gpsReady, saveKey: realGps ? 'survival-gps-world-v1' : 'survival-world-v1', cloudSync: realGps, indoor: realGps });
+  const g = useSurvivalWorld(START, {
+    enabled: !realGps || gpsReady || !isLocalTutorialDone,
+    saveKey: realGps ? 'survival-gps-world-v1' : 'survival-world-v1',
+    cloudSync: realGps,
+    indoor: realGps,
+  });
   const gps = useSurvivalGps(realGps, g.moveTo, g.state.base ?? g.state.pos ?? START, g.maxSpeedKmh);
   useEffect(() => setGpsReady(gps.ready || gps.isIndoor), [gps.ready, gps.isIndoor]);
   useEffect(() => { preloadCoreSprites(); }, []);
@@ -254,14 +263,23 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     const checkAndTriggerOfflineReport = () => {
       const raw = localStorage.getItem(LAST_ACTIVE_KEY);
       const now = Date.now();
-      if (raw) {
-        const lastTime = parseInt(raw, 10);
-        if (!isNaN(lastTime) && lastTime > 0) {
-          const diffMin = Math.floor((now - lastTime) / (60 * 1000));
-          if (diffMin >= 30) {
-            setOfflineElapsedMinutes(diffMin);
-            setOfflineReportModalOpen(true);
-          }
+
+      // BLOCK OfflineReportModal on fresh start or before tutorial is completed
+      const isCompleted =
+        s.shamanMet ||
+        s.tutorialCompleted ||
+        localStorage.getItem(TUTORIAL_COMPLETED_KEY) === '1';
+      if (!isCompleted || !raw) {
+        localStorage.setItem(LAST_ACTIVE_KEY, now.toString());
+        return;
+      }
+
+      const lastTime = parseInt(raw, 10);
+      if (!isNaN(lastTime) && lastTime > 0) {
+        const diffMin = Math.floor((now - lastTime) / (60 * 1000));
+        if (diffMin >= 30) {
+          setOfflineElapsedMinutes(diffMin);
+          setOfflineReportModalOpen(true);
         }
       }
       localStorage.setItem(LAST_ACTIVE_KEY, now.toString());
@@ -324,45 +342,65 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [baseTab, setBaseTab] = useState<'village' | 'lab' | 'craft' | 'storage' | 'expedition' | 'pets'>('village');
   const [craftCat, setCraftCat] = useState<CraftCat>('all');
 
-  // Check if player is a starter / newcomer without an established base or who hasn't met the shaman yet
-  const isStarterPlayer = (!s.base || s.starterCampPending) || ((s.level ?? 1) <= 1 && (s.expeditionCount ?? 0) === 0 && !s.shamanMet);
+  // Tutorial completion flag: either shamanMet, tutorialCompleted in save, or localStorage flag
+  const isTutorialCompleted =
+    !!s.shamanMet ||
+    !!s.tutorialCompleted ||
+    (typeof window !== 'undefined' && localStorage.getItem(TUTORIAL_COMPLETED_KEY) === '1');
 
-  const [showStoryTutorial, setShowStoryTutorial] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    // Show prologue story if brand new starter player who hasn't seen it in current session, or if never seen
-    if (isStarterPlayer && sessionStorage.getItem('colonion.storyTutorialSeenSession') !== '1') {
-      return true;
-    }
-    return !hasSeenStoryTutorial();
-  });
+  // Strict First-Time Boot Priority: Shaman Tutorial Step 1 is the #1 overlay (StoryTutorial deferred)
+  const [showStoryTutorial, setShowStoryTutorial] = useState(false);
+
+  const TUTORIAL_STEP_STORAGE_KEY = 'colonion.tutorialStep.v2';
 
   // 3-Phase Interactive Survival Tutorial State
-  const [tutorialStep, setTutorialStep] = useState<TutorialStep | null>(() => {
+  const [tutorialStep, setTutorialStepState] = useState<TutorialStep | null>(() => {
     if (typeof window === 'undefined') return null;
-    // If starter player without a placed base, auto-start Phase 1 tutorial regardless of stale browser localStorage
-    if (isStarterPlayer) {
-      return 'phase1_meet';
+    if (isTutorialCompleted) {
+      return 'completed';
     }
-    const completed = localStorage.getItem(TUTORIAL_COMPLETED_KEY) === '1';
-    return !completed && hasSeenStoryTutorial() ? 'phase1_meet' : null;
+    const savedStep = s.tutorialStep || localStorage.getItem(TUTORIAL_STEP_STORAGE_KEY);
+    if (savedStep && savedStep !== 'completed') {
+      return savedStep as TutorialStep;
+    }
+    return 'phase1_meet';
   });
+
+  const setTutorialStep = useCallback((step: TutorialStep) => {
+    setTutorialStepState(step);
+    try {
+      localStorage.setItem(TUTORIAL_STEP_STORAGE_KEY, step);
+      if (step === 'completed') {
+        localStorage.setItem(TUTORIAL_COMPLETED_KEY, '1');
+      }
+    } catch { /* ignore */ }
+    g.updateTutorialState?.(step, step === 'completed');
+  }, [g]);
+
   const [tutorialBranches, setTutorialBranches] = useState<TutorialGroundBranch[]>([]);
-  const [collectedBranches, setCollectedBranches] = useState(0);
+  const [collectedBranches, setCollectedBranches] = useState(() => {
+    return Math.min(3, countOf(s.backpack, 'branch'));
+  });
 
-  const handleStoryTutorialDone = () => {
-    setShowStoryTutorial(false);
-    sessionStorage.setItem('colonion.storyTutorialSeenSession', '1');
-    const completed = localStorage.getItem(TUTORIAL_COMPLETED_KEY) === '1';
-    if (!completed || isStarterPlayer) {
-      setTutorialStep('phase1_meet');
-    }
-  };
-
+  // Sync collectedBranches if backpack already contains branches (e.g. page refresh mid-tutorial)
   useEffect(() => {
-    if (tutorialStep === 'phase1_gather' && tutorialBranches.length === 0 && collectedBranches < 3) {
-      setTutorialBranches(generateTutorialGroundBranches(s.pos));
+    const packBranches = countOf(s.backpack, 'branch');
+    if (packBranches > collectedBranches && packBranches <= 3) {
+      setCollectedBranches(packBranches);
     }
-  }, [tutorialStep, tutorialBranches.length, collectedBranches, s.pos]);
+  }, [s.backpack, collectedBranches]);
+
+  // Decoupled Ground Branches: Spawns immediately and smoothly recenters if GPS moves player by >30m
+  useEffect(() => {
+    if (tutorialStep === 'phase1_gather' && collectedBranches < 3) {
+      const needsRegen =
+        tutorialBranches.length === 0 ||
+        tutorialBranches.some(b => distanceM(s.pos, b) > 30);
+      if (needsRegen) {
+        setTutorialBranches(generateTutorialGroundBranches(s.pos));
+      }
+    }
+  }, [tutorialStep, tutorialBranches, collectedBranches, s.pos]);
 
   const handlePickTutorialBranch = (branchId: string) => {
     g.pickTutorialBranch();
@@ -379,21 +417,23 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     g.meetShaman();
     try {
       localStorage.setItem(TUTORIAL_COMPLETED_KEY, '1');
+      localStorage.setItem(TUTORIAL_STEP_STORAGE_KEY, 'completed');
     } catch { /* ignore */ }
-    setTutorialStep('completed');
+    setTutorialStepState('completed');
     toast.success('🎉 기본 생존 튜토리얼을 모두 완료했습니다!');
   };
 
   const handleReplayTutorial = () => {
     try {
       localStorage.removeItem(TUTORIAL_COMPLETED_KEY);
+      localStorage.removeItem(TUTORIAL_STEP_STORAGE_KEY);
       localStorage.removeItem(STORY_TUTORIAL_SEEN_KEY);
       sessionStorage.removeItem('colonion.storyTutorialSeenSession');
     } catch { /* ignore */ }
     setCollectedBranches(0);
     setTutorialBranches(generateTutorialGroundBranches(s.pos));
-    setShowStoryTutorial(true);
-    setTutorialStep('phase1_meet');
+    setTutorialStepState('phase1_meet');
+    g.updateTutorialState?.('phase1_meet', false);
     toast.info('📖 초보자 튜토리얼을 다시 시작합니다.');
   };
 
@@ -1097,12 +1137,12 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       </div>}
       <StoryTutorialModal
         open={showStoryTutorial}
-        onComplete={handleStoryTutorialDone}
-        onSkip={handleStoryTutorialDone}
+        onComplete={() => setShowStoryTutorial(false)}
+        onSkip={() => setShowStoryTutorial(false)}
         finishLabel="콜로니온 월드 입장하기"
       />
       <SurvivalTutorialOverlay
-        open={!showStoryTutorial && tutorialStep !== null && tutorialStep !== 'completed'}
+        open={!isTutorialCompleted && tutorialStep !== null && tutorialStep !== 'completed'}
         step={tutorialStep ?? 'phase1_meet'}
         collectedBranches={collectedBranches}
         onSetStep={setTutorialStep}

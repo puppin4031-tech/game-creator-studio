@@ -28,6 +28,30 @@ export default function PwaInstallBanner() {
     const wasDismissed = localStorage.getItem(STORAGE_KEY) === 'true';
     if (wasDismissed) return;
 
+    // Defer PWA install banner until after survival tutorial is completed
+    const isTutorialDone = () => {
+      try {
+        return (
+          localStorage.getItem('colonion.tutorialCompleted.v2') === '1' ||
+          localStorage.getItem('colonion_tutorial_completed') === '1'
+        );
+      } catch {
+        return true;
+      }
+    };
+
+    if (!isTutorialDone()) {
+      // Defer showing until tutorial completed
+      setDismissed(true);
+      const onStorage = () => {
+        if (isTutorialDone() && !wasDismissed) {
+          setDismissed(false);
+        }
+      };
+      window.addEventListener('storage', onStorage);
+      return () => window.removeEventListener('storage', onStorage);
+    }
+
     // Detect iOS (Safari doesn't support beforeinstallprompt)
     const ua = window.navigator.userAgent;
     const isIosDevice = /iPhone|iPad|iPod/.test(ua) && !('MSStream' in window);

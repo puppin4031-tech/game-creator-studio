@@ -133,6 +133,8 @@ export interface WorldSave extends WorldProgress {
   expeditionAutoSecToday?: number;
   mercenary?: MercenaryContract | null;
   shamanMet?: boolean;
+  tutorialCompleted?: boolean;
+  tutorialStep?: string | null;
   tribe?: TribeState;
   village?: VillageState;
   expeditionCount?: number;
@@ -177,6 +179,7 @@ const fresh = (start: LatLng): WorldSave => ({
   saveVersion: CURRENT_SAVE_VERSION,
   pos: start, hp: C.baseMaxHp, hunger: 100, backpack: [], storage: [], gear: [], base: null,
   depleted: {}, damage: {}, gathered: {}, techs: [], explored: [start], terrainZones: {}, parkCells: {}, shamanLevel: 1, shamanClass: 'NONE', classResource: 100, classSkills: [], civilizationTechs: ['tech_fire_gathering'],
+  shamanMet: false, tutorialCompleted: false, tutorialStep: 'phase1_meet', starterCampPending: false,
   codex: defaultCodexState(),
   lastTickAt: Date.now(),
   lastActiveAt: Date.now(),
@@ -243,8 +246,17 @@ function isFreshOrEmptySave(w?: Partial<WorldSave> | null): boolean {
   const backpackCount = w.backpack?.length ?? 0;
   const storageCount = w.storage?.length ?? 0;
   const techsCount = w.techs?.length ?? 0;
-  const hasBase = !!w.base;
-  return level <= 1 && xp <= 0 && petsCount === 0 && backpackCount === 0 && storageCount === 0 && techsCount === 0 && !hasBase;
+  const hasRealBase = !!w.base && !w.starterCampPending;
+  return (
+    level <= 1 &&
+    xp <= 0 &&
+    petsCount === 0 &&
+    backpackCount === 0 &&
+    storageCount === 0 &&
+    techsCount === 0 &&
+    !hasRealBase &&
+    !w.shamanMet
+  );
 }
 
 export function migrateSaveData(raw: unknown, start: LatLng): WorldSave {
@@ -281,6 +293,10 @@ export function migrateSaveData(raw: unknown, start: LatLng): WorldSave {
     classResource: typeof p.classResource === 'number' ? p.classResource : 100,
     classSkills: Array.isArray(p.classSkills) ? p.classSkills : [],
     shamanLevel: (p.shamanLevel ?? 1) as 1 | 2 | 3 | 4 | 5,
+    shamanMet: typeof p.shamanMet === 'boolean' ? p.shamanMet : (!!p.shamanMet || (p.level ?? 1) > 1 || (p.expeditionCount ?? 0) > 0),
+    tutorialCompleted: typeof p.tutorialCompleted === 'boolean' ? p.tutorialCompleted : (!!p.shamanMet || (p.level ?? 1) > 1 || (p.expeditionCount ?? 0) > 0),
+    tutorialStep: typeof p.tutorialStep === 'string' ? p.tutorialStep : (p.shamanMet || (p.level ?? 1) > 1 ? 'completed' : 'phase1_meet'),
+    starterCampPending: typeof p.starterCampPending === 'boolean' ? p.starterCampPending : false,
     activeBuffs: Array.isArray(p.activeBuffs) ? p.activeBuffs : [],
     permanentStats: p.permanentStats && typeof p.permanentStats === 'object' ? p.permanentStats : {},
     depleted: p.depleted && typeof p.depleted === 'object' ? p.depleted : {},
@@ -595,8 +611,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
       if (remote && useRemote) {
         skipNextUploadRef.current = true;
-        const migratedRemote = migrateTribeState(remote);
-        setS(migratePets({ ...fresh(local.pos), ...migratedRemote, base: migratedRemote.base ? { ...migratedRemote.base, placedAt: migratedRemote.base.placedAt ?? Date.now() } : null }, id => petById(id)?.name ?? id));
+        setS(migrateSaveData(remote, local.pos));
         toast.success('클라우드에 저장된 생존 진행도를 복원했습니다.');
       } else if (!localFresh) {
         // Only upload to cloud if local is NOT a blank/empty save (prevents accidental wiping on blank browser)
@@ -1148,7 +1163,26 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     });
   }, [setS]);
 
-  const meetShaman = useCallback(() => setS(p => ({ ...p, shamanMet: true })), [setS]);
+  const updateTutorialState = useCallback((step: string, completed?: boolean) => {
+    setS(p => ({
+      ...p,
+      tutorialStep: step,
+      tutorialCompleted: completed ?? p.tutorialCompleted ?? false,
+      shamanMet: completed ? true : p.shamanMet,
+      lastTickAt: Date.now(),
+    }));
+  }, [setS]);
+
+  const meetShaman = useCallback(() => {
+    setS(p => ({
+      ...p,
+      shamanMet: true,
+      tutorialCompleted: true,
+      tutorialStep: 'completed',
+      lastTickAt: Date.now(),
+    }));
+    setTimeout(flushSave, 0);
+  }, [setS, flushSave]);
   const rallyExpedition = useCallback(() => {
     const p = ref.current; const crew = p.observedExpedition; const at = Date.now();
     if (!crew || at < crew.moraleReadyAt) return;
@@ -3113,7 +3147,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return chosen;
   }, [saveKey, userId, setS, flushSave]);
 
-  return { codex: s.codex ?? defaultCodexState(), codexProgress, recordCodexResource, recordCodexPet, recordCodexBoss, recordCodexAiInvention, markCodexSeen, reloadSaveFromBestSource, claimOfflineRewards, shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, classSkills: s.classSkills ?? [], learnClassSkill, maxSpeedKmh: getPlayerSpeedLimitKmh(s.classSkills), triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, dismissTribe, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
+  return { codex: s.codex ?? defaultCodexState(), codexProgress, recordCodexResource, recordCodexPet, recordCodexBoss, recordCodexAiInvention, markCodexSeen, reloadSaveFromBestSource, claimOfflineRewards, shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, classSkills: s.classSkills ?? [], learnClassSkill, maxSpeedKmh: getPlayerSpeedLimitKmh(s.classSkills), triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, dismissTribe, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, updateTutorialState, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
     savedIndicator, flushSave,
     moveOutpost, petHits, mergePets, togglePetDeploy, assignPetRole, feedPet, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
