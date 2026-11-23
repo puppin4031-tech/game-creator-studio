@@ -12,7 +12,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Switch } from '@/components/ui/switch';
 import { getSettings, saveSettings, subscribeSettings, playSfx, haptic, type GameSettings, type VolumeLevel } from '@/lib/survival/gameSettings';
 
-interface Props { onExit: () => void; onLogout: () => Promise<void> | void; loggedIn: boolean; onRestoreSave?: () => Promise<unknown> }
+interface Props {
+  onExit: () => void;
+  onLogout: () => Promise<void> | void;
+  loggedIn: boolean;
+  onRestoreSave?: () => Promise<unknown>;
+  trigger?: React.ReactNode;
+}
 
 export function useGameSettings() {
   const [s, setS] = useState<GameSettings>(getSettings);
@@ -20,7 +26,7 @@ export function useGameSettings() {
   return s;
 }
 
-export default function GameMenu({ onExit, onLogout, loggedIn }: Props) {
+export default function GameMenu({ onExit, onLogout, loggedIn, trigger }: Props) {
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
@@ -38,7 +44,9 @@ export default function GameMenu({ onExit, onLogout, loggedIn }: Props) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button type="button" aria-label="메뉴" className="pixel-btn relative flex h-11 w-11 items-center justify-center bg-card"><Menu className="!h-6 !w-6" />{unread && <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-destructive" />}</button>
+          {trigger ?? (
+            <button type="button" aria-label="메뉴" className="pixel-btn relative flex h-11 w-11 items-center justify-center bg-card"><Menu className="!h-6 !w-6" />{unread && <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-destructive" />}</button>
+          )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="font-pixel">
           <DropdownMenuItem className="min-h-11" onSelect={onExit}><DoorOpen className="mr-2 !h-5 !w-5" />나가기</DropdownMenuItem>

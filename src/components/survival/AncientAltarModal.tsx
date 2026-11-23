@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { BookOpen, Flame, Sparkles, X, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { ContextualHelpButton } from './ContextualHelpButton';
 import { ITEMS, gearEffect, type ItemId } from '@/lib/survival/items';
 import {
   MATERIAL_PHYSICS,
@@ -111,14 +112,24 @@ export default function AncientAltarModal({
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          aria-label="고대 제단 닫기"
-          onClick={onClose}
-          className="pixel-btn flex items-center justify-center bg-card py-1.5 px-2.5 text-xs"
-        >
-          <X className="!h-4 !w-4" />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <ContextualHelpButton
+            title="고대 제단 · 유물 조합"
+            bullets={[
+              "서로 다른 재료 2~4종을 슬롯에 올려 고대 유물과 미지의 장비를 발견하세요.",
+              "불 피우기 여부와 재료의 순서·조합 비율에 따라 완전히 다른 결과물이 탄생합니다.",
+              "발견된 레시피는 유물 도감에 영구 기록되어 언제든 다시 제작할 수 있습니다."
+            ]}
+          />
+          <button
+            type="button"
+            aria-label="고대 제단 닫기"
+            onClick={onClose}
+            className="pixel-btn flex items-center justify-center bg-card py-1.5 px-2.5 text-xs"
+          >
+            <X className="!h-4 !w-4" />
+          </button>
+        </div>
       </div>
 
       {/* Tab Switcher */}

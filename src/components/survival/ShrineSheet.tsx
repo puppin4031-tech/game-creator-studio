@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { Sparkles, X } from 'lucide-react';
+import { ContextualHelpButton } from './ContextualHelpButton';
 import melchizedek from '@/assets/survival/melchizedek.png';
 import { ITEMS } from '@/lib/survival/items';
 import { countOf } from '@/lib/survival/inventory';
@@ -32,7 +33,17 @@ export default function ShrineSheet({ shrine, state, pos, inRange, backpack, wor
       <div className="flex items-center justify-between border-b-2 border-foreground px-3 py-2">
         <div className="min-w-0 flex-1"><b className="text-lg">{shrine.name}</b>
           <p className="text-[11px] text-muted-foreground">성소 네트워크 {state.found.length}/{SHRINES.length} · 신성력 {state.sacred}</p></div>
-        <button type="button" aria-label="닫기" onClick={onClose} className="flex h-11 w-11 items-center justify-center"><X className="!h-7 !w-7" /></button>
+        <div className="flex items-center gap-1.5">
+          <ContextualHelpButton
+            title="고대 거석 성소"
+            bullets={[
+              "실제 위치에 다가가 성소를 깨우면 성소 네트워크가 연결됩니다.",
+              "정기적으로 제단의 축복을 받아 생명의 떡과 정화의 이슬을 얻으세요.",
+              "고대의 제사를 올려 부족의 신성력을 높이고 고대 가호를 받으세요."
+            ]}
+          />
+          <button type="button" aria-label="닫기" onClick={onClose} className="flex h-11 w-11 items-center justify-center"><X className="!h-7 !w-7" /></button>
+        </div>
       </div>
       <div className="flex-1 space-y-3 overflow-y-auto p-3 pb-[max(1rem,env(safe-area-inset-bottom))] text-sm">
         <div className="flex items-end gap-2">

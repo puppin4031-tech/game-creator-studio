@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Egg, Drumstick, Lock, LockOpen, Merge, Shield, Swords } from 'lucide-react';
+import { ContextualHelpButton } from './ContextualHelpButton';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { fusionPartner, PET_DAILY_LOOT_CAP, PET_GUARD_SLOTS, PET_MAX_LEVEL, petDay, petStats, petRole, PET_ROLE_LABEL, PET_HUNT_MS, PET_DEFENSE, PET_FOLLOW_ATK, type PetRole, type OwnedPet, type PetDefense } from '@/lib/survival/pets';
@@ -46,7 +47,17 @@ export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, 
     )}
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2 text-xs">
       <b className="flex items-center gap-1 text-sm"><Shield className="!h-4 !w-4" />수호 {pets.filter(p => p.deployed).length}/{PET_GUARD_SLOTS}</b>
-      <span>오늘 전리품 {defense?.day === petDay(now) ? defense.claims : 0}/{PET_DAILY_LOOT_CAP}</span>
+      <div className="flex items-center gap-2">
+        <span>오늘 전리품 {defense?.day === petDay(now) ? defense.claims : 0}/{PET_DAILY_LOOT_CAP}</span>
+        <ContextualHelpButton
+          title="공룡 펫 & 알 부화"
+          bullets={[
+            "공룡 알을 배낭에 넣고 걸으면 부화 거리가 누적되어 새 공룡이 태어납니다.",
+            "수호/사냥/동행 역할을 부여해 거점 방어와 야생 탐험에 활용하세요.",
+            "같은 종의 공룡 2마리를 융합하면 상위 세대와 강력한 고유 스킬이 발현됩니다."
+          ]}
+        />
+      </div>
     </div>
     {eggs.length > 0 && <div className="space-y-2" aria-label="부화 대기 알">
       <b className="flex items-center gap-1 text-sm"><Egg className="!h-4 !w-4" />보유한 알 {eggs.length}개</b>

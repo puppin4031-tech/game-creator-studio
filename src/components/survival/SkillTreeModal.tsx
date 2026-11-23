@@ -12,6 +12,7 @@ import type { ShamanClassId } from '@/lib/survival/shamanEvolution';
 import { bundledSpriteUrl } from '@/hooks/useItemCatalog';
 import { X, Lock, Check, Sparkles, ChevronRight, AlertCircle, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ContextualHelpButton } from './ContextualHelpButton';
 
 export interface SkillTreeModalProps {
   open: boolean;
@@ -110,14 +111,24 @@ export const SkillTreeModal: React.FC<SkillTreeModalProps> = ({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded p-1 text-stone-400 hover:bg-stone-800 hover:text-stone-200 transition-colors"
-            aria-label="닫기"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <ContextualHelpButton
+              title="4대 주술사 심화 스킬트리"
+              bullets={[
+                "전직한 주술사의 고유 스킬을 배워 GPS 탐험 속도와 파밍 반경을 돌파하세요.",
+                "필요 레벨과 재료를 갖추면 스킬 노드가 영구적으로 활성화됩니다.",
+                "다른 클래스의 스킬트리도 자유롭게 미리 열람하고 진로를 계획할 수 있습니다."
+              ]}
+            />
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded p-1 text-stone-400 hover:bg-stone-800 hover:text-stone-200 transition-colors"
+              aria-label="닫기"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         {/* Class Selection Tabs */}

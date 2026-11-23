@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ContextualHelpButton } from './ContextualHelpButton';
 import { Hammer, Info, Lock, MessageSquare, Rotate3d, ShieldCheck, Sparkles, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -1380,6 +1381,14 @@ export default function BaseVillageView({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1">
+          <ContextualHelpButton
+            title="부족 거점 마을"
+            bullets={[
+              "모닥불과 방어벽을 중심으로 부족민을 배치하고 건물을 건설하세요.",
+              "훈제막사와 주막에서 전투 버프 요리를 제작하고 식량을 보존할 수 있습니다.",
+              "상단 지붕에 맺히는 수확 거품을 터뜨려 매일 자원을 획득하세요."
+            ]}
+          />
           {totalReadyBubbles > 0 && onHarvestAllBubbles && (
             <Button
               type="button"

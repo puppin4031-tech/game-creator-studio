@@ -1,5 +1,6 @@
 import { Hourglass, Sparkles, Compass, MapPin } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { ContextualHelpButton } from './ContextualHelpButton';
 import { EXPEDITION_FOOD_COUNT, expeditionLog, fmtRemaining, jobProgress, mapFragments, type Expedition, type ScoutTarget, type TimedJob } from '@/lib/survival/homeActivities';
 
 /** Live real-time job card: shows remaining time or a claim button. */
@@ -30,7 +31,17 @@ export function ExpeditionPanel({ expedition, report, now, exploredTotal, mark, 
   const walked = Math.max(0, exploredTotal - mark) % 25;
   return (
     <div className="pixel-frame space-y-2 bg-card p-2 text-xs">
-      <div className="flex items-center gap-1.5"><Compass className="!h-5 !w-5" /><b className="text-sm">원정대</b></div>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5"><Compass className="!h-5 !w-5" /><b className="text-sm">원정대</b></div>
+        <ContextualHelpButton
+          title="부족 원정대"
+          bullets={[
+            "밖에서 실제 걸음을 누적하여 새로운 사냥터 지도 조각을 획득하세요.",
+            "식량을 챙겨 원정대를 파견하면 고기·뼈·가죽 등의 자원을 자동으로 물어옵니다.",
+            "귀환 후 정찰 보고서를 확인해 유용한 랜드마크를 나침반/지도에 등록하세요."
+          ]}
+        />
+      </div>
       {expedition ? (
         <>
           <JobCard title="사냥터 원정" job={{ id: 'exp', ...expedition }} now={now} claimLabel="전리품 받기" onClaim={onClaim} />

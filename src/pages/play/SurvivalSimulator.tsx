@@ -40,7 +40,8 @@ import { MAX_SKILL_LEVEL, skillLevel, skillUpgradeCost } from '@/lib/survival/sk
 import { type SpriteAction } from '@/hooks/useSpriteAnimations';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Backpack, Flame, Lightbulb, LocateFixed, X, Lock, ListChecks, Compass, ChevronUp, Star, MapPin, Navigation, Radar, Map as MapIcon, FileText, BookOpen, Zap, Shield, Home, Radio, RefreshCw, Sparkles } from 'lucide-react';
+import { Backpack, Flame, Lightbulb, LocateFixed, X, Lock, ListChecks, Compass, ChevronUp, ChevronDown, HelpCircle, Search, Settings, Egg, Star, MapPin, Navigation, Radar, Map as MapIcon, FileText, BookOpen, Zap, Shield, Home, Radio, RefreshCw, Sparkles } from 'lucide-react';
+import { UiGuideOverlay } from '@/components/survival/UiGuideOverlay';
 import { bearingDeg, useSurvivalFavorites } from '@/hooks/useSurvivalFavorites';
 import { useDeviceHeading } from '@/hooks/useDeviceHeading';
 import { useSurvivalGps } from '@/hooks/useSurvivalGps';
@@ -792,8 +793,21 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     : expeditionTarget
     ? { lat: expeditionTarget.lat, lng: expeditionTarget.lng, name: '지정 목표 좌표', isFav: false, id: null }
     : null;
-  const [leftOpen, setLeftOpen] = useState(false);
-  const [rightOpen, setRightOpen] = useState(false);
+  const [quickMenuOpen, setQuickMenuOpen] = useState(false);
+  const [uiGuideOpen, setUiGuideOpen] = useState(false);
+  const touchStartY = useRef<number | null>(null);
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartY.current === null) return;
+    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
+    touchStartY.current = null;
+    if (deltaY < -35) {
+      setPanel('base');
+      setBaseTab('village');
+    }
+  };
   const mapBearing = compassOn && heading !== null ? heading : 0;
   const [shamanWords, setShamanWords] = useState<string | null>(null);
   const [dinoExpeditionOpen, setDinoExpeditionOpen] = useState(false);
@@ -1571,100 +1585,260 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         })()}
         {readyEgg && !g.inBase && <b className="text-primary"> · 거점으로!</b>}</div>}
       <DinoEggHatchModal baby={hatched} onClose={() => setHatched(null)} />
-      {/* Top HUD */}
-      <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-background/80 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur">
-        <GameMenu
-          loggedIn={!!user}
-          onExit={() => navigate(realGps ? '/' : '/play')}
-          onLogout={async () => { try { await signOut(); navigate('/login'); } catch { toast.error('로그아웃에 실패했어요. 다시 시도해 주세요'); } }}
-          onRestoreSave={g.reloadSaveFromBestSource}
-        />
-        <div className="flex-1 space-y-1 text-xs">
-          <div className="flex items-center gap-1">체력<HpBar value={s.hp} max={g.maxHp} />{s.hp}/{g.maxHp}</div>
-          <div className="flex items-center gap-1">허기<div className="h-2.5 flex-1 border border-foreground bg-muted"><div className="h-full bg-primary" style={{ width: `${s.hunger}%` }} /></div>{s.hunger}</div>
-        </div>
-        <div className="text-right text-[11px] leading-tight">
-          {(inPark || g.inSanctuary) && <div className="font-bold text-primary">{g.inSanctuary ? '성소(안전)' : '공원(짐승 多)'}</div>}
-          <div>
-            배낭 {g.weight}/{g.capacity}kg
-            {(() => {
-              const rangedInfo = computeRangedReach(g.weapon, s.level);
-              if (!rangedInfo.category) return null;
-              const ammo = findAvailableAmmo(s.backpack, g.weapon?.itemId);
-              const cnt = ammo ? countOf(s.backpack, ammo.itemId) : 0;
-              const rangeStr = `${rangedInfo.rangeM}m`;
-              return (
-                <span className={`ml-1.5 rounded px-1.5 py-0.5 text-[10px] font-bold ${cnt > 0 ? 'bg-accent/30 text-primary border border-primary/40' : 'bg-destructive/20 text-destructive border border-destructive/40'}`}>
-                  {rangedInfo.category === 'bow' ? `🏹 활 (${rangeStr}) ` : rangedInfo.category === 'spear' ? `🗡️ 투창 (${rangeStr}) ` : `🪨 물매 (${rangeStr}) `}
-                  {cnt > 0 ? `${cnt}발` : '탄약 없음!'}
-                </span>
-              );
-            })()}
+      {/* ── 1. Top-Left Compact Wooden Status Card ── */}
+      <div className="absolute top-[max(0.6rem,env(safe-area-inset-top))] left-2.5 z-30 flex flex-col items-start gap-1 pointer-events-auto select-none">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setStatusModalOpen(true)}
+          className="pixelated flex items-center gap-2 rounded border-3 border-[#2b1d14] bg-[#8b5a2b] p-1.5 shadow-[3px_3px_0_0_#2b1d14] hover:bg-[#9d6732] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer transition-all font-pixel text-xs"
+          title="족장 상태·장비·스킬 확인 (터치하여 열기)"
+        >
+          {/* Square carved-stone portrait */}
+          <div className="h-10 w-10 shrink-0 overflow-hidden rounded border-2 border-[#2b1d14] bg-[#5c544a] flex items-center justify-center shadow-inner relative">
+            <CharacterSprite height={32} action="idle" level={s.level} />
           </div>
-          <div aria-label="성장 진행도">족장 {presence.name} · Lv.{s.level} · XP {s.xp}/{g.nextLevelXp}</div>
+
+          {/* Right Column: Lv badge + Sleek HP & Hunger bars */}
+          <div className="flex flex-col gap-1 min-w-[95px]">
+            <div className="flex items-center justify-between gap-1 leading-none">
+              <span className="rounded bg-[#2b1d14] px-1 py-0.5 text-[9px] font-bold text-amber-300">
+                Lv.{s.level}
+              </span>
+              <span className="text-[10px] font-bold text-amber-100 truncate max-w-[65px]">
+                {presence.name}
+              </span>
+            </div>
+
+            {/* Sleek red HP bar */}
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] leading-none shrink-0">❤️</span>
+              <div className="h-2 flex-1 rounded-xs bg-[#2b1d14] p-[1px] border border-[#2b1d14]">
+                <div
+                  className="h-full rounded-xs bg-red-500 transition-all duration-300"
+                  style={{ width: `${Math.min(100, Math.max(0, (s.hp / Math.max(1, g.maxHp)) * 100))}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Sleek green/yellow Hunger bar */}
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] leading-none shrink-0">🍖</span>
+              <div className="h-2 flex-1 rounded-xs bg-[#2b1d14] p-[1px] border border-[#2b1d14]">
+                <div
+                  className={`h-full rounded-xs transition-all duration-300 ${
+                    s.hunger <= 25 ? 'bg-orange-500 animate-pulse' : 'bg-amber-400'
+                  }`}
+                  style={{ width: `${Math.min(100, Math.max(0, s.hunger))}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Attached carved-stone mini-pill underneath */}
+        <div className="flex items-center gap-1">
+          {realGps && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (gps.isIndoor) gps.retry();
+                else if (!gps.ready) gps.switchToIndoor();
+                else gps.retry();
+              }}
+              className="pixelated flex items-center gap-1 rounded border-2 border-[#2b1d14] bg-[#7a7267] px-2 py-0.5 text-[9px] font-bold text-amber-200 shadow-[1px_1px_0_0_#2b1d14] hover:bg-[#8e8578] active:translate-x-[1px] active:translate-y-[1px]"
+              title={gps.isIndoor ? '실내 모드 · 터치하여 GPS 재시도' : gps.ready ? `GPS ±${Math.round(gps.fix?.accuracy ?? 0)}m` : 'GPS 탐색 중 · 터치하여 실내 전환'}
+            >
+              {gps.isIndoor ? (
+                <>
+                  <Home className="h-2.5 w-2.5 text-amber-300 shrink-0" />
+                  <span>🏠 실내 (GPS 재시도)</span>
+                </>
+              ) : gps.ready ? (
+                <>
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  <span>📡 GPS ±{Math.round(gps.fix?.accuracy ?? 0)}m</span>
+                </>
+              ) : (
+                <>
+                  <Radio className="h-2.5 w-2.5 text-amber-300 animate-spin shrink-0" />
+                  <span>📡 검색중 (실내 전환)</span>
+                </>
+              )}
+            </button>
+          )}
+
+          {s.dinoEggs?.[0] && (() => {
+            const egg = s.dinoEggs[0];
+            const discount = g.codexProgress?.hatchDiscountPct ?? 0;
+            const walked = eggWalkedM(egg, s.walkSteps ?? 0);
+            const need = eggNeedM(egg, discount);
+            const pct = Math.min(100, Math.round((walked / need) * 100));
+            return (
+              <div
+                onClick={() => { setPanel('base'); setBaseTab('pets'); }}
+                className="pixelated flex items-center gap-1 rounded border-2 border-[#2b1d14] bg-[#5c544a] px-1.5 py-0.5 text-[9px] font-bold text-amber-200 shadow-[1px_1px_0_0_#2b1d14] cursor-pointer hover:bg-[#6c6358]"
+                title="공룡 알 부화 진행도 · 클릭하여 펫 관리"
+              >
+                <span className="leading-none">🥚</span>
+                <span>{pct}%</span>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
-      {/* Compass toggle: north-up vs heading-up */}
-      <button type="button" aria-label={compassOn ? '북쪽 고정으로 전환' : '방향 따라가기 켜기'} aria-pressed={compassOn} onClick={toggleCompass}
-        className={`pixel-btn absolute right-2 top-[calc(max(0.5rem,env(safe-area-inset-top))+4.25rem)] z-20 flex items-center justify-center py-1.5 px-2.5 text-xs ${compassOn ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
-        <Compass className="!h-4 !w-4" style={{ transform: `rotate(${compassOn && heading !== null ? -heading : 0}deg)` }} />
-      </button>
-
-      <WorldViewTabs
-        contextMode={contextMode}
-        onContextMode={handleSelectContextMode}
-        site={baseSite}
-        onSite={setBaseSite}
-        hasBase={!!s.base}
-        hasOutpost={!!s.outpost}
-        crewActive={!!crew}
-        hasExpeditionUnlocked={hasTribe || !!crew || !!s.expedition}
-      />
-      {view === 'base' && baseSite === 'outpost' && s.outpost && panel === 'none' && (
-        <div className="pixel-frame absolute inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-20 flex items-center justify-between gap-2 bg-card/95 py-1.5 px-2.5 text-xs">
-          <b>전진기지</b>
-          <button
-            type="button"
-            disabled={!actionReady || (realGps && !gps.ready && !gps.isIndoor)}
-            className="pixel-btn bg-primary py-1.5 px-2.5 text-xs text-primary-foreground disabled:opacity-40"
-            onClick={g.moveOutpost}
-          >
-            여기로 이전
-          </button>
-        </div>
-      )}
-      {realGps && (
-        <div className="absolute left-2 top-[calc(7.25rem+env(safe-area-inset-top))] z-20 flex items-center gap-1.5 pointer-events-auto">
-          {gps.isIndoor ? (
-            <button
-              type="button"
-              onClick={gps.retry}
-              className="pixel-frame flex items-center gap-1.5 rounded-full border border-amber-500/80 bg-stone-900/95 py-1 px-2.5 text-[11px] font-bold text-amber-300 shadow-lg backdrop-blur hover:border-amber-400 active:scale-95 transition-all cursor-pointer"
-              title="실내 모드 활성화 (거점·원정·제작 100% 가능) · 터치하여 GPS 재시도"
-            >
-              <Home className="!h-3.5 !w-3.5 text-amber-400 shrink-0" />
-              <span>실내 모드 · GPS 재시도</span>
-              <RefreshCw className="!h-3 !w-3 text-amber-400/80 shrink-0" />
-            </button>
-          ) : gps.ready ? (
-            <div className="pixel-frame flex items-center gap-1.5 rounded-full border border-emerald-500/60 bg-stone-900/90 py-1 px-2.5 text-[11px] font-medium text-emerald-300 shadow-md backdrop-blur">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-              <span>GPS ±{Math.round(gps.fix?.accuracy ?? 0)}m</span>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={gps.switchToIndoor}
-              className="pixel-frame flex items-center gap-1.5 rounded-full border border-stone-600 bg-stone-900/90 py-1 px-2.5 text-[11px] text-stone-300 shadow-md backdrop-blur hover:border-stone-500 active:scale-95 transition-all cursor-pointer"
-              title="GPS 신호 탐색 중 · 클릭하여 즉시 실내 모드로 전환"
-            >
-              <Radio className="!h-3.5 !w-3.5 text-stone-400 animate-pulse shrink-0" />
-              <span>GPS 검색 중 (실내 전환)</span>
-            </button>
+      {/* ── 2. Top-Right Collapsible Circular Menu (v) ── */}
+      <div className="absolute top-[max(0.6rem,env(safe-area-inset-top))] right-2.5 z-30 flex flex-col items-end pointer-events-auto font-pixel">
+        <button
+          type="button"
+          onClick={() => setQuickMenuOpen(v => !v)}
+          className="pixelated relative w-10 h-10 rounded-full border-3 border-[#2b1d14] bg-[#8b5a2b] text-amber-200 shadow-[3px_3px_0_0_#2b1d14] hover:bg-[#9d6732] active:translate-x-[1px] active:translate-y-[1px] flex items-center justify-center font-bold cursor-pointer"
+          aria-expanded={quickMenuOpen}
+          aria-label={quickMenuOpen ? '메뉴 닫기' : '간편 메뉴 열기'}
+        >
+          {quickMenuOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          {g.canClaimQuest && !quickMenuOpen && (
+            <span className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-red-500 border border-[#2b1d14] animate-ping" />
           )}
-        </div>
-      )}
+        </button>
+
+        <AnimatePresence>
+          {quickMenuOpen && (
+            <>
+              {/* Tap outside to collapse */}
+              <div
+                className="fixed inset-0 z-20"
+                onClick={() => setQuickMenuOpen(false)}
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.85, y: -8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.85, y: -8 }}
+                transition={{ duration: 0.15 }}
+                className="relative z-30 mt-2 flex flex-col items-center gap-2 rounded-lg border-2 border-[#2b1d14] bg-[#8b5a2b]/95 p-2 shadow-[4px_4px_0_0_#2b1d14] backdrop-blur-xs font-pixel"
+              >
+                {/* ❓ 도움 */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuickMenuOpen(false);
+                    setUiGuideOpen(true);
+                  }}
+                  className="flex flex-col items-center text-amber-100 hover:text-white group cursor-pointer"
+                  title="화면 도움말"
+                >
+                  <div className="w-8 h-8 rounded border border-[#2b1d14] bg-[#7a7267] flex items-center justify-center shadow group-active:translate-y-[1px]">
+                    <HelpCircle className="h-4 w-4 text-amber-200" />
+                  </div>
+                  <span className="text-[9px] font-bold mt-0.5">도움</span>
+                </button>
+
+                {/* 📖 도감 */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuickMenuOpen(false);
+                    setCodexModalOpen(true);
+                    g.markCodexSeen();
+                  }}
+                  className="flex flex-col items-center text-amber-100 hover:text-white group relative cursor-pointer"
+                  title="부족 대도감"
+                >
+                  <div className="w-8 h-8 rounded border border-[#2b1d14] bg-[#7a7267] flex items-center justify-center shadow group-active:translate-y-[1px]">
+                    <BookOpen className="h-4 w-4 text-amber-200" />
+                  </div>
+                  <span className="text-[9px] font-bold mt-0.5">도감</span>
+                  {g.codex?.hasUnseenNew && (
+                    <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-amber-400" />
+                  )}
+                </button>
+
+                {/* 📜 퀘스트 */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuickMenuOpen(false);
+                    setPanel('quests');
+                  }}
+                  className="flex flex-col items-center text-amber-100 hover:text-white group relative cursor-pointer"
+                  title="생존 목표 및 주술사 퀘스트"
+                >
+                  <div className="w-8 h-8 rounded border border-[#2b1d14] bg-[#7a7267] flex items-center justify-center shadow group-active:translate-y-[1px]">
+                    <FileText className="h-4 w-4 text-amber-200" />
+                  </div>
+                  <span className="text-[9px] font-bold mt-0.5">퀘스트</span>
+                  {g.canClaimQuest && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white shadow border border-[#2b1d14] animate-bounce">
+                      !
+                    </span>
+                  )}
+                </button>
+
+                {/* 🧭 나침반 */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuickMenuOpen(false);
+                    setRadarOpen(true);
+                  }}
+                  className="flex flex-col items-center text-amber-100 hover:text-white group cursor-pointer"
+                  title="나침반 & 레이더"
+                >
+                  <div className="w-8 h-8 rounded border border-[#2b1d14] bg-[#7a7267] flex items-center justify-center shadow group-active:translate-y-[1px]">
+                    <Compass className="h-4 w-4 text-amber-200" style={{ transform: `rotate(${compassOn && heading !== null ? -heading : 0}deg)` }} />
+                  </div>
+                  <span className="text-[9px] font-bold mt-0.5">나침반</span>
+                </button>
+
+                {/* ✨ 스킬 */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuickMenuOpen(false);
+                    setSkillTreeModalOpen(true);
+                  }}
+                  className="flex flex-col items-center text-amber-100 hover:text-white group cursor-pointer"
+                  title="심화 스킬트리"
+                >
+                  <div className="w-8 h-8 rounded border border-[#2b1d14] bg-[#7a7267] flex items-center justify-center shadow group-active:translate-y-[1px]">
+                    <Sparkles className="h-4 w-4 text-amber-200" />
+                  </div>
+                  <span className="text-[9px] font-bold mt-0.5">스킬</span>
+                </button>
+
+                {/* ⚙️ 설정 */}
+                <GameMenu
+                  loggedIn={!!user}
+                  onExit={() => navigate(realGps ? '/' : '/play')}
+                  onLogout={async () => {
+                    try {
+                      await signOut();
+                      navigate('/login');
+                    } catch {
+                      toast.error('로그아웃에 실패했어요. 다시 시도해 주세요');
+                    }
+                  }}
+                  onRestoreSave={g.reloadSaveFromBestSource}
+                  trigger={
+                    <button
+                      type="button"
+                      className="flex flex-col items-center text-amber-100 hover:text-white group cursor-pointer"
+                      title="게임 설정"
+                    >
+                      <div className="w-8 h-8 rounded border border-[#2b1d14] bg-[#7a7267] flex items-center justify-center shadow group-active:translate-y-[1px]">
+                        <Settings className="h-4 w-4 text-amber-200" />
+                      </div>
+                      <span className="text-[9px] font-bold mt-0.5">설정</span>
+                    </button>
+                  }
+                />
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* Top HUD Auto-Save Indicator */}
       <AnimatePresence>
@@ -1674,20 +1848,21 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: -4 }}
             transition={{ duration: 0.2 }}
-            className="pixel-frame fixed top-[calc(0.75rem+env(safe-area-inset-top))] right-3 z-50 flex items-center gap-1 rounded bg-stone-900/95 border border-emerald-500/70 px-2 py-0.5 text-[10px] font-bold text-emerald-400 shadow-lg backdrop-blur pointer-events-none"
+            className="pixel-frame fixed top-[calc(0.75rem+env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 rounded bg-stone-900/95 border border-emerald-500/70 px-2.5 py-0.5 text-[10px] font-bold text-emerald-400 shadow-lg backdrop-blur pointer-events-none font-pixel"
           >
             <span>저장됨 ✓</span>
           </motion.div>
         )}
       </AnimatePresence>
 
+      {/* Active Target Banner */}
       {activeTarget && (() => {
         const d = distanceM(s.pos, activeTarget);
         return (
           <button
             type="button"
             onClick={() => setRadarOpen(true)}
-            className="pixel-frame absolute left-1/2 top-[calc(7.25rem+env(safe-area-inset-top))] z-20 flex max-w-[65%] -translate-x-1/2 items-center gap-1.5 rounded border border-emerald-500 bg-[#0d1911]/95 text-white py-1 px-2.5 text-xs shadow-lg"
+            className="pixel-frame absolute left-1/2 top-[calc(max(0.6rem,env(safe-area-inset-top))+4.5rem)] z-20 flex max-w-[65%] -translate-x-1/2 items-center gap-1.5 rounded border border-emerald-500 bg-[#0d1911]/95 text-white py-1 px-2.5 text-xs shadow-lg font-pixel"
           >
             <Navigation className="!h-3.5 !w-3.5 shrink-0 text-emerald-400" style={{ transform: `rotate(${bearingDeg(s.pos, activeTarget) - mapBearing}deg)` }} />
             <span className="truncate text-emerald-100">{activeTarget.name}</span>
@@ -1696,95 +1871,211 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         );
       })()}
 
-      {/* Right drawer: survival actions */}
-      <div className="absolute right-2 top-[calc(9.25rem+env(safe-area-inset-top))] z-20 flex flex-col items-end gap-1">
-        <Button type="button" variant="outline" aria-expanded={rightOpen} aria-label={rightOpen ? '생존 메뉴 접기' : '생존 메뉴 펼치기'} onClick={() => setRightOpen((v) => !v)} className={`pixel-btn relative h-auto min-h-0 py-1.5 px-2.5 text-xs ${rightOpen ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
-          {rightOpen ? <ChevronUp className="!h-4 !w-4" /> : <Backpack className="!h-4 !w-4" />}
-        </Button>
-        <AnimatePresence>
-          {rightOpen && (
-            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex flex-col items-end gap-1">
-              <MenuBtn icon={Backpack} label="배낭" onClick={() => setPanel('bag')} />
-              <MenuBtn icon={Shield} label="상태창" onClick={() => setStatusModalOpen(true)} />
-              <MenuBtn
-                icon={BookOpen}
-                label="부족 대도감"
-                dot={g.codex?.hasUnseenNew}
-                onClick={() => {
-                  setCodexModalOpen(true);
-                  g.markCodexSeen();
-                }}
-              />
-              <MenuBtn icon={Zap} label={skillBarVisible ? '스킬들 목록 접기' : '스킬들 목록 펼치기'} onClick={() => setSkillBarVisible(v => !v)} />
-              <MenuBtn
-                icon={FileText}
-                label="밤사이 보고서 (테스트 2시간)"
-                onClick={() => {
-                  setOfflineElapsedMinutes(120);
-                  setOfflineReportModalOpen(true);
-                }}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+      {/* ── 3. Bottom Carved-Stone & Wood Swipe-Up Dock ── */}
+      {panel === 'none' && (() => {
+        const weightPct = Math.round((g.weight / Math.max(1, g.capacity)) * 100);
+        const isBagHeavy = weightPct >= 85;
+        return (
+          <aside
+            aria-label="생존 및 거점 관리 도크"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            className="fixed inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-25 flex items-center justify-between gap-1.5 rounded-t-lg rounded-b border-3 border-[#2b1d14] bg-[#5c3a1e]/95 p-1.5 shadow-[0_-2px_12px_rgba(0,0,0,0.5)] backdrop-blur-md font-pixel select-none"
+          >
+            {/* Top Center Handle (— ▲) */}
+            <button
+              type="button"
+              onClick={() => {
+                setPanel('base');
+                setBaseTab('village');
+              }}
+              className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 px-3 py-0.5 rounded-t border-t-2 border-x-2 border-[#2b1d14] bg-[#8b5a2b] text-amber-200 text-[10px] font-bold shadow hover:bg-[#9d6732] active:translate-y-[1px] cursor-pointer"
+              aria-label="통합 관리 도크 열기"
+            >
+              <span className="w-3.5 h-0.5 bg-amber-300 rounded" />
+              <span>▲</span>
+            </button>
 
-      {/* Left drawer: skills & exploration */}
-      <div className="absolute left-2 top-[calc(9.25rem+env(safe-area-inset-top))] z-20 flex flex-col items-start gap-1">
-        <Button type="button" variant="outline" aria-expanded={leftOpen} aria-label={leftOpen ? '기술 메뉴 접기' : '기술 메뉴 펼치기'} onClick={() => setLeftOpen((v) => !v)} className={`pixel-btn relative h-auto min-h-0 py-1.5 px-2.5 text-xs ${leftOpen ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
-          {leftOpen ? <ChevronUp className="!h-4 !w-4" /> : <Lightbulb className="!h-4 !w-4" />}{!leftOpen && techDone && <RedDot />}
-        </Button>
-        <AnimatePresence>
-          {leftOpen && (
-            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex flex-col items-start gap-1">
-              <MenuBtn icon={LocateFixed} label="GPS 갱신" onClick={gps.retry} />
-              <MenuBtn icon={Lightbulb} label="기술" dot={techDone} onClick={() => setPanel('tech')} />
-              <MenuBtn icon={Sparkles} label="심화 스킬트리" onClick={() => setSkillTreeModalOpen(true)} />
-              <MenuBtn icon={ListChecks} label="생존 목표" onClick={() => setPanel('quests')} />
-              <MenuBtn icon={MapIcon} label="맵" onClick={() => setRadarOpen(true)} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+            {/* Left square stone slot: [🔍 탐색] */}
+            <button
+              type="button"
+              onClick={() => setRadarOpen(true)}
+              className="pixelated w-11 h-11 shrink-0 rounded border-2 border-[#2b1d14] bg-[#7a7267] text-amber-200 hover:bg-[#8e8578] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex flex-col items-center justify-center cursor-pointer"
+              aria-label="주변 탐색 레이더 열기"
+            >
+              <Search className="h-4 w-4 text-amber-200" />
+              <span className="text-[9px] font-bold">탐색</span>
+            </button>
+
+            {/* Center horizontal pixel progress bar: Backpack weight */}
+            <div
+              onClick={() => setPanel('bag')}
+              className="flex-1 min-w-0 px-2 flex flex-col justify-center cursor-pointer"
+              title="배낭 열기"
+            >
+              <div className="flex justify-between items-center text-[10px] text-amber-200/90 font-mono mb-0.5">
+                <span className="font-pixel text-[10px]">배낭</span>
+                <span className={`font-bold ${isBagHeavy ? 'text-red-400 font-extrabold animate-pulse' : 'text-amber-100'}`}>
+                  {g.weight}/{g.capacity}kg ({weightPct}%)
+                </span>
+              </div>
+              <div className="h-2 w-full rounded bg-[#2b1d14] border border-[#2b1d14] overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-300 ${
+                    isBagHeavy ? 'bg-red-500 animate-pulse' : 'bg-amber-400'
+                  }`}
+                  style={{ width: `${Math.min(100, weightPct)}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Right 3 square wooden icon slots: [🎒 배낭], [🥚 펫], [🔥 거점] */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* [🎒 배낭] */}
+              <button
+                type="button"
+                onClick={() => setPanel('bag')}
+                className="pixelated relative w-11 h-11 rounded border-2 border-[#2b1d14] bg-[#8b5a2b] text-amber-100 hover:bg-[#9d6732] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex flex-col items-center justify-center cursor-pointer"
+                aria-label="배낭 열기"
+              >
+                <Backpack className="h-4 w-4" />
+                <span className="text-[9px] font-bold">배낭</span>
+                {isBagHeavy && (
+                  <span className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-red-500 animate-ping" />
+                )}
+              </button>
+
+              {/* [🥚 펫] */}
+              <button
+                type="button"
+                onClick={() => {
+                  setPanel('base');
+                  setBaseTab('pets');
+                }}
+                className="pixelated relative w-11 h-11 rounded border-2 border-[#2b1d14] bg-[#8b5a2b] text-amber-100 hover:bg-[#9d6732] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex flex-col items-center justify-center cursor-pointer"
+                aria-label="펫 관리 열기"
+              >
+                <Egg className="h-4 w-4" />
+                <span className="text-[9px] font-bold">펫</span>
+                {readyEgg && (
+                  <span className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-emerald-400 animate-bounce" />
+                )}
+              </button>
+
+              {/* [🔥 거점] */}
+              <button
+                type="button"
+                onClick={() => {
+                  setPanel('base');
+                  setBaseTab('village');
+                }}
+                className="pixelated relative w-11 h-11 rounded border-2 border-[#2b1d14] bg-[#8b5a2b] text-amber-100 hover:bg-[#9d6732] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex flex-col items-center justify-center cursor-pointer"
+                aria-label="거점 마을 열기"
+              >
+                <Flame className="h-4 w-4 text-amber-300" />
+                <span className="text-[9px] font-bold">거점</span>
+                {s.baseUpgrade && nowTick >= s.baseUpgrade.readyAt && (
+                  <span className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-orange-400 animate-ping" />
+                )}
+              </button>
+            </div>
+          </aside>
+        );
+      })()}
+
+      {/* UI Guide Spotlight Overlay */}
+      <UiGuideOverlay isOpen={uiGuideOpen} onClose={() => setUiGuideOpen(false)} />
 
       {!s.base && (
-        <div className="absolute inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 pixel-frame bg-card p-2 text-xs">
+        <div className="absolute inset-x-3 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+4.25rem)] z-20 pixel-frame bg-card p-2 text-xs font-pixel">
           나뭇가지 {countOf(s.backpack, 'branch')}/{CAMP_COST[0].count}개를 모아 모닥불 거점을 세우세요.
           <Button type="button" disabled={realGps && !gps.ready && !gps.isIndoor} onClick={g.placeBase} className="pixel-btn mt-1.5 h-auto min-h-0 w-full py-1.5 px-2.5 text-xs">여기에 모닥불 세우기</Button>
         </div>
       )}
 
       {view === 'user' && skillBarVisible && <SkillQuickBar known={s.techs} cooldowns={s.cooldowns} levels={s.skillLevels} ready={actionReady} onUse={(id) => activateSkill(id)} />}
-      {!realGps && s.base && <button type="button" onClick={() => setPanel('quests')} className="pixel-frame absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-2 z-20 flex max-w-[60%] items-center gap-1.5 bg-card py-1.5 px-2.5 text-left text-xs">
-        <ListChecks className="!h-4 !w-4 shrink-0 text-primary" />
-        <span className="min-w-0 truncate">
-          {s.level >= 5 && !s.languageLearned ? `🧙 ${LANGUAGE_QUEST.title}` : `🧙 ${g.quest?.title ?? '모든 목표 완료'}`}
-        </span>
-        <span className="shrink-0 text-primary">
-          {s.level >= 5 && !s.languageLearned ? '말 배우기!' : g.canClaimQuest ? '보상!' : g.questProgress ? `${g.questProgress.cur}/${g.questProgress.max}` : '완료'}
-        </span>
-      </button>}
 
       <AnimatePresence>
         {panel !== 'none' && (
           <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 26, stiffness: 260 }}
             className={
-              panel === 'base'
-                ? 'fixed inset-0 z-40 flex flex-col bg-background pt-[max(0.5rem,env(safe-area-inset-top))]'
+              panel === 'base' || panel === 'bag'
+                ? 'fixed inset-x-0 bottom-0 top-[max(2.5rem,env(safe-area-inset-top))] z-40 flex flex-col bg-background border-t-4 border-[#2b1d14] shadow-2xl'
                 : 'absolute inset-x-0 bottom-0 z-30 flex max-h-[75dvh] flex-col border-t-4 border-foreground bg-background'
             }>
-            <div className="flex items-center justify-between border-b-2 border-foreground bg-card px-3 py-2">
-              <b className="text-lg">
-                {panel === 'bag'
-                  ? '배낭'
-                  : panel === 'base'
-                    ? `🏕️ ${g.baseDef?.name ?? '거점'} (Lv.${s.base?.level ?? 1}) · 마을 건설`
-                    : panel === 'quests'
-                      ? '🧙 떠돌이 주술사의 생존 목표'
-                      : panel === 'favs'
-                        ? '즐겨찾기'
-                        : '제작 기술'}
-              </b>
+            <div className="flex items-center justify-between border-b-2 border-[#2b1d14] bg-card px-2.5 py-2 font-pixel">
+              {panel === 'base' || panel === 'bag' ? (
+                /* 4 clean tabs: [🔥 거점] [🚩 원정대] [🥚 펫] [🎒 배낭] */
+                <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPanel('base');
+                      setBaseTab('village');
+                    }}
+                    className={`pixelated px-2.5 py-1 text-xs font-bold rounded border-2 border-[#2b1d14] transition-all flex items-center gap-1 cursor-pointer ${
+                      panel === 'base' && (baseTab === 'village' || baseTab === 'lab' || baseTab === 'craft' || baseTab === 'storage')
+                        ? 'bg-[#8b5a2b] text-amber-100 shadow-[2px_2px_0_0_#2b1d14]'
+                        : 'bg-[#5c4432] text-stone-300 opacity-80 hover:opacity-100'
+                    }`}
+                  >
+                    <span>🔥</span>
+                    <span>거점</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPanel('base');
+                      setBaseTab('expedition');
+                    }}
+                    className={`pixelated px-2.5 py-1 text-xs font-bold rounded border-2 border-[#2b1d14] transition-all flex items-center gap-1 cursor-pointer ${
+                      panel === 'base' && baseTab === 'expedition'
+                        ? 'bg-[#8b5a2b] text-amber-100 shadow-[2px_2px_0_0_#2b1d14]'
+                        : 'bg-[#5c4432] text-stone-300 opacity-80 hover:opacity-100'
+                    }`}
+                  >
+                    <span>🚩</span>
+                    <span>원정대</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPanel('base');
+                      setBaseTab('pets');
+                    }}
+                    className={`pixelated px-2.5 py-1 text-xs font-bold rounded border-2 border-[#2b1d14] transition-all flex items-center gap-1 cursor-pointer ${
+                      panel === 'base' && baseTab === 'pets'
+                        ? 'bg-[#8b5a2b] text-amber-100 shadow-[2px_2px_0_0_#2b1d14]'
+                        : 'bg-[#5c4432] text-stone-300 opacity-80 hover:opacity-100'
+                    }`}
+                  >
+                    <span>🥚</span>
+                    <span>펫</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPanel('bag');
+                    }}
+                    className={`pixelated px-2.5 py-1 text-xs font-bold rounded border-2 border-[#2b1d14] transition-all flex items-center gap-1 cursor-pointer ${
+                      panel === 'bag'
+                        ? 'bg-[#8b5a2b] text-amber-100 shadow-[2px_2px_0_0_#2b1d14]'
+                        : 'bg-[#5c4432] text-stone-300 opacity-80 hover:opacity-100'
+                    }`}
+                  >
+                    <span>🎒</span>
+                    <span>배낭</span>
+                  </button>
+                </div>
+              ) : (
+                <b className="text-base">
+                  {panel === 'quests'
+                    ? '🧙 떠돌이 주술사의 생존 목표'
+                    : panel === 'favs'
+                      ? '즐겨찾기'
+                      : '제작 기술'}
+                </b>
+              )}
               <button
                 type="button"
                 aria-label="닫기"
@@ -1792,9 +2083,9 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   setPanel('none');
                   if (view === 'base') setView('user');
                 }}
-                className="relative z-[90] pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-md border-2 border-foreground bg-card text-foreground hover:bg-accent active:scale-95 shadow-lg"
+                className="relative z-[90] pointer-events-auto flex h-9 w-9 shrink-0 items-center justify-center rounded border-2 border-[#2b1d14] bg-[#7a7267] text-amber-200 hover:bg-[#8e8578] active:scale-95 shadow cursor-pointer"
               >
-                <X className="!h-6 !w-6" />
+                <X className="!h-5 !w-5" />
               </button>
             </div>
             <div className="flex-1 space-y-4 overflow-y-auto p-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
@@ -1870,11 +2161,13 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               {panel === 'base' && (!s.base ? <p className="text-sm">아직 거점이 없습니다.</p> : (
                 <>
                   {!g.inBase && <p className="pixel-frame bg-accent p-2 text-sm">거점 반경 안에서만 제작·연구할 수 있어요.</p>}
-                  <div className="sticky top-0 z-10 -mx-3 -mt-3 grid grid-cols-6 gap-1 border-b border-border bg-background p-2">
-                    {([['village','마을'],['lab','연구·발명'],['craft','제작'],['storage','창고'],['expedition','원정'],['pets','펫']] as const).map(([id, label]) => (
-                      <Button key={id} type="button" variant={baseTab === id ? 'default' : 'outline'} onClick={() => setBaseTab(id)} className="pixel-btn h-auto min-h-0 py-1.5 px-1 text-xs">{label}{id === 'expedition' && s.expedition && nowTick >= s.expedition.readyAt ? ' •' : ''}</Button>
-                    ))}
-                  </div>
+                  {(baseTab === 'village' || baseTab === 'lab' || baseTab === 'craft' || baseTab === 'storage') && (
+                    <div className="sticky top-0 z-10 -mx-3 -mt-3 grid grid-cols-4 gap-1 border-b border-border bg-background p-2 font-pixel">
+                      {([['village','마을 광장'],['lab','연구·발명'],['craft','제작'],['storage','창고']] as const).map(([id, label]) => (
+                        <Button key={id} type="button" variant={baseTab === id ? 'default' : 'outline'} onClick={() => setBaseTab(id)} className="pixel-btn h-auto min-h-0 py-1.5 px-1 text-xs">{label}</Button>
+                      ))}
+                    </div>
+                  )}
                   {baseTab === 'village' && (
                     <BaseVillageView
                       village={s.village}
