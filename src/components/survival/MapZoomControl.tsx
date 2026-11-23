@@ -14,7 +14,7 @@ export default function MapZoomControl({ onZoomBy, onReset }: Props) {
   const [open, setOpen] = useState(false);
   const btn = 'pixel-btn flex items-center justify-center bg-card py-1.5 px-2.5 text-xs';
   return (
-    <div className="absolute bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+2rem)] right-2 z-20 flex flex-col items-end gap-1">
+    <div className="absolute bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+5.2rem)] right-2.5 z-20 flex flex-col items-end gap-1">
       <AnimatePresence>
         {open && (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
