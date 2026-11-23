@@ -33,6 +33,7 @@ import { CREATURES } from '@/lib/survival/entities';
 import { TRIBE_CLASS_LIST } from '@/data/tribeClasses';
 import { useCustomCatalog } from '@/hooks/useCustomCatalog';
 import TribeSprite from '@/components/survival/TribeSprite';
+import { getBuiltinMobSprite, PREHISTORIC_MOBS } from '@/utils/mobSpriteFactory';
 
 const TRIBE_TARGETS = [
   { key: 'tribe', label: '부족민 (공통 기본)' },
@@ -165,7 +166,17 @@ export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARAC
 
   // Normalizer configuration options
   const isMob = CHARACTER.startsWith('mob:');
-  const targetCellSize = isMob ? 64 : 48;
+  const mobSpecies = isMob ? CHARACTER.replace('mob:', '') : '';
+  let builtinMob: ReturnType<typeof getBuiltinMobSprite> | null = null;
+  if (isMob) {
+    try {
+      builtinMob = getBuiltinMobSprite(mobSpecies, action === 'attack' ? 'attack' : 'idle');
+    } catch {
+      builtinMob = null;
+    }
+  }
+
+  const targetCellSize = isMob ? (builtinMob?.cellWidth || 64) : 48;
   const [autoChroma, setAutoChroma] = useState(true);
   const [bgMode, setBgMode] = useState<'auto' | 'hot_pink' | 'white'>('auto');
   const [tolerance, setTolerance] = useState(25);
@@ -179,8 +190,11 @@ export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARAC
     if (current) {
       setFrames(current.frame_count);
       setFps(current.fps);
+    } else if (builtinMob) {
+      setFrames(builtinMob.frames);
+      setFps(builtinMob.fps);
     }
-  }, [current]);
+  }, [current, builtinMob?.frames, builtinMob?.fps]);
 
   // Run auto-normalizer when rawFile or options change
   useEffect(() => {
@@ -350,7 +364,8 @@ export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARAC
     ? TRIBE_ACTION_TITLE[action] ?? SPRITE_ACTION_LABELS[action]
     : SPRITE_ACTION_LABELS[action];
 
-  const displaySrc = normalizedResult?.previewUrl ?? current?.url;
+  const displaySrc = normalizedResult?.previewUrl ?? current?.url ?? builtinMob?.url;
+  const isUsingBuiltin = !normalizedResult && !current && !!builtinMob;
   const targetScale = data?.scale ?? 1.0;
   const previewHeight = Math.min(110, Math.round(72 * targetScale));
 
@@ -377,11 +392,15 @@ export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARAC
         ) : displaySrc ? (
           <div className="flex flex-col items-center justify-center gap-1">
             <SpriteAnimator url={displaySrc} frames={frames} fps={fps} height={previewHeight} />
-            {normalizedResult && (
+            {normalizedResult ? (
               <span className="rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 text-[10px] font-bold">
                 ✓ {normalizedResult.cellWidth}×{normalizedResult.cellHeight}px 발 기준선 정렬 완료
               </span>
-            )}
+            ) : isUsingBuiltin ? (
+              <span className="rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 text-[10px] font-bold">
+                16비트 내장 도트 (업로드 시 대체)
+              </span>
+            ) : null}
           </div>
         ) : isTribeTarget ? (
           <div className="flex flex-col items-center gap-1">
@@ -536,10 +555,16 @@ export default function SpriteAssets() {
       key: `pet:${p.pet_id}`,
       label: `커스텀 펫 · 🐾 ${p.name}`,
     })),
-    ...Object.entries(CREATURES).map(([k, c]) => ({
-      key: `mob:${k}`,
-      label: `${k.startsWith('custom_') ? '커스텀 몹' : '야생 몹'} · ${c.name}`,
+    ...PREHISTORIC_MOBS.map(m => ({
+      key: `mob:${m.id}`,
+      label: `🦖 선사시대 몹 · [${m.tier}] ${m.name}`,
     })),
+    ...Object.entries(CREATURES)
+      .filter(([k]) => !PREHISTORIC_MOBS.some(m => m.id === k))
+      .map(([k, c]) => ({
+        key: `mob:${k}`,
+        label: `${k.startsWith('custom_') ? '커스텀 몹' : '야생 몹'} · ${c.name}`,
+      })),
   ];
 
   const isTribe = target === 'tribe' || target.startsWith('tribe:');
@@ -560,33 +585,48 @@ export default function SpriteAssets() {
       <div>
         <h1 className="text-2xl font-bold">캐릭터 · 펫 · 몹 스프라이트 스튜디오</h1>
         <p className="text-sm text-muted-foreground">
-          유저 캐릭터의 10가지 액션 모션(기본, 걷기, 공격, 벌목, 채집, 대화, 똥싸기, 코딱지파기, 신난다, 피격)과 펫/몹의 스프라이트 시트 및 크기 비율(배율)을 직접 등록·관리합니다. 업로드 시 자동 규격화(크로마키 배경 투명화 및 발 기준선 정렬)가 즉시 적용됩니다.
+          유저 캐릭터의 10가지 액션 모션(기본, 걷기, 공격, 벌목, 채집, 대화, 똥싸기, 코딱지파기, 신난다, 피격)과 펫/몹의 스프라이트 시트 및 크기 비율(배율)을 직접 등록·관리합니다. 13종의 선사시대 몹·공룡은 16비트 내장 도트 애니메이션이 기본 탑재되어 있으며, 업로드 시 즉시 커스텀 도트로 오버라이드됩니다.
         </p>
       </div>
 
-      {/* Target Quick Select */}
-      <div className="flex flex-wrap gap-1.5" role="group" aria-label="빠른 대상 선택">
+      {/* Target Quick Category Select */}
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="카테고리 빠른 선택">
         <Button
           type="button"
           size="sm"
-          variant={target === 'hunter' ? 'default' : 'outline'}
+          variant={target.startsWith('hunter') ? 'default' : 'outline'}
           onClick={() => setTarget('hunter')}
           className="text-xs font-bold"
         >
-          👤 유저 캐릭터 (10가지 액션)
+          👤 유저 캐릭터
         </Button>
-        {TRIBE_TARGETS.slice(1).map(t => (
-          <Button
-            key={t.key}
-            type="button"
-            size="sm"
-            variant={target === t.key ? 'default' : 'outline'}
-            onClick={() => setTarget(t.key)}
-            className="text-xs"
-          >
-            {t.label.split('·')[1]?.trim() ?? t.label}
-          </Button>
-        ))}
+        <Button
+          type="button"
+          size="sm"
+          variant={isTribe ? 'default' : 'outline'}
+          onClick={() => setTarget('tribe')}
+          className="text-xs font-bold"
+        >
+          👥 부족 용병
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={isPet ? 'default' : 'outline'}
+          onClick={() => setTarget('pet:baby_raptor')}
+          className="text-xs font-bold"
+        >
+          🦕 공룡 펫
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={isMob ? 'default' : 'outline'}
+          onClick={() => setTarget('mob:boar')}
+          className="text-xs font-bold"
+        >
+          🦖 선사 몹·공룡 (13종)
+        </Button>
       </div>
 
       <div className="flex items-center gap-2">

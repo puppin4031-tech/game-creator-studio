@@ -9,6 +9,7 @@ import { addStacks, countOf } from '@/lib/survival/inventory';
 import { playSample, playSfx, haptic } from '@/lib/survival/gameSettings';
 import type { Stack } from '@/lib/survival/types';
 import PetSprite from './PetSprite';
+import CreatureSprite from './CreatureSprite';
 import { HpBar } from './HitFeedback';
 import boarImg from '@/assets/survival/mob-boar.png';
 import wolfImg from '@/assets/survival/mob-wolf.png';
@@ -25,6 +26,7 @@ export const DINO_MEAT_HEAL_AMOUNT = 35;
 export interface DinoEncounter {
   id: string;
   kind: 'node' | 'beast';
+  speciesId?: string;
   name: string;
   spriteUrl: string;
   hp: number;
@@ -74,6 +76,7 @@ const ENCOUNTER_TEMPLATES: Omit<DinoEncounter, 'id' | 'xPct'>[] = [
   },
   {
     kind: 'beast',
+    speciesId: 'boar',
     name: '성난 멧돼지',
     spriteUrl: boarImg,
     hp: 48,
@@ -99,6 +102,7 @@ const ENCOUNTER_TEMPLATES: Omit<DinoEncounter, 'id' | 'xPct'>[] = [
   },
   {
     kind: 'beast',
+    speciesId: 'wolf',
     name: '굶주린 회색 늑대',
     spriteUrl: wolfImg,
     hp: 62,
@@ -124,6 +128,7 @@ const ENCOUNTER_TEMPLATES: Omit<DinoEncounter, 'id' | 'xPct'>[] = [
   },
   {
     kind: 'beast',
+    speciesId: 'raptor',
     name: '사나운 랩터',
     spriteUrl: raptorImg,
     hp: 88,
@@ -137,6 +142,48 @@ const ENCOUNTER_TEMPLATES: Omit<DinoEncounter, 'id' | 'xPct'>[] = [
   },
   {
     kind: 'beast',
+    speciesId: 'sabertooth',
+    name: '사나운 검치호',
+    spriteUrl: wolfImg,
+    hp: 110,
+    maxHp: 110,
+    atk: 18,
+    loot: [
+      { itemId: 'raw_meat', count: 3 },
+      { itemId: 'tusk', count: 1 },
+      { itemId: 'hide', count: 2 },
+    ],
+  },
+  {
+    kind: 'beast',
+    speciesId: 'bear',
+    name: '동굴곰',
+    spriteUrl: boarImg,
+    hp: 130,
+    maxHp: 130,
+    atk: 20,
+    loot: [
+      { itemId: 'raw_meat', count: 4 },
+      { itemId: 'fur', count: 2 },
+    ],
+  },
+  {
+    kind: 'beast',
+    speciesId: 'triceratops',
+    name: '돌진하는 트리케라톱스',
+    spriteUrl: raptorImg,
+    hp: 170,
+    maxHp: 170,
+    atk: 24,
+    loot: [
+      { itemId: 'raw_meat', count: 5 },
+      { itemId: 'bone', count: 4 },
+      { itemId: 'hide', count: 3 },
+    ],
+  },
+  {
+    kind: 'beast',
+    speciesId: 'mammoth',
     name: '우두머리 눈보라 매머드',
     spriteUrl: mammothImg,
     hp: 150,
@@ -146,6 +193,20 @@ const ENCOUNTER_TEMPLATES: Omit<DinoEncounter, 'id' | 'xPct'>[] = [
       { itemId: 'raw_meat', count: 5 },
       { itemId: 'frost_pelt', count: 1 },
       { itemId: 'tusk', count: 2 },
+    ],
+  },
+  {
+    kind: 'beast',
+    speciesId: 'trex',
+    name: '폭군 티라노사우루스 렉스',
+    spriteUrl: raptorImg,
+    hp: 250,
+    maxHp: 250,
+    atk: 35,
+    loot: [
+      { itemId: 'raw_meat', count: 8 },
+      { itemId: 'bone', count: 6 },
+      { itemId: 'dino_egg', count: 2 },
     ],
   },
   {
@@ -827,11 +888,21 @@ export default function DinoExpeditionModal({
                         : 'scaleX(-1)',
                   }}
                 >
-                  <img
-                    src={encounter.spriteUrl}
-                    alt={encounter.name}
-                    className="pixelated h-16 w-16 object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]"
-                  />
+                  {encounter.kind === 'beast' ? (
+                    <CreatureSprite
+                      type={encounter.speciesId || 'boar'}
+                      fallbackUrl={encounter.spriteUrl}
+                      width={64}
+                      height={64}
+                      attacking={engaged}
+                    />
+                  ) : (
+                    <img
+                      src={encounter.spriteUrl}
+                      alt={encounter.name}
+                      className="pixelated h-16 w-16 object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]"
+                    />
+                  )}
                 </div>
               </div>
             )}

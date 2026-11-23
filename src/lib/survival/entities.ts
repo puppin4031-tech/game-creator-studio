@@ -237,6 +237,11 @@ export const CREATURES = {
     loot: [{ itemId: 'raw_meat', min: 1, max: 1 }, { itemId: 'hide', min: 1, max: 1, chance: 0.6 }], xp: 6,
     biomes: { plains: 5, forest: 3, wetland: 3 }, nightWeight: 0.2,
   },
+  dodo: {
+    name: '도도새', sprite: 'mob-dodo', hp: 12, atk: 2, temper: 'passive', escapeChance: 0.4,
+    loot: [{ itemId: 'raw_meat', min: 1, max: 2 }, { itemId: 'fiber', min: 1, max: 2 }], xp: 10,
+    biomes: { plains: 4, forest: 2 }, nightWeight: 0.1,
+  },
   boar: {
     name: '멧돼지', sprite: 'mob-boar', hp: 24, atk: 5, temper: 'neutral',
     loot: [{ itemId: 'raw_meat', min: 2, max: 3 }, { itemId: 'hide', min: 1, max: 2 }, { itemId: 'fur', min: 1, max: 1, chance: 0.3 }, { itemId: 'bone', min: 1, max: 1 }, { itemId: 'tusk', min: 1, max: 1, chance: 0.25 }], xp: 22,
@@ -252,10 +257,45 @@ export const CREATURES = {
     loot: [{ itemId: 'hide', min: 2, max: 3 }, { itemId: 'bone', min: 2, max: 3 }, { itemId: 'raw_meat', min: 2, max: 2 }], xp: 45,
     biomes: { rocky: 3, forest: 1, plains: 1 }, nightWeight: 1.4,
   },
+  eagle: {
+    name: '거대 독수리', sprite: 'mob-eagle', hp: 28, atk: 6, temper: 'aggressive',
+    loot: [{ itemId: 'hide', min: 1, max: 2 }, { itemId: 'raw_meat', min: 1, max: 2 }, { itemId: 'bone', min: 1, max: 2 }], xp: 35,
+    biomes: { rocky: 4, plains: 2 }, nightWeight: 1.2,
+  },
+  sabertooth: {
+    name: '검치호 (세이버투스)', sprite: 'mob-sabertooth', hp: 48, atk: 11, temper: 'aggressive', nightAggressive: true,
+    loot: [{ itemId: 'hide', min: 2, max: 3 }, { itemId: 'prime_pelt', min: 1, max: 1, chance: 0.3 }, { itemId: 'ancient_fang', min: 1, max: 1, chance: 0.3 }, { itemId: 'raw_meat', min: 3, max: 4 }], xp: 75,
+    biomes: { rocky: 2, forest: 3, plains: 2 }, nightWeight: 2.0,
+  },
+  bear: {
+    name: '선사시대 동굴곰', sprite: 'mob-bear', hp: 60, atk: 12, temper: 'neutral',
+    loot: [{ itemId: 'hide', min: 3, max: 4 }, { itemId: 'prime_pelt', min: 1, max: 2 }, { itemId: 'bone', min: 3, max: 4 }, { itemId: 'raw_meat', min: 4, max: 5 }], xp: 90,
+    biomes: { forest: 3, rocky: 3, wetland: 1 }, nightWeight: 1.0,
+  },
+  crocodile: {
+    name: '거대 고대악어', sprite: 'mob-crocodile', hp: 52, atk: 10, temper: 'aggressive',
+    loot: [{ itemId: 'hide', min: 3, max: 4 }, { itemId: 'bone', min: 2, max: 3 }, { itemId: 'raw_meat', min: 3, max: 4 }], xp: 80,
+    biomes: { wetland: 5, plains: 1 }, nightWeight: 1.5,
+  },
+  triceratops: {
+    name: '트리케라톱스', sprite: 'mob-triceratops', hp: 80, atk: 14, temper: 'neutral',
+    loot: [{ itemId: 'hide', min: 4, max: 6 }, { itemId: 'bone', min: 4, max: 5 }, { itemId: 'raw_meat', min: 5, max: 7 }, { itemId: 'tusk', min: 1, max: 2 }], xp: 120,
+    biomes: { plains: 3, wetland: 2, forest: 2 }, nightWeight: 0.5,
+  },
   mammoth: {
     name: '눈보라 털매머드', sprite: 'mob-mammoth', hp: 90, atk: 15, temper: 'neutral',
     loot: [{ itemId: 'frost_pelt', min: 1, max: 2 }, { itemId: 'raw_meat', min: 6, max: 8 }, { itemId: 'hide', min: 4, max: 5 }, { itemId: 'tusk', min: 2, max: 2 }, { itemId: 'bone', min: 4, max: 5 }], xp: 130,
     biomes: { wetland: 1.2, plains: 0.8, rocky: 0.6 }, nightWeight: 0.6,
+  },
+  trex: {
+    name: '티라노사우루스 렉스', sprite: 'mob-trex', hp: 150, atk: 25, temper: 'aggressive', boss: true,
+    loot: [{ itemId: 'prime_pelt', min: 2, max: 4 }, { itemId: 'ancient_fang', min: 2, max: 3 }, { itemId: 'alpha_heart', min: 1, max: 1 }, { itemId: 'raw_meat', min: 8, max: 12 }], xp: 380,
+    biomes: { rocky: 1, plains: 1 }, nightWeight: 1.2,
+  },
+  skull_dragon: {
+    name: '스컬 드래곤 (심연의 골룡)', sprite: 'mob-skull-dragon', hp: 220, atk: 32, temper: 'aggressive', boss: true,
+    loot: [{ itemId: 'ancient_fang', min: 3, max: 4 }, { itemId: 'meteor_shard', min: 1, max: 2 }, { itemId: 'alpha_heart', min: 1, max: 1 }, { itemId: 'raw_meat', min: 10, max: 15 }], xp: 550,
+    biomes: { rocky: 0.5 }, nightWeight: 2.0,
   },
   boss_direwolf: {
     name: '우두머리 · 거대 늑대', sprite: 'mob-wolf', hp: 72, atk: 9, temper: 'aggressive', boss: true,
@@ -273,7 +313,7 @@ export const CREATURES = {
   },
 } satisfies Record<string, CreatureDef>;
 
-export const BOSS_TYPES = ['boss_direwolf', 'boss_mammoth'] as const;
+export const BOSS_TYPES = ['boss_direwolf', 'boss_mammoth', 'trex', 'skull_dragon'] as const;
 
 export type CreatureType = keyof typeof CREATURES;
 
