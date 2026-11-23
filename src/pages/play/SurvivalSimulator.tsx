@@ -2,7 +2,7 @@ import { tribeRatio, tribeInjured } from '@/lib/survival/mercenaries';
 import { DEFAULT_TRIBE_CLASS, getTribeClass, type TribeClassId } from '@/data/tribeClasses';
 // @refresh reset
 // Custom GPS/world hook changes must remount this screen instead of reusing stale hook queues.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SkillControls, ConstructionControls, CompanionControls, SkillEffect } from '@/components/survival/SurvivalAbilities';
 import CharacterSprite from '@/components/survival/CharacterSprite';
 import WinterThemeOverlay from '@/components/WinterThemeOverlay';
