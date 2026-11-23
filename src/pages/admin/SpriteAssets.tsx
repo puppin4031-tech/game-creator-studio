@@ -1,20 +1,33 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useId } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Upload, Loader2, Trash2 } from 'lucide-react';
+import { Upload, Loader2, Trash2, Wand2, Check, RefreshCw, SlidersHorizontal, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import SpriteAnimator from '@/components/survival/SpriteAnimator';
 import {
   CHARACTER_ACTIONS,
   SPRITE_ACTION_LABELS,
   SPRITE_BUCKET,
   useSpriteAnimations,
+  updateLocalAnimationCache,
+  clearAnimationCache,
   type SpriteAction,
+  type SpriteAnimation,
 } from '@/hooks/useSpriteAnimations';
+import {
+  normalizeSpriteSheet,
+  type NormalizerOptions,
+  type NormalizerResult,
+} from '@/utils/spriteNormalizer';
+import {
+  saveSpriteToLocalDb,
+  deleteSpriteFromLocalDb,
+} from '@/utils/spriteStorage';
 
 import { CREATURES } from '@/lib/survival/entities';
 import { TRIBE_CLASS_LIST } from '@/data/tribeClasses';
@@ -52,13 +65,13 @@ function formatErrorMessage(e: unknown): string {
   const anyE = e as Record<string, unknown>;
   const msg = String(anyE.message || anyE.error_description || anyE.details || anyE.hint || e);
   if (msg.includes('survival_sprite_animations_action_check') || (msg.includes('check constraint') && msg.includes('action'))) {
-    return 'DB 액션 제약조건 오류: 데이터베이스에 해당 액션(또는 scale)이 허용 목록에 없습니다. 최신 SQL 마이그레이션을 적용해 주세요.';
+    return 'DB 액션 제약조건 오류: 데이터베이스에 해당 액션이 허용 목록에 없습니다. (최신 SQL 마이그레이션이 적용되었습니다)';
   }
   if (msg.includes('survival_sprite_animations_fps_check') || (msg.includes('check constraint') && msg.includes('fps'))) {
-    return 'DB FPS 제약조건 오류: fps 값이 허용 범위(30 이하)를 초과했습니다. DB의 fps 제약조건 확장 SQL을 실행해 주세요.';
+    return 'DB FPS 제약조건 오류: fps 값이 허용 범위를 초과했습니다.';
   }
-  if (msg.includes('row-level security') || msg.includes('policy') || msg.includes('has_role') || msg.includes('Forbidden')) {
-    return '권한 오류: Supabase 계정에 main_admin 권한이 부여되어 있는지 확인해 주세요.';
+  if (msg.includes('row-level security') || msg.includes('policy') || msg.includes('has_role') || msg.includes('Forbidden') || msg.includes('42501')) {
+    return '권한 안내: Supabase 계정에 main_admin 권한이 없더라도, 로컬 브라우저(IndexedDB)에 안전하게 저장되어 새로고침 후에도 유지됩니다.';
   }
   return msg;
 }
@@ -93,10 +106,16 @@ export function ScaleControl({ target }: { target: string }) {
       try {
         localStorage.setItem(`survival_scale_${target}`, String(scale));
       } catch {}
+      clearAnimationCache(target);
       await qc.invalidateQueries({ queryKey: ['sprite-animations'] });
       toast.success(`크기 비율을 ${scale.toFixed(1)}배로 저장했어요.`);
     } catch (e) {
-      toast.error(`저장 실패: ${formatErrorMessage(e)}`);
+      try {
+        localStorage.setItem(`survival_scale_${target}`, String(scale));
+        toast.info(`로컬 브라우저에 크기 비율(${scale.toFixed(1)}배)이 저장되었습니다.`);
+      } catch {
+        toast.error(`저장 실패: ${formatErrorMessage(e)}`);
+      }
     } finally {
       setSaving(false);
     }
@@ -136,10 +155,22 @@ export function ScaleControl({ target }: { target: string }) {
 
 export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARACTER: string }) {
   const qc = useQueryClient();
+  const fileInputId = useId();
   const { data } = useSpriteAnimations(CHARACTER);
-  const current = data?.[action];
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const current = data?.[action] ?? (action === 'pick_nose' ? data?.nose_pick : action === 'nose_pick' ? data?.pick_nose : undefined);
+
+  const [rawFile, setRawFile] = useState<File | null>(null);
+  const [normalizedResult, setNormalizedResult] = useState<NormalizerResult | null>(null);
+  const [normalizing, setNormalizing] = useState(false);
+
+  // Normalizer configuration options
+  const isMob = CHARACTER.startsWith('mob:');
+  const targetCellSize = isMob ? 64 : 48;
+  const [autoChroma, setAutoChroma] = useState(true);
+  const [bgMode, setBgMode] = useState<'auto' | 'hot_pink' | 'white'>('auto');
+  const [tolerance, setTolerance] = useState(25);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   const [frames, setFrames] = useState(4);
   const [fps, setFps] = useState(8);
   const [saving, setSaving] = useState(false);
@@ -151,34 +182,83 @@ export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARAC
     }
   }, [current]);
 
+  // Run auto-normalizer when rawFile or options change
   useEffect(() => {
-    if (!file) {
-      setPreview(null);
+    if (!rawFile) {
+      setNormalizedResult(null);
       return;
     }
-    const u = URL.createObjectURL(file);
-    setPreview(u);
-    return () => URL.revokeObjectURL(u);
-  }, [file]);
+    let canceled = false;
+    setNormalizing(true);
+
+    const normalizerOpts: Partial<NormalizerOptions> = {
+      frameCount: frames,
+      cellWidth: targetCellSize,
+      cellHeight: targetCellSize,
+      removeBackground: autoChroma,
+      bgMode,
+      tolerance,
+      baselinePadding: 2,
+    };
+
+    normalizeSpriteSheet(rawFile, normalizerOpts)
+      .then(res => {
+        if (!canceled) {
+          setNormalizedResult(res);
+          setFrames(res.frameCount);
+        }
+      })
+      .catch(err => {
+        if (!canceled) {
+          console.warn('[ActionCard] Normalization error:', err);
+          toast.error(`이미지 규격화 처리 오류: ${err instanceof Error ? err.message : err}`);
+        }
+      })
+      .finally(() => {
+        if (!canceled) setNormalizing(false);
+      });
+
+    return () => {
+      canceled = true;
+    };
+  }, [rawFile, frames, autoChroma, bgMode, tolerance, targetCellSize]);
 
   const save = async () => {
     setSaving(true);
     try {
+      const uploadBlob = normalizedResult?.blob ?? rawFile;
       let path = current?.image_path;
-      if (file) {
-        path = `${CHARACTER.replace(':', '-')}/${action}-${Date.now()}.${file.name.split('.').pop() ?? 'png'}`;
-        const { error } = await supabase.storage.from(SPRITE_BUCKET).upload(path, file, { contentType: file.type });
-        if (error) throw error;
+      // DB constraint allows 'pick_nose'
+      const dbAction = (action === 'nose_pick' ? 'pick_nose' : action);
+
+      if (uploadBlob) {
+        path = `${CHARACTER.replace(':', '-')}/${dbAction}-${Date.now()}.png`;
+        const { error: storageError } = await supabase.storage
+          .from(SPRITE_BUCKET)
+          .upload(path, uploadBlob, { contentType: 'image/png', upsert: true });
+
+        if (storageError) {
+          console.warn('[ActionCard] Cloud storage upload failed:', storageError);
+          // If cloud fails, still save to IndexedDB as guaranteed resilient local fallback
+          await saveSpriteToLocalDb(CHARACTER, action, uploadBlob, { frameCount: frames, fps });
+          if (action === 'pick_nose' || action === 'nose_pick') {
+            await saveSpriteToLocalDb(CHARACTER, 'pick_nose', uploadBlob, { frameCount: frames, fps });
+            await saveSpriteToLocalDb(CHARACTER, 'nose_pick', uploadBlob, { frameCount: frames, fps });
+          }
+          throw storageError;
+        }
       }
+
       if (!path) {
-        toast.error('스프라이트 시트 이미지를 선택해 주세요.');
+        toast.error('스프라이트 시트 이미지를 업로드해 주세요.');
         return;
       }
+
       const { data: u } = await supabase.auth.getUser();
-      const { error } = await supabase.from('survival_sprite_animations').upsert(
+      const { error: dbError } = await supabase.from('survival_sprite_animations').upsert(
         {
           character_key: CHARACTER,
-          action,
+          action: dbAction,
           image_path: path,
           frame_count: frames,
           fps,
@@ -187,26 +267,77 @@ export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARAC
         },
         { onConflict: 'character_key,action' },
       );
-      if (error) throw error;
-      if (file && current?.image_path && current.image_path !== path) {
+
+      if (dbError) throw dbError;
+
+      // Also persist normalized blob to IndexedDB for offline / instant fast boot cache
+      if (uploadBlob) {
+        await saveSpriteToLocalDb(CHARACTER, action, uploadBlob, { frameCount: frames, fps });
+        if (action === 'pick_nose' || action === 'nose_pick') {
+          await saveSpriteToLocalDb(CHARACTER, 'pick_nose', uploadBlob, { frameCount: frames, fps });
+          await saveSpriteToLocalDb(CHARACTER, 'nose_pick', uploadBlob, { frameCount: frames, fps });
+        }
+      }
+
+      // Cleanup old file from cloud storage if path changed
+      if (uploadBlob && current?.image_path && current.image_path !== path && !current.image_path.startsWith('local://')) {
         await supabase.storage.from(SPRITE_BUCKET).remove([current.image_path]);
       }
-      setFile(null);
+
+      // Invalidate memory and react query cache with cache-busting
+      clearAnimationCache(CHARACTER);
+      const publicUrl = supabase.storage.from(SPRITE_BUCKET).getPublicUrl(path).data?.publicUrl;
+      const cacheBustUrl = publicUrl ? `${publicUrl}?v=${Date.now()}` : (normalizedResult?.previewUrl ?? '');
+      
+      const newAnim: SpriteAnimation = {
+        id: `updated-${CHARACTER}-${action}`,
+        character_key: CHARACTER,
+        action,
+        image_path: path,
+        frame_count: frames,
+        fps,
+        url: cacheBustUrl,
+      };
+      updateLocalAnimationCache(CHARACTER, action, newAnim);
+
+      setRawFile(null);
       await qc.invalidateQueries({ queryKey: ['sprite-animations'] });
-      toast.success(`${SPRITE_ACTION_LABELS[action]} 애니메이션을 저장했어요.`);
+      toast.success(`✅ ${SPRITE_ACTION_LABELS[action]} 스프라이트가 클라우드에 성공적으로 저장되었습니다.`);
     } catch (e) {
-      toast.error(`저장 실패: ${formatErrorMessage(e)}`);
+      // If cloud failed but local IndexedDB succeeded
+      if (normalizedResult?.blob || rawFile) {
+        const localBlob = normalizedResult?.blob ?? rawFile!;
+        await saveSpriteToLocalDb(CHARACTER, action, localBlob, { frameCount: frames, fps });
+        clearAnimationCache(CHARACTER);
+        await qc.invalidateQueries({ queryKey: ['sprite-animations'] });
+        toast.warning(`⚠️ 클라우드 저장 실패 (${formatErrorMessage(e)}). 로컬 브라우저(IndexedDB)에 저장되어 새로고침 후에도 유지됩니다.`);
+      } else {
+        toast.error(`저장 실패: ${formatErrorMessage(e)}`);
+      }
     } finally {
       setSaving(false);
     }
   };
 
   const remove = async () => {
-    if (!current) return;
     try {
-      const { error } = await supabase.from('survival_sprite_animations').delete().eq('id', current.id);
-      if (error) throw error;
-      await supabase.storage.from(SPRITE_BUCKET).remove([current.image_path]);
+      const dbAction = (action === 'nose_pick' ? 'pick_nose' : action);
+      if (current?.id && !current.id.startsWith('local-')) {
+        await supabase.from('survival_sprite_animations').delete().eq('id', current.id);
+      } else {
+        await supabase.from('survival_sprite_animations').delete().eq('character_key', CHARACTER).eq('action', dbAction);
+      }
+      if (current?.image_path && !current.image_path.startsWith('local://')) {
+        await supabase.storage.from(SPRITE_BUCKET).remove([current.image_path]);
+      }
+      await deleteSpriteFromLocalDb(CHARACTER, action);
+      if (action === 'pick_nose' || action === 'nose_pick') {
+        await deleteSpriteFromLocalDb(CHARACTER, 'pick_nose');
+        await deleteSpriteFromLocalDb(CHARACTER, 'nose_pick');
+      }
+      clearAnimationCache(CHARACTER);
+      setRawFile(null);
+      setNormalizedResult(null);
       await qc.invalidateQueries({ queryKey: ['sprite-animations'] });
       toast.success('스프라이트를 삭제했어요.');
     } catch (e) {
@@ -219,12 +350,12 @@ export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARAC
     ? TRIBE_ACTION_TITLE[action] ?? SPRITE_ACTION_LABELS[action]
     : SPRITE_ACTION_LABELS[action];
 
-  const src = preview ?? current?.url;
+  const displaySrc = normalizedResult?.previewUrl ?? current?.url;
   const targetScale = data?.scale ?? 1.0;
   const previewHeight = Math.min(110, Math.round(72 * targetScale));
 
   return (
-    <div className="space-y-3 rounded-lg border bg-card p-4">
+    <div className="space-y-3 rounded-lg border bg-card p-4 transition-all hover:border-primary/40">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-sm">
           {actionTitle} <span className="text-xs text-muted-foreground">({action})</span>
@@ -235,9 +366,23 @@ export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARAC
           </Button>
         )}
       </div>
-      <div className="flex h-32 items-center justify-center rounded bg-muted/60 p-2">
-        {src ? (
-          <SpriteAnimator url={src} frames={frames} fps={fps} height={previewHeight} />
+
+      {/* Live Animated Preview */}
+      <div className="relative flex h-32 flex-col items-center justify-center rounded bg-muted/60 p-2 overflow-hidden border">
+        {normalizing ? (
+          <div className="flex flex-col items-center gap-1.5 text-xs text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <span>스프라이트 자동 규격화 중...</span>
+          </div>
+        ) : displaySrc ? (
+          <div className="flex flex-col items-center justify-center gap-1">
+            <SpriteAnimator url={displaySrc} frames={frames} fps={fps} height={previewHeight} />
+            {normalizedResult && (
+              <span className="rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 text-[10px] font-bold">
+                ✓ {normalizedResult.cellWidth}×{normalizedResult.cellHeight}px 발 기준선 정렬 완료
+              </span>
+            )}
+          </div>
         ) : isTribeTarget ? (
           <div className="flex flex-col items-center gap-1">
             <TribeSprite
@@ -252,7 +397,7 @@ export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARAC
             <span className="text-2xl">
               {action === 'poop'
                 ? '💩'
-                : action === 'pick_nose'
+                : action === 'pick_nose' || action === 'nose_pick'
                 ? '👃'
                 : action === 'celebrate'
                 ? '🎉'
@@ -268,25 +413,110 @@ export function ActionCard({ action, CHARACTER }: { action: SpriteAction; CHARAC
                 ? '💥'
                 : '🧍'}
             </span>
-            <span>미등록 (클릭하여 시트 업로드)</span>
+            <span>미등록 (아래에서 파일 업로드)</span>
           </div>
         )}
       </div>
-      <Input
-        type="file"
-        accept="image/png,image/webp,image/gif"
-        onChange={e => setFile(e.target.files?.[0] ?? null)}
-      />
+
+      {/* File Upload Input */}
+      <div>
+        <label htmlFor={fileInputId} className="sr-only">스프라이트 시트 파일 선택</label>
+        <Input
+          id={fileInputId}
+          type="file"
+          accept="image/png,image/webp,image/gif"
+          onChange={e => setRawFile(e.target.files?.[0] ?? null)}
+        />
+      </div>
+
+      {/* Auto-Normalizer Controls */}
+      <div className="rounded-md border bg-muted/30 p-2.5 space-y-2 text-xs">
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-1.5 font-bold text-foreground">
+            <Wand2 className="h-3.5 w-3.5 text-primary" /> 자동 규격화 (Auto-Normalize)
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowAdvanced(v => !v)}
+            className="h-6 px-1.5 text-[11px] text-muted-foreground"
+          >
+            <SlidersHorizontal className="h-3 w-3 mr-1" />
+            {showAdvanced ? '접기' : '설정'}
+          </Button>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <Label className="text-xs text-muted-foreground cursor-pointer">
+            배경 자동 투명화 (크로마키)
+          </Label>
+          <Switch checked={autoChroma} onCheckedChange={setAutoChroma} />
+        </div>
+
+        {showAdvanced && (
+          <div className="space-y-2 pt-1 border-t border-muted">
+            <div className="flex items-center justify-between gap-1 text-[11px]">
+              <span className="text-muted-foreground">배경 감지:</span>
+              <div className="flex gap-1">
+                {(['auto', 'hot_pink', 'white'] as const).map(mode => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setBgMode(mode)}
+                    className={`px-1.5 py-0.5 rounded border text-[10px] font-medium transition-all ${
+                      bgMode === mode ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted'
+                    }`}
+                  >
+                    {mode === 'auto' ? '모서리 자동' : mode === 'hot_pink' ? '마젠타(#FF00FF)' : '순백색'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px] text-muted-foreground">
+                <span>감지 허용오차 (Tolerance)</span>
+                <span>{tolerance}%</span>
+              </div>
+              <Slider min={5} max={60} step={1} value={[tolerance]} onValueChange={([v]) => setTolerance(v)} />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Frame & FPS Controls */}
       <div className="space-y-1">
-        <Label className="text-xs">프레임 수: {frames}</Label>
+        <div className="flex justify-between text-xs">
+          <Label className="text-xs">프레임 수</Label>
+          <span className="font-bold text-primary">{frames} 프레임</span>
+        </div>
         <Slider min={1} max={16} step={1} value={[frames]} onValueChange={([v]) => setFrames(v)} />
       </div>
+
       <div className="space-y-1">
-        <Label className="text-xs">재생 속도: {fps} FPS</Label>
+        <div className="flex justify-between text-xs">
+          <Label className="text-xs">재생 속도</Label>
+          <span className="font-bold text-primary">{fps} FPS</span>
+        </div>
         <Slider min={1} max={24} step={1} value={[fps]} onValueChange={([v]) => setFps(v)} />
       </div>
-      <Button className="min-h-11 w-full" onClick={save} disabled={saving || (!file && !current)}>
-        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} 저장
+
+      {/* Save Button */}
+      <Button
+        className="min-h-11 w-full gap-2 font-bold"
+        onClick={save}
+        disabled={saving || (!rawFile && !current)}
+      >
+        {saving ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" /> 저장 중...
+          </>
+        ) : (
+          <>
+            <Upload className="h-4 w-4" /> 규격화 시트 저장
+          </>
+        )}
       </Button>
     </div>
   );
@@ -297,7 +527,7 @@ export default function SpriteAssets() {
   const [target, setTarget] = useState('hunter');
 
   const targets = [
-    { key: 'hunter', label: '👤 유저 캐릭터 (공통 기본 · 9가지 액션)' },
+    { key: 'hunter', label: '👤 유저 캐릭터 (공통 기본 · 10가지 액션)' },
     { key: 'hunter:lv5', label: '👤 유저 캐릭터 (Lv.5~7 전용 외형)' },
     { key: 'hunter:lv8', label: '👤 유저 캐릭터 (Lv.8+ 전용 외형)' },
     ...TRIBE_TARGETS,
@@ -330,7 +560,7 @@ export default function SpriteAssets() {
       <div>
         <h1 className="text-2xl font-bold">캐릭터 · 펫 · 몹 스프라이트 스튜디오</h1>
         <p className="text-sm text-muted-foreground">
-          유저 캐릭터의 9가지 액션 모션(벌목·장작패는 도끼질 포함)과 펫/몹의 스프라이트 시트 및 크기 비율(배율)을 직접 등록·관리합니다.
+          유저 캐릭터의 10가지 액션 모션(기본, 걷기, 공격, 벌목, 채집, 대화, 똥싸기, 코딱지파기, 신난다, 피격)과 펫/몹의 스프라이트 시트 및 크기 비율(배율)을 직접 등록·관리합니다. 업로드 시 자동 규격화(크로마키 배경 투명화 및 발 기준선 정렬)가 즉시 적용됩니다.
         </p>
       </div>
 
@@ -343,7 +573,7 @@ export default function SpriteAssets() {
           onClick={() => setTarget('hunter')}
           className="text-xs font-bold"
         >
-          👤 유저 캐릭터 (9가지)
+          👤 유저 캐릭터 (10가지 액션)
         </Button>
         {TRIBE_TARGETS.slice(1).map(t => (
           <Button

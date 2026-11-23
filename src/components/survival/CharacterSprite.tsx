@@ -30,10 +30,12 @@ export default function CharacterSprite({
   const { data: tierRemote, isLoading: tierLoading } = useSpriteAnimations(isCustomTier ? tierKey : 'hunter');
   const [frame, setFrame] = useState(0);
 
-  // Exact action priority: tier action -> base hunter action -> intelligent action fallbacks -> idle -> walk
+  // Exact action priority: tier action -> base hunter action -> alias fallback -> intelligent action fallbacks -> idle -> walk
   const anim =
     tierRemote?.[action] ??
     baseRemote?.[action] ??
+    (action === 'nose_pick' ? (tierRemote?.pick_nose ?? baseRemote?.pick_nose) : undefined) ??
+    (action === 'pick_nose' ? (tierRemote?.nose_pick ?? baseRemote?.nose_pick) : undefined) ??
     (action === 'chop' ? (tierRemote?.attack ?? baseRemote?.attack ?? tierRemote?.gather ?? baseRemote?.gather) : undefined) ??
     (action === 'gather' ? (tierRemote?.chop ?? baseRemote?.chop ?? tierRemote?.walk ?? baseRemote?.walk) : undefined) ??
     tierRemote?.idle ??
@@ -105,6 +107,7 @@ export default function CharacterSprite({
             action === 'celebrate' ||
             action === 'poop' ||
             action === 'pick_nose' ||
+            action === 'nose_pick' ||
             action === 'hurt'
           }
         />

@@ -39,18 +39,26 @@ export function useItemCatalog() {
       }
       const out: CatalogItem[] = Object.entries(ITEMS).map(([id, it]) => {
         const r = rows.get(id);
+        let signedUrl = (r?.image_path && signed.get(r.image_path)) || null;
+        if (signedUrl && r?.updated_at) {
+          signedUrl = signedUrl.includes('?') ? `${signedUrl}&v=${new Date(r.updated_at).getTime()}` : `${signedUrl}?v=${new Date(r.updated_at).getTime()}`;
+        }
         return {
           itemId: id, name: r?.name ?? it.name, description: r?.description ?? it.desc,
           category: (r?.category as ItemCategory) ?? it.category, rarity: (r?.rarity as Rarity) ?? it.rarity,
           weight: r?.weight ?? it.weight, spriteKey: it.sprite, imagePath: r?.image_path ?? null,
-          imageUrl: (r?.image_path && signed.get(r.image_path)) || bundledSpriteUrl(it.sprite), isCustom: false, edited: !!r,
+          imageUrl: signedUrl || bundledSpriteUrl(it.sprite), isCustom: false, edited: !!r,
         };
       });
       for (const r of data ?? []) {
         if (r.item_id in ITEMS) continue;
+        let signedUrl = r.image_path ? signed.get(r.image_path) ?? null : null;
+        if (signedUrl && r.updated_at) {
+          signedUrl = signedUrl.includes('?') ? `${signedUrl}&v=${new Date(r.updated_at).getTime()}` : `${signedUrl}?v=${new Date(r.updated_at).getTime()}`;
+        }
         out.push({ itemId: r.item_id, name: r.name, description: r.description, category: r.category as ItemCategory,
           rarity: r.rarity as Rarity, weight: r.weight, imagePath: r.image_path,
-          imageUrl: r.image_path ? signed.get(r.image_path) ?? null : null, isCustom: true, edited: true });
+          imageUrl: signedUrl, isCustom: true, edited: true });
       }
       return out;
     },
