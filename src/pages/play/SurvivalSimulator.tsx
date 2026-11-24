@@ -402,11 +402,18 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     const checkAndTriggerOfflineReport = () => {
       const raw = localStorage.getItem(LAST_ACTIVE_KEY);
       const now = Date.now();
+      const todayKey = new Date(now).toISOString().slice(0, 10);
 
-      // BLOCK OfflineReportModal on fresh start or before tutorial is completed
+      // BLOCK OfflineReportModal on fresh start, during nickname setup, or before tutorial is completed
       const currentSave = stateRef.current;
       const isCompleted = isTutorialCompleted || currentSave.shamanMet || currentSave.tutorialCompleted;
-      if (!isCompleted || !raw) {
+      const hasAmbacho = currentSave.mercenary?.name === '암바초' || (currentSave.tribe?.classCounts?.gatherer ?? 0) > 0;
+
+      // 1일 1회 암바초 오프라인 파밍 보고서 제한 (Ambacho offline report: 1 time per day)
+      const lastReportDate = currentSave.lastOfflineReportDate || localStorage.getItem('colonion_last_offline_report_date');
+      const alreadyClaimedToday = lastReportDate === todayKey;
+
+      if (showNicknameModal || !isCompleted || !hasAmbacho || alreadyClaimedToday || !raw) {
         localStorage.setItem(LAST_ACTIVE_KEY, now.toString());
         return;
       }
@@ -460,9 +467,12 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   }, [g]);
 
   const handleClaimOfflineReport = (items: OfflineRewardItem[], classResourceAmount?: number) => {
+    const todayKey = new Date().toISOString().slice(0, 10);
+    localStorage.setItem('colonion_last_offline_report_date', todayKey);
     g.claimOfflineRewards(
       items.map(it => ({ itemId: it.itemId, count: it.count })),
-      classResourceAmount
+      classResourceAmount,
+      todayKey
     );
     localStorage.setItem('colonion_last_active_at', Date.now().toString());
   };
@@ -472,10 +482,9 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     expeditionLevel={g.expeditionLevelInfo.level}
     autoRemainingSec={g.expeditionAutoRemainingSec}
     autoLimitSec={g.expeditionAutoLimitSec}
-    ambachoDailyDone={g.ambachoDailyDone}
     onSend={() => { if (g.dispatchObserved(expeditionDestination, expeditionFocus, activeTribeClassId)) { setWatchExpedition(true); setPanel('none'); setView('expedition'); } }}
     onAuto={() => { g.toggleExpeditionAuto(expeditionDestination, expeditionFocus); setWatchExpedition(true); }} onPocket={g.togglePocket} onMorale={g.rallyExpedition} onReturn={g.recallExpedition} onWatch={() => setView(v => v === 'expedition' ? 'user' : 'expedition')}
-    tribe={s.tribe ? { count: s.tribe.count, trainLevel: s.tribe.trainLevel ?? 0, ratio: tribeRatio(s.tribe), maxHp: Math.max(1, Math.round(g.maxHp * tribeRatio(s.tribe) * s.tribe.count)), injured: tribeInjured(s.tribe, Date.now()), starving: !!s.tribe.starving, classId: s.tribe.classId, classCounts: s.tribe.classCounts, mercenaryName: s.mercenary?.name, ambachoDailyDone: g.ambachoDailyDone } : undefined} />;
+    tribe={s.tribe ? { count: s.tribe.count, trainLevel: s.tribe.trainLevel ?? 0, ratio: tribeRatio(s.tribe), maxHp: Math.max(1, Math.round(g.maxHp * tribeRatio(s.tribe) * s.tribe.count)), injured: tribeInjured(s.tribe, Date.now()), starving: !!s.tribe.starving, classId: s.tribe.classId, classCounts: s.tribe.classCounts, mercenaryName: s.mercenary?.name } : undefined} />;
   const [panel, setPanel] = useState<Panel>('none');
   const [baseTab, setBaseTab] = useState<'village' | 'lab' | 'craft' | 'storage' | 'expedition' | 'pets'>('village');
   const [craftCat, setCraftCat] = useState<CraftCat>('all');

@@ -164,11 +164,14 @@ export const OfflineReportModal: React.FC<OfflineReportModalProps> = ({
       <div className="w-full max-w-md bg-stone-950 border-4 border-amber-500 rounded p-4 text-white shadow-2xl space-y-3.5 max-h-[92dvh] overflow-y-auto">
         {/* 모달 상단 헤더 */}
         <div className="flex items-center justify-between border-b-2 border-stone-800 pb-2">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-xl">📜</span>
             <h2 className="text-base font-bold text-amber-300">
-              암바초의 밤사이 활동 보고서
+              암바초의 일일 오프라인 보고서
             </h2>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">
+              1일 1회
+            </span>
           </div>
           <button
             type="button"
