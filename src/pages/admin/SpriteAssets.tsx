@@ -40,7 +40,15 @@ import { SPRITE_META, type SpriteKey } from '@/lib/survival/spriteMeta';
 // Bundled image assets under src/assets/survival/
 const bundledSprites = import.meta.glob('/src/assets/survival/*.png', { eager: true, import: 'default' }) as Record<string, string>;
 export const getBundledSpriteUrl = (key: string): string | undefined => {
-  return bundledSprites[`/src/assets/survival/${key}.png`];
+  let mappedKey = key;
+  if (key === 'hunter' || key.startsWith('hunter')) mappedKey = 'char-hunter';
+  else if (key === 'tribe' || key === 'tribe:gatherer') mappedKey = 'char-gatherer';
+  else if (key === 'tribe:scout') mappedKey = 'char-scout';
+  else if (key === 'tribe:tank') mappedKey = 'char-hunter';
+  else if (key === 'tribe:shaman') mappedKey = 'char-shaman';
+  else if (key.startsWith('pet:')) mappedKey = 'item-dino-egg';
+
+  return bundledSprites[`/src/assets/survival/${mappedKey}.png`] ?? bundledSprites[`/src/assets/survival/${key}.png`];
 };
 
 const TRIBE_TARGETS = [
@@ -115,9 +123,28 @@ const GEAR_TARGETS = [
   { key: 'item-bone-charm', label: '✨ 장신구 · 뼈 부적' },
   { key: 'item-quartz-charm', label: '✨ 장신구 · 석영 부적' },
   { key: 'item-jade-amulet', label: '✨ 장신구 · 옥 목걸이' },
+  { key: 'item-bronze-sword', label: '⚔️ 문명 무기 · 청동 검' },
+  { key: 'item-iron-sword', label: '⚔️ 문명 무기 · 철제 검' },
+  { key: 'item-steel-sword', label: '⚔️ 문명 무기 · 강철 검' },
+  { key: 'item-bronze-axe', label: '🪓 문명 도구 · 청동 도끼' },
+  { key: 'item-iron-axe', label: '🪓 문명 도구 · 철제 도끼' },
+  { key: 'item-steel-axe', label: '🪓 문명 도구 · 강철 도끼' },
+  { key: 'item-bronze-pickaxe', label: '⛏️ 문명 도구 · 청동 곡괭이' },
+  { key: 'item-iron-pickaxe', label: '⛏️ 문명 도구 · 철제 곡괭이' },
+  { key: 'item-steel-pickaxe', label: '⛏️ 문명 도구 · 강철 곡괭이' },
+  { key: 'item-torch', label: '🔥 보조 무기 · 원시 횃불' },
+  { key: 'item-stone-shield', label: '🛡️ 방어구 · 돌 방패' },
+  { key: 'item-leather-shield', label: '🛡️ 방어구 · 가죽 방패' },
+  { key: 'item-fishing-rod', label: '🎣 생존 도구 · 원시 낚싯대' },
 ];
 
 const ITEM_TARGETS = [
+  { key: 'item-jerky', label: '🥩 식량 · 말린 고기 (육포)' },
+  { key: 'item-spring-water', label: '💧 식수 · 맑은 샘물' },
+  { key: 'item-grindstone', label: '🪨 도구 재료 · 원시 숫돌' },
+  { key: 'item-mortar-pestle', label: '🥣 가공 도구 · 약초 절구' },
+  { key: 'item-healing-ointment', label: '🌿 의약품 · 상처 치료 연고' },
+  { key: 'item-antidote', label: '🧪 의약품 · 해독 물약' },
   { key: 'item-flint', label: '🪨 재료 · 부싯돌' },
   { key: 'item-branch', label: '🪵 재료 · 나뭇가지' },
   { key: 'item-log', label: '🪵 재료 · 통나무' },

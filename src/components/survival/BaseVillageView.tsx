@@ -42,6 +42,11 @@ import AncientAltarModal from './AncientAltarModal';
 import WanderingShamanModal from './WanderingShamanModal';
 import ShamanQuestModal from './ShamanQuestModal';
 import { ShamanEvolutionModal, ShamanResourceHUD } from './ShamanEvolutionUI';
+import {
+  type AffinityState,
+  defaultAffinityState,
+  mapAffinityToShamanClass,
+} from '@/data/affinitySystem';
 import CivilizationTechModal from './CivilizationTechModal';
 import ShamanCuisineModal from './ShamanCuisineModal';
 import { ShamanAuraWrapper, VillageAtmosphereOverlay } from './ShamanVisualEffects';
@@ -100,6 +105,7 @@ interface Props {
   playerLevel?: number;
   shamanLevel?: ShamanLevel;
   shamanClass?: ShamanClassId | null;
+  affinityState?: AffinityState;
   classResource?: number;
   onTriggerUltimate?: () => void;
   onSelectShamanClass?: (classId: ShamanClassId) => boolean;
@@ -684,6 +690,7 @@ export default function BaseVillageView({
   playerLevel = 1,
   shamanLevel = 1,
   shamanClass = null,
+  affinityState = defaultAffinityState(),
   classResource = 100,
   onTriggerUltimate,
   onSelectShamanClass,
@@ -748,7 +755,8 @@ export default function BaseVillageView({
 }: Props) {
   const vState = useMemo(() => ensureVillageState(village, hasAltar), [village, hasAltar]);
   const activeShamanLevel = (vState.shamanLevel ?? shamanLevel ?? 1) as ShamanLevel;
-  const effectiveClass = vState.shamanClass ?? shamanClass;
+  const dominantClass = mapAffinityToShamanClass(affinityState?.dominantAffinity ?? null);
+  const effectiveClass = dominantClass ?? vState.shamanClass ?? shamanClass;
   const canonicalClass = normalizeShamanClassId(effectiveClass);
   const isClassChosen = canonicalClass !== null && canonicalClass !== undefined;
 
@@ -2727,7 +2735,8 @@ export default function BaseVillageView({
       <ShamanEvolutionModal
         open={activeModal === 'shaman_evolution'}
         onClose={() => setActiveModal(null)}
-        currentClass={vState.shamanClass ?? shamanClass ?? null}
+        currentClass={effectiveClass}
+        affinityState={affinityState}
         pets={pets}
         storage={storage}
         backpack={backpack}

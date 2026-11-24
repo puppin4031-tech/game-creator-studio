@@ -595,20 +595,21 @@ for (const classConfig of Object.values(CLASS_SKILL_TREES)) {
   }
 }
 
-/** Compute player max GPS speed limit (km/h) based on unlocked Vehicle skills */
-export function getPlayerSpeedLimitKmh(classSkills: string[] = []): number {
-  if (classSkills.includes('steam_carriage')) return 60;
-  if (classSkills.includes('clockwork_bike')) return 35;
-  if (classSkills.includes('wooden_cart')) return 22;
+/** Compute player max GPS speed limit (km/h) based on unlocked Vehicle skills or Engineering Affinity */
+export function getPlayerSpeedLimitKmh(classSkills: string[] = [], engineeringAffinity: number = 0): number {
+  if (engineeringAffinity >= 250 || classSkills.includes('steam_carriage')) return 60;
+  if (engineeringAffinity >= 100 || classSkills.includes('clockwork_bike')) return 35;
+  if (engineeringAffinity >= 30 || classSkills.includes('wooden_cart')) return 22;
   if (classSkills.includes('wooden_sled')) return 16;
-  return 13;
+  return 16;
 }
 
-/** Compute player extra reach (meters) based on unlocked Mage skills */
-export function getPlayerReachBonusM(classSkills: string[] = []): number {
+/** Compute player extra reach (meters) based on unlocked Mage skills or Nature Affinity */
+export function getPlayerReachBonusM(classSkills: string[] = [], natureAffinity: number = 0): number {
   let bonus = 0;
-  if (classSkills.includes('mana_sense')) bonus += 15;
-  if (classSkills.includes('telekinesis_gather')) bonus += 50;
+  if (natureAffinity >= 250 || classSkills.includes('telekinesis_gather')) bonus = Math.max(bonus, 50);
+  else if (natureAffinity >= 100) bonus = Math.max(bonus, 30);
+  else if (natureAffinity >= 30 || classSkills.includes('mana_sense')) bonus = Math.max(bonus, 15);
   return bonus;
 }
 

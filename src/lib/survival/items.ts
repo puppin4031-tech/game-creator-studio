@@ -75,9 +75,9 @@ export const ITEMS = def({
   pear: { name: '돌배', desc: '허기 +10 · 체력 +6', category: 'food', rarity: 'common', weight: 0.25, sprite: 'item-pear', food: { hunger: 10, hp: 6 } },
   raw_meat: { name: '날고기', desc: '허기 +12 · 체력 -5 (배탈 주의)', category: 'food', rarity: 'common', weight: 1, sprite: 'item-raw-meat', food: { hunger: 12, hp: -5 } },
   cooked_meat: { name: '구운 고기', desc: '허기 +35 · 체력 +10', category: 'food', rarity: 'uncommon', weight: 0.75, sprite: 'item-cooked-meat', food: { hunger: 35, hp: 10 } },
-  spring_water: { name: '샘물', desc: '허기 +4 · 체력 +8', category: 'food', rarity: 'common', weight: 0.5, sprite: 'item-clay-pot', food: { hunger: 4, hp: 8 } },
+  spring_water: { name: '샘물', desc: '허기 +4 · 체력 +8', category: 'food', rarity: 'common', weight: 0.5, sprite: 'item-spring-water', food: { hunger: 4, hp: 8 } },
   coconut: { name: '야자 열매', desc: '허기 +14 · 체력 +6', category: 'food', rarity: 'uncommon', weight: 0.5, sprite: 'item-coconut', food: { hunger: 14, hp: 6 } },
-  jerky: { name: '말린 고기', desc: '허기 +28 · 체력 +5 (훈연 보존 · 썩지 않음)', category: 'food', rarity: 'uncommon', weight: 0.25, sprite: 'item-cooked-meat', food: { hunger: 28, hp: 5 } },
+  jerky: { name: '말린 고기', desc: '허기 +28 · 체력 +5 (훈연 보존 · 썩지 않음)', category: 'food', rarity: 'uncommon', weight: 0.25, sprite: 'item-jerky', food: { hunger: 28, hp: 5 } },
   dried_fruit: { name: '말린 과일', desc: '허기 +22 · 체력 +10 (훈연 건조 · 썩지 않음)', category: 'food', rarity: 'uncommon', weight: 0.2, sprite: 'item-dried-fruit', food: { hunger: 22, hp: 10 } },
   spoiled_food: { name: '상한 음식 (초록 곰팡이)', desc: '시간이 지나 부패한 식량. 먹으면 배탈(체력 -12)이 나니 훈제소나 주막에서 폐기하세요.', category: 'food', rarity: 'common', weight: 0.25, sprite: 'item-spoiled-food', food: { hunger: 2, hp: -12 } },
   // ── Spices & Tavern Dishes (향신료 & 주막 요리)
@@ -142,6 +142,24 @@ export const ITEMS = def({
   hide_armor: { name: '가죽 갑옷', desc: '방어력 3', category: 'armor', rarity: 'uncommon', weight: 2, sprite: 'item-hide-armor', armor: { def: 3 }, durability: 80 },
   fur_cloak: { name: '늑대 털망토', desc: '방어력 5', category: 'armor', rarity: 'rare', weight: 2, sprite: 'item-fur-cloak', armor: { def: 5 }, durability: 120 },
   jade_amulet: { name: '옥 목걸이', desc: '전리품 +15% · 경험치 +10%', category: 'trinket', rarity: 'epic', weight: 0.25, sprite: 'item-jade-amulet', trinket: { lootBonus: 0.15, xpBonus: 0.1 }, durability: 0 },
+  // ── Advanced Civilization Tools & Weapons (신규 문명 장비 & 도구)
+  bronze_sword: { name: '청동 검', desc: '공격력 22 · 청동기 문명의 정밀한 직검', category: 'weapon', rarity: 'rare', weight: 1.8, sprite: 'item-bronze-sword', weapon: { atk: 22 }, durability: 100 },
+  iron_sword: { name: '철제 검', desc: '공격력 28 · 단단히 벼린 철제 장검', category: 'weapon', rarity: 'rare', weight: 2.0, sprite: 'item-iron-sword', weapon: { atk: 28 }, durability: 140 },
+  steel_sword: { name: '강철 검', desc: '공격력 36 · 푸른 광채의 명품 강철 검', category: 'weapon', rarity: 'epic', weight: 2.2, sprite: 'item-steel-sword', weapon: { atk: 36 }, durability: 200 },
+  bronze_axe: { name: '청동 도끼', desc: '벌목 2단계 · 채취력 2.5', category: 'tool', rarity: 'rare', weight: 1.8, sprite: 'item-bronze-axe', tool: { chop: 2, mine: 0, power: 2.5 }, durability: 120 },
+  iron_axe: { name: '철제 도끼', desc: '벌목 3단계 · 채취력 3.2', category: 'tool', rarity: 'rare', weight: 2.0, sprite: 'item-iron-axe', tool: { chop: 3, mine: 0, power: 3.2 }, durability: 160 },
+  steel_axe: { name: '강철 도끼', desc: '벌목 3단계 · 채취력 4.5', category: 'tool', rarity: 'epic', weight: 2.2, sprite: 'item-steel-axe', tool: { chop: 3, mine: 0, power: 4.5 }, durability: 220 },
+  bronze_pickaxe: { name: '청동 곡괭이', desc: '채굴 2단계 · 채취력 2.4', category: 'tool', rarity: 'rare', weight: 1.8, sprite: 'item-bronze-pickaxe', tool: { chop: 0, mine: 2, power: 2.4 }, durability: 120 },
+  iron_pickaxe: { name: '철제 곡괭이', desc: '채굴 3단계 · 채취력 3.2', category: 'tool', rarity: 'rare', weight: 2.0, sprite: 'item-iron-pickaxe', tool: { chop: 0, mine: 3, power: 3.2 }, durability: 160 },
+  steel_pickaxe: { name: '강철 곡괭이', desc: '채굴 3단계 · 채취력 4.5', category: 'tool', rarity: 'epic', weight: 2.2, sprite: 'item-steel-pickaxe', tool: { chop: 0, mine: 3, power: 4.5 }, durability: 220 },
+  torch: { name: '원시 횃불', desc: '공격력 8 · 야간 시야 반경 +10m', category: 'weapon', rarity: 'common', weight: 0.8, sprite: 'item-torch', weapon: { atk: 8 }, durability: 50 },
+  stone_shield: { name: '돌 방패', desc: '방어력 3 · 충격 완화', category: 'armor', rarity: 'uncommon', weight: 3.0, sprite: 'item-stone-shield', armor: { def: 3 }, durability: 90 },
+  leather_shield: { name: '가죽 방패', desc: '방어력 2 · 가벼운 기동 방어', category: 'armor', rarity: 'common', weight: 1.2, sprite: 'item-leather-shield', armor: { def: 2 }, durability: 70 },
+  fishing_rod: { name: '원시 낚싯대', desc: '물가에서 물고기·연꽃 채취 확률 2배', category: 'tool', rarity: 'uncommon', weight: 0.8, sprite: 'item-fishing-rod', tool: { chop: 0, mine: 0, power: 1 }, durability: 60 },
+  grindstone: { name: '원시 숫돌', desc: '무기 손질 시 날카로움 유지', category: 'processed', rarity: 'uncommon', weight: 1.5, sprite: 'item-grindstone' },
+  mortar_pestle: { name: '약초 절구', desc: '연고와 비약 제작의 기본 도구', category: 'processed', rarity: 'uncommon', weight: 1.5, sprite: 'item-mortar-pestle' },
+  healing_ointment: { name: '상처 연고', desc: '체력 +25 즉시 회복', category: 'food', rarity: 'uncommon', weight: 0.25, sprite: 'item-healing-ointment', heal: 25 },
+  antidote: { name: '해독 물약', desc: '독성과 부패 정화 · 체력 +15', category: 'food', rarity: 'rare', weight: 0.25, sprite: 'item-antidote', heal: 15 },
 });
 
 export type ItemId = keyof typeof ITEMS;

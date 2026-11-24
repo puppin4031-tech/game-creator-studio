@@ -277,6 +277,10 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const canDispatch = !!s.base && (!realGps || gps.ready || gps.isIndoor || g.inBase || hasTribe);
   const [fieldExp, setFieldExp] = useState(false);
   const [radarOpen, setRadarOpen] = useState(false);
+  const handleOpenRadar = useCallback(() => {
+    setRadarOpen(true);
+    g.gainEnergy('wind', 1, { reason: 'scan' });
+  }, [g]);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [skillBarVisible, setSkillBarVisible] = useState(true);
   const [tribeInfoModalOpen, setTribeInfoModalOpen] = useState(false);
@@ -1131,7 +1135,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       expeditionLevel={g.expeditionLevelInfo.level}
       expeditionDistanceM={(s.expeditionDistanceM ?? 0) + (s.walkSteps ?? 0) * 20}
       lastExpeditionLog={s.expeditionLogs?.[s.expeditionLogs.length - 1]?.text}
-      onScanNearby={() => setRadarOpen(true)}
+      onScanNearby={handleOpenRadar}
       onOpenPetFusion={() => {
         setBaseTab('pets');
         setPanel('base');
@@ -1849,7 +1853,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   type="button"
                   onClick={() => {
                     setQuickMenuOpen(false);
-                    setRadarOpen(true);
+                    handleOpenRadar();
                   }}
                   className="flex flex-col items-center text-amber-100 hover:text-white group cursor-pointer"
                   title="나침반 & 레이더"
@@ -1929,7 +1933,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         return (
           <button
             type="button"
-            onClick={() => setRadarOpen(true)}
+            onClick={handleOpenRadar}
             className="pixel-frame absolute left-1/2 top-[calc(max(0.6rem,env(safe-area-inset-top))+4.5rem)] z-20 flex max-w-[65%] -translate-x-1/2 items-center gap-1.5 rounded border border-emerald-500 bg-[#0d1911]/95 text-white py-1 px-2.5 text-xs shadow-lg font-pixel"
           >
             <Navigation className="!h-3.5 !w-3.5 shrink-0 text-emerald-400" style={{ transform: `rotate(${bearingDeg(s.pos, activeTarget) - mapBearing}deg)` }} />
@@ -1969,7 +1973,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
               {/* Left square stone slot: [🔍 탐색] */}
               <button
                 type="button"
-                onClick={() => setRadarOpen(true)}
+                onClick={handleOpenRadar}
                 className="pixelated w-11 h-11 shrink-0 rounded-xl border-2 border-[#2b1d14] bg-[#7a7267] text-amber-100 hover:bg-[#8e8578] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex flex-col items-center justify-center cursor-pointer"
                 aria-label="주변 탐색 레이더 열기"
               >
@@ -2246,6 +2250,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                       playerLevel={s.level}
                       shamanLevel={s.shamanLevel ?? s.village?.shamanLevel ?? 1}
                       shamanClass={s.shamanClass ?? s.village?.shamanClass ?? null}
+                      affinityState={s.affinityState}
                       classResource={s.classResource ?? s.village?.classResource ?? 100}
                       onTriggerUltimate={g.triggerClassUltimate}
                       onSelectShamanClass={g.evolveShaman}

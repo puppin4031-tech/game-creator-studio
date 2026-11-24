@@ -292,30 +292,16 @@ export default function ShamanQuestModal({
 
             {/* Action Button */}
             <div className="pt-2">
-              {shamanLevel >= 5 ? (
-                <Button
-                  type="button"
-                  onClick={onOpenEvolutionModal}
-                  className="pixel-btn w-full h-12 gap-2 bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-600 text-white font-bold text-xs hover:opacity-90 shadow-lg animate-pulse"
-                >
-                  <Sparkles className="h-4 w-4 text-amber-300" />
-                  <span>
-                    {shamanClass
-                      ? `🔮 [${classMeta?.name ?? '전직 주술사'}] 4대 전직 상세 메뉴 열기`
-                      : '🔮 4대 전직 의식 진행하기 (클래스 선택 및 궁극 진화)'}
-                  </span>
-                </Button>
-              ) : (
-                <div className="p-3.5 rounded-lg border border-border bg-muted/20 text-center space-y-1">
-                  <span className="font-bold text-muted-foreground text-xs flex items-center justify-center gap-1.5">
-                    <Lock className="h-4 w-4" />
-                    <span>주술사 Lv.5 달성 시 4대 전직 의식이 개방됩니다</span>
-                  </span>
-                  <p className="text-[10px] text-muted-foreground">
-                    현재 주술사 Lv.{shamanLevel}/5 단계입니다. 제{shamanLevel}막 승급 퀘스트를 먼저 완수하세요.
-                  </p>
-                </div>
-              )}
+              <Button
+                type="button"
+                onClick={onOpenEvolutionModal}
+                className="pixel-btn w-full h-12 gap-2 bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-600 text-white font-bold text-xs hover:opacity-90 shadow-lg animate-pulse"
+              >
+                <Sparkles className="h-4 w-4 text-amber-300" />
+                <span>
+                  🔮 [영혼의 조화] 4대 친화도 & 12원소 기운 수련 현황 열기
+                </span>
+              </Button>
             </div>
           </div>
         ) : activeStage ? (
@@ -593,20 +579,16 @@ export default function ShamanQuestModal({
           )}
 
           {/* Lv.5 Evolution Prompt Button */}
-          {shamanLevel >= 5 && (
-            <Button
-              type="button"
-              onClick={onOpenEvolutionModal}
-              className="pixel-btn w-full h-11 gap-2 bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-600 text-white font-bold text-xs hover:opacity-90 shadow-lg"
-            >
-              <Sparkles className="h-4 w-4 text-amber-300" />
-              <span>
-                {shamanClass
-                  ? `🔮 [${classMeta?.name ?? '전직 주술사'}] 4대 전직 메뉴 열기`
-                  : '🔮 Lv.5 달성 특전: [4대 전직(공돌이·마법·흑마·정직)] 의식 거행하기!'}
-              </span>
-            </Button>
-          )}
+          <Button
+            type="button"
+            onClick={onOpenEvolutionModal}
+            className="pixel-btn w-full h-11 gap-2 bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-600 text-white font-bold text-xs hover:opacity-90 shadow-lg"
+          >
+            <Sparkles className="h-4 w-4 text-amber-300" />
+            <span>
+              🔮 [영혼의 조화] 4대 친화도 & 12원소 기운 수련 현황 열기
+            </span>
+          </Button>
 
           {/* Auxiliary Nav Buttons */}
           <div className="grid grid-cols-3 gap-1.5 pt-1">

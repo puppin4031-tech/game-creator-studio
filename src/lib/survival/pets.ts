@@ -7,6 +7,7 @@ import { BABY_DINOS } from './dinoEggs';
 
 export const PET_MAX_LEVEL = 5;
 export const PET_GUARD_SLOTS = 3;
+export const maxGuardSlotsFor = (divinityAffinity = 0) => (divinityAffinity >= 100 ? 4 : PET_GUARD_SLOTS);
 export const PET_REST_MS = 60_000;
 export const PET_DAILY_LOOT_CAP = 10;
 export const PET_ATTACK_MS = 2000;
@@ -64,9 +65,9 @@ export function fusePets(pets: OwnedPet[], firstId: string, secondId: string, ui
   return { pets: [...pets.filter(p => p.uid !== firstId && p.uid !== secondId), pet], pet };
 }
 
-export function deployPet(pets: OwnedPet[], uid: string): OwnedPet[] | null {
+export function deployPet(pets: OwnedPet[], uid: string, maxGuardSlots: number = PET_GUARD_SLOTS): OwnedPet[] | null {
   const pet = pets.find(p => p.uid === uid);
-  if (!pet || (!pet.deployed && pets.filter(p => p.deployed).length >= PET_GUARD_SLOTS)) return null;
+  if (!pet || (!pet.deployed && pets.filter(p => p.deployed).length >= maxGuardSlots)) return null;
   return pets.map(p => p.uid === uid ? { ...p, deployed: !p.deployed } : p);
 }
 
@@ -132,11 +133,11 @@ export const PET_FOLLOW_ATK = 2;
 export const petRole = (p: OwnedPet): PetRole => p.role ?? (p.deployed ? 'guard' : 'idle');
 
 /** Assign a role; guard and follow have slot limits. `deployed` mirrors guard for existing base defense. */
-export function setPetRole(pets: OwnedPet[], uid: string, role: PetRole, now: number): OwnedPet[] | null {
+export function setPetRole(pets: OwnedPet[], uid: string, role: PetRole, now: number, maxGuardSlots: number = PET_GUARD_SLOTS): OwnedPet[] | null {
   const pet = pets.find(p => p.uid === uid);
   if (!pet) return null;
   const others = pets.filter(p => p.uid !== uid);
-  if (role === 'guard' && others.filter(p => petRole(p) === 'guard').length >= PET_GUARD_SLOTS) return null;
+  if (role === 'guard' && others.filter(p => petRole(p) === 'guard').length >= maxGuardSlots) return null;
   if (role === 'follow' && others.filter(p => petRole(p) === 'follow').length >= PET_FOLLOW_SLOTS) return null;
   return pets.map(p => p.uid === uid ? { ...p, role, deployed: role === 'guard', huntAt: role === 'hunt' ? now : p.huntAt } : p);
 }

@@ -29,6 +29,13 @@ import obsidianAxeImg from '@/assets/survival/item-obsidian-axe.png';
 import clubImg from '@/assets/survival/item-wooden-club.png';
 import maulImg from '@/assets/survival/item-stone-maul.png';
 import slingImg from '@/assets/survival/item-sling.png';
+import bronzeSwordImg from '@/assets/survival/item-bronze-sword.png';
+import ironSwordImg from '@/assets/survival/item-iron-sword.png';
+import steelSwordImg from '@/assets/survival/item-steel-sword.png';
+import torchImg from '@/assets/survival/item-torch.png';
+import bronzeAxeImg from '@/assets/survival/item-bronze-axe.png';
+import ironAxeImg from '@/assets/survival/item-iron-axe.png';
+import steelAxeImg from '@/assets/survival/item-steel-axe.png';
 import CulinaryDishIcon from './CulinaryDishIcon';
 
 const WEAPON_ICON_MAP: Partial<Record<ItemId, string>> = {
@@ -41,6 +48,13 @@ const WEAPON_ICON_MAP: Partial<Record<ItemId, string>> = {
   obsidian_axe: obsidianAxeImg,
   wooden_club: clubImg,
   stone_maul: maulImg,
+  bronze_sword: bronzeSwordImg,
+  iron_sword: ironSwordImg,
+  steel_sword: steelSwordImg,
+  torch: torchImg,
+  bronze_axe: bronzeAxeImg,
+  iron_axe: ironAxeImg,
+  steel_axe: steelAxeImg,
 };
 
 export const SIGNATURE_WEAPONS: {
@@ -90,6 +104,41 @@ export const SIGNATURE_WEAPONS: {
     cost: [
       { itemId: 'hide', count: 1 },
       { itemId: 'cordage', count: 2 },
+    ],
+  },
+  {
+    itemId: 'torch',
+    label: '원시 횃불',
+    cost: [
+      { itemId: 'branch', count: 2 },
+      { itemId: 'fiber', count: 2 },
+      { itemId: 'resin', count: 1 },
+    ],
+  },
+  {
+    itemId: 'bronze_sword',
+    label: '청동 검 (문명)',
+    cost: [
+      { itemId: 'bronze_ingot', count: 3 },
+      { itemId: 'leather', count: 1 },
+    ],
+  },
+  {
+    itemId: 'iron_sword',
+    label: '철제 검 (문명)',
+    cost: [
+      { itemId: 'copper_ingot', count: 2 },
+      { itemId: 'leather', count: 2 },
+      { itemId: 'coal', count: 2 },
+    ],
+  },
+  {
+    itemId: 'steel_sword',
+    label: '강철 검 (명품)',
+    cost: [
+      { itemId: 'steel_ingot', count: 3 },
+      { itemId: 'leather', count: 2 },
+      { itemId: 'gold_ore', count: 1 },
     ],
   },
 ];

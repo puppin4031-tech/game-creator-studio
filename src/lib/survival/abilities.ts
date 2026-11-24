@@ -42,8 +42,9 @@ export const WORK_REWARDS: Record<'gatherer' | 'rescued', Stack[]> = {
   rescued: [{ itemId: 'bone', count: 1 }, { itemId: 'soil', count: 1 }],
 };
 
-export function atMainBase(p: AbilitySave) {
-  return !!p.base && distanceM(p.pos, p.base) <= BASE_LEVELS[p.base.level].radiusM + (p.palisade ? 15 : 0);
+export function atMainBase(p: AbilitySave & { affinityState?: { totals?: { divinity?: number } } }) {
+  const extraRadius = (p.affinityState?.totals?.divinity ?? 0) >= 250 ? 50 : 0;
+  return !!p.base && distanceM(p.pos, p.base) <= BASE_LEVELS[p.base.level].radiusM + (p.palisade ? 15 : 0) + extraRadius;
 }
 export function atWorkshop(p: AbilitySave) {
   return atMainBase(p) || (!!p.outpost && distanceM(p.pos, p.outpost) <= C.outpostRadiusM);

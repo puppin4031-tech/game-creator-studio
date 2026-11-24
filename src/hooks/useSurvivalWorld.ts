@@ -41,6 +41,18 @@ import {
   type ShamanLevel,
 } from '@/lib/survival/shamanEvolution';
 import { CIV_TECHS, checkCivTechStatus, getCivilizationEraBadge, type CivTechDef } from '@/lib/survival/civilizationTech';
+import {
+  type AffinityId,
+  type SubEnergyId,
+  type AffinityState,
+  defaultAffinityState,
+  computeAffinityTotals,
+  computeDominantAffinity,
+  mapAffinityToShamanClass,
+  applyEnergyGain,
+  getAffinityPerks,
+  SUB_ENERGIES,
+} from '@/data/affinitySystem';
 import { settleFoodSpoilage, SMOKE_CURING_MS, TAVERN_RECIPES, SHAMAN_CUISINE_RECIPES, type SmokehouseBatch, type ActiveFoodBuff, type CookingJob, type ShamanDishDef } from '@/lib/survival/culinary';
 import { computeExpeditionLevel, detectExpeditionPins, type RadarPin } from '@/lib/survival/radar';
 import { addStacks, countOf, hasAll, removeStacks, splitDeathDrop, splitByCapacity, stackWeight, transferStack, validStackCount } from '@/lib/survival/inventory';
@@ -71,7 +83,7 @@ import {
 } from '@/lib/survival/codex';
 import type { GearInstance, LatLng, Stack, WorldEntity } from '@/lib/survival/types';
 
-import { advancePetDefense, deployPet, setPetRole, settlePetHunts, petRole, PET_GUARD_SLOTS, PET_FOLLOW_SLOTS, PET_FOLLOW_ATK, petStats, type PetRole, fusePets, hatchPet, migratePets, type OwnedPet, type PetDefense, type PetHit } from '@/lib/survival/pets';
+import { advancePetDefense, deployPet, setPetRole, settlePetHunts, petRole, PET_GUARD_SLOTS, maxGuardSlotsFor, PET_FOLLOW_SLOTS, PET_FOLLOW_ATK, petStats, type PetRole, fusePets, hatchPet, migratePets, type OwnedPet, type PetDefense, type PetHit } from '@/lib/survival/pets';
 
 const SAVE_KEY = 'survival-world-v1';
 export const CURRENT_SAVE_VERSION = 2;
@@ -171,6 +183,7 @@ export interface WorldSave extends WorldProgress {
   /** Cooking cauldron ongoing jobs */
   cookingJobs?: CookingJob[];
   codex?: CodexState;
+  affinityState?: AffinityState;
   lastTickAt: number;
 }
 
@@ -181,6 +194,7 @@ const fresh = (start: LatLng): WorldSave => ({
   depleted: {}, damage: {}, gathered: {}, techs: [], explored: [start], terrainZones: {}, parkCells: {}, shamanLevel: 1, shamanClass: 'NONE', classResource: 100, classSkills: [], civilizationTechs: ['tech_fire_gathering'],
   shamanMet: false, tutorialCompleted: false, tutorialStep: 'phase1_meet', starterCampPending: false,
   codex: defaultCodexState(),
+  affinityState: defaultAffinityState(),
   lastTickAt: Date.now(),
   lastActiveAt: Date.now(),
 });
@@ -307,6 +321,53 @@ export function migrateSaveData(raw: unknown, start: LatLng): WorldSave {
     lastTickAt: typeof p.lastTickAt === 'number' ? p.lastTickAt : Date.now(),
     lastActiveAt: typeof p.lastActiveAt === 'number' ? p.lastActiveAt : Date.now(),
   };
+
+  const defaultAff = defaultAffinityState();
+  let affinityState: AffinityState = defaultAff;
+  if (p.affinityState && typeof p.affinityState === 'object') {
+    const rawAff = p.affinityState as Partial<AffinityState>;
+    const energies = { ...defaultAff.energies, ...(rawAff.energies ?? {}) };
+    const totals = computeAffinityTotals(energies);
+    const { dominantAffinity, dominantValue } = computeDominantAffinity(totals);
+    affinityState = {
+      ...defaultAff,
+      ...rawAff,
+      energies,
+      totals,
+      dominantAffinity,
+      dominantValue,
+    };
+  } else if (p.shamanClass && p.shamanClass !== 'NONE') {
+    const classId = normalizeShamanClassId(p.shamanClass as any);
+    const energies = { ...defaultAff.energies };
+    if (classId === 'ENGINEER') {
+      energies.tension = 15;
+      energies.smelting = 15;
+      energies.machinery = 15;
+    } else if (classId === 'MAGE') {
+      energies.wind = 15;
+      energies.water = 15;
+      energies.fire = 15;
+    } else if (classId === 'NECROMANCER') {
+      energies.pain = 15;
+      energies.decay = 15;
+      energies.soul = 15;
+    } else if (classId === 'HONEST') {
+      energies.blessing = 15;
+      energies.sun = 15;
+      energies.bond = 15;
+    }
+    const totals = computeAffinityTotals(energies);
+    const { dominantAffinity, dominantValue } = computeDominantAffinity(totals);
+    affinityState = {
+      ...defaultAff,
+      energies,
+      totals,
+      dominantAffinity,
+      dominantValue,
+    };
+  }
+  merged.affinityState = affinityState;
 
   merged.codex = syncCodexStateWithSave(merged);
   return merged;
@@ -674,7 +735,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       ),
     [s.expeditionCount, s.expeditionDistanceM, s.walkSteps]
   );
-  const reach = reachRadius(s.techs, s.techLevels) + getPlayerReachBonusM(s.classSkills);
+  const reach = reachRadius(s.techs, s.techLevels) + getPlayerReachBonusM(s.classSkills, s.affinityState?.totals?.nature);
   const baseDef = s.base ? BASE_LEVELS[s.base.level] : null;
   const [sanctuaries, setSanctuaries] = useState<LatLng[]>([]);
   const sanctuariesRef = useRef(sanctuaries);
@@ -797,12 +858,42 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const last = p.explored[p.explored.length - 1];
       const explored = !last || distanceM(last, pos) >= EXPLORE_STEP_M ? [...p.explored, pos].slice(-MAX_EXPLORED) : p.explored;
       const grew = explored !== p.explored;
-      // Reward walking counts new steps taken within speed limit (unlocked by Engineer vehicles).
-      const speedLimit = getPlayerSpeedLimitKmh(p.classSkills);
+      // Reward walking counts new steps taken within speed limit (unlocked by Engineer vehicles & Engineering Affinity).
+      const speedLimit = getPlayerSpeedLimitKmh(p.classSkills, p.affinityState?.totals?.engineering);
       const walkLimit = Math.max(speedLimit, walkLimitKmh(activePetAbilities(p.pets ?? []), MAX_WALK_KMH));
-      const walking = grew && prevAt > 0 && isWalkingPace(distanceM(p.pos, pos), now - prevAt, walkLimit);
-      const eggDistMult = p.classSkills?.includes('straw_sandals') ? 1.25 : 1;
-      if (options.indoor && prevAt > 0 && isPocketMovement(distanceM(p.pos, pos), now - prevAt)) {
+      const stepDistM = distanceM(p.pos, pos);
+      const walking = grew && prevAt > 0 && isWalkingPace(stepDistM, now - prevAt, walkLimit);
+      const perks = getAffinityPerks(p.affinityState?.totals);
+      const eggPerkMult = 1 + (perks.eggHatchDistDiscountPct / 100);
+      const eggDistMult = (p.classSkills?.includes('straw_sandals') ? 1.25 : 1) * eggPerkMult;
+
+      let nextAff = p.affinityState ?? defaultAffinityState();
+      if (walking) {
+        let walkAcc = (nextAff.walkAccumulatorM ?? 0) + stepDistM;
+        let dayWalkAcc = (nextAff.dayWalkAccumulatorM ?? 0) + (dayPhase(new Date(now)) !== 'night' ? stepDistM : 0);
+        let tribeWalkAcc = (nextAff.tribeWalkAccumulatorM ?? 0) + ((p.tribe?.count ?? 0) > 0 ? stepDistM : 0);
+
+        if (walkAcc >= 100) {
+          const cycles = Math.floor(walkAcc / 100);
+          walkAcc -= cycles * 100;
+          nextAff = applyEnergyGain(nextAff, { energy: 'wind', amount: 2 * cycles, reason: 'walk' }, now).next;
+        }
+        if (dayWalkAcc >= 100) {
+          const cycles = Math.floor(dayWalkAcc / 100);
+          dayWalkAcc -= cycles * 100;
+          nextAff = applyEnergyGain(nextAff, { energy: 'sun', amount: 1 * cycles, reason: 'walk_sun' }, now).next;
+        }
+        if (tribeWalkAcc >= 100) {
+          const cycles = Math.floor(tribeWalkAcc / 100);
+          tribeWalkAcc -= cycles * 100;
+          nextAff = applyEnergyGain(nextAff, { energy: 'bond', amount: 2 * cycles, reason: 'walk_bond' }, now).next;
+        }
+        nextAff.walkAccumulatorM = walkAcc;
+        nextAff.dayWalkAccumulatorM = dayWalkAcc;
+        nextAff.tribeWalkAccumulatorM = tribeWalkAcc;
+      }
+
+      if (options.indoor && prevAt > 0 && isPocketMovement(stepDistM, now - prevAt)) {
         outdoorMovingRef.current = now + 10_000;
         setMovingUntil(now + 10_000);
       } else if (options.indoor && prevAt > 0) {
@@ -818,15 +909,32 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         explored,
         exploredTotal: (p.exploredTotal ?? p.explored.length) + (grew ? 1 : 0),
         walkSteps: (p.walkSteps ?? 0) + (walking ? 1 : 0),
+        affinityState: nextAff,
         dinoEggs:
           walking && p.dinoEggs?.length
-            ? advanceEggs(p.dinoEggs, distanceM(p.pos, pos) * eggDistMult, now - prevAt, walkLimit)
+            ? advanceEggs(p.dinoEggs, stepDistM * eggDistMult, now - prevAt, walkLimit)
             : p.dinoEggs,
       };
     });
   }, [setS, options.indoor]);
 
   const appendLog = (p: WorldSave, text: string, at: number): ExpeditionLog[] => [...(p.expeditionLogs ?? []), { at, text }].slice(-20);
+
+  const gainEnergy = useCallback((energy: SubEnergyId, amount: number, options?: { reason?: string; silent?: boolean }) => {
+    setS(p => {
+      const { next, granted } = applyEnergyGain(p.affinityState ?? defaultAffinityState(), {
+        energy,
+        amount,
+        reason: options?.reason,
+        silent: options?.silent,
+      }, Date.now());
+      if (!granted || next === p.affinityState) return p;
+      return {
+        ...p,
+        affinityState: next,
+      };
+    });
+  }, [setS]);
   const selectTribeClass = useCallback((classId: TribeClassId) => {
     setS(p => ({
       ...p,
@@ -1339,7 +1447,13 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const rite = RITES.find((r) => r.id === riteId); if (!rite) return false;
     const left = removeStacks(p.backpack, rite.cost);
     if (!left) { toast.error('제물이 부족합니다'); return false; }
-    setS({ ...p, backpack: rite.reward ? addStacks(left, rite.reward) : left, shrines: performRite(st, rite) });
+    const isGoldSilver = rite.cost.some(c => c.itemId === 'gold_ore' || c.itemId === 'silver_ore');
+    const aff = applyEnergyGain(p.affinityState ?? defaultAffinityState(), {
+      energy: isGoldSilver ? 'sun' : 'blessing',
+      amount: isGoldSilver ? 10 : 5,
+      reason: isGoldSilver ? 'gold_silver_offering' : 'shrine_rite',
+    }).next;
+    setS({ ...p, backpack: rite.reward ? addStacks(left, rite.reward) : left, shrines: performRite(st, rite), affinityState: aff });
     toast.success(`${rite.name} · 신성력 +${rite.sacred}${rite.reward ? ` · ${fmt(rite.reward)}` : ''}`);
     return true;
   }, []);
@@ -1353,7 +1467,12 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (!check.ok) { toast(`제단이 아직 비어 있습니다 · ${Math.ceil((check as { waitMs: number }).waitMs / 3_600_000)}시간 뒤`); return false; }
     const gift = blessingGift(st);
     if (stackWeight(gift) > capacity - stackWeight(p.backpack)) { toast.warning('배낭이 너무 무겁습니다'); return false; }
-    setS({ ...p, backpack: addStacks(p.backpack, gift), shrines: recordBlessing(st, sh.id, now) });
+    const aff = applyEnergyGain(p.affinityState ?? defaultAffinityState(), {
+      energy: 'blessing',
+      amount: 5,
+      reason: 'shrine_bless',
+    }).next;
+    setS({ ...p, backpack: addStacks(p.backpack, gift), shrines: recordBlessing(st, sh.id, now), affinityState: aff });
     toast.success(`제단의 축복: ${fmt(gift)}`);
     return true;
   }, [capacity]);
@@ -1400,7 +1519,12 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const die = (p: WorldSave): WorldSave => {
     const { kept, dropped } = splitDeathDrop(p.backpack, C.deathDropRatio);
     toast.error('쓰러졌습니다…', { description: dropped.length ? `잃어버림: ${fmt(dropped)}` : undefined });
-    return { ...p, backpack: kept, hp: Math.round(maxHpOf(p) / 2), pos: p.base ?? p.pos };
+    const painAff = applyEnergyGain(p.affinityState ?? defaultAffinityState(), {
+      energy: 'pain',
+      amount: 15,
+      reason: 'death',
+    }).next;
+    return { ...p, backpack: kept, hp: Math.round(maxHpOf(p) / 2), pos: p.base ?? p.pos, affinityState: painAff };
   };
 
   // Report whether a hit succeeded so automatic actions stop on rejected attempts.
@@ -1411,7 +1535,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const { category: rangedCat, rangeM: rangedReach } = computeRangedReach(weapon, p.level);
     const isRangedWeapon = e.kind === 'creature' && !!rangedCat;
     const reachBonus = p.techs.includes('long_reach') ? longReachBonus(techLevel(p.techLevels, 'long_reach')) : 0;
-    const extraReach = getPlayerReachBonusM(p.classSkills);
+    const extraReach = getPlayerReachBonusM(p.classSkills, p.affinityState?.totals?.nature);
     const baseReach = reachRadius(p.techs, p.techLevels) + extraReach;
     const r = isRangedWeapon ? Math.max(baseReach, rangedReach + reachBonus + extraReach) : baseReach;
     if (distanceM(p.pos, e) > r) { toast.warning(`${r}m 안으로 다가가세요`); return false; }
@@ -1460,6 +1584,18 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         const afterAmmo = removeStacks(p.backpack, [{ itemId: ammo.itemId, count: 1 }]);
         if (!afterAmmo) return false;
         next.backpack = afterAmmo;
+
+        const hits = (next.affinityState?.rangedHitsCount ?? 0) + 1;
+        let aff = next.affinityState ?? defaultAffinityState();
+        if (hits % 5 === 0) {
+          aff = applyEnergyGain(aff, {
+            energy: 'tension',
+            amount: 1,
+            reason: 'ranged_5hits',
+          }, at).next;
+        }
+        aff.rangedHitsCount = hits;
+        next.affinityState = aff;
       }
       power = weapon ? Math.round((ITEMS[weapon.itemId].weapon?.atk ?? C.fistAtk) * gearMult(weapon)) : C.fistAtk;
       if (p.techs.includes('primal_strike')) power *= primalStrikeMult(techLevel(p.techLevels, 'primal_strike'));
@@ -1619,6 +1755,35 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       recordCodexBoss(e.type);
     }
     next = gainXp(next, e.kind === 'node' ? nodeDef(e.type).xp : creatureDef(e.type).xp);
+
+    let affGain = next.affinityState ?? defaultAffinityState();
+    if (e.kind === 'node') {
+      const typeStr = e.type.toLowerCase();
+      if (typeStr.includes('copper') || typeStr.includes('iron') || typeStr.includes('tin') || typeStr.includes('gold') || typeStr.includes('silver') || typeStr.includes('ore') || typeStr.includes('stone') || typeStr.includes('flint') || typeStr.includes('obsidian') || typeStr.includes('hematite') || typeStr.includes('rock')) {
+        affGain = applyEnergyGain(affGain, { energy: 'smelting', amount: 2, reason: 'mining' }).next;
+      }
+      if (typeStr.includes('fire') || typeStr.includes('wood') || typeStr.includes('coal') || typeStr.includes('sulfur') || typeStr.includes('branch') || typeStr.includes('log') || typeStr.includes('tree')) {
+        affGain = applyEnergyGain(affGain, { energy: 'fire', amount: 2, reason: 'fire_mat' }).next;
+      }
+      if (typeStr.includes('bone')) {
+        affGain = applyEnergyGain(affGain, { energy: 'soul', amount: 2, reason: 'bone_gather' }).next;
+      }
+      if (typeStr.includes('tar') || typeStr.includes('toxic') || typeStr.includes('bitumen') || typeStr.includes('decay')) {
+        affGain = applyEnergyGain(affGain, { energy: 'decay', amount: 3, reason: 'toxic_gather' }).next;
+      }
+      if (p.hunger < 95 && (typeStr.includes('water') || typeStr.includes('reed') || typeStr.includes('lotus') || typeStr.includes('clay'))) {
+        affGain = applyEnergyGain(affGain, { energy: 'water', amount: 2, reason: 'water_gather' }).next;
+      }
+    } else {
+      affGain = applyEnergyGain(affGain, { energy: 'decay', amount: 2, reason: 'mob_kill' }).next;
+      if (hp < maxHpOf(p) * 0.2) {
+        affGain = applyEnergyGain(affGain, { energy: 'pain', amount: 8, reason: 'low_hp_victory' }).next;
+      }
+      if (dayPhase(new Date(Date.now())) === 'night') {
+        affGain = applyEnergyGain(affGain, { energy: 'soul', amount: 4, reason: 'night_combat' }).next;
+      }
+    }
+    next.affinityState = affGain;
     if (e.kind === 'creature' && creatureDef(e.type).boss && fits) toast.success(`우두머리 처치! ${d0Name(e.type)}`, { description: `획득: ${fmt(got)}` });
     else if (fits) toast.success(`획득: ${fmt(got) || '없음'}`); else toast.warning('배낭이 너무 무겁습니다! 거점에 다녀오세요');
     next = learn(next, checkInspiration(gathered, next.techs));
@@ -1669,12 +1834,24 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       });
     }
 
+    let eatAff = p.affinityState ?? defaultAffinityState();
+    if (p.hunger < 95 && (itemId.includes('water') || itemId.includes('coconut') || itemId.includes('soup') || itemId.includes('dew'))) {
+      eatAff = applyEnergyGain(eatAff, { energy: 'water', amount: 3, reason: 'drink' }).next;
+    }
+    if (hpGain > 0 && p.hp < maxHpOf(p)) {
+      eatAff = applyEnergyGain(eatAff, { energy: 'blessing', amount: 3, reason: 'heal' }).next;
+    }
+    if (itemId === 'spoiled_food') {
+      eatAff = applyEnergyGain(eatAff, { energy: 'decay', amount: 3, reason: 'spoiled_food' }).next;
+    }
+
     setS({
       ...p,
       [from]: left,
       hunger: Math.min(100, p.hunger + (it.food?.hunger ?? 0)),
       hp: Math.max(1, Math.min(maxHpOf(p), p.hp + hpGain)),
       activeBuffs,
+      affinityState: eatAff,
       lastAteAt: nowAt,
     });
     toast(`${it.name} 섭취 완료 (허기 +${it.food?.hunger ?? 0} · 체력 +${hpGain})`);
@@ -1685,7 +1862,12 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const p = ref.current;
     const left = removeStacks(p.backpack, CAMP_COST);
     if (!left) { toast.error(`모닥불 설치에 ${fmt(CAMP_COST)} 필요`); return; }
-    setS({ ...p, backpack: left, base: { lat: p.pos.lat, lng: p.pos.lng, level: p.base?.level ?? 1, placedAt: Date.now() } });
+    const aff = applyEnergyGain(p.affinityState ?? defaultAffinityState(), {
+      energy: 'machinery',
+      amount: 5,
+      reason: 'place_base',
+    }).next;
+    setS({ ...p, backpack: left, affinityState: aff, base: { lat: p.pos.lat, lng: p.pos.lng, level: p.base?.level ?? 1, placedAt: Date.now() } });
     toast.success('이곳에 모닥불 거점을 세웠습니다');
   }, []);
 
@@ -1708,7 +1890,12 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const p = ref.current; const job = p.baseUpgrade;
     if (!p.base || !job || Date.now() < job.readyAt) return;
     const lv = Number(job.id) as 2 | 3;
-    setS({ ...p, baseUpgrade: null, base: { ...p.base, level: lv } });
+    const aff = applyEnergyGain(p.affinityState ?? defaultAffinityState(), {
+      energy: 'machinery',
+      amount: 5,
+      reason: 'upgrade_base',
+    }).next;
+    setS({ ...p, baseUpgrade: null, affinityState: aff, base: { ...p.base, level: lv } });
     toast.success(`${BASE_LEVELS[lv].name}(으)로 발전!`);
   }, [setS]);
 
@@ -1753,7 +1940,14 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (!paid) { toast.error('재료가 부족합니다'); return; }
     const left = paid.storage;
     const it = ITEMS[r.result];
-    const next = { ...p, backpack: paid.backpack, crafted: { ...p.crafted, [r.result]: (p.crafted[r.result] ?? 0) + r.count } };
+    let craftAff = p.affinityState ?? defaultAffinityState();
+    if (r.result === 'cordage' || r.result === 'bone_bow' || r.result === 'sling' || r.result === 'leather' || r.result === 'arrow' || (r.result as string) === 'javelin') {
+      craftAff = applyEnergyGain(craftAff, { energy: 'tension', amount: 2, reason: 'tension_craft' }).next;
+    }
+    if (r.result.includes('ingot') || r.result.includes('metal') || r.result.includes('bronze') || r.result.includes('steel') || r.result.includes('copper')) {
+      craftAff = applyEnergyGain(craftAff, { energy: 'smelting', amount: 4, reason: 'smelting_craft' }).next;
+    }
+    const next = { ...p, backpack: paid.backpack, affinityState: craftAff, crafted: { ...p.crafted, [r.result]: (p.crafted[r.result] ?? 0) + r.count } };
     if (it.durability !== undefined) {
       const g: GearInstance = { uid: crypto.randomUUID(), itemId: r.result, quality: 'NORMAL', durability: it.durability, maxDurability: it.durability };
       setS({ ...next, storage: left, gear: [...(paid.gear ?? p.gear), g], storedGear: paid.storedGear ?? p.storedGear });
@@ -1812,7 +2006,13 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const construct = useCallback((kind: 'palisade' | 'outpost') => {
     const result = buildStructure(ref.current, kind, enabledRef.current);
     if (result.ok === false) { toast.warning(result.reason); return; }
-    setS(result.state); toast.success(kind === 'palisade' ? '목책을 세웠습니다' : '전진기지를 세웠습니다');
+    const aff = applyEnergyGain(result.state.affinityState ?? defaultAffinityState(), {
+      energy: 'machinery',
+      amount: 5,
+      reason: 'build_structure',
+    }).next;
+    setS({ ...result.state, affinityState: aff });
+    toast.success(kind === 'palisade' ? '목책을 세웠습니다' : '전진기지를 세웠습니다');
   }, [setS]);
   const moveOutpost = useCallback(() => {
     const result = relocateOutpost(ref.current, enabledRef.current);
@@ -1921,7 +2121,12 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if ((p.base?.level ?? 0) < 2) { toast.warning('뼈 움막을 먼저 완공하세요'); return; }
     const paid = payAccessible(p, ALTAR_COST);
     if (!paid) { toast.error(`재료 부족: ${fmt(ALTAR_COST)}`); return; }
-    setS({ ...paid, altar: true });
+    const aff = applyEnergyGain(paid.affinityState ?? defaultAffinityState(), {
+      energy: 'machinery',
+      amount: 5,
+      reason: 'build_altar',
+    }).next;
+    setS({ ...paid, altar: true, affinityState: aff });
     toast.success('제단을 세웠습니다. 이제 발명할 수 있어요');
   }, [setS]);
   /** Consumes the materials and adds one invented item as equipped gear. */
@@ -1939,7 +2144,12 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const inventions = known ? p.inventions ?? [] : [...(p.inventions ?? []), inv];
     registerInventions(inventions);
     const g: GearInstance = { uid: crypto.randomUUID(), itemId: id as ItemId, quality: naming?.masterwork ? 'MASTERWORK' : 'NORMAL', durability: INVENTED_DURABILITY, maxDurability: INVENTED_DURABILITY };
-    setS({ ...paid, inventions, gear: [...paid.gear, g] });
+    const aff = applyEnergyGain(paid.affinityState ?? defaultAffinityState(), {
+      energy: 'machinery',
+      amount: 6,
+      reason: 'invent',
+    }).next;
+    setS({ ...paid, inventions, gear: [...paid.gear, g], affinityState: aff });
     toast.success(`${inv.name} 완성! 배낭에 담았어요`, { description: known ? '알려진 발명품을 다시 만들었습니다' : '제작 탭에 레시피가 등록되었어요. 배낭에서 착용할 수 있어요' });
     return inv;
   }, [setS]);
@@ -2087,14 +2297,16 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS, options.indoor, recordCodexPet, flushSave]);
   const togglePetDeploy = useCallback((uid: string) => {
     const p = petAccess(); if (!p) return;
-    const pets = deployPet(p.pets ?? [], uid);
-    if (!pets) { toast.warning('수호 펫은 최대 3마리입니다'); return; }
+    const maxGuards = maxGuardSlotsFor(p.affinityState?.totals?.divinity ?? 0);
+    const pets = deployPet(p.pets ?? [], uid, maxGuards);
+    if (!pets) { toast.warning(`수호 펫은 최대 ${maxGuards}마리입니다`); return; }
     setS({ ...p, pets, lastTickAt: Date.now() });
   }, [setS, options.indoor]);
   const assignPetRole = useCallback((uid: string, role: PetRole) => {
     const p = petAccess(); if (!p) return;
-    const pets = setPetRole(p.pets ?? [], uid, role, Date.now());
-    if (!pets) { toast.warning(role === 'guard' ? `거점 지키기는 최대 ${PET_GUARD_SLOTS}마리예요` : `따라다니기는 최대 ${PET_FOLLOW_SLOTS}마리예요`); return; }
+    const maxGuards = maxGuardSlotsFor(p.affinityState?.totals?.divinity ?? 0);
+    const pets = setPetRole(p.pets ?? [], uid, role, Date.now(), maxGuards);
+    if (!pets) { toast.warning(role === 'guard' ? `거점 지키기는 최대 ${maxGuards}마리예요` : `따라다니기는 최대 ${PET_FOLLOW_SLOTS}마리예요`); return; }
     setS({ ...p, pets, lastTickAt: Date.now() });
   }, [setS, options.indoor]);
   const feedPet = useCallback((uid: string) => {
@@ -2128,9 +2340,15 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const target = (p.pets ?? []).find(pt => pt.uid === uid);
     if (!target) return;
     const pName = petById(target.speciesId)?.name ?? target.name;
+    const painAff = applyEnergyGain(p.affinityState ?? defaultAffinityState(), {
+      energy: 'pain',
+      amount: 15,
+      reason: 'death',
+    }).next;
     setS({
       ...p,
       pets: (p.pets ?? []).filter(pt => pt.uid !== uid),
+      affinityState: painAff,
       lastTickAt: Date.now(),
     });
     toast.error(`💀 ${pName} (Lv.${target.level})이(가) 체력 0이 되어 영구 소멸했습니다!`);
@@ -2575,9 +2793,10 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
 
   const evolvePetToSkullDragon = useCallback((petUid: string): boolean => {
     const p = ref.current;
-    const isWarlock = p.shamanClass === 'warlock' || p.village?.shamanClass === 'warlock';
+    const deathAff = p.affinityState?.totals?.death ?? 0;
+    const isWarlock = p.shamanClass === 'warlock' || p.village?.shamanClass === 'warlock' || deathAff >= 250;
     if (!isWarlock) {
-      toast.warning('암흑 흑마술사만이 스컬 드래곤 암흑 의식을 거행할 수 있습니다.');
+      toast.warning('심연·죽음 기운 250 이상(또는 흑마술사)만이 스컬 드래곤 암흑 의식을 거행할 수 있습니다.');
       return false;
     }
     const targetPet = (p.pets ?? []).find(pet => pet.uid === petUid);
@@ -2922,11 +3141,17 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       return false;
     }
     const crafted = { ...paid.crafted, [r.result]: (paid.crafted[r.result] ?? 0) + 1 };
+    const fireAff = applyEnergyGain(paid.affinityState ?? defaultAffinityState(), {
+      energy: 'fire',
+      amount: 3,
+      reason: 'cooking',
+    }).next;
     const next = gainXp(
       {
         ...paid,
         storage: addStacks(paid.storage, [{ itemId: r.result, count: 1 }]),
         crafted,
+        affinityState: fireAff,
         lastFreshnessCheckAt: Date.now(),
         lastTickAt: Date.now(),
       },
@@ -2949,6 +3174,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     }
 
     const nowAt = Date.now();
+    const fireAff = applyEnergyGain(paid.affinityState ?? defaultAffinityState(), {
+      energy: 'fire',
+      amount: 3,
+      reason: 'shaman_cooking',
+    }).next;
     // Health tonics & special dishes require cauldron cooking time
     if (r.cookTimeSec > 0) {
       const newJob: CookingJob = {
@@ -2959,6 +3189,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       };
       setS({
         ...paid,
+        affinityState: fireAff,
         cookingJobs: [...(paid.cookingJobs ?? []), newJob],
         lastTickAt: nowAt,
       });
@@ -2989,6 +3220,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       crafted,
       hunger: nextHunger,
       hp: nextHp,
+      affinityState: fireAff,
       lastTickAt: nowAt,
       lastFreshnessCheckAt: nowAt,
     });
@@ -3147,7 +3379,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return chosen;
   }, [saveKey, userId, setS, flushSave]);
 
-  return { codex: s.codex ?? defaultCodexState(), codexProgress, recordCodexResource, recordCodexPet, recordCodexBoss, recordCodexAiInvention, markCodexSeen, reloadSaveFromBestSource, claimOfflineRewards, shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, classSkills: s.classSkills ?? [], learnClassSkill, maxSpeedKmh: getPlayerSpeedLimitKmh(s.classSkills), triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, dismissTribe, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, updateTutorialState, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
+  return { codex: s.codex ?? defaultCodexState(), codexProgress, recordCodexResource, recordCodexPet, recordCodexBoss, recordCodexAiInvention, markCodexSeen, reloadSaveFromBestSource, claimOfflineRewards, shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, classSkills: s.classSkills ?? [], learnClassSkill, maxSpeedKmh: getPlayerSpeedLimitKmh(s.classSkills, s.affinityState?.totals?.engineering), affinityState: s.affinityState ?? defaultAffinityState(), gainEnergy, triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, dismissTribe, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, updateTutorialState, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
     savedIndicator, flushSave,
     moveOutpost, petHits, mergePets, togglePetDeploy, assignPetRole, feedPet, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),
