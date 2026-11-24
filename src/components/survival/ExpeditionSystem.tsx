@@ -108,6 +108,7 @@ interface Props {
   expeditionLevel?: number;
   autoRemainingSec?: number;
   autoLimitSec?: number;
+  ambachoDailyDone?: boolean;
 }
 export interface TribeInfo {
   count: number;
@@ -119,6 +120,7 @@ export interface TribeInfo {
   classId?: TribeClassId;
   classCounts?: Partial<Record<TribeClassId, number>>;
   mercenaryName?: string;
+  ambachoDailyDone?: boolean;
 }
 
 export interface TribeMember {
@@ -132,9 +134,10 @@ export interface TribeMember {
 }
 
 export function buildTribeMembers(tribe?: TribeInfo, activeTribeClass?: TribeClassId): TribeMember[] {
-  const count = Math.max(1, tribe?.count ?? 1);
-  const baseClass = activeTribeClass ?? tribe?.classId ?? DEFAULT_TRIBE_CLASS;
-  const counts = tribe?.classCounts ?? {};
+  if (!tribe || (tribe.count ?? 0) <= 0) return [];
+  const count = Math.max(1, tribe.count);
+  const baseClass = activeTribeClass ?? tribe.classId ?? DEFAULT_TRIBE_CLASS;
+  const counts = tribe.classCounts ?? {};
 
   const list: TribeMember[] = [];
 
@@ -144,8 +147,8 @@ export function buildTribeMembers(tribe?: TribeInfo, activeTribeClass?: TribeCla
     name: '암바초',
     title: '파밍 부족민 (1번째 동료)',
     classId: 'gatherer',
-    roleDescription: '물자 탐색 및 자원 채집 특화',
-    specialPerk: '돌·나무·약초 채집 속도 +50%, 밤사이 오프라인 보고서 자동 채집 수행',
+    roleDescription: '물자 탐색 및 자원 채집 특화 (1일 1회 원정)',
+    specialPerk: '돌·나무·약초 채집 속도 +50%, 1일 1회 안전 원정 수행 (복귀 후 거점 휴식)',
     slotIndex: 0,
   });
 
@@ -340,8 +343,22 @@ export default function ExpeditionSystem(p: Props) {
     setTimeout(checkScroll, 350);
   };
 
+  const isAmbachoExhausted = !!p.ambachoDailyDone && (p.tribe?.mercenaryName === '암바초' || (p.tribe?.classCounts?.gatherer ?? 0) > 0 || (p.tribe?.count ?? 0) <= 1);
+
   return (
     <section aria-label="원정대 관찰" className="space-y-1.5 border-t border-border bg-background/95 p-2 text-xs">
+      {/* Ambacho Daily 1-Time Limit Banner */}
+      {isAmbachoExhausted && (
+        <div className="rounded bg-amber-950/40 border border-amber-600/50 p-2 text-center text-xs text-amber-200 shadow-sm">
+          <p className="font-bold text-amber-300 flex items-center justify-center gap-1">
+            <span>🎒</span>
+            <span>암바초의 오늘 원정 완료 (1일 1회)</span>
+          </p>
+          <p className="text-[10px] text-amber-200/80 mt-0.5">
+            암바초가 거점에서 휴식 중입니다. 내일 자정(00:00)에 다시 파견할 수 있습니다.
+          </p>
+        </div>
+      )}
       {/* 가로 최대 4명 부족원 배치 박스 (초과 시 좌우 화살표 스크롤, 클릭 시 개별 상세 팝업) */}
       <div className="relative rounded-md border border-border/80 bg-card p-2 shadow-xs">
         {/* 상단 헤더: 전체 요약 및 전체 정보 보기 */}
@@ -467,24 +484,28 @@ export default function ExpeditionSystem(p: Props) {
 
       {/* 핵심 액션 버튼 */}
       <div className="grid grid-cols-2 gap-1">
-        <Button size="sm" className={`${compactBtn} whitespace-normal`} disabled={!p.canSend || !!p.crew} onClick={p.onSend}>
+        <Button size="sm" className={`${compactBtn} whitespace-normal`} disabled={!p.canSend || !!p.crew || isAmbachoExhausted} onClick={p.onSend}>
           <Flag className="!h-3.5 !w-3.5 shrink-0" />
-          {p.target && p.home ? `${Math.round(distanceM(p.home, p.target))}m 파견` : '원정대 파견'}
+          {isAmbachoExhausted
+            ? '오늘 원정 완료'
+            : p.target && p.home ? `${Math.round(distanceM(p.home, p.target))}m 파견` : '원정대 파견'}
         </Button>
         <Button
           size="sm"
           variant={p.auto ? 'default' : 'outline'}
           className={`${compactBtn} whitespace-normal`}
-          disabled={(!p.canSend && !p.auto) || ((p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0) && !p.auto)}
+          disabled={(!p.canSend && !p.auto) || ((p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0) && !p.auto) || (isAmbachoExhausted && !p.auto)}
           aria-pressed={p.auto}
           onClick={p.onAuto}
         >
           {p.auto ? <Pause className="!h-3.5 !w-3.5" /> : <Play className="!h-3.5 !w-3.5" />}
           {p.auto
             ? '자동사냥 끄기'
-            : (p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0)
-              ? '자동사냥 (소진)'
-              : '자동사냥 켜기'}
+            : isAmbachoExhausted
+              ? '자동사냥 (완료)'
+              : (p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0)
+                ? '자동사냥 (소진)'
+                : '자동사냥 켜기'}
         </Button>
         <Button size="sm" variant="outline" className={`${compactBtn} whitespace-normal`} disabled={!p.crew || Date.now() < (p.crew?.moraleReadyAt ?? 0)} onClick={p.onMorale}>
           <Zap className="!h-3.5 !w-3.5 shrink-0" />사기 진작

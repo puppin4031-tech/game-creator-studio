@@ -255,12 +255,19 @@ export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEnt
     } else if (waypoint && distanceM(crew.pos, waypoint) < 1) {
       crew.waypoints = crew.waypoints?.slice(1);
     } else if (!waypoint && distanceM(crew.pos, destination) < 1) {
-      if (crew.phase === 'outbound') { crew.phase = 'returning'; text = '목표 타일 도착 · 거점으로 귀환합니다'; }
-      else if (repeat) {
+      if (crew.phase === 'outbound') {
+        crew.phase = 'returning';
+        text = '목표 타일 도착 · 거점으로 귀환합니다';
+      } else if (repeat && crew.mercenary !== '암바초' && !crew.mercenary?.includes('암바초')) {
         const next = offsetM(crew.home, Math.cos(crew.cycle * 2.4) * 180, Math.sin(crew.cycle * 2.4) * 180);
         crew = { ...crew, hp: crew.maxHp ?? 100, phase: 'outbound', cycle: crew.cycle + 1, destination: next, waypoints: patrolWaypoints(crew.home, next, crew.cycle + 1) };
         text = '거점 회복 완료 · 다음 자동사냥 출발';
-      } else { finished = true; text = '원정대가 거점에 귀환했습니다'; }
+      } else {
+        finished = true;
+        text = (crew.mercenary === '암바초' || crew.mercenary?.includes('암바초'))
+          ? '🎒 암바초가 오늘의 1회 원정을 마치고 거점에 안전하게 복귀했습니다 (내일 다시 출발 가능)'
+          : '원정대가 거점에 귀환했습니다';
+      }
     }
   }
   return { crew, rewards, completed, text, finished };

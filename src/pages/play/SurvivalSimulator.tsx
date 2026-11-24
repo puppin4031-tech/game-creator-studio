@@ -249,6 +249,21 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
   // Distinguish non-member (guest) vs registered member account
   const isGuest = !user || user.is_anonymous === true;
+  const guestSaveKey = realGps ? 'survival-guest-gps-world-v1' : 'survival-guest-world-v1';
+  const memberSaveKey = realGps ? 'survival-gps-world-v1' : 'survival-world-v1';
+  const currentSaveKey = isGuest ? guestSaveKey : memberSaveKey;
+
+  // Unconditionally wipe any old guest save if fresh game requested
+  if (typeof window !== 'undefined' && isGuest && sessionStorage.getItem('colonion.forceFreshGame') === '1') {
+    sessionStorage.removeItem('colonion.forceFreshGame');
+    try {
+      localStorage.removeItem(guestSaveKey);
+      localStorage.removeItem(`${guestSaveKey}_backup`);
+      localStorage.removeItem('colonion.tutorialStep.guest');
+      localStorage.removeItem('colonion_last_active_at');
+    } catch { /* ignore */ }
+  }
+
   const accountTutorialKey = user && !user.is_anonymous ? `colonion.tutorialCompleted.${user.id}` : null;
   const TUTORIAL_STEP_STORAGE_KEY = user && !user.is_anonymous
     ? `colonion.tutorialStep.${user.id}`
@@ -266,8 +281,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [gpsReady, setGpsReady] = useState(false);
   const g = useSurvivalWorld(START, {
     enabled: !realGps || gpsReady || !isLocalTutorialDone,
-    saveKey: realGps ? 'survival-gps-world-v1' : 'survival-world-v1',
-    cloudSync: realGps,
+    saveKey: currentSaveKey,
+    cloudSync: realGps && !isGuest,
     indoor: realGps,
   });
   const gps = useSurvivalGps(realGps, g.moveTo, g.state.base ?? g.state.pos ?? START, g.maxSpeedKmh);
@@ -419,9 +434,10 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     expeditionLevel={g.expeditionLevelInfo.level}
     autoRemainingSec={g.expeditionAutoRemainingSec}
     autoLimitSec={g.expeditionAutoLimitSec}
+    ambachoDailyDone={g.ambachoDailyDone}
     onSend={() => { if (g.dispatchObserved(expeditionDestination, expeditionFocus, activeTribeClassId)) { setWatchExpedition(true); setPanel('none'); setView('expedition'); } }}
     onAuto={() => { g.toggleExpeditionAuto(expeditionDestination, expeditionFocus); setWatchExpedition(true); }} onPocket={g.togglePocket} onMorale={g.rallyExpedition} onReturn={g.recallExpedition} onWatch={() => setView(v => v === 'expedition' ? 'user' : 'expedition')}
-    tribe={s.tribe ? { count: s.tribe.count, trainLevel: s.tribe.trainLevel ?? 0, ratio: tribeRatio(s.tribe), maxHp: Math.max(1, Math.round(g.maxHp * tribeRatio(s.tribe) * s.tribe.count)), injured: tribeInjured(s.tribe, Date.now()), starving: !!s.tribe.starving, classId: s.tribe.classId, classCounts: s.tribe.classCounts, mercenaryName: s.mercenary?.name } : undefined} />;
+    tribe={s.tribe ? { count: s.tribe.count, trainLevel: s.tribe.trainLevel ?? 0, ratio: tribeRatio(s.tribe), maxHp: Math.max(1, Math.round(g.maxHp * tribeRatio(s.tribe) * s.tribe.count)), injured: tribeInjured(s.tribe, Date.now()), starving: !!s.tribe.starving, classId: s.tribe.classId, classCounts: s.tribe.classCounts, mercenaryName: s.mercenary?.name, ambachoDailyDone: g.ambachoDailyDone } : undefined} />;
   const [panel, setPanel] = useState<Panel>('none');
   const [baseTab, setBaseTab] = useState<'village' | 'lab' | 'craft' | 'storage' | 'expedition' | 'pets'>('village');
   const [craftCat, setCraftCat] = useState<CraftCat>('all');
@@ -518,6 +534,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
   const handleCompleteTutorial = useCallback(() => {
     g.meetShaman();
+    g.recruitAmbacho();
     try {
       if (user && !user.is_anonymous) {
         localStorage.setItem(`colonion.tutorialCompleted.${user.id}`, '1');
@@ -562,6 +579,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         localStorage.setItem(TUTORIAL_COMPLETED_KEY, '1');
       } catch { /* ignore */ }
       g.meetShaman();
+      g.recruitAmbacho();
       g.updateTutorialState?.('completed', true);
       setTutorialStepState('completed');
       setTutorialCompletedOverride(true);

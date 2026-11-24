@@ -159,6 +159,7 @@ export interface WorldSave extends WorldProgress {
   expeditionAutoDay?: string;
   expeditionAutoSecToday?: number;
   mercenary?: MercenaryContract | null;
+  ambachoDailyExpeditionDate?: string;
   shamanMet?: boolean;
   tutorialCompleted?: boolean;
   tutorialStep?: string | null;
@@ -328,6 +329,7 @@ export function migrateSaveData(raw: unknown, start: LatLng): WorldSave {
     tutorialCompleted: typeof p.tutorialCompleted === 'boolean' ? p.tutorialCompleted : (!!p.shamanMet || (p.level ?? 1) > 1 || (p.expeditionCount ?? 0) > 0),
     tutorialStep: typeof p.tutorialStep === 'string' ? p.tutorialStep : (p.shamanMet || (p.level ?? 1) > 1 ? 'completed' : 'phase1_meet'),
     starterCampPending: typeof p.starterCampPending === 'boolean' ? p.starterCampPending : false,
+    ambachoDailyExpeditionDate: typeof p.ambachoDailyExpeditionDate === 'string' ? p.ambachoDailyExpeditionDate : undefined,
     activeBuffs: Array.isArray(p.activeBuffs) ? p.activeBuffs : [],
     permanentStats: p.permanentStats && typeof p.permanentStats === 'object' ? p.permanentStats : {},
     depleted: p.depleted && typeof p.depleted === 'object' ? p.depleted : {},
@@ -426,28 +428,30 @@ function load(start: LatLng, saveKey: string): WorldSave {
       }
     }
 
-    // 2. Cross-key fallback and safety backup scan
-    // If target is empty or fresh (level 1 with 0 progress), scan related keys
-    const fallbackKeys = [
-      `${saveKey}_backup`,
-      saveKey !== 'survival-world-v1' ? 'survival-world-v1' : 'survival-gps-world-v1',
-      'survival-world-v1_backup',
-      'survival-gps-world-v1_backup',
-    ];
+    // 2. Cross-key fallback and safety backup scan ONLY for registered member accounts
+    // Guest accounts MUST never load legacy member saves!
+    if (!saveKey.includes('guest')) {
+      const fallbackKeys = [
+        `${saveKey}_backup`,
+        saveKey !== 'survival-world-v1' ? 'survival-world-v1' : 'survival-gps-world-v1',
+        'survival-world-v1_backup',
+        'survival-gps-world-v1_backup',
+      ];
 
-    for (const fbKey of fallbackKeys) {
-      const raw = localStorage.getItem(fbKey);
-      if (!raw) continue;
-      try {
-        const parsed = JSON.parse(raw) as Partial<WorldSave>;
-        const score = computeSaveScore(parsed);
-        if (score > bestScore && !isFreshOrEmptySave(parsed)) {
-          console.info(`[survival] Auto-recovered higher progress save from ${fbKey} (score: ${score} vs ${bestScore})`);
-          bestSaved = parsed;
-          bestScore = score;
+      for (const fbKey of fallbackKeys) {
+        const raw = localStorage.getItem(fbKey);
+        if (!raw) continue;
+        try {
+          const parsed = JSON.parse(raw) as Partial<WorldSave>;
+          const score = computeSaveScore(parsed);
+          if (score > bestScore && !isFreshOrEmptySave(parsed)) {
+            console.info(`[survival] Auto-recovered higher progress save from ${fbKey} (score: ${score} vs ${bestScore})`);
+            bestSaved = parsed;
+            bestScore = score;
+          }
+        } catch {
+          // ignore malformed candidate
         }
-      } catch {
-        // ignore malformed candidate
       }
     }
 
@@ -592,9 +596,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const json = JSON.stringify(dataToSave);
       if (json === lastSavedJsonRef.current) return;
       localStorage.setItem(saveKey, json);
-      if (!isFreshOrEmptySave(dataToSave)) {
+      if (!isFreshOrEmptySave(dataToSave) && !saveKey.includes('guest')) {
         localStorage.setItem(`${saveKey}_backup`, json);
         localStorage.setItem('survival-world-v1', json);
+      } else if (!isFreshOrEmptySave(dataToSave)) {
+        localStorage.setItem(`${saveKey}_backup`, json);
       }
       lastSavedJsonRef.current = json;
 
@@ -980,26 +986,58 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS]);
   const dispatchObserved = useCallback((destination: LatLng, focus: ExpeditionFocus = 'materials', classId?: TribeClassId) => {
     const p = ref.current;
-    const hasTribe = (p.tribe?.count ?? 0) > 0 && !tribeInjured(p.tribe, Date.now());
+    const now = Date.now();
+    const todayKey = getTodayKey(now);
+    const hasTribe = (p.tribe?.count ?? 0) > 0 && !tribeInjured(p.tribe, now);
     if (!p.base || p.observedExpedition || (enabledRef.current && !atMainBase(p) && !hasTribe)) return false;
-    const raw = startObservedExpedition(p.base, destination, Date.now(), focus);
+    const raw = startObservedExpedition(p.base, destination, now, focus);
     if (!raw) { toast.warning('거점에서 10~1,500m 이내 목표를 선택하세요'); return false; }
-    const tribeReady = (p.tribe?.count ?? 0) > 0 && !tribeInjured(p.tribe, Date.now());
-    const merc = tribeReady && mercActive(p.mercenary, Date.now()) ? p.mercenary!.name : undefined;
+    const tribeReady = (p.tribe?.count ?? 0) > 0 && !tribeInjured(p.tribe, now);
+    const merc = tribeReady && mercActive(p.mercenary, now) ? p.mercenary!.name : undefined;
     const hasAmbacho = merc === '암바초' || (p.tribe?.classCounts?.gatherer ?? 0) > 0;
+
+    // 1일 1회 암바초 원정 제한 (Ambacho daily limit: 1 time per day)
+    if (hasAmbacho && p.ambachoDailyExpeditionDate === todayKey) {
+      toast.warning('암바초는 오늘 1회 원정을 이미 완료했습니다 (1일 1회 제한)', {
+        description: '충성된 암바초가 거점에서 휴식 중입니다. 내일 자정(00:00)에 다시 파견할 수 있습니다.',
+      });
+      return false;
+    }
+
     const chosenClass: TribeClassId = classId ?? (hasAmbacho ? 'gatherer' : (p.tribe?.classId ?? DEFAULT_TRIBE_CLASS));
     const cls = getTribeClass(chosenClass);
     const ratio = tribeRatio(p.tribe);
     const members = Math.max(1, p.tribe?.count ?? 1);
     const maxHp = Math.max(1, Math.round(maxHpOf(p) * ratio * members * cls.hpMult));
     const crew = merc ? { ...raw, mercenary: merc, tribeClass: chosenClass, statMult: ratio, members, maxHp, hp: maxHp } : { ...raw, tribeClass: chosenClass };
-    setS({ ...p, starterCampPending: false, expeditionCount: (p.expeditionCount ?? 0) + 1, tribe: p.tribe ? { ...p.tribe, classId: chosenClass } : p.tribe, observedExpedition: crew, expeditionLogs: appendLog(p, `${merc ? `${cls.icon} ${cls.name}(${merc})` : '원정'} 출발 · 목표: ${FOCUS_LABEL[focus]}`, Date.now()) });
+    setS({
+      ...p,
+      starterCampPending: false,
+      ambachoDailyExpeditionDate: hasAmbacho ? todayKey : p.ambachoDailyExpeditionDate,
+      expeditionCount: (p.expeditionCount ?? 0) + 1,
+      tribe: p.tribe ? { ...p.tribe, classId: chosenClass } : p.tribe,
+      observedExpedition: crew,
+      expeditionLogs: appendLog(p, `${merc ? `${cls.icon} ${cls.name}(${merc})` : '원정'} 출발 · 목표: ${FOCUS_LABEL[focus]}`, now),
+    });
     return true;
   }, [setS]);
   const toggleExpeditionAuto = useCallback((destination: LatLng, focus: ExpeditionFocus = 'materials') => {
     const p = ref.current;
     if (p.expeditionAuto) { setS({ ...p, expeditionAuto: false }); return; }
-    const todayKey = getTodayKey();
+    const now = Date.now();
+    const todayKey = getTodayKey(now);
+    const tribeReady = (p.tribe?.count ?? 0) > 0 && !tribeInjured(p.tribe, now);
+    const merc = tribeReady && mercActive(p.mercenary, now) ? p.mercenary!.name : undefined;
+    const hasAmbacho = merc === '암바초' || (p.tribe?.classCounts?.gatherer ?? 0) > 0;
+
+    // 1일 1회 암바초 원정 제한 (Ambacho daily limit: 1 time per day)
+    if (hasAmbacho && p.ambachoDailyExpeditionDate === todayKey) {
+      toast.warning('암바초는 오늘 1회 원정을 이미 완료했습니다 (1일 1회 제한)', {
+        description: '충성된 암바초가 거점에서 휴식 중입니다. 내일 자정(00:00)에 다시 파견할 수 있습니다.',
+      });
+      return;
+    }
+
     const usedSec = p.expeditionAutoDay === todayKey ? (p.expeditionAutoSecToday ?? 0) : 0;
     if (usedSec >= DAILY_EXPEDITION_AUTO_LIMIT_SEC) {
       toast.warning('오늘의 자동사냥 가능 시간(6시간)을 모두 소진했습니다.', {
@@ -1308,13 +1346,31 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS]);
 
   const updateTutorialState = useCallback((step: string, completed?: boolean) => {
-    setS(p => ({
-      ...p,
-      tutorialStep: step,
-      tutorialCompleted: completed ?? p.tutorialCompleted ?? false,
-      shamanMet: completed ? true : p.shamanMet,
-      lastTickAt: Date.now(),
-    }));
+    setS(p => {
+      const isReset = step === 'phase1_meet' && !completed;
+      let nextMerc = p.mercenary;
+      let nextTribe = p.tribe;
+      if (isReset) {
+        nextMerc = null;
+        if (p.tribe) {
+          const nextCounts = { ...p.tribe.classCounts };
+          delete nextCounts.gatherer;
+          const nextCount = Math.max(0, (p.tribe.count ?? 1) - 1);
+          nextTribe = nextCount > 0 ? { ...p.tribe, count: nextCount, classCounts: nextCounts } : undefined;
+        }
+      }
+      return {
+        ...p,
+        mercenary: nextMerc,
+        tribe: nextTribe,
+        observedExpedition: isReset ? null : p.observedExpedition,
+        expeditionAuto: isReset ? false : p.expeditionAuto,
+        tutorialStep: step,
+        tutorialCompleted: completed ?? p.tutorialCompleted ?? false,
+        shamanMet: completed ? true : p.shamanMet,
+        lastTickAt: Date.now(),
+      };
+    });
   }, [setS]);
 
   const meetShaman = useCallback(() => {
@@ -1360,6 +1416,12 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         }
       }
       const result = advanceExpedition(crew, nearby, at, outdoors, nextAuto, Math.random, p.damage);
+      if (result.finished && (crew.mercenary === '암바초' || crew.mercenary?.includes('암바초'))) {
+        nextAuto = false;
+        toast.success('🎒 암바초가 오늘의 1회 원정을 마치고 거점으로 무사히 복귀했습니다!', {
+          description: '내일 자정(00:00) 이후 다시 원정을 떠날 수 있습니다.',
+        });
+      }
       if (nextAuto === false && p.expeditionAuto) {
         result.text = (result.text ? result.text + ' · ' : '') + '⚠️ 오늘 자동사냥 한도(6시간) 도달로 거점에 복귀합니다';
       }
@@ -3844,7 +3906,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return chosen;
   }, [saveKey, userId, setS, flushSave]);
 
-  return { codex: s.codex ?? defaultCodexState(), codexProgress, recordCodexResource, recordCodexPet, recordCodexBoss, recordCodexAiInvention, markCodexSeen, reloadSaveFromBestSource, claimOfflineRewards, shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, classSkills: s.classSkills ?? [], learnClassSkill, maxSpeedKmh: getPlayerSpeedLimitKmh(s.classSkills, s.affinityState?.totals?.engineering), affinityState: s.affinityState ?? defaultAffinityState(), gainEnergy, triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, dismissTribe, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, updateTutorialState, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
+  return { codex: s.codex ?? defaultCodexState(), codexProgress, recordCodexResource, recordCodexPet, recordCodexBoss, recordCodexAiInvention, markCodexSeen, reloadSaveFromBestSource, claimOfflineRewards, shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, classSkills: s.classSkills ?? [], learnClassSkill, maxSpeedKmh: getPlayerSpeedLimitKmh(s.classSkills, s.affinityState?.totals?.engineering), affinityState: s.affinityState ?? defaultAffinityState(), gainEnergy, triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, dismissTribe, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, updateTutorialState, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, ambachoDailyDone: (s.mercenary?.name === '암바초' || (s.tribe?.classCounts?.gatherer ?? 0) > 0) && s.ambachoDailyExpeditionDate === getTodayKey(), pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
     modularSkills: s.modularSkills ?? defaultModularSkillsState(),
     fuseModularSkill,
     useModularSkill,

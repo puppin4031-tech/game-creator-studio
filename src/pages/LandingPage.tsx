@@ -108,12 +108,22 @@ export default function LandingPage() {
     if (isLoading || entering) return;
     setEntering(true);
     try {
+      try {
+        localStorage.removeItem('survival-guest-world-v1');
+        localStorage.removeItem('survival-guest-world-v1_backup');
+        localStorage.removeItem('survival-guest-gps-world-v1');
+        localStorage.removeItem('survival-guest-gps-world-v1_backup');
+        localStorage.removeItem('colonion.tutorialStep.guest');
+        localStorage.removeItem('colonion_last_active_at');
+      } catch { /* ignore */ }
+      sessionStorage.setItem('colonion.forceFreshGame', '1');
       sessionStorage.setItem('colonion.forceTutorial', '1');
       sessionStorage.removeItem('colonion.guestTutorialCompleted');
       await enterGuestSession();
       navigate('/play/survival');
     } catch {
       toast.error('간편 입장 연결이 지연됩니다. 기기 체험판으로 시작합니다.');
+      sessionStorage.setItem('colonion.forceFreshGame', '1');
       sessionStorage.setItem('colonion.forceTutorial', '1');
       sessionStorage.removeItem('colonion.guestTutorialCompleted');
       navigate('/play/survival');
@@ -124,6 +134,15 @@ export default function LandingPage() {
     if (entering) return;
     setEntering(true);
     try {
+      try {
+        localStorage.removeItem('survival-guest-world-v1');
+        localStorage.removeItem('survival-guest-world-v1_backup');
+        localStorage.removeItem('survival-guest-gps-world-v1');
+        localStorage.removeItem('survival-guest-gps-world-v1_backup');
+        localStorage.removeItem('colonion.tutorialStep.guest');
+        localStorage.removeItem('colonion_last_active_at');
+      } catch { /* ignore */ }
+      sessionStorage.setItem('colonion.forceFreshGame', '1');
       sessionStorage.setItem('colonion.forceTutorial', '1');
       sessionStorage.removeItem('colonion.guestTutorialCompleted');
       await enterGuestSession();
