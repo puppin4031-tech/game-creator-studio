@@ -108,10 +108,14 @@ export default function LandingPage() {
     if (isLoading || entering) return;
     setEntering(true);
     try {
+      sessionStorage.setItem('colonion.forceTutorial', '1');
+      sessionStorage.removeItem('colonion.guestTutorialCompleted');
       await enterGuestSession();
       navigate('/play/survival');
     } catch {
       toast.error('간편 입장 연결이 지연됩니다. 기기 체험판으로 시작합니다.');
+      sessionStorage.setItem('colonion.forceTutorial', '1');
+      sessionStorage.removeItem('colonion.guestTutorialCompleted');
       navigate('/play/survival');
     } finally { setEntering(false); }
   };
@@ -119,7 +123,12 @@ export default function LandingPage() {
   const guestWorld = async () => {
     if (entering) return;
     setEntering(true);
-    try { await enterGuestSession(); navigate('/world'); }
+    try {
+      sessionStorage.setItem('colonion.forceTutorial', '1');
+      sessionStorage.removeItem('colonion.guestTutorialCompleted');
+      await enterGuestSession();
+      navigate('/world');
+    }
     catch { toast.error('비회원 입장이 지연돼요. 잠시 후 다시 시도해 주세요.'); }
     finally { setEntering(false); }
   };
@@ -188,7 +197,7 @@ export default function LandingPage() {
           <p className="mb-4 text-sm text-colonion-parchment">GPS기반 문명개척 무료게임</p>
           {user ? (
             <Button
-              onClick={() => runWithTutorialFirst(() => navigate('/world'))}
+              onClick={() => { if (getSettings().bgm) setBgmPlaying(true); navigate('/world'); }}
               disabled={isLoading}
               className="flex h-14 w-full items-center justify-center gap-2 rounded border-2 border-colonion-wood-edge bg-gradient-to-b from-primary to-colonion-ember text-base font-bold text-colonion-night shadow-lg active:translate-y-0.5"
             >
@@ -198,7 +207,7 @@ export default function LandingPage() {
             <div className="pixel-panel space-y-2 p-3">
               <p className="text-xs text-colonion-parchment">로그인 · 회원가입</p>
               <Button onClick={() => runWithTutorialFirst(loginGoogle)} disabled={isLoading || entering} className="h-12 w-full rounded border-2 border-colonion-wood-edge font-bold">Google로 계속하기</Button>
-              <Button onClick={() => runWithTutorialFirst(guestWorld)} disabled={isLoading || entering} variant="secondary" className="h-12 w-full rounded border-2 border-colonion-wood-edge font-bold">{entering ? '입장 중…' : '비회원으로 바로 입장하기'}</Button>
+              <Button onClick={() => { if (getSettings().bgm) setBgmPlaying(true); void guestWorld(); }} disabled={isLoading || entering} variant="secondary" className="h-12 w-full rounded border-2 border-colonion-wood-edge font-bold">{entering ? '입장 중…' : '비회원으로 바로 입장하기'}</Button>
               <Button onClick={() => runWithTutorialFirst(() => navigate('/login?returnTo=%2Fworld'))} variant="outline" className="h-12 w-full rounded border-2 border-colonion-wood-edge font-bold">기존 이메일 계정으로 로그인</Button>
             </div>
           )}

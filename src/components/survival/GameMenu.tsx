@@ -13,11 +13,13 @@ import { Switch } from '@/components/ui/switch';
 import { getSettings, saveSettings, subscribeSettings, playSfx, haptic, type GameSettings, type VolumeLevel } from '@/lib/survival/gameSettings';
 
 interface Props {
-  onExit: () => void;
-  onLogout: () => Promise<void> | void;
-  loggedIn: boolean;
+  onExit?: () => void;
+  onLogout?: () => Promise<void> | void;
+  loggedIn?: boolean;
   onRestoreSave?: () => Promise<unknown>;
   trigger?: React.ReactNode;
+  tutorialCompleted?: boolean;
+  onToggleTutorial?: (wantsTutorial: boolean) => void;
 }
 
 export function useGameSettings() {
@@ -26,7 +28,14 @@ export function useGameSettings() {
   return s;
 }
 
-export default function GameMenu({ onExit, onLogout, loggedIn, trigger }: Props) {
+export default function GameMenu({
+  onExit = () => window.history.back(),
+  onLogout = () => {},
+  loggedIn = false,
+  trigger,
+  tutorialCompleted,
+  onToggleTutorial,
+}: Props) {
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
@@ -71,6 +80,27 @@ export default function GameMenu({ onExit, onLogout, loggedIn, trigger }: Props)
         <DialogContent className="font-pixel">
           <DialogHeader><DialogTitle>설정</DialogTitle></DialogHeader>
           <div className="space-y-3">
+            {onToggleTutorial && (
+              <div className="flex min-h-11 items-center justify-between gap-3 rounded bg-amber-950/20 border border-amber-600/30 p-2.5">
+                <div>
+                  <b className="block text-sm text-amber-300">초보자 튜토리얼 (떠돌이 주술사)</b>
+                  <span className="text-xs text-muted-foreground">
+                    {tutorialCompleted
+                      ? '완료됨 · 스위치를 켜면 언제든 다시 시작합니다'
+                      : '진행 중 · 스위치를 끄면 건너뛰어 완료 처리됩니다'}
+                  </span>
+                </div>
+                <Switch
+                  checked={!tutorialCompleted}
+                  onCheckedChange={(checked) => {
+                    onToggleTutorial(checked);
+                    if (checked) {
+                      setSettingsOpen(false);
+                    }
+                  }}
+                />
+              </div>
+            )}
             <Row k="bgm" label="배경음 (BGM)" hint="음악 앱과 함께 쓸 땐 꺼두세요" />
             <Row k="sfx" label="효과음 (SFX)" hint="타격음·위험 경고음" />
             <div>

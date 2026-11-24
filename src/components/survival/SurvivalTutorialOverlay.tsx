@@ -132,8 +132,20 @@ export function SurvivalTutorialOverlay({
               발밑 땅바닥의 <b>나뭇가지 3개</b>를 터치하여 주우세요!
             </p>
           </div>
-          <div className="rounded bg-emerald-900/60 border border-emerald-500 px-2 py-1 text-xs font-bold text-emerald-300">
-            {collectedBranches} / 3
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <div className="rounded bg-emerald-900/60 border border-emerald-500 px-2 py-0.5 text-xs font-bold text-emerald-300">
+              {collectedBranches} / 3
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                onCompleteTutorial();
+                toast.info('튜토리얼을 건너뛰었습니다.');
+              }}
+              className="text-[9px] text-muted-foreground hover:text-foreground underline decoration-dotted"
+            >
+              건너뛰기 ⏩
+            </button>
           </div>
         </motion.div>
       </aside>
@@ -153,6 +165,24 @@ export function SurvivalTutorialOverlay({
         onPointerDownOutside={e => e.preventDefault()}
       >
         <DialogDescription className="sr-only">콜로니온 생존 튜토리얼</DialogDescription>
+
+        {/* Top Header with Skip Button */}
+        <div className="flex items-center justify-between pb-1 -mt-1 border-b border-border/30">
+          <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1">
+            <span>📜</span>
+            <span>생존 가이드</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              onCompleteTutorial();
+              toast.info('튜토리얼을 건너뛰었습니다.');
+            }}
+            className="text-[10px] text-muted-foreground hover:text-foreground underline decoration-dotted px-1 py-0.5 active:translate-y-0.5 transition-colors"
+          >
+            건너뛰기 ⏩
+          </button>
+        </div>
 
         {/* Phase 1: Meet (주술사와의 첫 만남) */}
         {step === 'phase1_meet' && (

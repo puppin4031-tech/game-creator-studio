@@ -223,6 +223,7 @@ const craftCatOf = (id: ItemId): CraftCat => {
 };
 
 export default function SurvivalSimulator({ realGps = false }: { realGps?: boolean }) {
+  const { user, isLoading: authLoading, signOut } = useAuth();
   // Opening now lives on the main page ("/"); first-time players see the 5-step story tutorial before entering the world.
   const [showOpening, setShowOpening] = useState(false);
   const [chiefName, setChiefName] = useState(() => localStorage.getItem(PIONEER_NAME_KEY) ?? '');
@@ -245,9 +246,22 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     }
   };
   const navigate = useNavigate();
+
+  // Distinguish non-member (guest) vs registered member account
+  const isGuest = !user || user.is_anonymous === true;
+  const accountTutorialKey = user && !user.is_anonymous ? `colonion.tutorialCompleted.${user.id}` : null;
+  const TUTORIAL_STEP_STORAGE_KEY = user && !user.is_anonymous
+    ? `colonion.tutorialStep.${user.id}`
+    : 'colonion.tutorialStep.guest';
+
+  // Manual override from settings switch or complete/skip actions
+  const [tutorialCompletedOverride, setTutorialCompletedOverride] = useState<boolean | null>(null);
+
+  // Initial local check for world initialization before GPS
   const isLocalTutorialDone = typeof window !== 'undefined' && (
-    localStorage.getItem(TUTORIAL_COMPLETED_KEY) === '1' ||
-    localStorage.getItem('colonion.tutorialCompleted.v2') === '1'
+    isGuest
+      ? (sessionStorage.getItem('colonion.forceTutorial') !== '1' && sessionStorage.getItem('colonion.guestTutorialCompleted') === '1')
+      : (!!accountTutorialKey && localStorage.getItem(accountTutorialKey) === '1')
   );
   const [gpsReady, setGpsReady] = useState(false);
   const g = useSurvivalWorld(START, {
@@ -260,6 +274,31 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   useEffect(() => setGpsReady(gps.ready || gps.isIndoor), [gps.ready, gps.isIndoor]);
   useEffect(() => { preloadCoreSprites(); }, []);
   const { state: s } = g;
+
+  // Check whether tutorial is completed:
+  // 1. Non-members (guests): MUST unconditionally start from tutorial unless completed in current session.
+  // 2. Members (1 account per 1 tutorial): checked via accountTutorialKey or save data.
+  const isTutorialCompleted = useMemo(() => {
+    if (tutorialCompletedOverride !== null) {
+      return tutorialCompletedOverride;
+    }
+    if (typeof window === 'undefined') return false;
+
+    const forceTutorial = sessionStorage.getItem('colonion.forceTutorial') === '1';
+    if (forceTutorial) {
+      return false;
+    }
+
+    if (isGuest) {
+      return sessionStorage.getItem('colonion.guestTutorialCompleted') === '1';
+    }
+
+    if (accountTutorialKey) {
+      const accountDone = localStorage.getItem(accountTutorialKey) === '1';
+      if (accountDone) return true;
+    }
+    return !!s.tutorialCompleted || !!s.shamanMet;
+  }, [tutorialCompletedOverride, isGuest, accountTutorialKey, s.tutorialCompleted, s.shamanMet]);
   const [expeditionTarget, setExpeditionTarget] = useState<LatLng | null>(null);
   const [watchExpedition, setWatchExpedition] = useState(true);
   const [view, setView] = useState<WorldView>('user');
@@ -313,10 +352,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
       // BLOCK OfflineReportModal on fresh start or before tutorial is completed
       const currentSave = stateRef.current;
-      const isCompleted =
-        currentSave.shamanMet ||
-        currentSave.tutorialCompleted ||
-        localStorage.getItem(TUTORIAL_COMPLETED_KEY) === '1';
+      const isCompleted = isTutorialCompleted || currentSave.shamanMet || currentSave.tutorialCompleted;
       if (!isCompleted || !raw) {
         localStorage.setItem(LAST_ACTIVE_KEY, now.toString());
         return;
@@ -390,22 +426,25 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [baseTab, setBaseTab] = useState<'village' | 'lab' | 'craft' | 'storage' | 'expedition' | 'pets'>('village');
   const [craftCat, setCraftCat] = useState<CraftCat>('all');
 
-  // Tutorial completion flag: either shamanMet, tutorialCompleted in save, or localStorage flag
-  const isTutorialCompleted =
-    !!s.shamanMet ||
-    !!s.tutorialCompleted ||
-    (typeof window !== 'undefined' && localStorage.getItem(TUTORIAL_COMPLETED_KEY) === '1');
-
   // Strict First-Time Boot Priority: Shaman Tutorial Step 1 is the #1 overlay (StoryTutorial deferred)
   const [showStoryTutorial, setShowStoryTutorial] = useState(false);
-
-  const TUTORIAL_STEP_STORAGE_KEY = 'colonion.tutorialStep.v2';
 
   // 3-Phase Interactive Survival Tutorial State
   const [tutorialStep, setTutorialStepState] = useState<TutorialStep | null>(() => {
     if (typeof window === 'undefined') return null;
-    if (isTutorialCompleted) {
-      return 'completed';
+    const forceTutorial = sessionStorage.getItem('colonion.forceTutorial') === '1';
+    if (forceTutorial) {
+      sessionStorage.removeItem('colonion.forceTutorial');
+      return 'phase1_meet';
+    }
+    if (isGuest) {
+      const guestDone = sessionStorage.getItem('colonion.guestTutorialCompleted') === '1';
+      if (guestDone) return 'completed';
+      return 'phase1_meet';
+    }
+    if (accountTutorialKey) {
+      const memberDone = localStorage.getItem(accountTutorialKey) === '1' || !!s.tutorialCompleted || !!s.shamanMet;
+      if (memberDone) return 'completed';
     }
     const savedStep = s.tutorialStep || localStorage.getItem(TUTORIAL_STEP_STORAGE_KEY);
     if (savedStep && savedStep !== 'completed') {
@@ -414,16 +453,32 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     return 'phase1_meet';
   });
 
+  // Synchronize when auth completes for registered member
+  useEffect(() => {
+    if (!authLoading && user && !user.is_anonymous) {
+      const memberKey = `colonion.tutorialCompleted.${user.id}`;
+      const memberDone = localStorage.getItem(memberKey) === '1' || !!s.tutorialCompleted || !!s.shamanMet;
+      if (memberDone && tutorialCompletedOverride === null) {
+        setTutorialStepState(prev => (prev === 'phase1_meet' ? 'completed' : prev));
+      }
+    }
+  }, [authLoading, user, s.tutorialCompleted, s.shamanMet, tutorialCompletedOverride]);
+
   const setTutorialStep = useCallback((step: TutorialStep) => {
     setTutorialStepState(step);
     try {
       localStorage.setItem(TUTORIAL_STEP_STORAGE_KEY, step);
       if (step === 'completed') {
+        if (user && !user.is_anonymous) {
+          localStorage.setItem(`colonion.tutorialCompleted.${user.id}`, '1');
+        } else {
+          sessionStorage.setItem('colonion.guestTutorialCompleted', '1');
+        }
         localStorage.setItem(TUTORIAL_COMPLETED_KEY, '1');
       }
     } catch { /* ignore */ }
     g.updateTutorialState?.(step, step === 'completed');
-  }, [g]);
+  }, [g, user, TUTORIAL_STEP_STORAGE_KEY]);
 
   const [tutorialBranches, setTutorialBranches] = useState<TutorialGroundBranch[]>([]);
   const [collectedBranches, setCollectedBranches] = useState(() => {
@@ -461,28 +516,61 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     });
   };
 
-  const handleCompleteTutorial = () => {
+  const handleCompleteTutorial = useCallback(() => {
     g.meetShaman();
     try {
-      localStorage.setItem(TUTORIAL_COMPLETED_KEY, '1');
+      if (user && !user.is_anonymous) {
+        localStorage.setItem(`colonion.tutorialCompleted.${user.id}`, '1');
+      } else {
+        sessionStorage.setItem('colonion.guestTutorialCompleted', '1');
+      }
       localStorage.setItem(TUTORIAL_STEP_STORAGE_KEY, 'completed');
+      localStorage.setItem(TUTORIAL_COMPLETED_KEY, '1');
     } catch { /* ignore */ }
     setTutorialStepState('completed');
+    setTutorialCompletedOverride(true);
     toast.success('🎉 기본 생존 튜토리얼을 모두 완료했습니다!');
-  };
+  }, [g, user, TUTORIAL_STEP_STORAGE_KEY]);
+
+  const handleToggleTutorial = useCallback((wantsTutorial: boolean) => {
+    if (wantsTutorial) {
+      try {
+        if (user && !user.is_anonymous) {
+          localStorage.removeItem(`colonion.tutorialCompleted.${user.id}`);
+        } else {
+          sessionStorage.removeItem('colonion.guestTutorialCompleted');
+        }
+        localStorage.removeItem(TUTORIAL_STEP_STORAGE_KEY);
+        localStorage.removeItem(TUTORIAL_COMPLETED_KEY);
+        localStorage.removeItem(STORY_TUTORIAL_SEEN_KEY);
+        sessionStorage.removeItem('colonion.storyTutorialSeenSession');
+      } catch { /* ignore */ }
+      setCollectedBranches(0);
+      setTutorialBranches(generateTutorialGroundBranches(s.pos));
+      setTutorialStepState('phase1_meet');
+      setTutorialCompletedOverride(false);
+      g.updateTutorialState?.('phase1_meet', false);
+      toast.info('📖 초보자 튜토리얼을 다시 시작합니다.');
+    } else {
+      try {
+        if (user && !user.is_anonymous) {
+          localStorage.setItem(`colonion.tutorialCompleted.${user.id}`, '1');
+        } else {
+          sessionStorage.setItem('colonion.guestTutorialCompleted', '1');
+        }
+        localStorage.setItem(TUTORIAL_STEP_STORAGE_KEY, 'completed');
+        localStorage.setItem(TUTORIAL_COMPLETED_KEY, '1');
+      } catch { /* ignore */ }
+      g.meetShaman();
+      g.updateTutorialState?.('completed', true);
+      setTutorialStepState('completed');
+      setTutorialCompletedOverride(true);
+      toast.success('초보자 튜토리얼을 건너뛰고 완료 처리했습니다.');
+    }
+  }, [user, TUTORIAL_STEP_STORAGE_KEY, s.pos, g]);
 
   const handleReplayTutorial = () => {
-    try {
-      localStorage.removeItem(TUTORIAL_COMPLETED_KEY);
-      localStorage.removeItem(TUTORIAL_STEP_STORAGE_KEY);
-      localStorage.removeItem(STORY_TUTORIAL_SEEN_KEY);
-      sessionStorage.removeItem('colonion.storyTutorialSeenSession');
-    } catch { /* ignore */ }
-    setCollectedBranches(0);
-    setTutorialBranches(generateTutorialGroundBranches(s.pos));
-    setTutorialStepState('phase1_meet');
-    g.updateTutorialState?.('phase1_meet', false);
-    toast.info('📖 초보자 튜토리얼을 다시 시작합니다.');
+    handleToggleTutorial(true);
   };
 
   // 4-Context Mode State ('user' | 'base' | 'pet' | 'expedition')
@@ -882,7 +970,6 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     setBubbles(b => ({ ...b, [id]: text }));
     window.setTimeout(() => setBubbles(b => { const n = { ...b }; if (n[id] === text) delete n[id]; return n; }), 3000);
   };
-  const { user, signOut } = useAuth();
   const gameSettings = useGameSettings();
   useEffect(() => { setBgmPlaying(gameSettings.bgm); return () => setBgmPlaying(false); }, [gameSettings.bgm]);
   useEffect(() => { if (hit.n > 0) { playSample('strike'); if (visibleEntities.some(e => e.kind === 'creature' && e.id === auto.job?.id)) playSample('beastAttack'); haptic(120); if (document.hidden) sendNotice('짐승의 공격!', '거점 밖에서 짐승에게 공격받고 있어요', 'beast-hit'); } }, [hit.n]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1943,6 +2030,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                     }
                   }}
                   onRestoreSave={g.reloadSaveFromBestSource}
+                  tutorialCompleted={isTutorialCompleted}
+                  onToggleTutorial={handleToggleTutorial}
                   trigger={
                     <button
                       type="button"
