@@ -1371,11 +1371,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           >
             <div className="flex -space-x-1 items-center">
               <span className="text-sm drop-shadow">{activeTribeClass.icon}</span>
-              {crew && (
-                <>
-                  <span className="text-[11px] drop-shadow">🎒</span>
-                  <span className="text-[11px] drop-shadow">🏹</span>
-                </>
+              {crew && (s.tribe?.count ?? 1) > 1 && (
+                <span className="text-[11px] drop-shadow">🏹</span>
               )}
             </div>
             <div className="flex flex-col items-start leading-tight">
@@ -1424,7 +1421,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   project={project}
                   metersPerPx={mpp}
                 />
-                {crew && <ExpeditionMarker crew={crew} project={project} members={Math.max(3, s.tribe?.count ?? 3)} tribeClass={activeTribeClassId} />}
+                {crew && <ExpeditionMarker crew={crew} project={project} members={crew.members ?? s.tribe?.count ?? 1} tribeClass={activeTribeClassId} />}
                 {crew && view === 'expedition' && <ExpeditionJoystick crew={crew} candidates={g.crewNearby} project={project} onManual={g.setCrewManual} onSteer={g.steerCrew} onCommand={g.commandCrew} onAct={g.crewAct} onHeal={g.healCrew} />}
                 {view === 'user' && (
                   <TutorialGroundBranches
@@ -1788,7 +1785,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                             {/* Escort tribes: individual classes, desynchronized animations and micro-actions */}
                             {escortReady(s.tribe, Date.now(), !!s.observedExpedition?.mercenary) && (
                               <>
-                                {Array.from({ length: Math.min(5, s.tribe?.count ?? 1) }, (_, k) => {
+                                {Array.from({ length: Math.min(5, Math.max(0, s.tribe?.count ?? 0)) }, (_, k) => {
                                   const isAmbachoSlot = k === 0 && (s.mercenary?.name === '암바초' || (s.tribe?.classCounts?.gatherer ?? 0) > 0);
                                   const classCycle: TribeClassId[] = ['gatherer', 'tank', 'ranged', 'assassin'];
                                   const escortClass: TribeClassId = isAmbachoSlot

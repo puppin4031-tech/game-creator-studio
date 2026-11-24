@@ -256,7 +256,7 @@ export default function BaseNpcs({
                     <div className="text-[10px] text-muted-foreground">HP +80% · 방어 +5 · 성벽 방어 피해 -35%</div>
                   </div>
                 </div>
-                <span className="font-bold text-primary">{tribe?.classCounts?.tank ?? count}명</span>
+                <span className="font-bold text-primary">{tribe?.classCounts?.tank ?? 0}명</span>
               </div>
               {(tribe?.classCounts?.gatherer ?? 0) > 0 && (
                 <div className="flex items-center justify-between border-t border-border/50 pt-1.5">

@@ -51,8 +51,8 @@ export function ExpeditionMarker({ crew, project, members = 1, tribeClass }: { c
       <div style={{ transform: (target ? dx < 0 : crew.facing === -1) ? 'scaleX(-1)' : undefined }} className="relative flex items-end justify-center">
         {/* 리더 부족민 (대장) */}
         {crew.mercenary && <TribeSprite action={tribeAct} tribeClass={activeClassId} height={52} frameOffset={0} memberIndex={0} />}
-        {/* 분대 동행 부족민들: 각각 고유한 클래스와 엇박자 보행 움직임 부여 */}
-        {crew.mercenary && Array.from({ length: Math.min(4, Math.max(2, members) - 1) }, (_, k) => {
+        {/* 분대 동행 부족민들: 실제 보유/파견된 부족민 수(members)에 맞춰 렌더링 (암바초 1명일 때는 추가 동행 부족민 0명) */}
+        {crew.mercenary && Array.from({ length: Math.min(4, Math.max(0, (crew.members ?? members ?? 1) - 1)) }, (_, k) => {
           const squadClass = SQUAD_CLASSES[(k + (activeClassId === 'tank' ? 1 : 0)) % SQUAD_CLASSES.length];
           const followerAction = tribeAct === 'attack' ? (k % 2 === 1 ? 'attack' : 'idle') : tribeAct;
           const bobY = Math.sin((tick + k * 2) * 0.7) * 2;
