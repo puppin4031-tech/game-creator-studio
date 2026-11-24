@@ -1,410 +1,584 @@
 import React, { useMemo, useState } from 'react';
 import {
-  CLASS_SKILL_TREES,
-  ALL_CLASS_SKILL_NODES,
-  checkSkillUnlockRequirements,
-  type ClassSkillNode,
-  type ShamanClassType,
-} from '@/data/classSkillTrees';
-import { ITEMS } from '@/lib/survival/items';
+  type ModularSkillsSaveState,
+  type PlayerModularSkill,
+  type BaseActionId,
+  type SkillCategory,
+  BASE_ACTIONS,
+  FUSED_SKILLS,
+  FUSED_SKILLS_MAP,
+  getFusionRecipe,
+  expRequiredForMasteryLevel,
+  defaultModularSkillsState,
+  defaultPlayerSkill,
+  getSkillDisplayName,
+  getSkillDisplayIcon,
+  getSkillCooldownMs,
+  ATTACK_SPECIALIZATIONS,
+  DEFENSE_SPECIALIZATIONS,
+  BUFF_SPECIALIZATIONS,
+} from '@/data/modularSkills';
+import {
+  type AffinityState,
+  type SubEnergyId,
+  SUB_ENERGIES,
+  defaultAffinityState,
+} from '@/data/affinitySystem';
 import type { Stack } from '@/lib/survival/types';
 import type { ShamanClassId } from '@/lib/survival/shamanEvolution';
-import { bundledSpriteUrl } from '@/hooks/useItemCatalog';
-import { X, Lock, Check, Sparkles, ChevronRight, AlertCircle, ArrowDown } from 'lucide-react';
+import { X, Lock, Check, Sparkles, ChevronRight, Wand2, Shield, Swords, Flame, RotateCcw, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ContextualHelpButton } from './ContextualHelpButton';
 
 export interface SkillTreeModalProps {
   open: boolean;
   onClose: () => void;
+  modularSkills?: ModularSkillsSaveState;
+  affinityState?: AffinityState;
+  onFuseModularSkill?: (baseActionId: BaseActionId, subEnergyId: SubEnergyId) => boolean;
+  onEquipModularSkill?: (skillId: string, slotIndex: number) => boolean;
+  onSpecializeModularSkill?: (skillId: string, specId: string) => boolean;
+  onResetModularSpecialization?: (skillId: string) => boolean;
+  onUseModularSkill?: (skillId: string) => boolean;
+
+  // Legacy fallback props
   shamanClass?: ShamanClassId | null;
-  playerLevel: number;
+  playerLevel?: number;
   classSkills?: string[];
-  ownedStacks: Stack[];
-  onLearnSkill: (skillId: string) => boolean | void;
+  ownedStacks?: Stack[];
+  onLearnSkill?: (skillId: string) => boolean | void;
 }
 
-function normalizeShamanClass(raw?: string | null): ShamanClassType {
-  if (!raw) return 'ENGINEER';
-  const upper = raw.toUpperCase();
-  if (upper === 'ENGINEER') return 'ENGINEER';
-  if (upper === 'MAGE') return 'MAGE';
-  if (upper === 'NECROMANCER' || upper === 'WARLOCK') return 'NECROMANCER';
-  if (upper === 'HONEST' || upper === 'ORTHODOX') return 'HONEST';
-  return 'ENGINEER';
-}
+type TabType = 'affinity' | 'fusion' | 'my_skills';
 
-const CLASS_TABS: { id: ShamanClassType; label: string; icon: string; color: string }[] = [
-  { id: 'ENGINEER', label: '공학 주술사', icon: '🔧', color: 'text-amber-400' },
-  { id: 'MAGE', label: '마법술사', icon: '🔮', color: 'text-cyan-400' },
-  { id: 'NECROMANCER', label: '흑마술사', icon: '💀', color: 'text-purple-400' },
-  { id: 'HONEST', label: '정직한 주술사', icon: '🌿', color: 'text-emerald-400' },
+const BASE_ACTION_LIST: { id: BaseActionId; name: string; icon: string; category: SkillCategory; desc: string }[] = [
+  { id: 'stone_throw', name: '돌팔매질', icon: '🎯', category: 'attack', desc: '돌이나 탄환을 던지는 원거리 기본 공격' },
+  { id: 'heavy_strike', name: '내려찍기', icon: '🔨', category: 'attack', desc: '무기나 주먹으로 강하게 타격하는 근접 공격' },
+  { id: 'guard_brace', name: '웅크려 막기', icon: '🛡️', category: 'defense', desc: '신체를 웅크려 충격을 완화하는 방어 기술' },
+  { id: 'primal_shout', name: '원시 함성', icon: '📢', category: 'buff', desc: '투지를 끌어올리고 동료를 고양하는 보조/소환 기술' },
 ];
 
 export const SkillTreeModal: React.FC<SkillTreeModalProps> = ({
   open,
   onClose,
-  shamanClass,
-  playerLevel,
-  classSkills = [],
-  ownedStacks,
-  onLearnSkill,
+  modularSkills,
+  affinityState,
+  onFuseModularSkill,
+  onEquipModularSkill,
+  onSpecializeModularSkill,
+  onResetModularSpecialization,
+  onUseModularSkill,
 }) => {
-  const activeUserClass = useMemo(() => {
-    if (!shamanClass || shamanClass === 'NONE') return null;
-    return normalizeShamanClass(shamanClass);
-  }, [shamanClass]);
+  const [activeTab, setActiveTab] = useState<TabType>('fusion');
 
-  const [selectedClass, setSelectedClass] = useState<ShamanClassType>(() => {
-    return activeUserClass ?? 'ENGINEER';
-  });
+  // Fusion bench state
+  const [selectedBaseAction, setSelectedBaseAction] = useState<BaseActionId>('stone_throw');
+  const [selectedSubEnergy, setSelectedSubEnergy] = useState<SubEnergyId>('fire');
 
-  const treeData = CLASS_SKILL_TREES[selectedClass];
+  // My skills state
+  const [categoryFilter, setCategoryFilter] = useState<'all' | SkillCategory>('all');
+  const [selectedSkillId, setSelectedSkillId] = useState<string>('stone_throw');
 
-  const [selectedSkillId, setSelectedSkillId] = useState<string>(() => {
-    return treeData.branch1.skills[0]?.id ?? 'wooden_sled';
-  });
+  const aff = affinityState ?? defaultAffinityState();
+  const modState = modularSkills ?? defaultModularSkillsState();
+  const unlocked = modState.unlockedSkills ?? {};
+  const equipped = modState.equippedSkillIds ?? [];
 
-  // Keep selectedSkill valid when switching classes
-  const currentSkillNode: ClassSkillNode = useMemo(() => {
-    if (ALL_CLASS_SKILL_NODES[selectedSkillId] && ALL_CLASS_SKILL_NODES[selectedSkillId].classId === selectedClass) {
-      return ALL_CLASS_SKILL_NODES[selectedSkillId];
-    }
-    return treeData.branch1.skills[0];
-  }, [selectedSkillId, selectedClass, treeData]);
+  // Current fusion recipe preview
+  const currentRecipe = useMemo(() => {
+    return getFusionRecipe(selectedBaseAction, selectedSubEnergy);
+  }, [selectedBaseAction, selectedSubEnergy]);
 
-  const skillStatus = useMemo(() => {
-    return checkSkillUnlockRequirements(currentSkillNode, playerLevel, classSkills, ownedStacks);
-  }, [currentSkillNode, playerLevel, classSkills, ownedStacks]);
+  const currentEnergyVal = aff.energies?.[selectedSubEnergy] ?? 0;
+  const canFuse = currentEnergyVal >= 30 && !!currentRecipe && !unlocked[currentRecipe.id];
+
+  // Selected skill in My Skills tab
+  const activePlayerSkill = unlocked[selectedSkillId] ?? defaultPlayerSkill(selectedSkillId);
+  const activeBaseAction = BASE_ACTIONS[selectedSkillId as BaseActionId];
+  const activeFusedDef = FUSED_SKILLS_MAP[selectedSkillId];
+  const activeCategory = activeBaseAction?.category ?? activeFusedDef?.category ?? 'attack';
+  const activeDisplayName = getSkillDisplayName(selectedSkillId, activePlayerSkill);
+  const activeDisplayIcon = getSkillDisplayIcon(selectedSkillId);
+  const isEquipped = equipped.includes(selectedSkillId);
+
+  const expRequired = expRequiredForMasteryLevel(activePlayerSkill.masteryLevel);
+  const isAwakened = activePlayerSkill.masteryLevel >= 10 || !!activePlayerSkill.isAwakened;
+  const isMaxMastery = activePlayerSkill.masteryLevel >= 20;
+
+  // Specialization options for the selected skill
+  const specOptions = useMemo(() => {
+    if (activeCategory === 'attack') return ATTACK_SPECIALIZATIONS;
+    if (activeCategory === 'defense') return DEFENSE_SPECIALIZATIONS;
+    return BUFF_SPECIALIZATIONS;
+  }, [activeCategory]);
 
   if (!open) return null;
 
-  const handleSelectSkill = (node: ClassSkillNode) => {
-    setSelectedSkillId(node.id);
-  };
-
-  const handleLearnClick = () => {
-    if (skillStatus.isUnlockable) {
-      onLearnSkill(currentSkillNode.id);
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 sm:p-4 backdrop-blur-sm animate-in fade-in-20">
-      <div className="relative flex flex-col h-[92vh] max-h-[820px] w-full max-w-lg rounded-lg border-2 border-amber-900/60 bg-stone-950/95 text-stone-100 shadow-2xl overflow-hidden font-sans">
-        
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-stone-800 bg-stone-900/80 px-3 py-2.5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 sm:p-4 font-pixel select-none backdrop-blur-xs">
+      <div className="relative flex h-[90dvh] w-full max-w-2xl flex-col rounded-2xl border-4 border-[#2b1d14] bg-[#1c1917] text-[#e7e5e4] shadow-2xl overflow-hidden">
+        {/* Header Bar */}
+        <div className="flex items-center justify-between border-b-2 border-[#2b1d14] bg-[#292524] px-4 py-3">
           <div className="flex items-center gap-2">
-            <span className="text-xl">📜</span>
+            <span className="text-xl">⚡</span>
             <div>
-              <h2 className="text-sm font-bold text-amber-200 tracking-wide flex items-center gap-1.5">
-                4대 주술사 심화 스킬트리
-                {activeUserClass && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-normal">
-                    내 클래스: {CLASS_SKILL_TREES[activeUserClass].className}
-                  </span>
-                )}
+              <h2 className="text-sm sm:text-base font-extrabold text-amber-300">
+                선사시대 기운 & 모듈러 스킬 시스템
               </h2>
-              <p className="text-[11px] text-stone-400">
-                GPS 제약 돌파 & 클래스 고유 특화 테크
+              <p className="text-[10px] text-stone-400">
+                행동으로 기운을 쌓고, 기본 동작과 융합하여 각성된 전설 기술을 연마하세요
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <ContextualHelpButton
-              title="4대 주술사 심화 스킬트리"
-              bullets={[
-                "전직한 주술사의 고유 스킬을 배워 GPS 탐험 속도와 파밍 반경을 돌파하세요.",
-                "필요 레벨과 재료를 갖추면 스킬 노드가 영구적으로 활성화됩니다.",
-                "다른 클래스의 스킬트리도 자유롭게 미리 열람하고 진로를 계획할 수 있습니다."
-              ]}
-            />
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded p-1 text-stone-400 hover:bg-stone-800 hover:text-stone-200 transition-colors"
-              aria-label="닫기"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#44403c] bg-[#1c1917] text-stone-300 hover:bg-[#292524] active:scale-95"
+            aria-label="닫기"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
-        {/* Class Selection Tabs */}
-        <div className="grid grid-cols-4 gap-1 border-b border-stone-800 bg-stone-950 p-1.5">
-          {CLASS_TABS.map((tab) => {
-            const isSelected = selectedClass === tab.id;
-            const isMyClass = activeUserClass === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => {
-                  setSelectedClass(tab.id);
-                  const firstSkill = CLASS_SKILL_TREES[tab.id].branch1.skills[0];
-                  if (firstSkill) setSelectedSkillId(firstSkill.id);
-                }}
-                className={`relative flex flex-col items-center justify-center rounded py-1.5 px-1 text-center transition-all ${
-                  isSelected
-                    ? 'bg-stone-800 text-stone-100 font-bold border border-amber-600/60 shadow-inner'
-                    : 'bg-stone-900/50 text-stone-400 hover:bg-stone-850 hover:text-stone-300'
-                }`}
-              >
-                <span className="text-base leading-none mb-0.5">{tab.icon}</span>
-                <span className={`text-[11px] leading-tight truncate w-full ${isSelected ? tab.color : ''}`}>
-                  {tab.label}
-                </span>
-                {isMyClass && (
-                  <span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping" />
-                )}
-              </button>
-            );
-          })}
+        {/* 3 Main Tabs: [기운 현황], [스킬 조합대], [내 스킬] */}
+        <div className="flex border-b border-[#2b1d14] bg-[#1c1917]">
+          <button
+            type="button"
+            onClick={() => setActiveTab('affinity')}
+            className={`flex-1 py-2.5 text-xs font-bold transition-colors border-b-2 ${
+              activeTab === 'affinity'
+                ? 'border-amber-500 bg-[#292524] text-amber-300'
+                : 'border-transparent text-stone-400 hover:text-stone-200 hover:bg-[#221f1d]'
+            }`}
+          >
+            기운 현황 (12기운)
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('fusion')}
+            className={`flex-1 py-2.5 text-xs font-bold transition-colors border-b-2 ${
+              activeTab === 'fusion'
+                ? 'border-amber-500 bg-[#292524] text-amber-300'
+                : 'border-transparent text-stone-400 hover:text-stone-200 hover:bg-[#221f1d]'
+            }`}
+          >
+            ✨ 스킬 조합대 (융합)
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('my_skills')}
+            className={`flex-1 py-2.5 text-xs font-bold transition-colors border-b-2 ${
+              activeTab === 'my_skills'
+                ? 'border-amber-500 bg-[#292524] text-amber-300'
+                : 'border-transparent text-stone-400 hover:text-stone-200 hover:bg-[#221f1d]'
+            }`}
+          >
+            내 스킬 및 숙련도 ({Object.keys(unlocked).length})
+          </button>
         </div>
 
-        {/* Tree Container (Compact 2-Branch Layout) */}
-        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            {/* Branch 1 */}
-            <div className="flex flex-col items-center rounded-lg border border-stone-800/80 bg-stone-900/40 p-2.5">
-              <div className="mb-2 text-center w-full pb-1 border-b border-stone-800">
-                <span className="text-[11px] font-bold text-amber-300 truncate block">
-                  {treeData.branch1.name}
-                </span>
-              </div>
-              <div className="flex flex-col items-center gap-2 w-full">
-                {treeData.branch1.skills.map((node, idx) => {
-                  const check = checkSkillUnlockRequirements(node, playerLevel, classSkills, ownedStacks);
-                  const isSelected = selectedSkillId === node.id;
-                  const isLearned = check.isLearned;
-                  const isUnlockable = check.isUnlockable;
-                  const isLocked = !isLearned && !isUnlockable;
-
-                  return (
-                    <React.Fragment key={node.id}>
-                      {idx > 0 && (
-                        <div className="flex justify-center -my-1 text-stone-600">
-                          <ArrowDown className={`h-3.5 w-3.5 ${classSkills.includes(treeData.branch1.skills[idx - 1].id) ? 'text-amber-400/80' : 'text-stone-700'}`} />
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleSelectSkill(node)}
-                        className={`relative group flex flex-col items-center justify-center w-full max-w-[150px] p-2 rounded-md transition-all border text-center ${
-                          isSelected
-                            ? 'ring-2 ring-amber-400 border-amber-300 bg-stone-800 shadow-md'
-                            : isLearned
-                            ? 'border-emerald-500/50 bg-emerald-950/20 hover:bg-emerald-950/40 text-stone-200'
-                            : isUnlockable
-                            ? 'border-amber-500/80 bg-amber-950/30 hover:bg-amber-950/50 animate-pulse text-stone-200'
-                            : 'border-stone-800 bg-stone-950/60 opacity-60 text-stone-400 hover:opacity-80'
-                        }`}
-                      >
-                        {/* Status Badges */}
-                        {isLearned && (
-                          <div className="absolute -top-1.5 -right-1.5 rounded-full bg-emerald-500 p-0.5 text-black shadow">
-                            <Check className="h-3 w-3 stroke-[3]" />
-                          </div>
-                        )}
-                        {isUnlockable && (
-                          <div className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-amber-400 border border-stone-950 shadow animate-ping" />
-                        )}
-                        {isLocked && (
-                          <div className="absolute top-1 right-1 text-stone-500">
-                            <Lock className="h-3 w-3" />
-                          </div>
-                        )}
-
-                        <span className="text-2xl filter drop-shadow mb-1">{node.icon}</span>
-                        <span className="text-[11px] font-medium leading-snug line-clamp-1">
-                          {node.name}
-                        </span>
-                        <span className="text-[9px] text-stone-400 mt-0.5">
-                          T{node.tier} · Lv.{node.reqLevel}
-                        </span>
-                      </button>
-                    </React.Fragment>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Branch 2 */}
-            <div className="flex flex-col items-center rounded-lg border border-stone-800/80 bg-stone-900/40 p-2.5">
-              <div className="mb-2 text-center w-full pb-1 border-b border-stone-800">
-                <span className="text-[11px] font-bold text-cyan-300 truncate block">
-                  {treeData.branch2.name}
-                </span>
-              </div>
-              <div className="flex flex-col items-center gap-2 w-full">
-                {treeData.branch2.skills.map((node, idx) => {
-                  const check = checkSkillUnlockRequirements(node, playerLevel, classSkills, ownedStacks);
-                  const isSelected = selectedSkillId === node.id;
-                  const isLearned = check.isLearned;
-                  const isUnlockable = check.isUnlockable;
-                  const isLocked = !isLearned && !isUnlockable;
-
-                  return (
-                    <React.Fragment key={node.id}>
-                      {idx > 0 && (
-                        <div className="flex justify-center -my-1 text-stone-600">
-                          <ArrowDown className={`h-3.5 w-3.5 ${classSkills.includes(treeData.branch2.skills[idx - 1].id) ? 'text-cyan-400/80' : 'text-stone-700'}`} />
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleSelectSkill(node)}
-                        className={`relative group flex flex-col items-center justify-center w-full max-w-[150px] p-2 rounded-md transition-all border text-center ${
-                          isSelected
-                            ? 'ring-2 ring-cyan-400 border-cyan-300 bg-stone-800 shadow-md'
-                            : isLearned
-                            ? 'border-emerald-500/50 bg-emerald-950/20 hover:bg-emerald-950/40 text-stone-200'
-                            : isUnlockable
-                            ? 'border-cyan-500/80 bg-cyan-950/30 hover:bg-cyan-950/50 animate-pulse text-stone-200'
-                            : 'border-stone-800 bg-stone-950/60 opacity-60 text-stone-400 hover:opacity-80'
-                        }`}
-                      >
-                        {/* Status Badges */}
-                        {isLearned && (
-                          <div className="absolute -top-1.5 -right-1.5 rounded-full bg-emerald-500 p-0.5 text-black shadow">
-                            <Check className="h-3 w-3 stroke-[3]" />
-                          </div>
-                        )}
-                        {isUnlockable && (
-                          <div className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-cyan-400 border border-stone-950 shadow animate-ping" />
-                        )}
-                        {isLocked && (
-                          <div className="absolute top-1 right-1 text-stone-500">
-                            <Lock className="h-3 w-3" />
-                          </div>
-                        )}
-
-                        <span className="text-2xl filter drop-shadow mb-1">{node.icon}</span>
-                        <span className="text-[11px] font-medium leading-snug line-clamp-1">
-                          {node.name}
-                        </span>
-                        <span className="text-[9px] text-stone-400 mt-0.5">
-                          T{node.tier} · Lv.{node.reqLevel}
-                        </span>
-                      </button>
-                    </React.Fragment>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Inspector Panel */}
-        <div className="border-t-2 border-stone-800 bg-stone-900/95 p-3 flex flex-col gap-2.5 shadow-lg">
-          {/* Skill Title & Desc */}
-          <div className="flex items-start gap-2.5">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-amber-600/50 bg-stone-950 text-2xl shadow-inner">
-              {currentSkillNode.icon}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="font-bold text-stone-100 text-xs">
-                  {currentSkillNode.name}
-                </span>
-                <span className="rounded bg-amber-950/80 px-1.5 py-0.2 text-[10px] text-amber-300 border border-amber-800/40">
-                  Tier {currentSkillNode.tier}
-                </span>
-                <span className="text-[10px] text-stone-400">
-                  [{currentSkillNode.branchName}]
-                </span>
-              </div>
-              <p className="text-[11px] text-stone-300 mt-1 leading-relaxed">
-                {currentSkillNode.desc}
+        {/* Tab 1: [기운 현황] */}
+        {activeTab === 'affinity' && (
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4">
+            <div className="rounded-xl border border-[#44403c] bg-[#292524] p-3 text-xs leading-relaxed">
+              <b className="text-amber-300">💡 4대 성향과 12대 서브 에너지</b>
+              <p className="text-stone-300 text-[11px] mt-1">
+                강제된 직업 선택 없이 실제 생존 행동(걷기, 채집, 사냥, 전투, 건축, 요리, 기도)을 통해 자연스럽게 기운을 수련합니다.
+                서브 에너지가 <b>30</b> 이상 축적되면 해당 기운을 기본 동작에 융합할 수 있습니다.
               </p>
             </div>
-          </div>
 
-          {/* Requirements & Costs */}
-          <div className="rounded-md border border-stone-800 bg-stone-950/70 p-2 text-[11px] space-y-1.5">
-            <div className="flex items-center gap-3 text-stone-400 flex-wrap">
-              <span className={`flex items-center gap-1 ${playerLevel >= currentSkillNode.reqLevel ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {playerLevel >= currentSkillNode.reqLevel ? <Check className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
-                족장 Lv.{currentSkillNode.reqLevel} (현재 {playerLevel})
-              </span>
-              {currentSkillNode.reqSkillId && (
-                <span className={`flex items-center gap-1 ${classSkills.includes(currentSkillNode.reqSkillId) ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {classSkills.includes(currentSkillNode.reqSkillId) ? <Check className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
-                  선행: {ALL_CLASS_SKILL_NODES[currentSkillNode.reqSkillId]?.name ?? currentSkillNode.reqSkillId}
-                </span>
-              )}
-            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {(Object.keys(SUB_ENERGIES) as SubEnergyId[]).map(energyId => {
+                const def = SUB_ENERGIES[energyId];
+                const val = aff.energies?.[energyId] ?? 0;
+                const pct = Math.min(100, Math.round((val / 100) * 100));
+                const isReadyForFusion = val >= 30;
 
-            {/* Materials requirement */}
-            {currentSkillNode.costItems.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap pt-0.5 border-t border-stone-850">
-                <span className="text-stone-400 text-[10px] shrink-0">필요 재료:</span>
-                {currentSkillNode.costItems.map((cost) => {
-                  const owned = ownedStacks.find(s => s.itemId === cost.itemId)?.count ?? 0;
-                  const isEnough = owned >= cost.count;
-                  const it = ITEMS[cost.itemId];
-                  const sprite = bundledSpriteUrl(it?.sprite);
-
-                  return (
-                    <span
-                      key={cost.itemId}
-                      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] border ${
-                        isEnough
-                          ? 'border-emerald-800/60 bg-emerald-950/30 text-emerald-300'
-                          : 'border-rose-900/60 bg-rose-950/30 text-rose-300'
-                      }`}
-                    >
-                      {sprite ? (
-                        <img src={sprite} alt="" className="h-3 w-3 object-contain pixelated" />
-                      ) : null}
-                      <span>{it?.name ?? cost.itemId}</span>
-                      <span className="font-bold">
-                        {owned}/{cost.count}
+                return (
+                  <div
+                    key={energyId}
+                    className={`rounded-xl border p-3 flex flex-col justify-between gap-2 bg-[#292524] ${
+                      isReadyForFusion ? 'border-amber-500/60 shadow-[0_0_8px_rgba(245,158,11,0.2)]' : 'border-[#44403c]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{def.icon}</span>
+                        <div>
+                          <b className="text-xs text-stone-100">{def.name}</b>
+                          <span className="block text-[9px] text-stone-400">{def.affinityName} 성향</span>
+                        </div>
+                      </div>
+                      <span className={`text-xs font-mono font-bold ${isReadyForFusion ? 'text-amber-300' : 'text-stone-400'}`}>
+                        {val} / 100
                       </span>
+                    </div>
+
+                    <p className="text-[10px] text-stone-300 line-clamp-1">{def.howToEarn}</p>
+
+                    {/* Progress Bar with 30-mark indicator */}
+                    <div className="relative h-2.5 w-full rounded-full bg-[#1c1917] overflow-hidden border border-[#44403c]">
+                      <div
+                        className="h-full rounded-full transition-all duration-300 bg-gradient-to-r from-amber-600 to-amber-400"
+                        style={{ width: `${pct}%` }}
+                      />
+                      {/* 30% indicator dot */}
+                      <div
+                        className="absolute top-0 bottom-0 w-0.5 bg-white/70"
+                        style={{ left: '30%' }}
+                        title="30 기운: 스킬 조합 해금 기준"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 2: [스킬 조합대] */}
+        {activeTab === 'fusion' && (
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="rounded-xl border border-[#44403c] bg-[#292524] p-3 text-xs">
+                <b className="text-amber-300">🛠️ 원시 스킬 융합대 (Modular Fusion Bench)</b>
+                <p className="text-[11px] text-stone-300 mt-1">
+                  <b>[기본 동작]</b> 1개와 <b>[해금된 기운(≥30)]</b> 1개를 결합하여 강력한 모듈러 스킬을 창조합니다.
+                </p>
+              </div>
+
+              {/* Slot 1: Base Action Picker */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-stone-300">
+                  1단계: 기본 동작 선택 (Base Action)
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {BASE_ACTION_LIST.map(action => {
+                    const isSelected = selectedBaseAction === action.id;
+                    return (
+                      <button
+                        key={action.id}
+                        type="button"
+                        onClick={() => setSelectedBaseAction(action.id)}
+                        className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-center transition-all ${
+                          isSelected
+                            ? 'border-amber-400 bg-amber-950/40 shadow-[0_0_8px_rgba(245,158,11,0.4)]'
+                            : 'border-[#44403c] bg-[#292524] hover:bg-[#342f2c]'
+                        }`}
+                      >
+                        <span className="text-2xl mb-1">{action.icon}</span>
+                        <b className="text-xs text-stone-100">{action.name}</b>
+                        <span className="text-[9px] text-stone-400 mt-0.5">{action.category}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Slot 2: Sub-Energy Picker */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-stone-300 flex items-center justify-between">
+                  <span>2단계: 주입할 기운 선택 (Sub-Energy ≥ 30 필요)</span>
+                  <span className="text-[10px] text-amber-300 font-mono">
+                    현재 선택: {SUB_ENERGIES[selectedSubEnergy]?.name} ({currentEnergyVal} 기운)
+                  </span>
+                </label>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {(Object.keys(SUB_ENERGIES) as SubEnergyId[]).map(energyId => {
+                    const def = SUB_ENERGIES[energyId];
+                    const val = aff.energies?.[energyId] ?? 0;
+                    const isEnough = val >= 30;
+                    const isSelected = selectedSubEnergy === energyId;
+
+                    return (
+                      <button
+                        key={energyId}
+                        type="button"
+                        onClick={() => setSelectedSubEnergy(energyId)}
+                        className={`flex items-center gap-2 p-2 rounded-xl border text-left transition-all ${
+                          isSelected
+                            ? 'border-amber-400 bg-amber-950/40 shadow-[0_0_6px_rgba(245,158,11,0.4)]'
+                            : isEnough
+                            ? 'border-[#44403c] bg-[#292524] hover:bg-[#342f2c]'
+                            : 'border-[#332f2c] bg-[#1c1917] opacity-60'
+                        }`}
+                      >
+                        <span className="text-lg">{def.icon}</span>
+                        <div className="min-w-0 flex-1">
+                          <b className="block truncate text-[11px] text-stone-200">{def.name}</b>
+                          <span className={`text-[9px] font-mono ${isEnough ? 'text-amber-300' : 'text-stone-500'}`}>
+                            {val}/30
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Fusion Result Preview Card */}
+            {currentRecipe && (
+              <div className="rounded-xl border-2 border-amber-500/70 bg-[#292524] p-3.5 space-y-2.5 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-3xl p-1.5 rounded-xl border border-amber-500/40 bg-[#1c1917]">
+                      {currentRecipe.icon}
                     </span>
-                  );
-                })}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <b className="text-sm font-bold text-amber-200">{currentRecipe.nameStage1}</b>
+                        <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-300">
+                          {currentRecipe.category === 'attack' ? '공격' : currentRecipe.category === 'defense' ? '방어' : '보조/소환'}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-stone-400">
+                        {selectedBaseAction} + {selectedSubEnergy}
+                      </span>
+                    </div>
+                  </div>
+
+                  {unlocked[currentRecipe.id] && (
+                    <span className="rounded bg-emerald-500/20 px-2 py-1 text-[10px] font-bold text-emerald-300 flex items-center gap-1">
+                      <Check className="h-3 w-3" /> 이미 해금됨
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                  <div className="rounded-lg border border-[#44403c] bg-[#1c1917] p-2">
+                    <b className="text-stone-300 block mb-0.5">초기 단계 (Lv.1~9)</b>
+                    <p className="text-stone-400 text-[10px] leading-relaxed">
+                      {currentRecipe.descStage1}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-amber-500/30 bg-[#1c1917] p-2">
+                    <b className="text-amber-300 block mb-0.5">각성 단계 (Lv.10+): {currentRecipe.nameStage2}</b>
+                    <p className="text-stone-400 text-[10px] leading-relaxed">
+                      {currentRecipe.descStage2}
+                    </p>
+                  </div>
+                </div>
+
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (onFuseModularSkill && canFuse) {
+                      onFuseModularSkill(selectedBaseAction, selectedSubEnergy);
+                    }
+                  }}
+                  disabled={!canFuse}
+                  className="w-full min-h-11 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-stone-900 font-extrabold text-xs shadow-md transition-all active:scale-98 disabled:opacity-50"
+                >
+                  <Wand2 className="h-4 w-4 mr-1.5" />
+                  {unlocked[currentRecipe.id]
+                    ? '이미 해금된 스킬입니다 (내 스킬 탭에서 확인)'
+                    : currentEnergyVal < 30
+                    ? `기운 부족 (${currentEnergyVal}/30)`
+                    : '✨ 기운 주입 및 신규 스킬 창조 (조합하기)'}
+                </Button>
               </div>
             )}
           </div>
+        )}
 
-          {/* Missing requirements alert if locked */}
-          {!skillStatus.isLearned && !skillStatus.isUnlockable && skillStatus.missingRequirements.length > 0 && (
-            <div className="flex items-center gap-1.5 text-[10px] text-rose-400 bg-rose-950/20 border border-rose-900/30 px-2 py-1 rounded">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{skillStatus.missingRequirements[0]}</span>
+        {/* Tab 3: [내 스킬] */}
+        {activeTab === 'my_skills' && (
+          <div className="flex-1 overflow-hidden p-3 sm:p-4 flex flex-col sm:flex-row gap-3">
+            {/* Left Column: Skill Grid with Category Filter */}
+            <div className="flex-1 flex flex-col min-w-0 border-b sm:border-b-0 sm:border-r border-[#2b1d14] pr-0 sm:pr-3 pb-3 sm:pb-0">
+              {/* Category Filter Tabs */}
+              <div className="flex gap-1 mb-2.5">
+                {(['all', 'attack', 'defense', 'buff'] as const).map(cat => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategoryFilter(cat)}
+                    className={`flex-1 py-1 px-1.5 rounded-lg text-[10px] font-bold transition-colors ${
+                      categoryFilter === cat
+                        ? 'bg-amber-500 text-stone-900'
+                        : 'bg-[#292524] text-stone-300 hover:bg-[#342f2c]'
+                    }`}
+                  >
+                    {cat === 'all' ? '전체' : cat === 'attack' ? '⚔️ 공격' : cat === 'defense' ? '🛡️ 방어' : '✨ 보조'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Icon Grid */}
+              <div className="flex-1 overflow-y-auto grid grid-cols-4 sm:grid-cols-4 gap-2 p-1">
+                {Object.keys(unlocked)
+                  .filter(skillId => {
+                    if (categoryFilter === 'all') return true;
+                    const base = BASE_ACTIONS[skillId as BaseActionId];
+                    const fused = FUSED_SKILLS_MAP[skillId];
+                    const cat = base?.category ?? fused?.category;
+                    return cat === categoryFilter;
+                  })
+                  .map(skillId => {
+                    const skill = unlocked[skillId];
+                    const isSelected = selectedSkillId === skillId;
+                    const isEquip = equipped.includes(skillId);
+                    const isAwak = skill.masteryLevel >= 10 || !!skill.isAwakened;
+                    const icon = getSkillDisplayIcon(skillId);
+                    const name = getSkillDisplayName(skillId, skill);
+
+                    return (
+                      <button
+                        key={skillId}
+                        type="button"
+                        onClick={() => setSelectedSkillId(skillId)}
+                        className={`relative flex h-14 w-full flex-col items-center justify-center rounded-xl border p-1 text-center transition-all ${
+                          isSelected
+                            ? 'border-amber-400 bg-amber-950/50 shadow-[0_0_8px_rgba(245,158,11,0.5)]'
+                            : 'border-[#44403c] bg-[#292524] hover:bg-[#342f2c]'
+                        }`}
+                      >
+                        <span className="text-xl leading-none">{icon}</span>
+                        <span className="truncate w-full text-[9px] font-bold text-stone-200 mt-1">
+                          {name}
+                        </span>
+
+                        {/* Level badge */}
+                        <span className="absolute top-1 left-1 text-[8px] font-mono font-bold text-amber-300 leading-none">
+                          Lv.{skill.masteryLevel}
+                        </span>
+
+                        {/* Equipped badge */}
+                        {isEquip && (
+                          <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-emerald-400" title="퀵바 장착 중" />
+                        )}
+
+                        {/* Awakening star */}
+                        {isAwak && (
+                          <span className="absolute bottom-1 right-1 text-[8px] leading-none text-amber-300">
+                            ✨
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+              </div>
             </div>
-          )}
 
-          {/* Action Button */}
-          {skillStatus.isLearned ? (
-            <Button
-              type="button"
-              disabled
-              className="w-full bg-emerald-900/50 text-emerald-300 border border-emerald-600/50 h-9 text-xs cursor-default"
-            >
-              <Check className="mr-1.5 h-3.5 w-3.5" /> 이미 습득 완료된 기술입니다
-            </Button>
-          ) : skillStatus.isUnlockable ? (
-            <Button
-              type="button"
-              onClick={handleLearnClick}
-              className="w-full bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold border border-amber-400 h-9 text-xs shadow-md transition-all active:scale-[0.98]"
-            >
-              <Sparkles className="mr-1.5 h-3.5 w-3.5" /> 기술 습득하기 (재료 소모)
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              disabled
-              className="w-full bg-stone-850 text-stone-500 border border-stone-800 h-9 text-xs opacity-70"
-            >
-              <Lock className="mr-1.5 h-3.5 w-3.5" /> 습득 불가 (선행 조건 미달성)
-            </Button>
-          )}
-        </div>
+            {/* Right Column: Selected Skill Details & Specialization */}
+            <div className="w-full sm:w-72 flex flex-col justify-between overflow-y-auto space-y-3">
+              <div className="space-y-3">
+                <div className="rounded-xl border border-[#44403c] bg-[#292524] p-3 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">{activeDisplayIcon}</span>
+                      <div>
+                        <b className="text-xs text-amber-200">{activeDisplayName}</b>
+                        <span className="block text-[9px] text-stone-400">
+                          {activeCategory === 'attack' ? '공격 스킬' : activeCategory === 'defense' ? '방어 스킬' : '보조/소환 스킬'}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="rounded bg-amber-500/20 px-2 py-0.5 text-xs font-mono font-bold text-amber-300">
+                      Lv.{activePlayerSkill.masteryLevel}
+                    </span>
+                  </div>
 
+                  {/* Mastery EXP Bar */}
+                  <div className="space-y-0.5 pt-1">
+                    <div className="flex justify-between text-[9px] text-stone-400 font-mono">
+                      <span>숙련도 경험치 (전투 시 +1)</span>
+                      <span>
+                        {isMaxMastery ? 'MAX' : `${activePlayerSkill.masteryExp} / ${expRequired}`}
+                      </span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-[#1c1917] overflow-hidden border border-[#44403c]">
+                      <div
+                        className="h-full bg-gradient-to-r from-amber-500 to-yellow-300 transition-all duration-300"
+                        style={{
+                          width: `${isMaxMastery ? 100 : Math.min(100, (activePlayerSkill.masteryExp / expRequired) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <p className="text-[10px] text-stone-300 leading-relaxed pt-1">
+                    {isAwakened
+                      ? activeFusedDef?.descStage2 ?? activeBaseAction?.desc
+                      : activeFusedDef?.descStage1 ?? activeBaseAction?.desc}
+                  </p>
+                </div>
+
+                {/* Lv.20 1-of-3 Specialization Selector */}
+                <div className="rounded-xl border border-amber-500/40 bg-[#292524] p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <b className="text-xs text-amber-300 flex items-center gap-1">
+                      <Sparkles className="h-3.5 w-3.5" /> Lv.20 마스터 특화 (3중 택1)
+                    </b>
+                    {activePlayerSkill.chosenSpecialization && (
+                      <button
+                        type="button"
+                        onClick={() => onResetModularSpecialization?.(selectedSkillId)}
+                        className="text-[9px] text-rose-300 hover:text-rose-200 underline flex items-center gap-0.5 cursor-pointer"
+                        title="거석 성소 또는 본진에서 석영/옥 1개로 초기화"
+                      >
+                        <RotateCcw className="h-2.5 w-2.5" /> 특화 초기화
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {specOptions.map(opt => {
+                      const isChosen = activePlayerSkill.chosenSpecialization === opt.id;
+                      const hasChosenAny = !!activePlayerSkill.chosenSpecialization;
+                      const canPick = isMaxMastery && !hasChosenAny;
+
+                      return (
+                        <div
+                          key={opt.id}
+                          className={`rounded-lg border p-2 text-left transition-all ${
+                            isChosen
+                              ? 'border-amber-400 bg-amber-950/60 shadow-[0_0_6px_rgba(245,158,11,0.4)]'
+                              : 'border-[#44403c] bg-[#1c1917]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="text-[11px] font-bold text-stone-200">
+                              {opt.icon} {opt.name}
+                            </span>
+                            {isChosen ? (
+                              <span className="text-[9px] font-bold text-amber-300">선택됨 (활성)</span>
+                            ) : canPick ? (
+                              <button
+                                type="button"
+                                onClick={() => onSpecializeModularSkill?.(selectedSkillId, opt.id)}
+                                className="rounded bg-amber-600 px-2 py-0.5 text-[9px] font-bold text-stone-900 hover:bg-amber-500 active:scale-95"
+                              >
+                                특화 선택
+                              </button>
+                            ) : null}
+                          </div>
+                          <p className="text-[9px] text-stone-400 leading-tight">{opt.desc}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Equip / Unequip Action */}
+              <div className="pt-2">
+                <Button
+                  type="button"
+                  variant={isEquipped ? 'secondary' : 'default'}
+                  onClick={() => onEquipModularSkill?.(selectedSkillId, 0)}
+                  className={`w-full min-h-10 text-xs font-bold shadow ${
+                    isEquipped ? 'bg-stone-700 text-stone-200 hover:bg-stone-600' : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  }`}
+                >
+                  {isEquipped ? '✓ 퀵바에서 장착 해제' : '⚡ 전투 퀵바에 장착 (최대 4개)'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

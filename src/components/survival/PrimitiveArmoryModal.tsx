@@ -57,6 +57,19 @@ const WEAPON_ICON_MAP: Partial<Record<ItemId, string>> = {
   steel_axe: steelAxeImg,
 };
 
+const allItemSprites = import.meta.glob('/src/assets/survival/*.png', { eager: true, import: 'default' }) as Record<string, string>;
+
+export function getItemSpriteUrl(itemId: ItemId | string): string {
+  const itemDef = ITEMS[itemId as ItemId];
+  const spriteKey = itemDef?.sprite ?? (itemId.startsWith('item-') ? itemId : `item-${itemId.replace(/_/g, '-')}`);
+  return (
+    allItemSprites[`/src/assets/survival/${spriteKey}.png`] ??
+    allItemSprites[`/src/assets/survival/${itemId}.png`] ??
+    WEAPON_ICON_MAP[itemId as ItemId] ??
+    hatchetImg
+  );
+}
+
 export const SIGNATURE_WEAPONS: {
   itemId: ItemId;
   label: string;
@@ -78,6 +91,121 @@ export const SIGNATURE_WEAPONS: {
       { itemId: 'bone', count: 2 },
       { itemId: 'flint', count: 1 },
       { itemId: 'cordage', count: 1 },
+    ],
+  },
+  {
+    itemId: 'obsidian_dagger',
+    label: '흑요석 단검',
+    cost: [
+      { itemId: 'obsidian', count: 2 },
+      { itemId: 'bone', count: 1 },
+      { itemId: 'cordage', count: 1 },
+    ],
+  },
+  {
+    itemId: 'heavy_club',
+    label: '돌가시 몽둥이',
+    cost: [
+      { itemId: 'log', count: 1 },
+      { itemId: 'flint', count: 3 },
+      { itemId: 'resin', count: 1 },
+    ],
+  },
+  {
+    itemId: 'flint_spear',
+    label: '부싯돌 창',
+    cost: [
+      { itemId: 'flint', count: 2 },
+      { itemId: 'branch', count: 3 },
+      { itemId: 'cordage', count: 1 },
+    ],
+  },
+  {
+    itemId: 'bone_harpoon',
+    label: '뼈 작살',
+    cost: [
+      { itemId: 'bone', count: 3 },
+      { itemId: 'sinew', count: 1 },
+      { itemId: 'branch', count: 2 },
+    ],
+  },
+  {
+    itemId: 'bone_bow',
+    label: '원거리 뼈 활',
+    cost: [
+      { itemId: 'bone', count: 3 },
+      { itemId: 'cordage', count: 2 },
+      { itemId: 'resin', count: 1 },
+    ],
+  },
+  {
+    itemId: 'composite_bow',
+    label: '명품 합성궁',
+    cost: [
+      { itemId: 'branch', count: 3 },
+      { itemId: 'sinew', count: 2 },
+      { itemId: 'horn' as ItemId, count: 1 },
+    ].filter(s => !!ITEMS[s.itemId]),
+  },
+  {
+    itemId: 'bronze_spear',
+    label: '청동 창',
+    cost: [
+      { itemId: 'bronze_ingot', count: 2 },
+      { itemId: 'branch', count: 2 },
+      { itemId: 'leather', count: 1 },
+    ],
+  },
+  {
+    itemId: 'iron_spear',
+    label: '철제 창',
+    cost: [
+      { itemId: 'iron_ingot', count: 2 },
+      { itemId: 'branch', count: 2 },
+      { itemId: 'leather', count: 1 },
+    ],
+  },
+  {
+    itemId: 'steel_spear',
+    label: '강철 창',
+    cost: [
+      { itemId: 'steel_ingot', count: 2 },
+      { itemId: 'branch', count: 2 },
+      { itemId: 'leather', count: 1 },
+    ],
+  },
+  {
+    itemId: 'stone_shield',
+    label: '돌 방패',
+    cost: [
+      { itemId: 'flint', count: 4 },
+      { itemId: 'hide', count: 2 },
+      { itemId: 'cordage', count: 2 },
+    ],
+  },
+  {
+    itemId: 'leather_shield',
+    label: '가죽 방패',
+    cost: [
+      { itemId: 'leather', count: 3 },
+      { itemId: 'branch', count: 2 },
+      { itemId: 'cordage', count: 1 },
+    ],
+  },
+  {
+    itemId: 'bronze_shield',
+    label: '청동 방패',
+    cost: [
+      { itemId: 'bronze_ingot', count: 3 },
+      { itemId: 'leather', count: 2 },
+    ],
+  },
+  {
+    itemId: 'iron_shield',
+    label: '철제 방패',
+    cost: [
+      { itemId: 'iron_ingot', count: 3 },
+      { itemId: 'leather', count: 2 },
     ],
   },
   {
@@ -363,7 +491,7 @@ export default function PrimitiveArmoryModal({
                     >
                       <div className="flex min-w-0 items-center gap-1.5">
                         <img
-                          src={WEAPON_ICON_MAP[w.itemId] ?? hatchetImg}
+                          src={getItemSpriteUrl(w.itemId)}
                           alt=""
                           className="pixelated h-7 w-7 shrink-0 object-contain"
                         />
@@ -558,7 +686,7 @@ export default function PrimitiveArmoryModal({
                           style={{ boxShadow: aura.glowStyle }}
                         >
                           <img
-                            src={WEAPON_ICON_MAP[w.itemId] ?? hatchetImg}
+                            src={getItemSpriteUrl(w.itemId)}
                             alt={def?.name ?? w.itemId}
                             className="pixelated h-8 w-8 object-contain"
                           />

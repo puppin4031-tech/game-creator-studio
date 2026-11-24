@@ -8,6 +8,7 @@ import { ITEMS, type ItemId } from '@/lib/survival/items';
 import { addStacks, countOf } from '@/lib/survival/inventory';
 import { playSample, playSfx, haptic } from '@/lib/survival/gameSettings';
 import type { Stack } from '@/lib/survival/types';
+import type { ActiveFoodBuff } from '@/lib/survival/culinary';
 import PetSprite from './PetSprite';
 import CreatureSprite from './CreatureSprite';
 import { HpBar } from './HitFeedback';
@@ -51,6 +52,7 @@ interface Props {
   storage: Stack[];
   backpack: Stack[];
   playerLevel?: number;
+  activeBuffs?: ActiveFoodBuff[];
   /** Permanently deletes a fallen pet from the player's save when its HP hits 0 */
   onPermadeathPet: (uid: string) => void;
   /** Syncs surviving pet HP back to the world save */
@@ -305,6 +307,7 @@ export default function DinoExpeditionModal({
   storage,
   backpack,
   playerLevel = 1,
+  activeBuffs = [],
   onPermadeathPet,
   onUpdatePetHp,
   onConsumeCookedMeat,
@@ -457,7 +460,11 @@ export default function DinoExpeditionModal({
       if (t - lastDinoStrikeRef.current >= dinoInterval) {
         lastDinoStrikeRef.current = t;
         const totalAtk = squad.reduce((sum, p) => sum + Math.round(petStats(p.level).attack), 0);
-        const dmg = Math.max(4, totalAtk + Math.floor(Math.random() * 5));
+        const playerAtkBonus = (activeBuffs ?? []).find(b => b.expiresAt > t && b.effects.atkBonusPct)?.effects.atkBonusPct ?? 0;
+        let dmg = Math.max(4, totalAtk + Math.floor(Math.random() * 5));
+        if (playerAtkBonus > 0) {
+          dmg = Math.round(dmg * (1 + playerAtkBonus / 100));
+        }
         const nextHp = Math.max(0, enc.hp - dmg);
         playSample(enc.kind === 'beast' ? 'strike' : 'chop');
         // Advanced elemental pet attack check (Skull Dragon or Lv.3+ Evolved Pets)
@@ -495,7 +502,11 @@ export default function DinoExpeditionModal({
         const frontDino = squad[0];
         if (!frontDino) return;
         const frontMaxHp = petStats(frontDino.level).maxHp;
-        const enemyDmg = Math.max(2, enc.atk - PET_DEFENSE);
+        const playerDrPct = (activeBuffs ?? []).find(b => b.expiresAt > t && b.effects.drPct)?.effects.drPct ?? 0;
+        let enemyDmg = Math.max(2, enc.atk - PET_DEFENSE);
+        if (playerDrPct > 0) {
+          enemyDmg = Math.max(1, Math.round(enemyDmg * (1 - playerDrPct / 100)));
+        }
         const nextPetHp = Math.max(0, frontDino.hp - enemyDmg);
         playSample('beastAttack');
         haptic(80);

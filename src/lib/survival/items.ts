@@ -160,6 +160,28 @@ export const ITEMS = def({
   mortar_pestle: { name: '약초 절구', desc: '연고와 비약 제작의 기본 도구', category: 'processed', rarity: 'uncommon', weight: 1.5, sprite: 'item-mortar-pestle' },
   healing_ointment: { name: '상처 연고', desc: '체력 +25 즉시 회복', category: 'food', rarity: 'uncommon', weight: 0.25, sprite: 'item-healing-ointment', heal: 25 },
   antidote: { name: '해독 물약', desc: '독성과 부패 정화 · 체력 +15', category: 'food', rarity: 'rare', weight: 0.25, sprite: 'item-antidote', heal: 15 },
+  // ── New Ancient & Metal Gear & Treasures
+  bronze_spear: { name: '청동 창', desc: '공격력 24 · 청동 투창 및 찌르기 (사거리 35m)', category: 'weapon', rarity: 'rare', weight: 1.8, sprite: 'item-bronze-spear', weapon: { atk: 24, ranged: true }, durability: 110 },
+  iron_spear: { name: '철제 창', desc: '공격력 30 · 벼린 철제 창 (사거리 40m)', category: 'weapon', rarity: 'rare', weight: 2.0, sprite: 'item-iron-spear', weapon: { atk: 30, ranged: true }, durability: 150 },
+  steel_spear: { name: '강철 창', desc: '공격력 40 · 푸른 강철 장창 (사거리 50m)', category: 'weapon', rarity: 'epic', weight: 2.2, sprite: 'item-steel-spear', weapon: { atk: 40, ranged: true }, durability: 210 },
+  obsidian_dagger: { name: '흑요석 단검', desc: '공격력 16 · 날카로운 흑요석 암습 단검', category: 'weapon', rarity: 'rare', weight: 0.6, sprite: 'item-obsidian-dagger', weapon: { atk: 16 }, durability: 70 },
+  bone_harpoon: { name: '뼈 작살', desc: '공격력 14 · 물가 및 대형 짐승 제압용 뼈 작살 (사거리 30m)', category: 'weapon', rarity: 'uncommon', weight: 1.2, sprite: 'item-bone-harpoon', weapon: { atk: 14, ranged: true }, durability: 60 },
+  composite_bow: { name: '합성궁', desc: '공격력 20 · 각궁과 힘줄로 빚은 명품 합성궁 (사거리 60~100m)', category: 'weapon', rarity: 'epic', weight: 1.2, sprite: 'item-composite-bow', weapon: { atk: 20, ranged: true }, durability: 120 },
+  heavy_club: { name: '돌가시 몽둥이', desc: '공격력 15 · 묵직한 돌가시 몽둥이 (스턴 충격)', category: 'weapon', rarity: 'uncommon', weight: 2.8, sprite: 'item-heavy-club', weapon: { atk: 15 }, durability: 75 },
+  bronze_shield: { name: '청동 방패', desc: '방어력 5 · 원거리 투창 및 화살 방어', category: 'armor', rarity: 'rare', weight: 2.5, sprite: 'item-bronze-shield', armor: { def: 5 }, durability: 130 },
+  iron_shield: { name: '철제 방패', desc: '방어력 7 · 단단한 철제 카이트 실드', category: 'armor', rarity: 'rare', weight: 3.2, sprite: 'item-iron-shield', armor: { def: 7 }, durability: 180 },
+  bone_needle: { name: '뼈 바늘', desc: '가죽 옷과 텐트 제작 정밀 도구', category: 'processed', rarity: 'common', weight: 0.1, sprite: 'item-bone-needle' },
+  stone_chisel: { name: '돌 끌', desc: '석재를 정밀 가공하는 석공 도구', category: 'tool', rarity: 'common', weight: 0.8, sprite: 'item-stone-chisel', tool: { chop: 0, mine: 1, power: 1.0 }, durability: 50 },
+  bronze_knife: { name: '청동 손칼', desc: '공격력 14 · 가죽 해체 보너스 도구', category: 'tool', rarity: 'rare', weight: 0.7, sprite: 'item-bronze-knife', tool: { chop: 1, mine: 0, power: 1.8 }, weapon: { atk: 14 }, durability: 90 },
+  iron_knife: { name: '철제 손칼', desc: '공격력 18 · 날카로운 철제 손칼', category: 'tool', rarity: 'rare', weight: 0.8, sprite: 'item-iron-knife', tool: { chop: 1, mine: 0, power: 2.2 }, weapon: { atk: 18 }, durability: 130 },
+  sinew: { name: '동물 힘줄', desc: '질기고 팽팽한 고대 짐승의 힘줄. 활줄과 결속재.', category: 'material', rarity: 'uncommon', weight: 0.3, sprite: 'item-sinew' },
+  fossil: { name: '암모나이트 화석', desc: '신비한 소용돌이 문양이 새겨진 고대 암석.', category: 'material', rarity: 'rare', weight: 1.2, sprite: 'item-fossil' },
+  amber: { name: '호박 보석', desc: '고대 곤충이 갇힌 따스한 황금빛 호박.', category: 'material', rarity: 'rare', weight: 0.2, sprite: 'item-amber' },
+  ruby: { name: '타오르는 루비', desc: '불꽃의 붉은 기운을 머금은 원시 보석.', category: 'material', rarity: 'epic', weight: 0.2, sprite: 'item-ruby' },
+  sapphire: { name: '차가운 사파이어', desc: '깊은 바다와 빙하의 푸른빛을 품은 보석.', category: 'material', rarity: 'epic', weight: 0.2, sprite: 'item-sapphire' },
+  emerald: { name: '생명의 에메랄드', desc: '태곳적 원시림의 짙은 녹색 생명력을 품은 보석.', category: 'material', rarity: 'epic', weight: 0.2, sprite: 'item-emerald' },
+  poison_gland: { name: '맹독샘', desc: '원시 독사나 거대 전갈에서 채취한 치명적 독낭.', category: 'material', rarity: 'rare', weight: 0.4, sprite: 'item-poison-gland' },
+  dragon_scale: { name: '용의 비늘', desc: '스컬 드래곤과 최상위 맹수에게서 얻은 무지갯빛 비늘.', category: 'material', rarity: 'epic', weight: 1.0, sprite: 'item-dragon-scale' },
 });
 
 export type ItemId = keyof typeof ITEMS;

@@ -1705,6 +1705,30 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 />
               </div>
             </div>
+
+            {/* Sleek weapon durability mini bar matching reference image */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] leading-none shrink-0 drop-shadow-xs">
+                {g.weapon ? '🗡️' : '👊'}
+              </span>
+              <div
+                className="h-2 flex-1 rounded-full bg-[#2b1d14] p-[1px] border border-[#1a110b] overflow-hidden"
+                title={g.weapon ? `무기 내구도: ${g.weapon.durability ?? 50}/${g.weapon.maxDurability ?? ITEMS[g.weapon.itemId]?.durability ?? 50}` : '맨손 (공격력 기본)'}
+              >
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${
+                    !g.weapon
+                      ? 'bg-stone-500'
+                      : ((g.weapon.durability ?? 1) / Math.max(1, g.weapon.maxDurability ?? ITEMS[g.weapon.itemId]?.durability ?? 50)) <= 0.25
+                      ? 'bg-rose-500 animate-pulse'
+                      : 'bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-300'
+                  }`}
+                  style={{
+                    width: `${g.weapon ? Math.min(100, Math.max(0, ((g.weapon.durability ?? 1) / Math.max(1, g.weapon.maxDurability ?? ITEMS[g.weapon.itemId]?.durability ?? 50)) * 100)) : 100}%`,
+                  }}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -2068,7 +2092,18 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         </div>
       )}
 
-      {view === 'user' && skillBarVisible && <SkillQuickBar known={s.techs} cooldowns={s.cooldowns} levels={s.skillLevels} ready={actionReady} onUse={(id) => activateSkill(id)} />}
+      {view === 'user' && skillBarVisible && (
+        <SkillQuickBar
+          modularSkills={g.modularSkills}
+          cooldowns={s.cooldowns}
+          ready={actionReady}
+          onUseModularSkill={g.useModularSkill}
+          onOpenSkillModal={() => setSkillTreeModalOpen(true)}
+          known={s.techs}
+          levels={s.skillLevels}
+          onUse={id => activateSkill(id)}
+        />
+      )}
 
       <AnimatePresence>
         {panel !== 'none' && (
@@ -2707,6 +2742,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         storage={s.storage}
         backpack={s.backpack}
         playerLevel={s.level}
+        activeBuffs={s.activeBuffs}
         onPermadeathPet={g.permadeathPet}
         onUpdatePetHp={g.updatePetHp}
         onConsumeCookedMeat={g.consumeDinoMeat}
@@ -2761,6 +2797,13 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
       <SkillTreeModal
         open={skillTreeModalOpen}
         onClose={() => setSkillTreeModalOpen(false)}
+        modularSkills={g.modularSkills}
+        affinityState={g.affinityState}
+        onFuseModularSkill={g.fuseModularSkill}
+        onEquipModularSkill={g.equipModularSkill}
+        onSpecializeModularSkill={g.specializeModularSkill}
+        onResetModularSpecialization={g.resetModularSpecialization}
+        onUseModularSkill={g.useModularSkill}
         shamanClass={s.shamanClass ?? s.village?.shamanClass}
         playerLevel={s.level}
         classSkills={g.classSkills}

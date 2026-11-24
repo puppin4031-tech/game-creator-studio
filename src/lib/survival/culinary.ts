@@ -242,6 +242,11 @@ export interface ActiveFoodBuff {
     defBonusPct?: number;
     speedBonusPct?: number;
     regenHpPer5s?: number;
+    shieldHp?: number;
+    drPct?: number;
+    thornsPct?: number;
+    undying?: boolean;
+    dodgePct?: number;
   };
 }
 

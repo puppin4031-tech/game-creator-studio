@@ -53,6 +53,21 @@ import {
   getAffinityPerks,
   SUB_ENERGIES,
 } from '@/data/affinitySystem';
+import {
+  type ModularSkillsSaveState,
+  type PlayerModularSkill,
+  type BaseActionId,
+  BASE_ACTIONS,
+  FUSED_SKILLS,
+  FUSED_SKILLS_MAP,
+  getFusionRecipe,
+  expRequiredForMasteryLevel,
+  defaultModularSkillsState,
+  defaultPlayerSkill,
+  getSkillDisplayName,
+  getSkillDisplayIcon,
+  getSkillCooldownMs,
+} from '@/data/modularSkills';
 import { settleFoodSpoilage, SMOKE_CURING_MS, TAVERN_RECIPES, SHAMAN_CUISINE_RECIPES, type SmokehouseBatch, type ActiveFoodBuff, type CookingJob, type ShamanDishDef } from '@/lib/survival/culinary';
 import { computeExpeditionLevel, detectExpeditionPins, type RadarPin } from '@/lib/survival/radar';
 import { addStacks, countOf, hasAll, removeStacks, splitDeathDrop, splitByCapacity, stackWeight, transferStack, validStackCount } from '@/lib/survival/inventory';
@@ -184,6 +199,7 @@ export interface WorldSave extends WorldProgress {
   cookingJobs?: CookingJob[];
   codex?: CodexState;
   affinityState?: AffinityState;
+  modularSkills?: ModularSkillsSaveState;
   lastTickAt: number;
 }
 
@@ -195,6 +211,7 @@ const fresh = (start: LatLng): WorldSave => ({
   shamanMet: false, tutorialCompleted: false, tutorialStep: 'phase1_meet', starterCampPending: false,
   codex: defaultCodexState(),
   affinityState: defaultAffinityState(),
+  modularSkills: defaultModularSkillsState(),
   lastTickAt: Date.now(),
   lastActiveAt: Date.now(),
 });
@@ -368,6 +385,21 @@ export function migrateSaveData(raw: unknown, start: LatLng): WorldSave {
     };
   }
   merged.affinityState = affinityState;
+
+  const defaultMod = defaultModularSkillsState();
+  if (p.modularSkills && typeof p.modularSkills === 'object') {
+    const rawMod = p.modularSkills as Partial<ModularSkillsSaveState>;
+    const unlocked = { ...defaultMod.unlockedSkills, ...(rawMod.unlockedSkills ?? {}) };
+    const equipped = Array.isArray(rawMod.equippedSkillIds) && rawMod.equippedSkillIds.length > 0
+      ? rawMod.equippedSkillIds
+      : defaultMod.equippedSkillIds;
+    merged.modularSkills = {
+      unlockedSkills: unlocked,
+      equippedSkillIds: equipped,
+    };
+  } else {
+    merged.modularSkills = defaultMod;
+  }
 
   merged.codex = syncCodexStateWithSave(merged);
   return merged;
@@ -1688,6 +1720,64 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         toast.info(`🛡️ 충격 완화 방어구 효과! (받는 피해: ${orig} → ${reducedCounter})`);
       }
 
+      // Modular Defense Buffs & Active Food Buffs
+      if (reducedCounter > 0 && Array.isArray(p.activeBuffs) && p.activeBuffs.length > 0) {
+        let activeBuffs = [...p.activeBuffs];
+        let buffChanged = false;
+
+        for (let i = 0; i < activeBuffs.length; i++) {
+          const b = activeBuffs[i];
+          if (b.expiresAt <= Date.now()) continue;
+
+          // 1. Dodge Check
+          if (b.effects.dodgePct && Math.random() * 100 < b.effects.dodgePct) {
+            toast.success(`💨 [${b.name}] 신속한 회피! 피해를 완전히 피했습니다.`);
+            reducedCounter = 0;
+            break;
+          }
+
+          // 2. Damage Reduction %
+          if (b.effects.drPct && b.effects.drPct > 0) {
+            const before = reducedCounter;
+            reducedCounter = Math.max(0, Math.round(reducedCounter * (1 - b.effects.drPct / 100)));
+            toast.info(`🛡️ [${b.name}] 피해 ${b.effects.drPct}% 감소 (${before} → ${reducedCounter})`);
+          }
+
+          // 3. Shield HP Absorption
+          if (b.effects.shieldHp && b.effects.shieldHp > 0 && reducedCounter > 0) {
+            const absorbed = Math.min(b.effects.shieldHp, reducedCounter);
+            reducedCounter -= absorbed;
+            const remainingShield = b.effects.shieldHp - absorbed;
+            toast.info(`🧱 [${b.name}] 보호막이 ${absorbed} 피해 흡수! (남은 보호막: ${remainingShield})`);
+            activeBuffs[i] = {
+              ...b,
+              effects: { ...b.effects, shieldHp: remainingShield },
+            };
+            buffChanged = true;
+          }
+
+          // 4. Thorns Reflect
+          if (b.effects.thornsPct && b.effects.thornsPct > 0) {
+            const reflected = Math.max(1, Math.round(reducedCounter * (b.effects.thornsPct / 100)));
+            const currDmg = next.damage[e.id] ?? 0;
+            next.damage[e.id] = currDmg + reflected;
+            toast.error(`🪞 [${b.name}] 가시 반사! ${d.name}에게 ${reflected} 피해 반사`);
+          }
+
+          // 5. Undying Survival Guard
+          if (b.effects.undying && hp - reducedCounter <= 0) {
+            reducedCounter = Math.max(0, hp - 1);
+            toast.warning(`💀 [${b.name}] 불사의 의지 발동! 죽음의 문턱에서 생존했습니다!`);
+            activeBuffs[i] = { ...b, effects: { ...b.effects, undying: false } };
+            buffChanged = true;
+          }
+        }
+
+        if (buffChanged) {
+          next.activeBuffs = activeBuffs.filter(b => (b.effects.shieldHp ?? 1) > 0);
+        }
+      }
+
       hp -= reducedCounter;
       if (reducedCounter > 0) {
         toast.error(`${d.name} 돌진 박치기 반격! 체력 -${reducedCounter}`);
@@ -2003,6 +2093,326 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     toast.success(`${ACTIVE_SKILLS[id].name} 사용`);
     return true;
   }, [capacity, entities, setS]);
+
+  // ── Modular Skills: Fusion, Execution, Mastery & Specialization ──
+  const fuseModularSkill = useCallback((baseActionId: BaseActionId, subEnergyId: SubEnergyId): boolean => {
+    const p = ref.current;
+    const aff = p.affinityState ?? defaultAffinityState();
+    const currentEnergy = aff.energies?.[subEnergyId] ?? 0;
+    if (currentEnergy < 30) {
+      toast.warning(`기운이 부족합니다. 해당 기운 ${currentEnergy}/30 필요`);
+      return false;
+    }
+    const recipe = getFusionRecipe(baseActionId, subEnergyId);
+    if (!recipe) {
+      toast.error('해당 조합의 융합 기술 레시피가 존재하지 않습니다.');
+      return false;
+    }
+
+    const currentModState = p.modularSkills ?? defaultModularSkillsState();
+    if (currentModState.unlockedSkills[recipe.id]) {
+      toast.info(`이미 해금된 기술입니다: ${recipe.nameStage1}`);
+      return false;
+    }
+
+    const newSkill = defaultPlayerSkill(recipe.id);
+    const updatedUnlocked = { ...currentModState.unlockedSkills, [recipe.id]: newSkill };
+    const updatedEquipped = currentModState.equippedSkillIds.length < 4
+      ? [...currentModState.equippedSkillIds, recipe.id]
+      : currentModState.equippedSkillIds;
+
+    const affResult = applyEnergyGain(aff, {
+      energy: 'machinery',
+      amount: 4,
+      reason: 'craft_tool',
+    });
+
+    const next: WorldSave = {
+      ...p,
+      affinityState: affResult.next,
+      modularSkills: {
+        unlockedSkills: updatedUnlocked,
+        equippedSkillIds: updatedEquipped,
+      },
+    };
+
+    setS(next);
+    toast.success(`✨ 신규 모듈러 스킬 해금! [${recipe.nameStage1}]`);
+    return true;
+  }, [setS]);
+
+  const equipModularSkill = useCallback((skillId: string, slotIndex: number): boolean => {
+    const p = ref.current;
+    const currentModState = p.modularSkills ?? defaultModularSkillsState();
+    if (!currentModState.unlockedSkills[skillId]) {
+      toast.error('해금되지 않은 기술입니다.');
+      return false;
+    }
+
+    const nextEquipped = [...currentModState.equippedSkillIds];
+    const existingIndex = nextEquipped.indexOf(skillId);
+    if (existingIndex !== -1) {
+      nextEquipped.splice(existingIndex, 1);
+      toast.info(`기술 장착 해제: ${getSkillDisplayName(skillId, currentModState.unlockedSkills[skillId])}`);
+    } else {
+      if (slotIndex >= 0 && slotIndex < 4) {
+        nextEquipped[slotIndex] = skillId;
+      } else if (nextEquipped.length < 4) {
+        nextEquipped.push(skillId);
+      } else {
+        nextEquipped[3] = skillId;
+      }
+      toast.success(`기술 퀵바 장착: ${getSkillDisplayName(skillId, currentModState.unlockedSkills[skillId])}`);
+    }
+
+    setS({
+      ...p,
+      modularSkills: {
+        ...currentModState,
+        equippedSkillIds: nextEquipped.slice(0, 4),
+      },
+    });
+    return true;
+  }, [setS]);
+
+  const specializeModularSkill = useCallback((skillId: string, specId: string): boolean => {
+    const p = ref.current;
+    const currentModState = p.modularSkills ?? defaultModularSkillsState();
+    const skill = currentModState.unlockedSkills[skillId];
+    if (!skill || skill.masteryLevel < 20) {
+      toast.error('숙련도 Lv.20 도달 시에만 특화 전직을 선택할 수 있습니다.');
+      return false;
+    }
+    if (skill.chosenSpecialization) {
+      toast.warning('이미 특화가 선택되었습니다. 성소에서만 초기화할 수 있습니다.');
+      return false;
+    }
+
+    const updatedSkill: PlayerModularSkill = {
+      ...skill,
+      chosenSpecialization: specId,
+    };
+
+    setS({
+      ...p,
+      modularSkills: {
+        ...currentModState,
+        unlockedSkills: {
+          ...currentModState.unlockedSkills,
+          [skillId]: updatedSkill,
+        },
+      },
+    });
+    toast.success(`🌟 [${getSkillDisplayName(skillId, updatedSkill)}] Lv.20 특화 선택 완료!`);
+    return true;
+  }, [setS]);
+
+  const resetModularSpecialization = useCallback((skillId: string): boolean => {
+    const p = ref.current;
+    const nearSanctuary = inSanctuary || atMainBase(p);
+    if (!nearSanctuary) {
+      toast.warning('특화 초기화는 거석 성소 또는 본진 거점에서만 가능합니다.');
+      return false;
+    }
+
+    const currentModState = p.modularSkills ?? defaultModularSkillsState();
+    const skill = currentModState.unlockedSkills[skillId];
+    if (!skill || !skill.chosenSpecialization) {
+      toast.info('초기화할 특화가 없습니다.');
+      return false;
+    }
+
+    const hasQuartz = countOf(p.backpack, 'quartz') > 0 || countOf(p.storage, 'quartz') > 0;
+    const hasJade = countOf(p.backpack, 'jade') > 0 || countOf(p.storage, 'jade') > 0;
+    if (!hasQuartz && !hasJade) {
+      toast.error('특화 초기화에는 성소의 제물(석영 1개 또는 옥 1개)이 필요합니다.');
+      return false;
+    }
+
+    const costItem: ItemId = hasQuartz ? 'quartz' : 'jade';
+    let paidBackpack = removeStacks(p.backpack, [{ itemId: costItem, count: 1 }]);
+    let paidStorage = p.storage;
+    if (countOf(p.backpack, costItem) === 0) {
+      paidStorage = removeStacks(p.storage, [{ itemId: costItem, count: 1 }]);
+    }
+
+    const updatedSkill: PlayerModularSkill = {
+      ...skill,
+      chosenSpecialization: null,
+    };
+
+    setS({
+      ...p,
+      backpack: paidBackpack,
+      storage: paidStorage,
+      modularSkills: {
+        ...currentModState,
+        unlockedSkills: {
+          ...currentModState.unlockedSkills,
+          [skillId]: updatedSkill,
+        },
+      },
+    });
+    toast.success(`✨ 성소의 축복으로 [${getSkillDisplayName(skillId, skill)}] 특화가 초기화되었습니다. (${ITEMS[costItem].name} 1개 소모)`);
+    return true;
+  }, [inSanctuary, setS]);
+
+  const useModularSkill = useCallback((skillId: string, targetEntityId?: string): boolean => {
+    const p = ref.current;
+    const at = Date.now();
+    const currentModState = p.modularSkills ?? defaultModularSkillsState();
+    const playerSkill = currentModState.unlockedSkills[skillId] ?? defaultPlayerSkill(skillId);
+
+    const cdRemaining = (p.cooldowns?.[skillId] ?? 0) - at;
+    if (cdRemaining > 0) {
+      toast.warning(`재사용 대기시간: ${(cdRemaining / 1000).toFixed(1)}초 남음`);
+      return false;
+    }
+
+    const baseAction = BASE_ACTIONS[skillId as BaseActionId];
+    const fusedDef = FUSED_SKILLS_MAP[skillId];
+    if (!baseAction && !fusedDef) {
+      toast.error('알 수 없는 기술입니다.');
+      return false;
+    }
+
+    const category = baseAction?.category ?? fusedDef!.category;
+    const displayName = getSkillDisplayName(skillId, playerSkill);
+    const isAwakened = playerSkill.masteryLevel >= 10 || playerSkill.isAwakened;
+    let next: WorldSave = { ...p, damage: { ...p.damage }, depleted: { ...p.depleted } };
+
+    // Ammo / Weapon requirement check
+    if (category === 'attack') {
+      const isRanged = baseAction?.attackSubtype === 'ranged' || fusedDef?.attackSubtype === 'ranged';
+      if (isRanged && !isAwakened) {
+        const ammo = findAvailableAmmo(next.backpack, 'sling');
+        if (!ammo) {
+          toast.warning('원거리 탄환(돌멩이 또는 부싯돌)이 배낭에 없습니다! (Lv.10 각성 시 무탄환 발동 가능)');
+          return false;
+        }
+        next.backpack = removeStacks(next.backpack, [{ itemId: ammo.itemId, count: 1 }]);
+      }
+    }
+
+    if (category === 'attack') {
+      const creatures = entities.filter((e): e is Extract<WorldEntity, { kind: 'creature' }> => e.kind === 'creature' && !next.depleted[e.id]);
+      if (creatures.length === 0) {
+        toast.info('주변에 공격할 대상이 없습니다.');
+        return false;
+      }
+
+      let targetCreature = creatures.find(c => c.id === targetEntityId) || creatures[0];
+      const basePow = baseAction?.basePower ?? fusedDef?.basePower ?? 12;
+      const powerGrowth = (playerSkill.masteryLevel - 1) * (fusedDef?.powerPerLevel ?? 1.5);
+      let totalPower = Math.round(basePow + powerGrowth + (weapon?.weapon?.atk ?? 0) * 0.8);
+
+      const spec = playerSkill.chosenSpecialization;
+      const isCrit = spec === 'crit' && Math.random() < 0.45;
+      if (isCrit) totalPower = Math.round(totalPower * 2.0);
+      if (spec === 'strike') totalPower = Math.round(totalPower * 1.7);
+
+      const hitTargets = (spec === 'spread') ? creatures.slice(0, 3) : [targetCreature];
+
+      for (const t of hitTargets) {
+        const cDef = creatureDef(t.type);
+        const currDmg = next.damage[t.id] ?? 0;
+        const newDmg = currDmg + totalPower;
+
+        if (newDmg >= cDef.hp) {
+          delete next.damage[t.id];
+          next.depleted[t.id] = at;
+          const got = rollLoot(cDef.loot);
+          next.backpack = addStacks(next.backpack, got);
+          toast.success(`💥 [${displayName}] 적중! ${cDef.name} 처치 (전리품 획득)`);
+        } else {
+          next.damage[t.id] = newDmg;
+          toast.success(`⚔️ [${displayName}] 적중! ${cDef.name}에게 ${totalPower} 피해${isCrit ? ' (💥치명타!)' : ''}`);
+        }
+      }
+    } else if (category === 'defense') {
+      const basePow = baseAction?.basePower ?? fusedDef?.basePower ?? 15;
+      const spec = playerSkill.chosenSpecialization;
+      const mult = spec === 'iron_wall' ? 2.0 : 1.0;
+      const shieldVal = Math.round((basePow * 2 + playerSkill.masteryLevel * 5) * mult);
+      const drVal = Math.min(85, Math.round((20 + playerSkill.masteryLevel * 2) * mult));
+      const thornsVal = spec === 'reflect' ? 50 : 0;
+      const undyingVal = spec === 'iron_wall' || fusedDef?.vfx === 'pain';
+      const dodgeVal = fusedDef?.vfx === 'wind' ? 40 : 15;
+
+      const newBuff: ActiveFoodBuff = {
+        name: `${displayName} (${isAwakened ? '각성' : 'Lv.' + playerSkill.masteryLevel})`,
+        expiresAt: at + (spec === 'eternal' ? 24_000 : 12_000),
+        effects: {
+          shieldHp: shieldVal,
+          drPct: drVal,
+          thornsPct: thornsVal,
+          undying: undyingVal,
+          dodgePct: dodgeVal,
+        },
+      };
+
+      if (spec === 'regen') {
+        const healAmt = Math.round(C.baseMaxHp * 0.15);
+        next.hp = Math.min(C.baseMaxHp, next.hp + healAmt);
+        toast.success(`💚 [재생 특화] 체력 +${healAmt} 즉시 회복!`);
+      }
+
+      next.activeBuffs = [...(next.activeBuffs ?? []).filter(b => b.expiresAt > at), newBuff];
+      toast.success(`🛡️ [${displayName}] 방어 태세 가동! (보호막: ${shieldVal}, 피해감소: ${drVal}%)`);
+    } else {
+      const spec = playerSkill.chosenSpecialization;
+      const durationMs = spec === 'eternal' ? 45_000 : 25_000;
+      const boostMult = spec === 'maximize' ? 1.6 : 1.0;
+
+      const newBuff: ActiveFoodBuff = {
+        name: `${displayName} 버프`,
+        expiresAt: at + durationMs,
+        effects: {
+          atkBonusPct: Math.round(20 * boostMult),
+          speedBonusPct: Math.round(30 * boostMult),
+          regenHpPer5s: Math.round(3 * boostMult),
+        },
+      };
+
+      next.activeBuffs = [...(next.activeBuffs ?? []).filter(b => b.expiresAt > at), newBuff];
+      toast.success(`🔥 [${displayName}] 기운 발동! 공격력+${newBuff.effects.atkBonusPct}%, 이동속도+${newBuff.effects.speedBonusPct}%`);
+    }
+
+    const updatedSkill: PlayerModularSkill = {
+      ...playerSkill,
+      totalCasts: (playerSkill.totalCasts ?? 0) + 1,
+      masteryExp: (playerSkill.masteryExp ?? 0) + 1,
+    };
+
+    const expReq = expRequiredForMasteryLevel(updatedSkill.masteryLevel);
+    if (updatedSkill.masteryExp >= expReq && updatedSkill.masteryLevel < 20) {
+      updatedSkill.masteryLevel += 1;
+      updatedSkill.masteryExp = 0;
+      toast.success(`🎉 [${displayName}] 숙련도 상승! Lv.${updatedSkill.masteryLevel}`);
+
+      if (updatedSkill.masteryLevel === 10 && !updatedSkill.isAwakened) {
+        updatedSkill.isAwakened = true;
+        toast.success(`🌟 [각성 완료] ${displayName} 기술이 2단계로 각성되었습니다! (무기/탄환 제약 해제)`);
+      }
+      if (updatedSkill.masteryLevel === 20) {
+        toast.info(`👑 [마스터 달성] ${displayName} 기술이 Lv.20에 도달했습니다! 스킬 창에서 3가지 중 1가지 궁극 특화를 선택하세요.`);
+      }
+    }
+
+    const cdMs = getSkillCooldownMs(skillId, updatedSkill);
+    next.cooldowns = { ...(next.cooldowns ?? {}), [skillId]: at + cdMs };
+    next.modularSkills = {
+      ...currentModState,
+      unlockedSkills: {
+        ...currentModState.unlockedSkills,
+        [skillId]: updatedSkill,
+      },
+    };
+
+    setS(next);
+    setSkillEffect({ id: skillId as any, at });
+    return true;
+  }, [entities, weapon, setS]);
   const construct = useCallback((kind: 'palisade' | 'outpost') => {
     const result = buildStructure(ref.current, kind, enabledRef.current);
     if (result.ok === false) { toast.warning(result.reason); return; }
@@ -3380,6 +3790,12 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [saveKey, userId, setS, flushSave]);
 
   return { codex: s.codex ?? defaultCodexState(), codexProgress, recordCodexResource, recordCodexPet, recordCodexBoss, recordCodexAiInvention, markCodexSeen, reloadSaveFromBestSource, claimOfflineRewards, shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, classSkills: s.classSkills ?? [], learnClassSkill, maxSpeedKmh: getPlayerSpeedLimitKmh(s.classSkills, s.affinityState?.totals?.engineering), affinityState: s.affinityState ?? defaultAffinityState(), gainEnergy, triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, dismissTribe, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, updateTutorialState, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
+    modularSkills: s.modularSkills ?? defaultModularSkillsState(),
+    fuseModularSkill,
+    useModularSkill,
+    equipModularSkill,
+    specializeModularSkill,
+    resetModularSpecialization,
     savedIndicator, flushSave,
     moveOutpost, petHits, mergePets, togglePetDeploy, assignPetRole, feedPet, togglePetLock, recordTerrainZone, recordPark, visitLandmark, sellItem, buyItem, takeDamage,
     state: s, entities, vision, reach, isNight, inBase, baseDef, weight, capacity, weapon, maxHp: maxHpOf(s),

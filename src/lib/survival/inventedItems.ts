@@ -50,24 +50,50 @@ export function inventedSprite(inv: Pick<InventedItem, 'category' | 'materials' 
   const m = inv.materials;
   switch (inv.category) {
     case 'weapon':
-      if (inv.ranged) return has(m, 'bone', 'tusk') ? 'item-bone-bow' : 'item-sling';
-      if (has(m, 'obsidian', 'frost_shard', 'ancient_fang')) return 'item-obsidian-spear';
+      if (inv.ranged) {
+        if (has(m, 'steel_ingot')) return 'item-steel-spear';
+        if (has(m, 'iron_ingot')) return 'item-iron-spear';
+        if (has(m, 'copper_ingot', 'bronze_ingot')) return 'item-bronze-spear';
+        if (has(m, 'sinew', 'prime_pelt')) return 'item-composite-bow';
+        if (has(m, 'bone', 'tusk')) return 'item-bone-harpoon';
+        return has(m, 'bone', 'tusk') ? 'item-bone-bow' : 'item-sling';
+      }
+      if (has(m, 'steel_ingot')) return 'item-steel-sword';
+      if (has(m, 'iron_ingot')) return 'item-iron-sword';
+      if (has(m, 'copper_ingot', 'bronze_ingot')) return 'item-bronze-sword';
+      if (has(m, 'obsidian')) return 'item-obsidian-dagger';
+      if (has(m, 'frost_shard', 'ancient_fang')) return 'item-obsidian-spear';
       if (has(m, 'flint', 'quartz')) return 'item-flint-spear';
-      if (has(m, 'log', 'tusk', 'clay_pot')) return 'item-stone-maul';
+      if (has(m, 'log', 'tusk', 'clay_pot')) return 'item-heavy-club';
       if (has(m, 'bone')) return 'item-bone-dagger';
       return 'item-wooden-club';
     case 'tool':
+      if (has(m, 'steel_ingot')) return has(m, 'log', 'branch') ? 'item-steel-axe' : 'item-steel-pickaxe';
+      if (has(m, 'iron_ingot')) return has(m, 'log', 'branch') ? 'item-iron-axe' : 'item-iron-pickaxe';
+      if (has(m, 'copper_ingot', 'bronze_ingot')) return has(m, 'log', 'branch') ? 'item-bronze-axe' : 'item-bronze-pickaxe';
+      if (has(m, 'bone_needle', 'sinew')) return 'item-bone-needle';
+      if (has(m, 'stone', 'flint', 'limestone')) return 'item-stone-chisel';
       if (has(m, 'obsidian', 'frost_shard')) return 'item-obsidian-pickaxe';
       if (has(m, 'bone', 'tusk')) return 'item-bone-pick';
       if (has(m, 'flint', 'quartz')) return 'item-flint-hatchet';
       if (has(m, 'clay', 'clay_pot', 'soil')) return 'item-digging-stick';
       return 'item-hand-axe';
     case 'building':
+      if (has(m, 'steel_ingot', 'iron_ingot')) return 'item-iron-shield';
+      if (has(m, 'copper_ingot', 'bronze_ingot')) return 'item-bronze-shield';
+      if (has(m, 'stone', 'flint', 'obsidian')) return 'item-stone-shield';
+      if (has(m, 'dragon_scale', 'alpha_heart')) return 'item-dragon-scale';
       if (has(m, 'frost_pelt', 'prime_pelt')) return 'item-fur-cloak';
       if (has(m, 'bone', 'tusk', 'jade')) return 'item-bone-plate';
       if (has(m, 'hide', 'leather')) return 'item-hide-armor';
       return 'item-bark-vest';
     case 'relic':
+      if (has(m, 'ruby')) return 'item-ruby';
+      if (has(m, 'sapphire')) return 'item-sapphire';
+      if (has(m, 'emerald')) return 'item-emerald';
+      if (has(m, 'amber')) return 'item-amber';
+      if (has(m, 'fossil')) return 'item-fossil';
+      if (has(m, 'dragon_scale')) return 'item-dragon-scale';
       if (has(m, 'jade')) return 'item-jade-amulet';
       if (has(m, 'quartz', 'frost_shard')) return 'item-quartz-charm';
       return 'item-bone-charm';

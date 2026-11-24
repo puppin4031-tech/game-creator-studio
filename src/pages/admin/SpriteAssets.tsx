@@ -39,6 +39,10 @@ import { SPRITE_META, type SpriteKey } from '@/lib/survival/spriteMeta';
 
 // Bundled image assets under src/assets/survival/
 const bundledSprites = import.meta.glob('/src/assets/survival/*.png', { eager: true, import: 'default' }) as Record<string, string>;
+export const ALL_PRESET_SPRITES = Object.keys(bundledSprites)
+  .map(p => p.replace('/src/assets/survival/', '').replace('.png', ''))
+  .sort();
+
 export const getBundledSpriteUrl = (key: string): string | undefined => {
   let mappedKey = key;
   if (key === 'hunter' || key.startsWith('hunter')) mappedKey = 'char-hunter';
@@ -135,10 +139,31 @@ const GEAR_TARGETS = [
   { key: 'item-torch', label: '🔥 보조 무기 · 원시 횃불' },
   { key: 'item-stone-shield', label: '🛡️ 방어구 · 돌 방패' },
   { key: 'item-leather-shield', label: '🛡️ 방어구 · 가죽 방패' },
+  { key: 'item-bronze-shield', label: '🛡️ 방어구 · 청동 방패' },
+  { key: 'item-iron-shield', label: '🛡️ 방어구 · 철제 방패' },
+  { key: 'item-bronze-spear', label: '🗡️ 무기 · 청동 창' },
+  { key: 'item-iron-spear', label: '🗡️ 무기 · 철제 창' },
+  { key: 'item-steel-spear', label: '🗡️ 무기 · 강철 창' },
+  { key: 'item-obsidian-dagger', label: '🗡️ 무기 · 흑요석 단검' },
+  { key: 'item-bone-harpoon', label: '🗡️ 무기 · 뼈 작살' },
+  { key: 'item-composite-bow', label: '🏹 무기 · 명품 합성궁' },
+  { key: 'item-heavy-club', label: '🪵 무기 · 돌가시 몽둥이' },
+  { key: 'item-stone-chisel', label: '⛏️ 도구 · 돌 끌' },
+  { key: 'item-bronze-knife', label: '🔪 도구 · 청동 손칼' },
+  { key: 'item-iron-knife', label: '🔪 도구 · 철제 손칼' },
+  { key: 'item-bone-needle', label: '🧵 도구 · 뼈 바늘' },
   { key: 'item-fishing-rod', label: '🎣 생존 도구 · 원시 낚싯대' },
 ];
 
 const ITEM_TARGETS = [
+  { key: 'item-sinew', label: '🧵 재료 · 동물 힘줄' },
+  { key: 'item-fossil', label: '🐚 보물 · 암모나이트 화석' },
+  { key: 'item-amber', label: '🍯 보물 · 호박 보석' },
+  { key: 'item-ruby', label: '💎 보석 · 타오르는 루비' },
+  { key: 'item-sapphire', label: '💎 보석 · 차가운 사파이어' },
+  { key: 'item-emerald', label: '💎 보석 · 생명의 에메랄드' },
+  { key: 'item-poison-gland', label: '☠️ 재료 · 맹독샘' },
+  { key: 'item-dragon-scale', label: '🐉 보물 · 용의 비늘' },
   { key: 'item-jerky', label: '🥩 식량 · 말린 고기 (육포)' },
   { key: 'item-spring-water', label: '💧 식수 · 맑은 샘물' },
   { key: 'item-grindstone', label: '🪨 도구 재료 · 원시 숫돌' },
@@ -699,6 +724,34 @@ export function ActionCard({
             <Download className="h-3.5 w-3.5" />
           </Button>
         )}
+      </div>
+
+      {/* Preset Asset Copy Loader */}
+      <div className="flex items-center gap-1.5 pt-0.5">
+        <label className="text-[11px] font-semibold text-muted-foreground shrink-0">
+          다른 에셋 복사:
+        </label>
+        <select
+          className="h-8 flex-1 rounded border border-border bg-background px-2 text-[11px] font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          defaultValue=""
+          onChange={e => {
+            const val = e.target.value;
+            if (!val) return;
+            const targetUrl = bundledSprites[`/src/assets/survival/${val}.png`];
+            if (targetUrl) {
+              loadExistingIntoEditor(targetUrl);
+              toast.info(`[${val}] 에셋을 불러왔습니다. 수정 후 저장하세요.`);
+            }
+            e.target.value = '';
+          }}
+        >
+          <option value="">다른 기존 도트 파일에서 불러와 편집하기...</option>
+          {ALL_PRESET_SPRITES.map(key => (
+            <option key={key} value={key}>
+              {key}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* File Upload Input */}
