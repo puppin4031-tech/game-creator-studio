@@ -182,6 +182,36 @@ export const ITEMS = def({
   emerald: { name: '생명의 에메랄드', desc: '태곳적 원시림의 짙은 녹색 생명력을 품은 보석.', category: 'material', rarity: 'epic', weight: 0.2, sprite: 'item-emerald' },
   poison_gland: { name: '맹독샘', desc: '원시 독사나 거대 전갈에서 채취한 치명적 독낭.', category: 'material', rarity: 'rare', weight: 0.4, sprite: 'item-poison-gland' },
   dragon_scale: { name: '용의 비늘', desc: '스컬 드래곤과 최상위 맹수에게서 얻은 무지갯빛 비늘.', category: 'material', rarity: 'epic', weight: 1.0, sprite: 'item-dragon-scale' },
+  // Extra Prehistoric Weapons
+  bone_club: { name: '원시 뼈 곤봉', desc: '매머드 뼈를 깎아 만든 묵직한 곤봉. 공격력 +12.', category: 'weapon', rarity: 'common', weight: 2.2, sprite: 'item-bone-club', weapon: { atk: 12 }, durability: 60 },
+  spiked_club: { name: '흑요석 가시 몽둥이', desc: '날카로운 흑요석 조각을 박아 넣은 흉포한 몽둥이. 공격력 +19.', category: 'weapon', rarity: 'uncommon', weight: 2.5, sprite: 'item-spiked-club', weapon: { atk: 19 }, durability: 75 },
+  flint_knife: { name: '부싯돌 손칼', desc: '정밀하게 깨뜨린 부싯돌 칼날. 공격력 +9, 채집 +1.2.', category: 'tool', rarity: 'common', weight: 0.6, sprite: 'item-flint-knife', tool: { chop: 1, mine: 0, power: 1.2 }, weapon: { atk: 9 }, durability: 50 },
+  stone_battleaxe: { name: '원시 양날 돌도끼', desc: '두 개의 석재 날을 결속한 육중한 전투 도끼. 공격력 +22.', category: 'weapon', rarity: 'uncommon', weight: 3.2, sprite: 'item-stone-battleaxe', weapon: { atk: 22 }, durability: 80 },
+  boomerang: { name: '사냥용 부메랑', desc: '단단한 활엽수로 깎아 곡선 비행하는 원거리 무기. 공격력 +11.', category: 'weapon', rarity: 'common', weight: 0.5, sprite: 'item-boomerang', weapon: { atk: 11, ranged: true }, durability: 70 },
+  blowpipe: { name: '원시 독침 바람총', desc: '대나무로 제작한 소음 없는 정밀 원거리 독침총. 공격력 +14.', category: 'weapon', rarity: 'uncommon', weight: 0.8, sprite: 'item-blowpipe', weapon: { atk: 14, ranged: true }, durability: 65 },
+  bone_spear: { name: '원시 뼈창', desc: '미늘이 달린 뾰족한 뼈 날을 엮은 투척/근접 창. 공격력 +15.', category: 'weapon', rarity: 'common', weight: 1.8, sprite: 'item-bone-spear', weapon: { atk: 15, ranged: true }, durability: 70 },
+  fire_torch_club: { name: '화염 횃불 몽둥이', desc: '기름과 송진에 흠뻑 적셔 불을 밝히고 적을 불태우는 몽둥이. 공격력 +16.', category: 'weapon', rarity: 'uncommon', weight: 1.9, sprite: 'item-fire-torch-club', weapon: { atk: 16 }, durability: 55 },
+  // Extra Prehistoric Tools
+  waterskin: { name: '가죽 물주머니', desc: '시원한 샘물을 담아 갈증을 해소하는 튼튼한 가죽 주머니.', category: 'processed', rarity: 'common', weight: 0.4, sprite: 'item-waterskin', food: { hunger: 5, hp: 10 } },
+  fire_drill: { name: '활비비 부싯깃 세트', desc: '마찰열로 즉시 불씨를 피울 수 있는 원시 도구.', category: 'tool', rarity: 'common', weight: 0.6, sprite: 'item-fire-drill', durability: 50 },
+  primitive_sickle: { name: '원시 흑요석 낫', desc: '턱뼈에 흑요석 이빨을 박아 약초와 풀을 빠르게 베어내는 낫. 채집 속도 +2.4.', category: 'tool', rarity: 'uncommon', weight: 0.9, sprite: 'item-primitive-sickle', tool: { chop: 1, mine: 0, power: 2.4 }, durability: 80 },
+  stone_anvil: { name: '가공용 돌 모루', desc: '도구 제작과 석기 가공 시 품질을 높여주는 단단한 평평한 돌 모루.', category: 'processed', rarity: 'uncommon', weight: 8.0, sprite: 'item-stone-anvil' },
+  flint_striker: { name: '부싯돌 격발기', desc: '황철석과 흑요석을 마찰시켜 강한 불꽃을 튀기는 격발 도구.', category: 'tool', rarity: 'common', weight: 0.5, sprite: 'item-flint-striker', durability: 70 },
+  // Extra Prehistoric Armor & Gear
+  bone_helmet: { name: '원시 두개골 투구', desc: '맹수의 두개골로 만든 뿔 달린 머리 보호구. 방어력 +7.', category: 'armor', rarity: 'uncommon', weight: 2.0, sprite: 'item-bone-helmet', armor: { def: 7 }, durability: 90 },
+  feather_headdress: { name: '주술사 깃털 머리장식', desc: '영적 에너지를 증폭시키는 신성한 깃털 관. 방어력 +4, 경험치 +20%.', category: 'trinket', rarity: 'rare', weight: 0.5, sprite: 'item-feather-headdress', armor: { def: 4 }, trinket: { lootBonus: 0.15, xpBonus: 0.20 }, durability: 80 },
+  beast_fur_boots: { name: '야수 털 부츠', desc: '거친 눈밭과 가시덤불로부터 발을 지켜주는 털 부츠. 방어력 +5.', category: 'armor', rarity: 'common', weight: 1.2, sprite: 'item-beast-fur-boots', armor: { def: 5 }, durability: 85 },
+  turtle_shield: { name: '거북 등껍질 방패', desc: '고대 거대 거북의 단단한 등딱지로 제작한 튼튼한 방패. 방어력 +14.', category: 'armor', rarity: 'rare', weight: 3.5, sprite: 'item-turtle-shield', armor: { def: 14 }, durability: 140 },
+  mammoth_coat: { name: '매머드 털외투', desc: '혹한의 추위와 야수의 발톱을 완전히 막아주는 두꺼운 통가죽 외투. 방어력 +16.', category: 'armor', rarity: 'epic', weight: 4.5, sprite: 'item-mammoth-coat', armor: { def: 16 }, durability: 180 },
+  // Extra Prehistoric Materials & Discoveries
+  dino_scale: { name: '단단한 공룡 비늘', desc: '원시 공룡의 피부에서 떨어진 무지갯빛 단단한 비늘.', category: 'material', rarity: 'rare', weight: 0.8, sprite: 'item-dino-scale' },
+  amber_fossil: { name: '호박 곤충 화석', desc: '수천만 년 전 고대 곤충이 그대로 보존된 신비한 황금빛 화석.', category: 'material', rarity: 'rare', weight: 0.3, sprite: 'item-amber-fossil' },
+  primal_feather: { name: '거대조 깃털', desc: '원시 맹금류의 화려하고 긴 날개 깃털. 화살과 의식용 제구의 핵심 재료.', category: 'material', rarity: 'uncommon', weight: 0.1, sprite: 'item-primal-feather' },
+  venom_sac: { name: '맹독 분비낭', desc: '독사와 전갈에서 조심스럽게 추출한 푸른 독낭. 독침 제작 재료.', category: 'material', rarity: 'rare', weight: 0.3, sprite: 'item-venom-sac' },
+  meteorite_ore: { name: '천강석 (운석 원석)', desc: '밤하늘을 가르고 떨어진 별똥별의 파편. 기이한 자성과 우주 에너지를 품고 있다.', category: 'ore', rarity: 'epic', weight: 2.5, sprite: 'item-meteorite-ore' },
+  primal_sap: { name: '황금 송진액', desc: '거대한 원시 침엽수에서 흘러나온 끈끈한 고접착 황금 수액.', category: 'material', rarity: 'common', weight: 0.6, sprite: 'item-primal-sap' },
+  volcanic_ash: { name: '화산재 비료', desc: '풍부한 대지의 미네랄을 함유한 회색 화산재. 토양을 비옥하게 한다.', category: 'material', rarity: 'uncommon', weight: 1.0, sprite: 'item-volcanic-ash' },
+  dragon_bone: { name: '고룡의 뼈', desc: '태고의 전설적 대형 용족 골격 파편. 신성한 무기와 제단의 핵심 촉매.', category: 'material', rarity: 'epic', weight: 3.0, sprite: 'item-dragon-bone' },
 });
 
 export type ItemId = keyof typeof ITEMS;

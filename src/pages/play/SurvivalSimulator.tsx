@@ -96,6 +96,14 @@ import { SHRINE_AURA_M, emptyShrineState, shrinesNear, type Shrine } from '@/lib
 import ShrineSheet from '@/components/survival/ShrineSheet';
 import dolmenShrine from '@/assets/survival/dolmen-shrine.png';
 import melchizedekImg from '@/assets/survival/melchizedek.png';
+import uiBackpackImg from '@/assets/survival/ui-backpack.png';
+import uiEggImg from '@/assets/survival/ui-egg.png';
+import uiCampfireImg from '@/assets/survival/ui-campfire.png';
+import uiStoneGearImg from '@/assets/survival/ui-stone-gear.png';
+import uiHeartImg from '@/assets/survival/ui-heart.png';
+import uiBananaImg from '@/assets/survival/ui-banana.png';
+import uiStoneImg from '@/assets/survival/ui-stone.png';
+import uiChevronDownImg from '@/assets/survival/ui-chevron-down.png';
 import PeerActionMenu, { type PeerChatMessage } from '@/components/survival/PeerActionMenu';
 import { LANGUAGE_QUEST } from '@/lib/survival/quests';
 import { useSurvivalPresence, type PeerEvent, type PeerPlayer } from '@/hooks/useSurvivalPresence';
@@ -891,8 +899,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     ) : (
       <Sprite k={ITEMS[id].sprite} scale={0.75} />
     );
-  const eggSpawns = useMemo(() => realGps && !g.inBase ? eggSpawnsNear(s.pos, s.depleted, Date.now()).filter(e => distanceM(s.pos, e) <= EGG_SPAWN_RADIUS_M) : [],
-    [realGps, g.inBase, s.pos, s.depleted]); // eslint-disable-line react-hooks/exhaustive-deps
+  const eggSpawns = useMemo(() => !g.inBase ? eggSpawnsNear(s.pos, s.depleted, Date.now()).filter(e => distanceM(s.pos, e) <= EGG_SPAWN_RADIUS_M) : [],
+    [g.inBase, s.pos, s.depleted]); // eslint-disable-line react-hooks/exhaustive-deps
   const hatchDiscount = g.codexProgress?.hatchDiscountPct ?? 0;
   const readyEgg = (s.dinoEggs ?? []).find(e => eggReady(e, s.walkSteps ?? 0, hatchDiscount));
   useEffect(() => {
@@ -1232,9 +1240,14 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   const eggZIndex = computeEntityZIndex(egg.lat, activeMapCenter.lat);
                   return (
                     <button key={egg.id} type="button" aria-label="신비한 픽셀 공룡 알" onClick={ev => { ev.stopPropagation(); g.pickEgg(egg); }}
-                      className="pointer-events-auto absolute flex min-h-11 min-w-11 -translate-x-1/2 -translate-y-full items-center justify-center"
+                      className="pointer-events-auto absolute flex min-h-11 min-w-11 -translate-x-1/2 -translate-y-full items-center justify-center group cursor-pointer"
                       style={{ left: p.x, top: p.y, zIndex: eggZIndex }}>
-                      <motion.img src={eggArt(egg.id)} alt="" className="pixelated h-10 w-10 object-contain drop-shadow-[0_0_8px_hsl(var(--accent))]" animate={reducedMotion ? undefined : { y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 1.4 }} />
+                      {/* Ground circular golden glow aura matching reference image */}
+                      <div aria-hidden className="pointer-events-none absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-3 rounded-full bg-amber-400/50 blur-[3px] animate-pulse" />
+                      {/* Sparkle stars */}
+                      <span aria-hidden className="pointer-events-none absolute -top-1 -right-1 text-[11px] animate-bounce select-none">✨</span>
+                      <span aria-hidden className="pointer-events-none absolute bottom-1 -left-1 text-[9px] animate-pulse select-none">✨</span>
+                      <motion.img src={eggArt(egg.id)} alt="" className="pixelated h-10 w-10 object-contain drop-shadow-[0_0_8px_rgba(250,204,21,0.9)]" animate={reducedMotion ? undefined : { y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 1.4 }} />
                     </button>
                   );
                 })}
@@ -1619,19 +1632,27 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                                 })}
                               </>
                             )}
-                            {/* Companion pets: remain stably anchored alongside player */}
-                            {(s.pets ?? []).filter(x => petRole(x) === 'follow').map((x, i) => (
-                              <div
-                                key={x.uid}
-                                className="pointer-events-none absolute bottom-0"
-                                style={{
-                                  left: isFacingLeft ? 40 + i * 26 : -40 - i * 26,
-                                  transform: isFacingLeft ? 'scaleX(-1)' : undefined
-                                }}
-                              >
-                                <PetSprite speciesId={x.speciesId} name={x.name} height={30} />
-                              </div>
-                            ))}
+                            {/* Companion pets: remain stably anchored alongside player with lively walk bounce */}
+                            {(() => {
+                              const followPets = (s.pets ?? []).filter(x => petRole(x) === 'follow');
+                              const activeCompanions = followPets.length > 0
+                                ? followPets
+                                : ((s.pets ?? []).find(x => petRole(x) !== 'hunt') ? [(s.pets ?? []).find(x => petRole(x) !== 'hunt')!] : []);
+                              return activeCompanions.map((x, i) => (
+                                <motion.div
+                                  key={x.uid}
+                                  className="pointer-events-none absolute bottom-0"
+                                  style={{
+                                    left: isFacingLeft ? 38 + i * 26 : -38 - i * 26,
+                                    transform: isFacingLeft ? 'scaleX(-1)' : undefined
+                                  }}
+                                  animate={action === 'walk' ? { y: [0, -3, 0] } : undefined}
+                                  transition={{ repeat: Infinity, duration: 0.35, ease: 'easeInOut' }}
+                                >
+                                  <PetSprite speciesId={x.speciesId} name={x.name} height={32} />
+                                </motion.div>
+                              ));
+                            })()}
                           </div>
                         </div>
                       </div>
@@ -1687,7 +1708,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
             {/* Sleek red HP pill bar */}
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] leading-none shrink-0 drop-shadow-xs">❤️</span>
+              <img src={uiHeartImg} alt="HP" width={14} height={14} className="pixelated shrink-0 drop-shadow-xs" />
               <div className="h-3 flex-1 rounded-full bg-[#2b1d14] p-[1.5px] border border-[#1a110b] overflow-hidden">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-red-600 via-rose-500 to-red-400 transition-all duration-300 shadow-sm"
@@ -1698,7 +1719,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
             {/* Sleek green/yellow Hunger pill bar */}
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] leading-none shrink-0 drop-shadow-xs">🍖</span>
+              <img src={uiBananaImg} alt="배고픔" width={14} height={14} className="pixelated shrink-0 drop-shadow-xs" />
               <div className="h-3 flex-1 rounded-full bg-[#2b1d14] p-[1.5px] border border-[#1a110b] overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-300 ${
@@ -1711,9 +1732,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
             {/* Sleek weapon durability mini bar matching reference image */}
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] leading-none shrink-0 drop-shadow-xs">
-                {g.weapon ? '🗡️' : '👊'}
-              </span>
+              <img src={uiStoneImg} alt="돌/내구도" width={14} height={14} className="pixelated shrink-0 drop-shadow-xs" />
               <div
                 className="h-2 flex-1 rounded-full bg-[#2b1d14] p-[1px] border border-[#1a110b] overflow-hidden"
                 title={g.weapon ? `무기 내구도: ${g.weapon.durability ?? 50}/${g.weapon.maxDurability ?? ITEMS[g.weapon.itemId]?.durability ?? 50}` : '맨손 (공격력 기본)'}
@@ -1793,11 +1812,15 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         <button
           type="button"
           onClick={() => setQuickMenuOpen(v => !v)}
-          className="pixelated relative w-11 h-11 rounded-full border-3 border-[#2b1d14] bg-[#9e6738] text-[#f4e2ce] shadow-[3px_3px_0_0_#2b1d14] hover:bg-[#aa7240] active:translate-x-[1px] active:translate-y-[1px] flex items-center justify-center font-bold cursor-pointer"
+          className="pixelated relative w-11 h-11 rounded-full border-3 border-[#2b1d14] bg-[#9e6738] text-[#f4e2ce] shadow-[3px_3px_0_0_#2b1d14] hover:bg-[#aa7240] active:translate-x-[1px] active:translate-y-[1px] flex items-center justify-center font-bold cursor-pointer p-0 overflow-hidden"
           aria-expanded={quickMenuOpen}
           aria-label={quickMenuOpen ? '메뉴 닫기' : '간편 메뉴 열기'}
         >
-          {quickMenuOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          {quickMenuOpen ? (
+            <ChevronUp className="h-5 w-5 text-amber-100" />
+          ) : (
+            <img src={uiChevronDownImg} alt="메뉴" className="w-full h-full object-contain pixelated" />
+          )}
           {g.canClaimQuest && !quickMenuOpen && (
             <span className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-red-500 border border-[#2b1d14] animate-ping" />
           )}
@@ -1997,15 +2020,15 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
 
             {/* Inner warm-wood plate inlay */}
             <div className="w-full rounded-xl border-2 border-[#2b1d14] bg-[#8a572c] p-1.5 flex items-center justify-between gap-2 shadow-inner">
-              {/* Left square stone slot: [🔍 탐색] */}
+              {/* Left square stone slot: [⚙️ 설정/탐색] */}
               <button
                 type="button"
                 onClick={handleOpenRadar}
-                className="pixelated w-11 h-11 shrink-0 rounded-xl border-2 border-[#2b1d14] bg-[#7a7267] text-amber-100 hover:bg-[#8e8578] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex flex-col items-center justify-center cursor-pointer"
-                aria-label="주변 탐색 레이더 열기"
+                className="pixelated w-11 h-11 shrink-0 rounded-xl border-2 border-[#2b1d14] bg-[#7a7267] text-amber-100 hover:bg-[#8e8578] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex items-center justify-center cursor-pointer p-1"
+                aria-label="주변 탐색 레이더 및 설정 열기"
+                title="탐색 레이더 및 설정"
               >
-                <Search className="h-4 w-4 text-amber-200" />
-                <span className="text-[9px] font-bold">탐색</span>
+                <img src={uiStoneGearImg} alt="설정" className="w-7 h-7 pixelated object-contain drop-shadow" />
               </button>
 
               {/* Center sunken groove progress bar: Backpack weight */}
@@ -2036,11 +2059,11 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 <button
                   type="button"
                   onClick={() => setPanel('bag')}
-                  className="pixelated relative w-11 h-11 rounded-xl border-2 border-[#2b1d14] bg-[#71431e] text-amber-100 hover:bg-[#855127] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex flex-col items-center justify-center cursor-pointer"
+                  className="pixelated relative w-11 h-11 rounded-xl border-2 border-[#2b1d14] bg-[#71431e] text-amber-100 hover:bg-[#855127] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex items-center justify-center cursor-pointer p-1"
                   aria-label="배낭 열기"
+                  title={`배낭 (${g.weight}/${g.capacity}kg)`}
                 >
-                  <Backpack className="h-4 w-4" />
-                  <span className="text-[9px] font-bold">배낭</span>
+                  <img src={uiBackpackImg} alt="배낭" className="w-7 h-7 pixelated object-contain drop-shadow" />
                   {isBagHeavy && (
                     <span className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-red-500 animate-ping" />
                   )}
@@ -2053,11 +2076,11 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                     setPanel('base');
                     setBaseTab('pets');
                   }}
-                  className="pixelated relative w-11 h-11 rounded-xl border-2 border-[#2b1d14] bg-[#71431e] text-amber-100 hover:bg-[#855127] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex flex-col items-center justify-center cursor-pointer"
+                  className="pixelated relative w-11 h-11 rounded-xl border-2 border-[#2b1d14] bg-[#71431e] text-amber-100 hover:bg-[#855127] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex items-center justify-center cursor-pointer p-1"
                   aria-label="펫 관리 열기"
+                  title="펫 및 부화기 관리"
                 >
-                  <Egg className="h-4 w-4" />
-                  <span className="text-[9px] font-bold">펫</span>
+                  <img src={uiEggImg} alt="펫" className="w-7 h-7 pixelated object-contain drop-shadow" />
                   {readyEgg && (
                     <span className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-emerald-400 animate-bounce" />
                   )}
@@ -2070,11 +2093,11 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                     setPanel('base');
                     setBaseTab('village');
                   }}
-                  className="pixelated relative w-11 h-11 rounded-xl border-2 border-[#2b1d14] bg-[#71431e] text-amber-100 hover:bg-[#855127] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex flex-col items-center justify-center cursor-pointer"
+                  className="pixelated relative w-11 h-11 rounded-xl border-2 border-[#2b1d14] bg-[#71431e] text-amber-100 hover:bg-[#855127] active:translate-x-[1px] active:translate-y-[1px] shadow-[2px_2px_0_0_#2b1d14] flex items-center justify-center cursor-pointer p-1"
                   aria-label="거점 마을 열기"
+                  title="거점 마을"
                 >
-                  <Flame className="h-4 w-4 text-amber-300" />
-                  <span className="text-[9px] font-bold">거점</span>
+                  <img src={uiCampfireImg} alt="거점" className="w-7 h-7 pixelated object-contain drop-shadow" />
                   {s.baseUpgrade && nowTick >= s.baseUpgrade.readyAt && (
                     <span className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-orange-400 animate-ping" />
                   )}

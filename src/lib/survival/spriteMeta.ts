@@ -175,6 +175,45 @@ export const SPRITE_META = {
   'item-emerald': { w: 32, h: 32 },
   'item-poison-gland': { w: 32, h: 32 },
   'item-dragon-scale': { w: 32, h: 32 },
+  // UI icons
+  'ui-backpack': { w: 32, h: 32 },
+  'ui-egg': { w: 32, h: 32 },
+  'ui-campfire': { w: 32, h: 32 },
+  'ui-stone-gear': { w: 32, h: 32 },
+  'ui-heart': { w: 16, h: 16 },
+  'ui-banana': { w: 16, h: 16 },
+  'ui-stone': { w: 16, h: 16 },
+  'ui-chevron-down': { w: 24, h: 24 },
+  // Extra Weapons
+  'item-bone-club': { w: 32, h: 32 },
+  'item-spiked-club': { w: 32, h: 32 },
+  'item-flint-knife': { w: 32, h: 32 },
+  'item-stone-battleaxe': { w: 32, h: 32 },
+  'item-boomerang': { w: 32, h: 32 },
+  'item-blowpipe': { w: 32, h: 32 },
+  'item-bone-spear': { w: 32, h: 32 },
+  'item-fire-torch-club': { w: 32, h: 32 },
+  // Extra Tools
+  'item-waterskin': { w: 32, h: 32 },
+  'item-fire-drill': { w: 32, h: 32 },
+  'item-primitive-sickle': { w: 32, h: 32 },
+  'item-stone-anvil': { w: 32, h: 32 },
+  'item-flint-striker': { w: 32, h: 32 },
+  // Extra Armor & Gear
+  'item-bone-helmet': { w: 32, h: 32 },
+  'item-feather-headdress': { w: 32, h: 32 },
+  'item-beast-fur-boots': { w: 32, h: 32 },
+  'item-turtle-shield': { w: 32, h: 32 },
+  'item-mammoth-coat': { w: 32, h: 32 },
+  // Extra Materials
+  'item-dino-scale': { w: 32, h: 32 },
+  'item-amber-fossil': { w: 32, h: 32 },
+  'item-primal-feather': { w: 32, h: 32 },
+  'item-venom-sac': { w: 32, h: 32 },
+  'item-meteorite-ore': { w: 32, h: 32 },
+  'item-primal-sap': { w: 32, h: 32 },
+  'item-volcanic-ash': { w: 32, h: 32 },
+  'item-dragon-bone': { w: 32, h: 32 },
 } as const;
 
 export type SpriteKey = keyof typeof SPRITE_META;
