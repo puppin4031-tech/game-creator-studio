@@ -160,7 +160,7 @@ export const OfflineReportModal: React.FC<OfflineReportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-3 font-pixel">
+    <div className="fixed inset-0 z-[1300] bg-black/85 flex items-center justify-center p-3 font-pixel">
       <div className="w-full max-w-md bg-stone-950 border-4 border-amber-500 rounded p-4 text-white shadow-2xl space-y-3.5 max-h-[92dvh] overflow-y-auto">
         {/* 모달 상단 헤더 */}
         <div className="flex items-center justify-between border-b-2 border-stone-800 pb-2">

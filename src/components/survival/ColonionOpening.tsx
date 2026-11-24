@@ -26,7 +26,7 @@ export function ColonionOpening({ onEnter, onClose }: { onEnter: (name: string) 
       role="dialog"
       aria-modal="true"
       aria-label="개척자 선택"
-      className="fixed inset-0 z-[100] flex h-[100dvh] flex-col overflow-y-auto bg-colonion-night font-pixel"
+      className="fixed inset-0 z-[1400] flex h-[100dvh] flex-col overflow-y-auto bg-colonion-night font-pixel"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}

@@ -2002,7 +2002,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
             aria-label="생존 및 거점 관리 도크"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
-            className="fixed inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-25 flex flex-col rounded-2xl border-4 border-[#2b1d14] bg-[#9e9589] p-1.5 shadow-[0_-4px_16px_rgba(0,0,0,0.6)] font-pixel select-none"
+            className="fixed inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-40 flex flex-col rounded-2xl border-4 border-[#2b1d14] bg-[#9e9589] p-1.5 shadow-[0_-4px_16px_rgba(0,0,0,0.6)] font-pixel select-none pointer-events-auto"
           >
             {/* Top Center Handle (— ▲) */}
             <button
@@ -2139,8 +2139,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 26, stiffness: 260 }}
             className={
               panel === 'base' || panel === 'bag'
-                ? 'fixed inset-x-0 bottom-0 top-[max(2.5rem,env(safe-area-inset-top))] z-40 flex flex-col bg-background border-t-4 border-[#2b1d14] shadow-2xl'
-                : 'absolute inset-x-0 bottom-0 z-30 flex max-h-[75dvh] flex-col border-t-4 border-foreground bg-background'
+                ? 'fixed inset-x-0 bottom-0 top-[max(2.5rem,env(safe-area-inset-top))] z-[1000] flex flex-col bg-background border-t-4 border-[#2b1d14] shadow-2xl'
+                : 'absolute inset-x-0 bottom-0 z-[1000] flex max-h-[75dvh] flex-col border-t-4 border-foreground bg-background shadow-2xl'
             }>
             <div className="flex items-center justify-between border-b-2 border-[#2b1d14] bg-card px-2.5 py-2 font-pixel">
               {panel === 'base' || panel === 'bag' ? (

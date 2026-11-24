@@ -372,7 +372,7 @@ export default function IntentCraftingModal({
     <div
       role="dialog"
       aria-label="유저 의도 기반 AI 건축 및 제련소"
-      className="fixed inset-0 z-50 flex flex-col bg-background font-pixel text-xs"
+      className="fixed inset-0 z-[1100] flex flex-col bg-background font-pixel text-xs"
     >
       {/* Top Header */}
       <div className="flex items-center justify-between border-b border-border bg-card/90 px-4 py-2.5">

@@ -294,14 +294,14 @@ export default function TerrainMap({ center, visionM, explored, onTap, zone = 'p
   const project = (p: LatLng): Projected => (map ? map.project([p.lng, p.lat]) : { x: -9999, y: -9999 });
 
   return (
-    <div className="absolute inset-0 overflow-hidden bg-muted">
+    <div className="absolute inset-0 overflow-hidden bg-muted z-0 [isolation:isolate]">
       <div
         ref={box}
         className="absolute inset-0 [filter:saturate(1.18)_hue-rotate(-8deg)_contrast(1.02)]"
       />
       <canvas ref={scenery} aria-hidden="true" data-terrain-scenery className="pointer-events-none absolute inset-0 h-full w-full" />
       <canvas ref={fog} className="pointer-events-none absolute inset-0 h-full w-full" />
-      <div className="pointer-events-none absolute inset-0">{map && children(project, metersPerPx(map))}</div>
+      <div className="pointer-events-none absolute inset-0 z-0 [isolation:isolate]">{map && children(project, metersPerPx(map))}</div>
       {map && <MapZoomControl onZoomBy={(d) => zoomTo(map, (zoomTarget.current ?? map.getZoom()) + d, 250)} onReset={() => zoomTo(map, DEFAULT_ZOOM, 350)} />}
     </div>
   );

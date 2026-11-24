@@ -81,7 +81,7 @@ export default function CivilizationTechModal({
     <div
       role="dialog"
       aria-label="문명 기술 발전 테크트리"
-      className="fixed inset-0 z-50 flex flex-col bg-background font-pixel text-xs"
+      className="fixed inset-0 z-[1100] flex flex-col bg-background font-pixel text-xs"
     >
       {/* 팡파르 축하 배너 */}
       {justResearched && (

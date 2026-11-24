@@ -389,7 +389,7 @@ export default function PrimitiveArmoryModal({
     <div
       role="dialog"
       aria-label="석기·원시 무기 제작소"
-      className="fixed inset-0 z-50 flex flex-col bg-background font-pixel text-xs"
+      className="fixed inset-0 z-[1100] flex flex-col bg-background font-pixel text-xs"
     >
       {/* Fullscreen Header */}
       <div className="flex items-center justify-between border-b-4 border-foreground bg-card px-3 py-2">

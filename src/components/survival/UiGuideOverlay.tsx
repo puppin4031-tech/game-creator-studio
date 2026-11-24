@@ -16,7 +16,7 @@ export function UiGuideOverlay({ isOpen, onClose }: UiGuideOverlayProps) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 z-50 flex flex-col justify-between bg-black/70 p-4 backdrop-blur-xs cursor-pointer select-none font-pixel pointer-events-auto"
+        className="fixed inset-0 z-[1300] flex flex-col justify-between bg-black/70 p-4 backdrop-blur-xs cursor-pointer select-none font-pixel pointer-events-auto"
         aria-label="화면 조작 가이드 오버레이"
       >
         {/* Top Section */}

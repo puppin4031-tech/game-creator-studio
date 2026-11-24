@@ -117,7 +117,7 @@ export function SurvivalTutorialOverlay({
   // Floating top guide during branch gathering on the map
   if (step === 'phase1_gather') {
     return (
-      <aside aria-label="튜토리얼 진행 안내" className="pointer-events-none fixed top-4 inset-x-2 z-40 flex justify-center">
+      <aside aria-label="튜토리얼 진행 안내" className="pointer-events-none fixed top-4 inset-x-2 z-[1200] flex justify-center">
         <motion.div
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}

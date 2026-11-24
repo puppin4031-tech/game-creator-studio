@@ -116,7 +116,7 @@ export const SkillTreeModal: React.FC<SkillTreeModalProps> = ({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 sm:p-4 font-pixel select-none backdrop-blur-xs">
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/80 p-2 sm:p-4 font-pixel select-none backdrop-blur-xs">
       <div className="relative flex h-[90dvh] w-full max-w-2xl flex-col rounded-2xl border-4 border-[#2b1d14] bg-[#1c1917] text-[#e7e5e4] shadow-2xl overflow-hidden">
         {/* Header Bar */}
         <div className="flex items-center justify-between border-b-2 border-[#2b1d14] bg-[#292524] px-4 py-3">

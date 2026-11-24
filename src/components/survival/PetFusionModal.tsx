@@ -80,7 +80,7 @@ export default function PetFusionModal({ result, onClose }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label="공룡 펫 합체 진화"
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-3.5 backdrop-blur-md font-pixel select-none"
+        className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/85 p-3.5 backdrop-blur-md font-pixel select-none"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}

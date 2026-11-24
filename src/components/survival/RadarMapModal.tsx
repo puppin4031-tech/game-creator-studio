@@ -623,7 +623,7 @@ export default function RadarMapModal({
     <div
       role="dialog"
       aria-label="전략 지도 및 즐겨찾기"
-      className="fixed inset-0 z-50 flex flex-col bg-[#0b140e] font-pixel text-xs text-white select-none overflow-hidden"
+      className="fixed inset-0 z-[1100] flex flex-col bg-[#0b140e] font-pixel text-xs text-white select-none overflow-hidden"
     >
       {/* ──────────────── TOP CONTROL BAR ──────────────── */}
       <div className="absolute inset-x-0 top-0 z-40 flex flex-col gap-2 p-2.5 bg-gradient-to-b from-[#080f0a]/95 via-[#080f0a]/85 to-transparent pb-6 pointer-events-none">

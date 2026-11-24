@@ -2222,7 +2222,7 @@ export default function BaseVillageView({
         <div
           role="dialog"
           aria-label={`${VILLAGE_BUILDINGS[buildingPopup.buildingId].name} 기능 팝업`}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 font-pixel text-xs"
+          className="fixed inset-0 z-[1050] flex items-center justify-center bg-black/65 p-4 font-pixel text-xs"
           onClick={() => setBuildingPopup(null)}
         >
           <div
@@ -2550,7 +2550,7 @@ export default function BaseVillageView({
         <div
           role="dialog"
           aria-label={`${inspectBuildingDef.name} 상세 정보`}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 text-xs font-pixel"
+          className="fixed inset-0 z-[1050] flex items-center justify-center bg-black/65 p-4 text-xs font-pixel"
           onClick={() => setInspectBuildingDef(null)}
         >
           <div

@@ -182,7 +182,7 @@ export default function WanderingShamanModal({
     <div
       role="dialog"
       aria-label="떠돌이 주술사 천막"
-      className="fixed inset-0 z-50 flex flex-col bg-background font-pixel text-xs"
+      className="fixed inset-0 z-[1100] flex flex-col bg-background font-pixel text-xs"
     >
       {/* Fullscreen Header */}
       <div className="flex items-center justify-between border-b-4 border-foreground bg-card px-3 py-2">

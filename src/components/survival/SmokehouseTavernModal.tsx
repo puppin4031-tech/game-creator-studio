@@ -77,7 +77,7 @@ export default function SmokehouseTavernModal({
     <div
       role="dialog"
       aria-label={open === 'smokehouse' ? '원시 훈제소' : '원시 주막 요리터'}
-      className="fixed inset-0 z-50 flex flex-col bg-background font-pixel text-xs"
+      className="fixed inset-0 z-[1100] flex flex-col bg-background font-pixel text-xs"
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b-4 border-foreground bg-card px-3 py-2">

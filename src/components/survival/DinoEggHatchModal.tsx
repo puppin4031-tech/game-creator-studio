@@ -49,7 +49,7 @@ export default function DinoEggHatchModal({ baby, onClose }: { baby: { id: strin
   return (
     <AnimatePresence>
       {baby && (
-        <motion.div role="dialog" aria-modal aria-label="공룡 알 부화" className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur"
+        <motion.div role="dialog" aria-modal aria-label="공룡 알 부화" className="fixed inset-0 z-[1300] flex items-center justify-center bg-background/80 p-4 backdrop-blur"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
           <motion.div className="pixel-frame w-full max-w-sm space-y-4 bg-card p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-center"
             initial={{ scale: 0.8, y: 20 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 220, damping: 18 }}>

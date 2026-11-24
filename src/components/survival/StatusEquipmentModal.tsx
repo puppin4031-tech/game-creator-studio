@@ -201,7 +201,7 @@ export default function StatusEquipmentModal({
     <div
       role="dialog"
       aria-label="유저 캐릭터 상태창"
-      className="fixed inset-0 z-50 flex flex-col bg-stone-950/98 text-stone-100 font-pixel text-xs"
+      className="fixed inset-0 z-[1100] flex flex-col bg-stone-950/98 text-stone-100 font-pixel text-xs"
     >
       {/* Top Header */}
       <div className="flex items-center justify-between border-b-4 border-stone-800 bg-stone-900 px-4 py-2.5">
@@ -497,7 +497,7 @@ export default function StatusEquipmentModal({
         const isWorn = wornUids.has(selectedGear.uid);
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
+          <div className="fixed inset-0 z-[1150] flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs">
             <div className="pixel-frame w-full max-w-xs bg-stone-900 p-4 space-y-3 border-2 border-amber-500 shadow-2xl">
               <div className="flex items-center justify-between border-b border-stone-800 pb-2">
                 <div className="flex items-center gap-2.5">

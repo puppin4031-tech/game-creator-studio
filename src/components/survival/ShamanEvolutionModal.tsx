@@ -71,7 +71,7 @@ export const ShamanEvolutionModal: React.FC<EvolutionModalProps> = ({
   const progressPct = Math.min(100, Math.round((totalPoints / nextGoal) * 100));
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-3 font-pixel">
+    <div className="fixed inset-0 z-[1200] bg-black/80 flex items-center justify-center p-3 font-pixel">
       <div className={`w-full max-w-lg bg-gradient-to-b ${currentMeta.bgGradient} border-4 ${currentMeta.borderColor} p-4 text-white max-h-[92dvh] overflow-y-auto rounded shadow-2xl space-y-3.5`}>
         {/* Header */}
         <div className="flex justify-between items-start border-b border-white/20 pb-2.5">

@@ -130,7 +130,7 @@ export function StoryTutorialModal({
       aria-modal="true"
       aria-label="콜로니온 오프닝 스토리 튜토리얼"
       data-story-tutorial
-      className="fixed inset-0 z-[120] flex h-[100dvh] w-full flex-col bg-black font-pixel text-white select-none"
+      className="fixed inset-0 z-[1400] flex h-[100dvh] w-full flex-col bg-black font-pixel text-white select-none"
     >
       {/* Top Progress Bar & Skip Button */}
       <div className="flex items-center justify-between gap-2 border-b-2 border-white/15 bg-black/90 px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top))]">

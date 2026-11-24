@@ -576,7 +576,7 @@ export default function DinoExpeditionModal({
       aria-modal="true"
       aria-label="공룡 탐험대 펫 사냥 내보내기"
       data-dino-expedition-modal
-      className="fixed inset-0 z-50 flex flex-col bg-background font-pixel text-xs"
+      className="fixed inset-0 z-[1100] flex flex-col bg-background font-pixel text-xs"
     >
       {/* Fullscreen Top Header */}
       <div className="flex items-center justify-between border-b-4 border-foreground bg-card px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
