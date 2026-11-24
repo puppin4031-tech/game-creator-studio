@@ -1,9 +1,11 @@
 import React, { useMemo } from 'react';
 import type { LatLng } from '@/lib/survival/types';
 import { getNearbyDecorativeProps, type MapDecorativeProp } from '@/utils/mapPropGenerator';
+import { computeEntityZIndex, isOccludedByCanopy } from '@/utils/depthSorting';
 
 interface MapFoliageOverlayProps {
   center: LatLng;
+  playerPos?: LatLng | null;
   basePos?: LatLng | null;
   project: (p: LatLng) => { x: number; y: number };
   metersPerPx: number;
@@ -227,6 +229,7 @@ function RenderPropSprite({ type }: { type: MapDecorativeProp['type'] }) {
 
 export function MapFoliageOverlay({
   center,
+  playerPos,
   basePos,
   project,
   metersPerPx,
@@ -241,7 +244,7 @@ export function MapFoliageOverlay({
 
   return (
     <div
-      className="pointer-events-none absolute inset-0 z-[4] overflow-hidden select-none"
+      className="pointer-events-none absolute inset-0 overflow-hidden select-none"
       aria-hidden="true"
     >
       {props.map((prop) => {
@@ -259,6 +262,9 @@ export function MapFoliageOverlay({
 
         const finalScale = prop.scale * zoomScale;
         const scaleX = prop.flip ? -finalScale : finalScale;
+        const zIndex = computeEntityZIndex(prop.pos.lat, center.lat);
+        const isTree = prop.type === 'jungle_tree' || prop.type === 'palm_tree';
+        const isOccluded = isTree && isOccludedByCanopy(playerPos, prop.pos);
 
         return (
           <div
@@ -267,10 +273,11 @@ export function MapFoliageOverlay({
             style={{
               left: `${pt.x}px`,
               top: `${pt.y}px`,
-              transform: `translate(-50%, -90%) scale(${scaleX}, ${finalScale})`,
+              transform: `translate(-50%, -100%) scale(${scaleX}, ${finalScale})`,
               transformOrigin: 'bottom center',
               imageRendering: 'pixelated',
-              zIndex: Math.floor(pt.y), // Natural isometric depth sorting
+              zIndex,
+              opacity: isOccluded ? 0.45 : 1,
             }}
           >
             <RenderPropSprite type={prop.type} />

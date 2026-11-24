@@ -16,7 +16,8 @@ import ExpeditionSystem, { ExpeditionMarker } from '@/components/survival/Expedi
 import OfflineReportModal, { type OfflineRewardItem } from '@/components/OfflineReportModal';
 import TribeCodexModal from '@/components/TribeCodexModal';
 import TribalHallModal from '@/components/survival/TribalHallModal';
-import { preloadCoreSprites } from '@/hooks/useSpriteAnimations';
+import SpriteAnimator from '@/components/survival/SpriteAnimator';
+import { preloadCoreSprites, useSpriteAnimations } from '@/hooks/useSpriteAnimations';
 import { CombatImpact, CREATURE_RING_RADIUS_M, expeditionActorPoint, freshCombatHit, useExpeditionCombatSound, useMovementSound } from '@/components/survival/ExpeditionCombat';
 import type { ExpeditionFocus } from '@/lib/survival/expedition';
 import BackpackDiscard from '@/components/survival/BackpackDiscard';
@@ -72,6 +73,7 @@ import SurvivalObjectives from '@/components/survival/SurvivalObjectives';
 import { toast } from 'sonner';
 import TerrainMap from '@/components/survival/TerrainMap';
 import { MapFoliageOverlay } from '@/components/survival/MapFoliageOverlay';
+import { computeEntityZIndex } from '@/utils/depthSorting';
 import { useSurvivalWorld } from '@/hooks/useSurvivalWorld';
 import { zoneCellKey } from '@/lib/survival/terrainZone';
 import { gearEffect, isGearItem, ITEMS, requiredRangedAmmo, findAvailableAmmo, computeRangedReach, type ItemId } from '@/lib/survival/items';
@@ -139,8 +141,26 @@ const STRIKE_NODES = new Set<string>([
 
 function Sprite({ k, scale = 1, className = '' }: { k: SpriteKey; scale?: number; className?: string }) {
   const m = SPRITE_META[k];
-  if (k === 'char-hunter') return <CharacterSprite height={m.h * scale} className={className} />;
-  return <img src={url(k)} height={m.h * scale} style={{ height: m.h * scale, width: 'auto' }} alt="" draggable={false} className={`pixelated select-none ${className}`} />;
+  const h = m?.h ?? 32;
+  if (k === 'char-hunter') return <CharacterSprite height={h * scale} className={className} />;
+  const { data } = useSpriteAnimations(k);
+  const anim = data?.idle ?? (data as Record<string, any>)?.[k];
+  const targetScale = (data?.scale ?? 1) * scale;
+  const targetH = Math.round(h * targetScale);
+  const staticSrc = url(k);
+  if (anim?.url) {
+    return (
+      <SpriteAnimator
+        url={anim.url}
+        frames={anim.frame_count}
+        fps={anim.fps}
+        height={targetH}
+        className={className}
+        fallback={<img src={staticSrc} height={targetH} style={{ height: targetH, width: 'auto' }} alt="" draggable={false} className={`pixelated select-none ${className}`} />}
+      />
+    );
+  }
+  return <img src={staticSrc} height={targetH} style={{ height: targetH, width: 'auto' }} alt="" draggable={false} className={`pixelated select-none ${className}`} />;
 }
 
 function Stacks({ stacks, onUse, have }: { stacks: Stack[]; onUse?: (id: ItemId) => void; have?: Stack[] }) {
@@ -1178,29 +1198,39 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         onCompleteTutorial={handleCompleteTutorial}
       />
       <AnimatePresence>{showOpening && <ColonionOpening onEnter={enterWorld} />}</AnimatePresence>
-      {<TerrainMap center={viewFocus(view, baseSite, { pos: s.pos, base: s.base, outpost: s.outpost, crew: crew?.pos })} visionM={g.vision} explored={s.explored} onTap={onTap} zone={zone} onSurfaceZone={onSurfaceZone} onSurfacePark={onSurfacePark} onLandmarks={setLandmarks} bearing={compassOn && heading !== null ? heading : 0}>
-        {(project, mpp) => (
-          <>
-            <MapFoliageOverlay
-              center={viewFocus(view, baseSite, { pos: s.pos, base: s.base, outpost: s.outpost, crew: crew?.pos })}
-              basePos={s.base}
-              project={project}
-              metersPerPx={mpp}
-            />
-            {crew && <ExpeditionMarker crew={crew} project={project} members={Math.max(3, s.tribe?.count ?? 3)} tribeClass={activeTribeClassId} />}
-            {crew && view === 'expedition' && <ExpeditionJoystick crew={crew} candidates={g.crewNearby} project={project} onManual={g.setCrewManual} onSteer={g.steerCrew} onCommand={g.commandCrew} onAct={g.crewAct} onHeal={g.healCrew} />}
-            {view === 'user' && (
-              <TutorialGroundBranches
-                project={project}
-                branches={tutorialBranches}
-                onPick={handlePickTutorialBranch}
-              />
-            )}
-            {view === 'user' && eggSpawns.map(egg => { const p = project(egg); return (
-              <button key={egg.id} type="button" aria-label="신비한 픽셀 공룡 알" onClick={ev => { ev.stopPropagation(); g.pickEgg(egg); }}
-                className="pointer-events-auto absolute z-10 flex min-h-11 min-w-11 -translate-x-1/2 -translate-y-full items-center justify-center" style={{ left: p.x, top: p.y }}>
-                <motion.img src={eggArt(egg.id)} alt="" className="pixelated h-10 w-10 object-contain drop-shadow-[0_0_8px_hsl(var(--accent))]" animate={reducedMotion ? undefined : { y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 1.4 }} />
-              </button>); })}
+      {(() => {
+        const activeMapCenter = viewFocus(view, baseSite, { pos: s.pos, base: s.base, outpost: s.outpost, crew: crew?.pos });
+        return (
+          <TerrainMap center={activeMapCenter} visionM={g.vision} explored={s.explored} onTap={onTap} zone={zone} onSurfaceZone={onSurfaceZone} onSurfacePark={onSurfacePark} onLandmarks={setLandmarks} bearing={compassOn && heading !== null ? heading : 0}>
+            {(project, mpp) => (
+              <>
+                <MapFoliageOverlay
+                  center={activeMapCenter}
+                  playerPos={s.pos}
+                  basePos={s.base}
+                  project={project}
+                  metersPerPx={mpp}
+                />
+                {crew && <ExpeditionMarker crew={crew} project={project} members={Math.max(3, s.tribe?.count ?? 3)} tribeClass={activeTribeClassId} />}
+                {crew && view === 'expedition' && <ExpeditionJoystick crew={crew} candidates={g.crewNearby} project={project} onManual={g.setCrewManual} onSteer={g.steerCrew} onCommand={g.commandCrew} onAct={g.crewAct} onHeal={g.healCrew} />}
+                {view === 'user' && (
+                  <TutorialGroundBranches
+                    project={project}
+                    branches={tutorialBranches}
+                    onPick={handlePickTutorialBranch}
+                  />
+                )}
+                {view === 'user' && eggSpawns.map(egg => {
+                  const p = project(egg);
+                  const eggZIndex = computeEntityZIndex(egg.lat, activeMapCenter.lat);
+                  return (
+                    <button key={egg.id} type="button" aria-label="신비한 픽셀 공룡 알" onClick={ev => { ev.stopPropagation(); g.pickEgg(egg); }}
+                      className="pointer-events-auto absolute flex min-h-11 min-w-11 -translate-x-1/2 -translate-y-full items-center justify-center"
+                      style={{ left: p.x, top: p.y, zIndex: eggZIndex }}>
+                      <motion.img src={eggArt(egg.id)} alt="" className="pixelated h-10 w-10 object-contain drop-shadow-[0_0_8px_hsl(var(--accent))]" animate={reducedMotion ? undefined : { y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 1.4 }} />
+                    </button>
+                  );
+                })}
             {activeTarget && (() => {
               const from = project(s.pos);
               const to = project(activeTarget);
@@ -1270,7 +1300,19 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 </div>
               );
             })()}
-            {s.outpost && (() => { const p = project(s.outpost); return <div className="pointer-events-none absolute flex flex-col items-center" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}><div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><Sprite k="base-outpost" scale={1.2} /></div><span className="rounded bg-background px-1 text-[10px]">전진기지</span></div>; })()}
+            {s.outpost && (() => {
+              const p = project(s.outpost);
+              const zIndex = computeEntityZIndex(s.outpost.lat, activeMapCenter.lat);
+              return (
+                <div className="pointer-events-none absolute flex flex-col items-center" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)', zIndex }}>
+                  <div className="relative">
+                    <div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" />
+                    <Sprite k="base-outpost" scale={1.2} />
+                  </div>
+                  <span className="rounded bg-background px-1 text-[10px]">전진기지</span>
+                </div>
+              );
+            })()}
             {landmarks.filter((l) => l.kind === 'shaman' && distanceM(s.pos, l) <= g.vision + SANCTUARY_RADIUS_M).map((l) => {
               const p = project(l); const r = SANCTUARY_RADIUS_M / mpp;
               return <div key={`sanct-${l.id}`} aria-hidden className="pointer-events-none absolute rounded-full border-2 border-primary/60 bg-primary/5 shadow-[0_0_18px_hsl(var(--primary)/0.5)]" style={{ left: p.x, top: p.y, width: r * 2, height: r * 2, transform: 'translate(-50%,-50%)' }} />;
@@ -1278,11 +1320,12 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
             {nearShrines.filter((sh) => distanceM(s.pos, sh) <= g.vision + SHRINE_AURA_M).map((sh) => {
               const p = project(sh); const r = SHRINE_AURA_M / mpp;
               const awake = !!s.shrines?.found.includes(sh.id);
+              const shrineZIndex = computeEntityZIndex(sh.lat, activeMapCenter.lat);
               return (
-                <div key={sh.id} className="absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
+                <div key={sh.id} className="absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)', zIndex: shrineZIndex }}>
                   <div aria-hidden className={`pointer-events-none rounded-full border-[3px] border-[hsl(var(--sacred))] bg-[hsl(var(--sacred)/0.18)] shadow-[0_0_28px_hsl(var(--sacred)/0.8)] ${awake ? 'animate-pulse' : 'opacity-60'}`} style={{ width: r * 2, height: r * 2 }} />
                   <button type="button" aria-label={sh.name} onClick={(ev) => { ev.stopPropagation(); setShrineWords(null); setSelShrine(sh); }}
-                    className="pointer-events-auto absolute left-1/2 top-1/2 flex w-max -translate-x-1/2 -translate-y-[85%] flex-col items-center">
+                    className="pointer-events-auto absolute left-1/2 top-1/2 flex w-max -translate-x-1/2 -translate-y-full flex-col items-center">
                     <div className="relative">
                       <div aria-hidden className="absolute bottom-1 left-1/2 h-3 w-20 -translate-x-1/2 rounded-full bg-foreground/30 blur-[3px]" />
                       <img src={dolmenShrine} alt="" width={96} height={85} className="relative w-28 max-w-none [image-rendering:pixelated]" />
@@ -1295,10 +1338,11 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
             })}
             {landmarks.filter((l) => distanceM(s.pos, l) <= g.vision).map((l) => {
               const p = project(l); const info = LANDMARK_INFO[l.kind];
+              const landmarkZIndex = computeEntityZIndex(l.lat, activeMapCenter.lat);
               return (
                 <button key={l.id} type="button" aria-label={info.name} data-landmark={l.kind} onClick={(ev) => { ev.stopPropagation(); setShamanWords(null); setSelLandmark(l); }}
                   className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center opacity-40 hover:opacity-100 transition-opacity"
-                  style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}>
+                  style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)', zIndex: landmarkZIndex }}>
                   <div className="rounded-full bg-primary/30 p-0.5 shadow-[0_0_12px_hsl(var(--primary))]"><Sprite k={info.sprite} scale={l.kind === 'shaman' || l.kind === 'trader' ? LANDMARK_FEATURE_SCALE : 1} /></div>
                   <span className="whitespace-nowrap rounded bg-primary/80 px-1 text-[10px] text-primary-foreground">{l.origin ?? info.name}</span>
                 </button>
@@ -1375,6 +1419,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
             {visibleEntities.map((e) => {
               const liveCoord = e.kind === 'creature' && mobPositions[e.id] ? mobPositions[e.id] : e;
               const p = project(liveCoord);
+              const entityZIndex = computeEntityZIndex(liveCoord.lat, activeMapCenter.lat);
               const sprite = e.kind === 'node' ? nodeDef(e.type).sprite : creatureDef(e.type).sprite;
               const name = e.kind === 'node' ? nodeDef(e.type).name : creatureDef(e.type).name;
               const engaged = crew?.target?.id === e.id;
@@ -1391,7 +1436,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 <button key={e.id} type="button" aria-label={name} onClick={(ev) => { ev.stopPropagation(); tapEntity(e); }}
                   data-resource-id={e.id} data-lat={liveCoord.lat} data-lng={liveCoord.lng}
                   className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center"
-                  style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}>
+                  style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)', zIndex: entityZIndex }}>
                   <div className="relative">
                   {creature && (creature.temper !== 'passive' || engaged || (dmg ?? 0) > 0) && <div data-creature-ring={e.id} aria-hidden className={`pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed ${aggroIds.has(e.id) || engaged || (dmg ?? 0) > 0 ? 'border-destructive bg-destructive/10' : 'border-destructive/40'}`} style={{ width: (CREATURE_RING_RADIUS_M / mpp) * 2, height: (CREATURE_RING_RADIUS_M / mpp) * 2 }} />}
                   <div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><motion.div key={`${e.id}:${combatHit?.at ?? (isHeadbutting ? beastStrike?.at : dmg ?? 0)}`} data-creature-strike={combatHit?.at ?? (isHeadbutting ? beastStrike?.at : undefined)} className={g.isNight ? '' : 'brightness-110 contrast-110 drop-shadow-[0_0_3px_hsl(var(--background))]'}
@@ -1472,10 +1517,11 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
             {presence.peers.filter((pr) => distanceM(s.pos, pr) <= g.vision).map((pr) => {
               const p = project(pr);
               const ally = allies.some(a => a.id === pr.id);
+              const prZIndex = computeEntityZIndex(pr.lat, activeMapCenter.lat);
               return (
                 <button key={pr.id} type="button" aria-label={`${pr.name} 상호작용`} onClick={(ev) => { ev.stopPropagation(); setSelPeerId(pr.id); }}
                   className="pointer-events-auto absolute flex min-h-11 min-w-11 flex-col items-center"
-                  style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)' }}>
+                  style={{ left: p.x, top: p.y, transform: 'translate(-50%,-100%)', zIndex: prZIndex }}>
                   {bubbles[pr.id] && <span className="whitespace-nowrap rounded bg-card px-1.5 text-[11px]">{bubbleView(bubbles[pr.id])}</span>}
                   <div className="relative"><div aria-hidden className="pointer-events-none absolute left-1/2 bottom-0 h-2 w-8 -translate-x-1/2 translate-y-1/2 rounded-full bg-foreground/30 blur-[2px]" /><CharacterSprite height={PLAYER_SPRITE_HEIGHT} className="opacity-90 hue-rotate-90" /></div>
                   <span className={`rounded px-1 text-[10px] ${ally ? 'bg-primary text-primary-foreground' : 'bg-background/80'}`}>{pr.name}</span>
@@ -1484,8 +1530,9 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
             })}
             {(() => {
               const p = project(s.pos); const r = g.reach / mpp;
+              const playerZIndex = computeEntityZIndex(s.pos.lat, activeMapCenter.lat);
               return (
-                <div className="pointer-events-none absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)' }}>
+                <div className="pointer-events-none absolute" style={{ left: p.x, top: p.y, transform: 'translate(-50%,-50%)', zIndex: playerZIndex }}>
                   {g.skillEffect && Date.now() - g.skillEffect.at < 1200 && <div className="absolute left-1/2 top-1/2"><SkillEffect id={g.skillEffect.id} stamp={g.skillEffect.at} radius={r} /></div>}
                   {(s.companions ?? []).some(c => c.kind === 'wolf') && <div className="absolute left-1/2 top-1/2 translate-x-5"><Sprite k="mob-wolf" scale={0.7} /></div>}
                   <div className="rounded-full border border-primary/60" style={{ width: r * 2, height: r * 2 }} />
@@ -1500,7 +1547,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                     const isFacingLeft = actorTarget ? rawDx < -1 : playerFacing === 'left';
                     return (
                       <div className="absolute left-1/2 top-1/2">
-                        <div className="-translate-x-1/2 -translate-y-[85%]">
+                        <div className="-translate-x-1/2 -translate-y-full">
                           {auto.job && (() => {
                             const tgt = g.entities.find(x => x.id === auto.job!.id);
                             const need = tgt ? (tgt.kind === 'node' ? nodeDef(tgt.type).hp : creatureDef(tgt.type).hp) : 1;
@@ -1588,7 +1635,9 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
             })()}
           </>
         )}
-      </TerrainMap>}
+      </TerrainMap>
+        );
+      })()}
 
       {winterOn && <WinterThemeOverlay />}
       {!!s.dinoEggs?.length && s.dinoEggs[0] && <div className="pointer-events-none absolute bottom-[calc(7rem+env(safe-area-inset-bottom))] left-2 z-20 flex origin-bottom-left scale-[0.8] items-center gap-1 rounded bg-card/90 px-2 py-1 text-xs" aria-label="공룡 알 부화 진행">
