@@ -126,6 +126,7 @@ import BaseVillageView from '@/components/survival/BaseVillageView';
 import RadarMapModal from '@/components/survival/RadarMapModal';
 import DinoExpeditionModal from '@/components/survival/DinoExpeditionModal';
 import StatusEquipmentModal from '@/components/survival/StatusEquipmentModal';
+import NicknameSetupModal from '@/components/survival/NicknameSetupModal';
 import SkillTreeModal from '@/components/survival/SkillTreeModal';
 import { atWorkshop } from '@/lib/survival/abilities';
 
@@ -223,7 +224,7 @@ const craftCatOf = (id: ItemId): CraftCat => {
 };
 
 export default function SurvivalSimulator({ realGps = false }: { realGps?: boolean }) {
-  const { user, isLoading: authLoading, signOut } = useAuth();
+  const { user, profile, isLoading: authLoading, signOut, refreshProfile } = useAuth();
   // Opening now lives on the main page ("/"); first-time players see the 5-step story tutorial before entering the world.
   const [showOpening, setShowOpening] = useState(false);
   const [chiefName, setChiefName] = useState(() => localStorage.getItem(PIONEER_NAME_KEY) ?? '');
@@ -246,6 +247,43 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     }
   };
   const navigate = useNavigate();
+
+  // Nickname Setup Modal State:
+  // Shown on very first entry if nickname is unset or placeholder ("원시인xxx") and hasSetNickname !== true
+  const [showNicknameModal, setShowNicknameModal] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const hasSet = localStorage.getItem('colonion.hasSetNickname') === 'true' ||
+      sessionStorage.getItem('colonion.hasSetNickname') === 'true';
+    if (hasSet) return false;
+    const existing = localStorage.getItem(PIONEER_NAME_KEY) ||
+      sessionStorage.getItem('colonion.guestNickname') ||
+      '';
+    const trimmed = existing.trim();
+    return !trimmed || /^원시인\d*$/i.test(trimmed);
+  });
+
+  // Sync with authenticated user profile when auth completes
+  useEffect(() => {
+    if (authLoading) return;
+    if (user && !user.is_anonymous) {
+      const userHasSet = localStorage.getItem(`colonion.hasSetNickname.${user.id}`) === 'true' ||
+        localStorage.getItem('colonion.hasSetNickname') === 'true';
+      const storedName = localStorage.getItem(`colonion.nickname.${user.id}`) ||
+        profile?.display_name ||
+        user.user_metadata?.display_name ||
+        localStorage.getItem(PIONEER_NAME_KEY);
+      if (storedName && !/^원시인\d*$/i.test(storedName.trim())) {
+        setChiefName(storedName.trim());
+        if (!userHasSet) {
+          localStorage.setItem(`colonion.hasSetNickname.${user.id}`, 'true');
+          localStorage.setItem('colonion.hasSetNickname', 'true');
+        }
+        setShowNicknameModal(false);
+      } else if (!userHasSet) {
+        setShowNicknameModal(true);
+      }
+    }
+  }, [authLoading, user, profile]);
 
   // Distinguish non-member (guest) vs registered member account
   const isGuest = !user || user.is_anonymous === true;
@@ -590,6 +628,56 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const handleReplayTutorial = () => {
     handleToggleTutorial(true);
   };
+
+  const handleConfirmNickname = useCallback((name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setChiefName(trimmed);
+    setShowNicknameModal(false);
+    toast.success(`${trimmed} 족장님, 환영합니다!`);
+
+    try {
+      localStorage.setItem(PIONEER_NAME_KEY, trimmed);
+      localStorage.setItem('colonion.hasSetNickname', 'true');
+      if (user && !user.is_anonymous) {
+        localStorage.setItem(`colonion.nickname.${user.id}`, trimmed);
+        localStorage.setItem(`colonion.hasSetNickname.${user.id}`, 'true');
+        void supabase.from('profiles').update({ display_name: trimmed }).eq('user_id', user.id);
+        void supabase.auth.updateUser({ data: { display_name: trimmed } });
+        void refreshProfile();
+      } else {
+        sessionStorage.setItem('colonion.guestNickname', trimmed);
+        sessionStorage.setItem('colonion.hasSetNickname', 'true');
+      }
+    } catch (e) {
+      console.warn('[NicknameSetup] Failed to persist nickname:', e);
+    }
+
+    // Immediately boot Shaman Tutorial Step 1 if tutorial not completed
+    if (!isTutorialCompleted) {
+      setTutorialStepState('phase1_meet');
+    }
+  }, [user, refreshProfile, isTutorialCompleted]);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      g.flushSave?.();
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('colonion.guestWorld');
+        sessionStorage.removeItem('colonion.guestNickname');
+        sessionStorage.removeItem('colonion.hasSetNickname');
+        sessionStorage.removeItem('colonion.guestTutorialCompleted');
+        sessionStorage.removeItem('colonion.forceTutorial');
+        sessionStorage.removeItem('colonion.openingSeen');
+      }
+      await signOut();
+      toast.success('저장 후 로그아웃되었습니다.');
+      navigate('/', { replace: true });
+    } catch (err) {
+      console.warn('[Logout] Error during sign out:', err);
+      navigate('/', { replace: true });
+    }
+  }, [g, signOut, navigate]);
 
   // 4-Context Mode State ('user' | 'base' | 'pet' | 'expedition')
   const [contextMode, setContextMode] = useState<ContextMode>('user');
@@ -1308,8 +1396,13 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         onSkip={() => setShowStoryTutorial(false)}
         finishLabel="콜로니온 월드 입장하기"
       />
+      <NicknameSetupModal
+        open={showNicknameModal}
+        defaultName={chiefName}
+        onConfirm={handleConfirmNickname}
+      />
       <SurvivalTutorialOverlay
-        open={!isTutorialCompleted && tutorialStep !== null && tutorialStep !== 'completed'}
+        open={!showNicknameModal && !isTutorialCompleted && tutorialStep !== null && tutorialStep !== 'completed'}
         step={tutorialStep ?? 'phase1_meet'}
         collectedBranches={collectedBranches}
         onSetStep={setTutorialStep}
@@ -1807,7 +1900,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                 Lv.{s.level}
               </span>
               <span className="text-[10px] font-bold text-amber-100 truncate max-w-[70px]">
-                {presence.name}
+                {chiefName || presence.name}
               </span>
             </div>
 
@@ -2777,6 +2870,9 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         open={statusModalOpen}
         onClose={() => setStatusModalOpen(false)}
         level={s.level}
+        nickname={chiefName || presence.name}
+        email={user?.email}
+        onLogout={handleLogout}
         gear={s.gear}
         storedGear={s.storedGear}
         loadout={g.loadout}
@@ -2893,7 +2989,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         onRemoveProjectile={id => setProjectiles(prev => prev.filter(p => p.id !== id))}
       />
       <OfflineReportModal
-        open={offlineReportModalOpen}
+        open={offlineReportModalOpen && !showNicknameModal && isTutorialCompleted}
         onClose={() => setOfflineReportModalOpen(false)}
         elapsedMinutes={offlineElapsedMinutes}
         playerLevel={s.level}

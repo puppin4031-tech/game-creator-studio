@@ -12,8 +12,10 @@ import {
   Archive,
   Check,
   ChevronRight,
+  LogOut,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ITEMS, type ItemId } from '@/lib/survival/items';
 import { bundledSpriteUrl } from '@/hooks/useItemCatalog';
 import {
@@ -32,6 +34,9 @@ interface Props {
   open: boolean;
   onClose: () => void;
   level: number;
+  nickname?: string;
+  email?: string | null;
+  onLogout?: () => Promise<void> | void;
   gear: GearInstance[];
   storedGear?: GearInstance[];
   loadout: Loadout;
@@ -54,6 +59,9 @@ export default function StatusEquipmentModal({
   open,
   onClose,
   level,
+  nickname,
+  email,
+  onLogout,
   gear = [],
   storedGear = [],
   loadout,
@@ -68,6 +76,8 @@ export default function StatusEquipmentModal({
 }: Props) {
   const [selectedGear, setSelectedGear] = useState<GearInstance | null>(null);
   const [targetSlot, setTargetSlot] = useState<GearSlot | null>(null);
+  const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   if (!open) return null;
 
@@ -204,31 +214,54 @@ export default function StatusEquipmentModal({
       className="fixed inset-0 z-[1100] flex flex-col bg-stone-950/98 text-stone-100 font-pixel text-xs"
     >
       {/* Top Header */}
-      <div className="flex items-center justify-between border-b-4 border-stone-800 bg-stone-900 px-4 py-2.5">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-400">
-            <Shield className="h-5 w-5" />
+      <div className="flex items-center justify-between border-b-4 border-stone-800 bg-stone-900 px-3.5 py-2.5 gap-2">
+        {/* Left: User Info (Nickname | Email) + Lv */}
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-400">
+            <Shield className="h-4.5 w-4.5" />
           </div>
-          <div>
-            <h1 className="text-sm font-bold text-stone-100 flex items-center gap-1.5">
-              <span>내 상태창 & 착용 장비</span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold border border-amber-500/40">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-bold text-sm text-amber-300 truncate max-w-[120px] sm:max-w-[180px]">
+                {nickname || '부족원'}
+              </span>
+              <span className="text-stone-500 text-xs">|</span>
+              <span className="text-[11px] text-stone-300 truncate max-w-[140px] sm:max-w-[220px]">
+                {email || '비회원 (게스트)'}
+              </span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold border border-amber-500/40 shrink-0">
                 Lv.{level}
               </span>
-            </h1>
-            <p className="text-[10px] text-stone-400">
-              장비 착용 스탯과 펫·버프 추가 능력치, 특수 효과를 확인하세요
+            </div>
+            <p className="text-[10px] text-stone-400 truncate">
+              내 상태창 & 착용 장비 · 스탯 종합
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="pixel-btn flex h-9 w-9 items-center justify-center rounded border border-stone-700 bg-stone-800 p-1 text-stone-200 hover:text-white"
-          aria-label="닫기"
-        >
-          <X className="!h-5 !w-5" />
-        </button>
+
+        {/* Right: Logout & Close Buttons */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {onLogout && (
+            <button
+              type="button"
+              onClick={() => setConfirmLogoutOpen(true)}
+              className="pixel-btn flex items-center gap-1 px-2 py-1.5 rounded border border-rose-800/80 bg-rose-950/70 text-rose-300 hover:bg-rose-900 hover:text-white transition-colors"
+              title="로그아웃"
+              aria-label="로그아웃"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span className="text-[10px] font-bold hidden sm:inline">로그아웃</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="pixel-btn flex h-8 w-8 items-center justify-center rounded border border-stone-700 bg-stone-800 p-1 text-stone-200 hover:text-white"
+            aria-label="닫기"
+          >
+            <X className="!h-4 !w-4" />
+          </button>
+        </div>
       </div>
 
       {/* Main Body */}
@@ -582,6 +615,51 @@ export default function StatusEquipmentModal({
           </div>
         );
       })()}
+
+      {/* Logout Confirmation Dialog */}
+      <Dialog open={confirmLogoutOpen} onOpenChange={setConfirmLogoutOpen}>
+        <DialogContent className="max-w-xs border-2 border-[#5c3a1e] bg-[#2b1d14] text-stone-100 font-pixel p-4 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold text-amber-300 flex items-center gap-1.5">
+              <LogOut className="h-4 w-4 text-rose-400" />
+              로그아웃 확인
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2 text-xs text-stone-300 space-y-1">
+            <p>로그아웃 하시겠습니까?</p>
+            <p className="text-[10px] text-stone-400">
+              진행 중인 데이터가 안전하게 저장된 후 메인 화면으로 이동합니다.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 pt-2 border-t border-[#5c3a1e]/60">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isLoggingOut}
+              onClick={() => setConfirmLogoutOpen(false)}
+              className="border-stone-600 bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs h-8"
+            >
+              아니오 (N)
+            </Button>
+            <Button
+              size="sm"
+              disabled={isLoggingOut}
+              onClick={async () => {
+                setIsLoggingOut(true);
+                try {
+                  await onLogout?.();
+                } finally {
+                  setIsLoggingOut(false);
+                  setConfirmLogoutOpen(false);
+                }
+              }}
+              className="bg-rose-700 hover:bg-rose-600 text-white font-bold text-xs h-8 px-3"
+            >
+              {isLoggingOut ? '저장 및 로그아웃 중...' : '예 (Y)'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
