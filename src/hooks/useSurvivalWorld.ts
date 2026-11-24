@@ -393,9 +393,13 @@ export function migrateSaveData(raw: unknown, start: LatLng): WorldSave {
     const equipped = Array.isArray(rawMod.equippedSkillIds) && rawMod.equippedSkillIds.length > 0
       ? rawMod.equippedSkillIds
       : defaultMod.equippedSkillIds;
+    const slots: [string | null, string | null, string | null] = Array.isArray(rawMod.equippedSkillSlots) && rawMod.equippedSkillSlots.length === 3
+      ? [rawMod.equippedSkillSlots[0] ?? null, rawMod.equippedSkillSlots[1] ?? null, rawMod.equippedSkillSlots[2] ?? null]
+      : [equipped[0] ?? null, equipped[1] ?? null, equipped[2] ?? null];
     merged.modularSkills = {
       unlockedSkills: unlocked,
       equippedSkillIds: equipped,
+      equippedSkillSlots: slots,
     };
   } else {
     merged.modularSkills = defaultMod;
@@ -2141,6 +2145,51 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return true;
   }, [setS]);
 
+  const equipModularSlot = useCallback((slotIndex: 0 | 1 | 2, skillId: string | null): boolean => {
+    const p = ref.current;
+    const currentModState = p.modularSkills ?? defaultModularSkillsState();
+    const currentSlots: [string | null, string | null, string | null] = currentModState.equippedSkillSlots
+      ? [...currentModState.equippedSkillSlots]
+      : [
+          currentModState.equippedSkillIds[0] ?? null,
+          currentModState.equippedSkillIds[1] ?? null,
+          currentModState.equippedSkillIds[2] ?? null,
+        ];
+
+    if (skillId && !currentModState.unlockedSkills[skillId]) {
+      toast.error('해금되지 않은 기술입니다.');
+      return false;
+    }
+
+    if (skillId) {
+      // Check if already equipped in another slot -> swap or unassign other slot to prevent duplicates
+      const existingSlotIdx = currentSlots.findIndex(s => s === skillId);
+      if (existingSlotIdx !== -1 && existingSlotIdx !== slotIndex) {
+        currentSlots[existingSlotIdx] = currentSlots[slotIndex]; // swap
+      }
+      currentSlots[slotIndex] = skillId;
+      toast.success(`${slotIndex + 1}번 슬롯에 [${getSkillDisplayName(skillId, currentModState.unlockedSkills[skillId])}] 장착`);
+    } else {
+      const removedId = currentSlots[slotIndex];
+      currentSlots[slotIndex] = null;
+      if (removedId) {
+        toast.info(`${slotIndex + 1}번 슬롯 [${getSkillDisplayName(removedId, currentModState.unlockedSkills[removedId])}] 해제`);
+      }
+    }
+
+    const updatedSkillIds = currentSlots.filter((id): id is string => Boolean(id));
+
+    setS({
+      ...p,
+      modularSkills: {
+        ...currentModState,
+        equippedSkillSlots: currentSlots,
+        equippedSkillIds: updatedSkillIds,
+      },
+    });
+    return true;
+  }, [setS]);
+
   const equipModularSkill = useCallback((skillId: string, slotIndex: number): boolean => {
     const p = ref.current;
     const currentModState = p.modularSkills ?? defaultModularSkillsState();
@@ -2149,27 +2198,33 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       return false;
     }
 
-    const nextEquipped = [...currentModState.equippedSkillIds];
-    const existingIndex = nextEquipped.indexOf(skillId);
-    if (existingIndex !== -1) {
-      nextEquipped.splice(existingIndex, 1);
+    const currentSlots: [string | null, string | null, string | null] = currentModState.equippedSkillSlots
+      ? [...currentModState.equippedSkillSlots]
+      : [
+          currentModState.equippedSkillIds[0] ?? null,
+          currentModState.equippedSkillIds[1] ?? null,
+          currentModState.equippedSkillIds[2] ?? null,
+        ];
+
+    const existingSlotIdx = currentSlots.findIndex(s => s === skillId);
+    if (existingSlotIdx !== -1) {
+      currentSlots[existingSlotIdx] = null;
       toast.info(`기술 장착 해제: ${getSkillDisplayName(skillId, currentModState.unlockedSkills[skillId])}`);
     } else {
-      if (slotIndex >= 0 && slotIndex < 4) {
-        nextEquipped[slotIndex] = skillId;
-      } else if (nextEquipped.length < 4) {
-        nextEquipped.push(skillId);
-      } else {
-        nextEquipped[3] = skillId;
-      }
-      toast.success(`기술 퀵바 장착: ${getSkillDisplayName(skillId, currentModState.unlockedSkills[skillId])}`);
+      const targetIdx = (slotIndex >= 0 && slotIndex < 3) ? (slotIndex as 0 | 1 | 2) : (currentSlots.findIndex(s => s === null) as 0 | 1 | 2);
+      const safeIdx = targetIdx !== -1 ? targetIdx : 0;
+      currentSlots[safeIdx] = skillId;
+      toast.success(`기술 ${safeIdx + 1}번 슬롯 장착: ${getSkillDisplayName(skillId, currentModState.unlockedSkills[skillId])}`);
     }
+
+    const updatedSkillIds = currentSlots.filter((id): id is string => Boolean(id));
 
     setS({
       ...p,
       modularSkills: {
         ...currentModState,
-        equippedSkillIds: nextEquipped.slice(0, 4),
+        equippedSkillSlots: currentSlots,
+        equippedSkillIds: updatedSkillIds,
       },
     });
     return true;
@@ -3794,6 +3849,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     fuseModularSkill,
     useModularSkill,
     equipModularSkill,
+    equipModularSlot,
     specializeModularSkill,
     resetModularSpecialization,
     savedIndicator, flushSave,

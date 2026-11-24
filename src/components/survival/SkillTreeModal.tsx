@@ -81,7 +81,9 @@ export const SkillTreeModal: React.FC<SkillTreeModalProps> = ({
   const aff = affinityState ?? defaultAffinityState();
   const modState = modularSkills ?? defaultModularSkillsState();
   const unlocked = modState.unlockedSkills ?? {};
-  const equipped = modState.equippedSkillIds ?? [];
+  const equipped = modState.equippedSkillSlots
+    ? modState.equippedSkillSlots.filter((id): id is string => Boolean(id))
+    : (modState.equippedSkillIds ?? []);
 
   // Current fusion recipe preview
   const currentRecipe = useMemo(() => {
@@ -573,7 +575,7 @@ export const SkillTreeModal: React.FC<SkillTreeModalProps> = ({
                     isEquipped ? 'bg-stone-700 text-stone-200 hover:bg-stone-600' : 'bg-primary text-primary-foreground hover:bg-primary/90'
                   }`}
                 >
-                  {isEquipped ? '✓ 퀵바에서 장착 해제' : '⚡ 전투 퀵바에 장착 (최대 4개)'}
+                  {isEquipped ? '✓ 퀵바에서 장착 해제' : '⚡ 전투 퀵바에 장착 (최대 3슬롯)'}
                 </Button>
               </div>
             </div>

@@ -77,7 +77,8 @@ export interface PlayerModularSkill {
 
 export interface ModularSkillsSaveState {
   unlockedSkills: Record<string, PlayerModularSkill>;
-  equippedSkillIds: string[]; // Up to 4 active skills
+  equippedSkillIds: string[]; // Up to 4 active skills (backward compatible)
+  equippedSkillSlots?: [string | null, string | null, string | null]; // 3 quick bar slots
 }
 
 // ── 1. Starter Base Actions (항상 사용 가능) ──
@@ -682,7 +683,8 @@ export function defaultModularSkillsState(): ModularSkillsSaveState {
       guard_brace: defaultPlayerSkill('guard_brace'),
       primal_shout: defaultPlayerSkill('primal_shout'),
     },
-    equippedSkillIds: ['stone_throw', 'heavy_strike', 'guard_brace', 'primal_shout'],
+    equippedSkillIds: ['stone_throw', 'heavy_strike', 'guard_brace'],
+    equippedSkillSlots: ['stone_throw', 'heavy_strike', 'guard_brace'],
   };
 }
 

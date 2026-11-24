@@ -32,7 +32,8 @@ import { petRole } from '@/lib/survival/pets';
 import { AltarPanel } from '@/components/survival/AltarPanel';
 import { EquipmentSlots } from '@/components/survival/EquipmentSlots';
 import { addStacks, hasAll } from "@/lib/survival/inventory";
-import { SkillQuickBar } from '@/components/survival/SkillQuickBar';
+import RightSkillDrawer from '@/components/survival/RightSkillDrawer';
+import SkillSettingsModal from '@/components/survival/SkillSettingsModal';
 import { useAutoAction } from '@/hooks/useAutoAction';
 import { BEAST_STRIKE_INTERVAL_MS, beastAggro } from '@/lib/survival/combat';
 import { ACTIVE_SKILLS, type ActiveSkill } from '@/lib/survival/abilities';
@@ -288,6 +289,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const [offlineElapsedMinutes, setOfflineElapsedMinutes] = useState(0);
   const [codexModalOpen, setCodexModalOpen] = useState(false);
   const [skillTreeModalOpen, setSkillTreeModalOpen] = useState(false);
+  const [skillSettingsModalOpen, setSkillSettingsModalOpen] = useState(false);
+  const [initialSkillSlot, setInitialSkillSlot] = useState<0 | 1 | 2>(0);
 
   const stateRef = useRef(s);
   stateRef.current = s;
@@ -2092,16 +2095,19 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         </div>
       )}
 
-      {view === 'user' && skillBarVisible && (
-        <SkillQuickBar
+      {/* Right-Edge Collapsible Wooden Skill Drawer (3 Slots + Settings) */}
+      {view === 'user' && panel === 'none' && (
+        <RightSkillDrawer
           modularSkills={g.modularSkills}
           cooldowns={s.cooldowns}
           ready={actionReady}
-          onUseModularSkill={g.useModularSkill}
-          onOpenSkillModal={() => setSkillTreeModalOpen(true)}
-          known={s.techs}
-          levels={s.skillLevels}
-          onUse={id => activateSkill(id)}
+          onUseSkill={g.useModularSkill}
+          onOpenSettings={(slotIdx) => {
+            if (typeof slotIdx === 'number') {
+              setInitialSkillSlot(slotIdx);
+            }
+            setSkillSettingsModalOpen(true);
+          }}
         />
       )}
 
@@ -2809,6 +2815,14 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         classSkills={g.classSkills}
         ownedStacks={addStacks(s.storage, s.backpack)}
         onLearnSkill={g.learnClassSkill}
+      />
+      <SkillSettingsModal
+        open={skillSettingsModalOpen}
+        onClose={() => setSkillSettingsModalOpen(false)}
+        modularSkills={g.modularSkills}
+        initialTargetSlot={initialSkillSlot}
+        onEquipSlot={g.equipModularSlot}
+        onOpenSkillBench={() => setSkillTreeModalOpen(true)}
       />
     </div>
       </ContextThemeWrapper>
