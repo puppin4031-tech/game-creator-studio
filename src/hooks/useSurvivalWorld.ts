@@ -1611,8 +1611,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   };
 
   // Report whether a hit succeeded so automatic actions stop on rejected attempts.
-  const interact = useCallback((e: WorldEntity): boolean => {
-    if (!enabledRef.current) { toast.warning('정확한 GPS 신호를 기다려 주세요.'); return false; }
+  const interact = useCallback((e: WorldEntity, options?: { silent?: boolean }): boolean => {
+    if (!enabledRef.current) {
+      if (!options?.silent) toast.warning('정확한 GPS 신호를 기다려 주세요.');
+      return false;
+    }
     const p = ref.current;
     if (e.kind === 'node' ? !isNodeAvailable(e.id, e.type, p.depleted, Date.now()) : !!p.depleted[e.id]) return false;
     const { category: rangedCat, rangeM: rangedReach } = computeRangedReach(weapon, p.level);
@@ -1621,7 +1624,10 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const extraReach = getPlayerReachBonusM(p.classSkills, p.affinityState?.totals?.nature);
     const baseReach = reachRadius(p.techs, p.techLevels) + extraReach;
     const r = isRangedWeapon ? Math.max(baseReach, rangedReach + reachBonus + extraReach) : baseReach;
-    if (distanceM(p.pos, e) > r) { toast.warning(`${r}m 안으로 다가가세요`); return false; }
+    if (distanceM(p.pos, e) > r) {
+      if (!options?.silent) toast.warning(`${r}m 안으로 다가가세요`);
+      return false;
+    }
     if (e.kind === 'creature') {
       const at = Date.now();
       const hasMeleeFast = weapon?.mechanics?.includes('MELEE_FAST') || ITEMS[weapon?.itemId ?? '']?.mechanics?.includes('MELEE_FAST');
@@ -1643,8 +1649,10 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         const tool = best((g) => ITEMS[g.itemId].tool?.[kind] ?? 0);
         const tier = tool ? ITEMS[tool.itemId].tool?.[kind] ?? 0 : 0;
         if (tier < d.requires.tier) {
-          const needName = kind === 'mine' ? (d.requires.tier >= 2 ? '흑요석 곡괭이' : '돌곡괭이') : (d.requires.tier >= 2 ? '흑요석 도끼' : '돌도끼');
-          toast.error(`${d.name}: ${needName}(${kind === 'chop' ? '벌목' : '채굴'} ${d.requires.tier}단계)가 필요합니다`, { description: tier ? `지금 가진 도구는 ${tier}단계예요. 거점에서 ${needName}를 만들어 배낭에 넣으세요.` : `거점에서 ${needName}를 만들어 배낭에 넣으세요.` });
+          if (!options?.silent) {
+            const needName = kind === 'mine' ? (d.requires.tier >= 2 ? '흑요석 곡괭이' : '돌곡괭이') : (d.requires.tier >= 2 ? '흑요석 도끼' : '돌도끼');
+            toast.error(`${d.name}: ${needName}(${kind === 'chop' ? '벌목' : '채굴'} ${d.requires.tier}단계)가 필요합니다`, { description: tier ? `지금 가진 도구는 ${tier}단계예요. 거점에서 ${needName}를 만들어 배낭에 넣으세요.` : `거점에서 ${needName}를 만들어 배낭에 넣으세요.` });
+          }
           return false;
         }
         if (!tool) return false;
@@ -1658,10 +1666,12 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       if (isRangedWeapon && distanceM(p.pos, e) > baseReach) {
         const ammo = findAvailableAmmo(p.backpack, weapon?.itemId);
         if (!ammo) {
-          const ammoLabel = rangedCat === 'bow' ? '화살(🏹)' : '돌멩이 탄환(🪨)이나 부싯돌';
-          toast.error(`배낭에 ${ammoLabel}이(가) 없습니다!`, {
-            description: '거점 제작 탭이나 모닥불에서 탄환을 만들어 배낭에 넣어 주세요 (1회 공격 시 1개 소진).',
-          });
+          if (!options?.silent) {
+            const ammoLabel = rangedCat === 'bow' ? '화살(🏹)' : '돌멩이 탄환(🪨)이나 부싯돌';
+            toast.error(`배낭에 ${ammoLabel}이(가) 없습니다!`, {
+              description: '거점 제작 탭이나 모닥불에서 탄환을 만들어 배낭에 넣어 주세요 (1회 공격 시 1개 소진).',
+            });
+          }
           return false;
         }
         const afterAmmo = removeStacks(p.backpack, [{ itemId: ammo.itemId, count: 1 }]);
@@ -2559,6 +2569,135 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     setS({ ...p, storage: addStacks(left, add) });
     return true;
   }, [setS]);
+
+  const setPlayerLevel = useCallback((lvl: number) => {
+    const targetLevel = Math.max(1, Math.min(100, Math.floor(lvl)));
+    setS(prev => {
+      let nextState: WorldSave = { ...prev, level: targetLevel, xp: 0 };
+      if (targetLevel >= 5 && !prev.languageLearned) {
+        nextState.languageQuestAccepted = true;
+      }
+      const maxHpVal = maxHpOf(nextState);
+      nextState.hp = maxHpVal;
+      return nextState;
+    });
+    setTimeout(flushSave, 0);
+    toast.success(`플레이어 레벨이 Lv.${targetLevel}(으)로 변경되었습니다!`);
+  }, [setS, flushSave]);
+
+  const addStorageItems = useCallback((items: Stack[], target: 'storage' | 'backpack' = 'storage') => {
+    setS(prev => {
+      if (target === 'backpack') {
+        return { ...prev, backpack: addStacks(prev.backpack ?? [], items) };
+      }
+      return { ...prev, storage: addStacks(prev.storage ?? [], items) };
+    });
+    setTimeout(flushSave, 0);
+    toast.success(`${target === 'backpack' ? '배낭' : '창고'}에 아이템이 지급되었습니다!`);
+  }, [setS, flushSave]);
+
+  const addGearItems = useCallback((itemIds: ItemId[], quality: Quality = 'NORMAL') => {
+    setS(prev => {
+      const newGears: GearInstance[] = itemIds.map(itemId => {
+        const it = ITEMS[itemId];
+        const dur = it?.durability ?? 50;
+        return {
+          uid: crypto.randomUUID(),
+          itemId,
+          quality,
+          durability: dur,
+          maxDurability: dur,
+        };
+      });
+      return { ...prev, gear: [...(prev.gear ?? []), ...newGears] };
+    });
+    setTimeout(flushSave, 0);
+    toast.success('새로운 장비/도구가 인벤토리에 지급되었습니다!');
+  }, [setS, flushSave]);
+
+  const grantPresetPackage = useCallback((packageKey: 'starter' | 'civilization' | 'ancient' | 'food') => {
+    let items: Stack[] = [];
+    let gearIds: ItemId[] = [];
+    let label = '';
+
+    if (packageKey === 'starter') {
+      label = '기초 생존 패키지';
+      items = [
+        { itemId: 'wood', count: 100 },
+        { itemId: 'stone', count: 100 },
+        { itemId: 'branch', count: 100 },
+        { itemId: 'flint', count: 50 },
+        { itemId: 'plant_fiber', count: 50 },
+        { itemId: 'cooked_meat', count: 30 },
+        { itemId: 'arrow', count: 50 },
+        { itemId: 'sling_stone', count: 50 },
+      ];
+      gearIds = ['stone_pickaxe', 'hand_axe', 'flint_spear', 'bow', 'leather_vest'];
+    } else if (packageKey === 'civilization') {
+      label = '청동/철기 문명 패키지';
+      items = [
+        { itemId: 'copper_ingot', count: 50 },
+        { itemId: 'tin_ore', count: 50 },
+        { itemId: 'bronze_ingot', count: 50 },
+        { itemId: 'iron_ingot', count: 50 },
+        { itemId: 'coal', count: 60 },
+        { itemId: 'obsidian', count: 30 },
+        { itemId: 'leather', count: 30 },
+        { itemId: 'cooked_meat', count: 50 },
+        { itemId: 'arrow', count: 100 },
+      ];
+      gearIds = ['obsidian_pickaxe', 'obsidian_axe', 'bronze_sword', 'iron_sword', 'bronze_plate'];
+    } else if (packageKey === 'ancient') {
+      label = '강철/고대 보석 패키지';
+      items = [
+        { itemId: 'steel_ingot', count: 50 },
+        { itemId: 'jade', count: 30 },
+        { itemId: 'ruby', count: 20 },
+        { itemId: 'sapphire', count: 20 },
+        { itemId: 'amber', count: 20 },
+        { itemId: 'dragon_scale', count: 10 },
+        { itemId: 'poison_gland', count: 10 },
+        { itemId: 'coal', count: 100 },
+        { itemId: 'arrow', count: 150 },
+      ];
+      gearIds = ['steel_pickaxe', 'steel_axe', 'steel_sword', 'steel_plate', 'jade_amulet'];
+    } else if (packageKey === 'food') {
+      label = '풍족한 식량 패키지';
+      items = [
+        { itemId: 'cooked_meat', count: 50 },
+        { itemId: 'cured_meat', count: 50 },
+        { itemId: 'smoked_bacon', count: 50 },
+        { itemId: 'waterskin', count: 10 },
+      ];
+      gearIds = [];
+    }
+
+    const newGears: GearInstance[] = gearIds.map(itemId => {
+      const it = ITEMS[itemId];
+      const dur = it?.durability ?? 60;
+      return {
+        uid: crypto.randomUUID(),
+        itemId,
+        quality: packageKey === 'ancient' ? 'MASTERWORK' : 'NORMAL',
+        durability: dur,
+        maxDurability: dur,
+      };
+    });
+
+    setS(prev => ({
+      ...prev,
+      storage: addStacks(prev.storage ?? [], items),
+      gear: [...(prev.gear ?? []), ...newGears],
+    }));
+    setTimeout(flushSave, 0);
+    toast.success(`${label}가 창고 및 인벤토리에 지급되었습니다!`);
+  }, [setS, flushSave]);
+
+  const clearStorage = useCallback(() => {
+    setS(prev => ({ ...prev, storage: [] }));
+    setTimeout(flushSave, 0);
+    toast.success('창고가 비워졌습니다.');
+  }, [setS, flushSave]);
   const withdraw = useCallback((itemId: ItemId) => {
     const p = ref.current;
     if (!enabledRef.current || !atWorkshop(p)) { toast.warning('거점 안에서만 꺼낼 수 있습니다'); return; }
@@ -3895,7 +4034,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return chosen;
   }, [saveKey, userId, setS, flushSave]);
 
-  return { codex: s.codex ?? defaultCodexState(), codexProgress, recordCodexResource, recordCodexPet, recordCodexBoss, recordCodexAiInvention, markCodexSeen, reloadSaveFromBestSource, claimOfflineRewards, shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, classSkills: s.classSkills ?? [], learnClassSkill, maxSpeedKmh: getPlayerSpeedLimitKmh(s.classSkills, s.affinityState?.totals?.engineering), affinityState: s.affinityState ?? defaultAffinityState(), gainEnergy, triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, dismissTribe, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, updateTutorialState, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, ambachoDailyDone: false, offlineReportClaimedToday: s.lastOfflineReportDate === getTodayKey(), pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage,
+  return { codex: s.codex ?? defaultCodexState(), codexProgress, recordCodexResource, recordCodexPet, recordCodexBoss, recordCodexAiInvention, markCodexSeen, reloadSaveFromBestSource, claimOfflineRewards, shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, classSkills: s.classSkills ?? [], learnClassSkill, maxSpeedKmh: getPlayerSpeedLimitKmh(s.classSkills, s.affinityState?.totals?.engineering), affinityState: s.affinityState ?? defaultAffinityState(), gainEnergy, triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, dismissTribe, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, updateTutorialState, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, ambachoDailyDone: false, offlineReportClaimedToday: s.lastOfflineReportDate === getTodayKey(), pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage, setPlayerLevel, addStorageItems, addGearItems, grantPresetPackage, clearStorage,
     modularSkills: s.modularSkills ?? defaultModularSkillsState(),
     fuseModularSkill,
     useModularSkill,

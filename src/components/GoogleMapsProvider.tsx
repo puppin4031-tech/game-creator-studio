@@ -14,7 +14,7 @@ export default function GoogleMapsProvider({ children }: Props) {
   // Entry, authentication, terrain survival and admin tools must not wait for or be blocked by the Kakao SDK.
   if (
     ['/', '/login', '/world'].includes(window.location.pathname) ||
-    window.location.pathname.startsWith('/play/survival') ||
+    window.location.pathname.startsWith('/play') ||
     window.location.pathname.startsWith('/admin')
   ) {
     return <>{children}</>;

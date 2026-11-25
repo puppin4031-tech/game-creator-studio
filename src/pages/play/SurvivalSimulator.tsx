@@ -126,6 +126,7 @@ import BaseVillageView from '@/components/survival/BaseVillageView';
 import RadarMapModal from '@/components/survival/RadarMapModal';
 import DinoExpeditionModal from '@/components/survival/DinoExpeditionModal';
 import StatusEquipmentModal from '@/components/survival/StatusEquipmentModal';
+import AccountSaveEditorModal from '@/components/survival/AccountSaveEditorModal';
 import NicknameSetupModal from '@/components/survival/NicknameSetupModal';
 import SkillTreeModal from '@/components/survival/SkillTreeModal';
 import { atWorkshop } from '@/lib/survival/abilities';
@@ -383,6 +384,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     g.gainEnergy('wind', 1, { reason: 'scan' });
   }, [g]);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [saveEditorOpen, setSaveEditorOpen] = useState(false);
   const [skillBarVisible, setSkillBarVisible] = useState(true);
   const [tribeInfoModalOpen, setTribeInfoModalOpen] = useState(false);
   const [offlineReportModalOpen, setOfflineReportModalOpen] = useState(false);
@@ -973,9 +975,22 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         const nearEgg = eggSpawnsNear(p.pos, p.depleted, Date.now()).find(e => distanceM(p.pos, e) <= Math.min(radius, eggRadius));
         if (nearEgg && w.pickEgg(nearEgg)) return;
       }
-      const target = w.entities.find(e => e.kind === 'node' && (gathererActive ? nodeDef(e.type).requires.tier <= 1 : !STRIKE_NODES.has(e.type))
-        && isNodeAvailable(e.id, e.type, p.depleted, Date.now()) && distanceM(p.pos, e) <= radius);
-      if (target) w.interact(target);
+      const canAutoGatherNode = (nodeType: Parameters<typeof nodeDef>[0]): boolean => {
+        const d = nodeDef(nodeType);
+        if (!d) return false;
+        if (d.requires.kind === 'none') return true;
+        // If node requires a tool (mining or chopping), player must have an equipped tool of sufficient tier
+        if (!gathererActive) return false;
+        const kind = d.requires.kind;
+        const tools = [w.loadout.tool1, w.loadout.tool2].filter(Boolean);
+        return tools.some(g => (ITEMS[g!.itemId]?.tool?.[kind] ?? 0) >= d.requires.tier);
+      };
+
+      const target = w.entities.find(e => e.kind === 'node'
+        && canAutoGatherNode(e.type)
+        && isNodeAvailable(e.id, e.type, p.depleted, Date.now())
+        && distanceM(p.pos, e) <= radius);
+      if (target) w.interact(target, { silent: true });
     }, gathererActive ? 2000 : AUTO_PICKUP_INTERVAL_MS);
     return () => window.clearInterval(id);
   }, [autoOn, gathererActive]);
@@ -2147,6 +2162,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                     }
                   }}
                   onRestoreSave={g.reloadSaveFromBestSource}
+                  onOpenSaveEditor={() => setSaveEditorOpen(true)}
                   tutorialCompleted={isTutorialCompleted}
                   onToggleTutorial={handleToggleTutorial}
                   trigger={
@@ -2890,6 +2906,24 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
         onStoreGear={g.storeGear}
         onRetrieveGear={g.retrieveGear}
         canStoreInBase={g.inBase}
+        onOpenSaveEditor={() => {
+          setStatusModalOpen(false);
+          setSaveEditorOpen(true);
+        }}
+      />
+      <AccountSaveEditorModal
+        open={saveEditorOpen}
+        onClose={() => setSaveEditorOpen(false)}
+        level={s.level}
+        xp={s.xp}
+        storageCount={s.storage?.length ?? 0}
+        backpackCount={s.backpack?.length ?? 0}
+        onSetLevel={g.setPlayerLevel}
+        onGrantPreset={g.grantPresetPackage}
+        onAddItems={g.addStorageItems}
+        onAddGear={g.addGearItems}
+        onClearStorage={g.clearStorage}
+        onRestoreBestSave={g.reloadSaveFromBestSource}
       />
       <RadarMapModal
         open={radarOpen}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Menu, LogOut, Settings, DoorOpen, MessageSquare, BookOpen, Megaphone } from 'lucide-react';
+import { Menu, LogOut, Settings, DoorOpen, MessageSquare, BookOpen, Megaphone, Wrench } from 'lucide-react';
 import SupportInquiryDialog from './SupportInquiryDialog';
 import NoticeDialog from './NoticeDialog';
 import { hasUnreadNotice, markNoticeRead } from '@/lib/survival/notices';
@@ -17,6 +17,7 @@ interface Props {
   onLogout?: () => Promise<void> | void;
   loggedIn?: boolean;
   onRestoreSave?: () => Promise<unknown>;
+  onOpenSaveEditor?: () => void;
   trigger?: React.ReactNode;
   tutorialCompleted?: boolean;
   onToggleTutorial?: (wantsTutorial: boolean) => void;
@@ -32,6 +33,8 @@ export default function GameMenu({
   onExit = () => window.history.back(),
   onLogout = () => {},
   loggedIn = false,
+  onRestoreSave,
+  onOpenSaveEditor,
   trigger,
   tutorialCompleted,
   onToggleTutorial,
@@ -59,6 +62,12 @@ export default function GameMenu({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="font-pixel">
           <DropdownMenuItem className="min-h-11" onSelect={onExit}><DoorOpen className="mr-2 !h-5 !w-5" />나가기</DropdownMenuItem>
+          {onOpenSaveEditor && (
+            <DropdownMenuItem className="min-h-11 text-amber-400 font-bold" onSelect={onOpenSaveEditor}>
+              <Wrench className="mr-2 !h-5 !w-5 text-amber-400" />
+              계정 레벨 및 창고 관리
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem className="min-h-11" onSelect={() => { setNoticeOpen(true); markNoticeRead(); setUnread(false); }}><Megaphone className="mr-2 !h-5 !w-5" />공지사항{unread && <span className="ml-2 h-2 w-2 rounded-full bg-destructive" />}</DropdownMenuItem>
           <DropdownMenuItem className="min-h-11" onSelect={() => setGuideOpen(true)}><BookOpen className="mr-2 !h-5 !w-5" />가이드</DropdownMenuItem>
           <DropdownMenuItem className="min-h-11" onSelect={() => setSettingsOpen(true)}><Settings className="mr-2 !h-5 !w-5" />설정</DropdownMenuItem>
@@ -123,6 +132,19 @@ export default function GameMenu({
                 else toast.success('알림을 켰어요');
               }} />
             </label>
+            {onOpenSaveEditor && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSettingsOpen(false);
+                  onOpenSaveEditor();
+                }}
+                className="pixel-btn flex min-h-11 w-full items-center justify-center gap-2 bg-amber-950/60 border border-amber-600/60 text-amber-300 hover:text-white text-sm"
+              >
+                <Wrench className="!h-5 !w-5 text-amber-400" />
+                계정 레벨 및 창고 데이터 관리
+              </button>
+            )}
             <button type="button" onClick={() => { setSettingsOpen(false); setSupportOpen(true); }} className="pixel-btn flex min-h-11 w-full items-center justify-center gap-2 bg-card text-sm"><MessageSquare className="!h-5 !w-5" />문의하기</button>
           </div>
         </DialogContent>

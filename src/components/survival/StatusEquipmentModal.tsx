@@ -13,6 +13,7 @@ import {
   Check,
   ChevronRight,
   LogOut,
+  Wrench,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -53,6 +54,7 @@ interface Props {
   onStoreGear?: (uid: string) => void;
   onRetrieveGear?: (uid: string) => void;
   canStoreInBase?: boolean;
+  onOpenSaveEditor?: () => void;
 }
 
 export default function StatusEquipmentModal({
@@ -73,6 +75,7 @@ export default function StatusEquipmentModal({
   onStoreGear,
   onRetrieveGear,
   canStoreInBase = true,
+  onOpenSaveEditor,
 }: Props) {
   const [selectedGear, setSelectedGear] = useState<GearInstance | null>(null);
   const [targetSlot, setTargetSlot] = useState<GearSlot | null>(null);
@@ -239,8 +242,20 @@ export default function StatusEquipmentModal({
           </div>
         </div>
 
-        {/* Right: Logout & Close Buttons */}
+        {/* Right: Save Editor, Logout & Close Buttons */}
         <div className="flex items-center gap-1.5 shrink-0">
+          {onOpenSaveEditor && (
+            <button
+              type="button"
+              onClick={onOpenSaveEditor}
+              className="pixel-btn flex items-center gap-1 px-2.5 py-1.5 rounded border border-amber-600/80 bg-amber-950/80 text-amber-200 hover:bg-amber-900 hover:text-white transition-colors shadow-sm"
+              title="계정 레벨 및 창고 데이터 수정"
+              aria-label="데이터 관리"
+            >
+              <Wrench className="h-3.5 w-3.5 text-amber-400" />
+              <span className="text-[10px] font-bold">레벨/창고 설정</span>
+            </button>
+          )}
           {onLogout && (
             <button
               type="button"
