@@ -3,6 +3,11 @@ import type { LatLng } from '@/lib/survival/types';
 import { getNearbyDecorativeProps, type MapDecorativeProp } from '@/utils/mapPropGenerator';
 import { useSpriteAnimations } from '@/hooks/useSpriteAnimations';
 import SpriteAnimator from '@/components/survival/SpriteAnimator';
+import jungleTreeArt from '@/assets/props/prop_jungle_tree.webp.asset.json';
+import palmTreeArt from '@/assets/props/prop_palm_tree.webp.asset.json';
+import bushArt from '@/assets/props/prop_bush.webp.asset.json';
+import grassTuftArt from '@/assets/props/prop_grass_tuft.webp.asset.json';
+import mossyRockArt from '@/assets/props/prop_mossy_rock.webp.asset.json';
 import { computeEntityZIndex, isOccludedByCanopy } from '@/utils/depthSorting';
 
 interface MapFoliageOverlayProps {
@@ -224,15 +229,41 @@ const PROP_BASE_HEIGHT: Record<MapDecorativeProp['type'], number> = {
   jungle_tree: 54, palm_tree: 48, bush: 24, grass_tuft: 16, mossy_rock: 22,
 };
 
+// Bundled default artwork; admin uploads override, SVG is the last fallback.
+const PROP_DEFAULT_ART: Record<MapDecorativeProp['type'], string> = {
+  jungle_tree: jungleTreeArt.url,
+  palm_tree: palmTreeArt.url,
+  bush: bushArt.url,
+  grass_tuft: grassTuftArt.url,
+  mossy_rock: mossyRockArt.url,
+};
+
+function DefaultPropArt({ type, height }: { type: MapDecorativeProp['type']; height: number }) {
+  const [failed, setFailed] = React.useState(false);
+  if (failed) return <DefaultPropSvg type={type} />;
+  return (
+    <img
+      src={PROP_DEFAULT_ART[type]}
+      alt=""
+      aria-hidden="true"
+      draggable={false}
+      onError={() => setFailed(true)}
+      style={{ height, width: 'auto', imageRendering: 'pixelated' }}
+      className="drop-shadow-[0_4px_3px_rgba(0,0,0,0.35)] select-none"
+    />
+  );
+}
+
 function RenderPropSprite({ type }: { type: MapDecorativeProp['type'] }) {
   const { data } = useSpriteAnimations(PROP_SPRITE_KEYS[type]);
   const anim = data?.idle;
-  if (anim?.url) {
-    const h = Math.round(PROP_BASE_HEIGHT[type] * (data?.scale ?? 1));
+  const h = Math.round(PROP_BASE_HEIGHT[type] * (data?.scale ?? data?._scale ?? 1));
+  const fallback = <DefaultPropArt type={type} height={h} />;
+  if (anim?.url && !anim.url.startsWith('local://')) {
     const frames = Math.max(1, anim.frame_count || 1);
-    return <SpriteAnimator url={anim.url} frames={frames} fps={anim.fps} height={h} fallback={<DefaultPropSvg type={type} />} />;
+    return <SpriteAnimator url={anim.url} frames={frames} fps={anim.fps} height={h} fallback={fallback} />;
   }
-  return <DefaultPropSvg type={type} />;
+  return fallback;
 }
 
 function DefaultPropSvg({ type }: { type: MapDecorativeProp['type'] }) {
