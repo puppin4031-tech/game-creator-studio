@@ -148,6 +148,20 @@
       "when": 1795384642029,
       "tag": "0020_scope_survival_catalog_reads",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795615923321,
+      "tag": "0021_expand_sprite_actions",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1795615955700,
+      "tag": "0022_allow_sprite_scale_fps",
+      "breakpoints": true
     }
   ]
 }

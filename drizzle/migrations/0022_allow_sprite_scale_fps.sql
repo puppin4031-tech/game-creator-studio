@@ -1,0 +1,2 @@
+ALTER TABLE public.survival_sprite_animations DROP CONSTRAINT survival_sprite_animations_fps_check;
+ALTER TABLE public.survival_sprite_animations ADD CONSTRAINT survival_sprite_animations_fps_check CHECK (fps >= 1 AND (fps <= 30 OR (action = 'scale' AND fps <= 300)));
