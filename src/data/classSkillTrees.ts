@@ -110,7 +110,7 @@ export const CLASS_SKILL_TREES: Record<ShamanClassType, {
           reqLevel: 25,
           reqSkillId: 'clockwork_bike',
           costItems: [
-            { itemId: 'hematite', count: 15 },
+            { itemId: 'magnetite', count: 15 },
             { itemId: 'coal', count: 15 },
             { itemId: 'copper_ore', count: 15 },
           ],
@@ -171,7 +171,7 @@ export const CLASS_SKILL_TREES: Record<ShamanClassType, {
           reqLevel: 20,
           reqSkillId: 'repeating_crossbow',
           costItems: [
-            { itemId: 'hematite', count: 12 },
+            { itemId: 'magnetite', count: 12 },
             { itemId: 'coal', count: 12 },
             { itemId: 'clay', count: 10 },
           ],
@@ -190,7 +190,7 @@ export const CLASS_SKILL_TREES: Record<ShamanClassType, {
           reqSkillId: 'steel_smelting',
           costItems: [
             { itemId: 'log', count: 25 },
-            { itemId: 'hematite', count: 15 },
+            { itemId: 'magnetite', count: 15 },
             { itemId: 'cordage', count: 15 },
           ],
           effectKey: 'base_auto_turret',

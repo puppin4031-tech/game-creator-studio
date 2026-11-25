@@ -37,6 +37,7 @@ import {
   SHAMAN_CLASSES,
   SHAMAN_QUEST_STAGES,
   checkShamanQuestStageProgress,
+  normalizeShamanClassId,
   type ShamanClassId,
   type ShamanLevel,
 } from '@/lib/survival/shamanEvolution';
@@ -96,7 +97,7 @@ import {
   CODEX_PETS,
   CODEX_BOSSES,
 } from '@/lib/survival/codex';
-import type { GearInstance, LatLng, Stack, WorldEntity } from '@/lib/survival/types';
+import type { GearInstance, LatLng, Stack, WorldEntity, Quality } from '@/lib/survival/types';
 
 import { advancePetDefense, deployPet, setPetRole, settlePetHunts, petRole, PET_GUARD_SLOTS, maxGuardSlotsFor, PET_FOLLOW_SLOTS, PET_FOLLOW_ATK, petStats, type PetRole, fusePets, hatchPet, migratePets, type OwnedPet, type PetDefense, type PetHit } from '@/lib/survival/pets';
 
@@ -359,7 +360,7 @@ export function migrateSaveData(raw: unknown, start: LatLng): WorldSave {
       dominantValue,
     };
   } else if (p.shamanClass && p.shamanClass !== 'NONE') {
-    const classId = normalizeShamanClassId(p.shamanClass as any);
+    const classId = normalizeShamanClassId(p.shamanClass);
     const energies = { ...defaultAff.energies };
     if (classId === 'ENGINEER') {
       energies.tension = 15;
@@ -908,7 +909,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const stepDistM = distanceM(p.pos, pos);
       const walking = grew && prevAt > 0 && isWalkingPace(stepDistM, now - prevAt, walkLimit);
       const perks = getAffinityPerks(p.affinityState?.totals);
-      const eggPerkMult = 1 + (perks.eggHatchDistDiscountPct / 100);
+      const eggPerkMult = 1 + (perks.hatchDiscountPct / 100);
       const eggDistMult = (p.classSkills?.includes('straw_sandals') ? 1.25 : 1) * eggPerkMult;
 
       let nextAff = p.affinityState ?? defaultAffinityState();
@@ -1611,9 +1612,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   };
 
   // Report whether a hit succeeded so automatic actions stop on rejected attempts.
-  const interact = useCallback((e: WorldEntity, options?: { silent?: boolean }): boolean => {
+  const interact = useCallback((e: WorldEntity, interactOpts?: { silent?: boolean }): boolean => {
     if (!enabledRef.current) {
-      if (!options?.silent) toast.warning('정확한 GPS 신호를 기다려 주세요.');
+      if (!interactOpts?.silent) toast.warning('정확한 GPS 신호를 기다려 주세요.');
       return false;
     }
     const p = ref.current;
@@ -1625,11 +1626,11 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     const baseReach = reachRadius(p.techs, p.techLevels) + extraReach;
     const r = isRangedWeapon ? Math.max(baseReach, rangedReach + reachBonus + extraReach) : baseReach;
     if (distanceM(p.pos, e) > r) {
-      if (!options?.silent) toast.warning(`${r}m 안으로 다가가세요`);
+      if (!interactOpts?.silent) toast.warning(`${r}m 안으로 다가가세요`);
       return false;
     }
+    const at = Date.now();
     if (e.kind === 'creature') {
-      const at = Date.now();
       const hasMeleeFast = weapon?.mechanics?.includes('MELEE_FAST') || ITEMS[weapon?.itemId ?? '']?.mechanics?.includes('MELEE_FAST');
       const attackInterval = hasMeleeFast ? Math.round(CREATURE_ATTACK_INTERVAL_MS * 0.6) : CREATURE_ATTACK_INTERVAL_MS;
       if (at - lastCreatureAttack.current < attackInterval) return false;
@@ -1649,7 +1650,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         const tool = best((g) => ITEMS[g.itemId].tool?.[kind] ?? 0);
         const tier = tool ? ITEMS[tool.itemId].tool?.[kind] ?? 0 : 0;
         if (tier < d.requires.tier) {
-          if (!options?.silent) {
+          if (!interactOpts?.silent) {
             const needName = kind === 'mine' ? (d.requires.tier >= 2 ? '흑요석 곡괭이' : '돌곡괭이') : (d.requires.tier >= 2 ? '흑요석 도끼' : '돌도끼');
             toast.error(`${d.name}: ${needName}(${kind === 'chop' ? '벌목' : '채굴'} ${d.requires.tier}단계)가 필요합니다`, { description: tier ? `지금 가진 도구는 ${tier}단계예요. 거점에서 ${needName}를 만들어 배낭에 넣으세요.` : `거점에서 ${needName}를 만들어 배낭에 넣으세요.` });
           }
@@ -1666,7 +1667,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       if (isRangedWeapon && distanceM(p.pos, e) > baseReach) {
         const ammo = findAvailableAmmo(p.backpack, weapon?.itemId);
         if (!ammo) {
-          if (!options?.silent) {
+          if (!interactOpts?.silent) {
             const ammoLabel = rangedCat === 'bow' ? '화살(🏹)' : '돌멩이 탄환(🪨)이나 부싯돌';
             toast.error(`배낭에 ${ammoLabel}이(가) 없습니다!`, {
               description: '거점 제작 탭이나 모닥불에서 탄환을 만들어 배낭에 넣어 주세요 (1회 공격 시 1개 소진).',
@@ -2268,7 +2269,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       currentSlots[existingSlotIdx] = null;
       toast.info(`기술 장착 해제: ${getSkillDisplayName(skillId, currentModState.unlockedSkills[skillId])}`);
     } else {
-      const targetIdx = (slotIndex >= 0 && slotIndex < 3) ? (slotIndex as 0 | 1 | 2) : (currentSlots.findIndex(s => s === null) as 0 | 1 | 2);
+      const targetIdx = (slotIndex >= 0 && slotIndex < 3) ? slotIndex : currentSlots.findIndex(s => s === null);
       const safeIdx = targetIdx !== -1 ? targetIdx : 0;
       currentSlots[safeIdx] = skillId;
       toast.success(`기술 ${safeIdx + 1}번 슬롯 장착: ${getSkillDisplayName(skillId, currentModState.unlockedSkills[skillId])}`);
@@ -2416,7 +2417,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       let targetCreature = creatures.find(c => c.id === targetEntityId) || creatures[0];
       const basePow = baseAction?.basePower ?? fusedDef?.basePower ?? 12;
       const powerGrowth = (playerSkill.masteryLevel - 1) * (fusedDef?.powerPerLevel ?? 1.5);
-      let totalPower = Math.round(basePow + powerGrowth + (weapon?.weapon?.atk ?? 0) * 0.8);
+      let totalPower = Math.round(basePow + powerGrowth + (weapon ? ITEMS[weapon.itemId]?.weapon?.atk ?? 0 : 0) * 0.8);
 
       const spec = playerSkill.chosenSpecialization;
       const isCrit = spec === 'crit' && Math.random() < 0.45;
@@ -2452,6 +2453,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const dodgeVal = fusedDef?.vfx === 'wind' ? 40 : 15;
 
       const newBuff: ActiveFoodBuff = {
+        id: `skill-defense-${skillId}`,
+        icon: getSkillDisplayIcon(skillId),
+        desc: displayName,
         name: `${displayName} (${isAwakened ? '각성' : 'Lv.' + playerSkill.masteryLevel})`,
         expiresAt: at + (spec === 'eternal' ? 24_000 : 12_000),
         effects: {
@@ -2477,6 +2481,9 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const boostMult = spec === 'maximize' ? 1.6 : 1.0;
 
       const newBuff: ActiveFoodBuff = {
+        id: `skill-buff-${skillId}`,
+        icon: getSkillDisplayIcon(skillId),
+        desc: displayName,
         name: `${displayName} 버프`,
         expiresAt: at + durationMs,
         effects: {
@@ -2623,30 +2630,30 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (packageKey === 'starter') {
       label = '기초 생존 패키지';
       items = [
-        { itemId: 'wood', count: 100 },
-        { itemId: 'stone', count: 100 },
+        { itemId: 'log', count: 100 },
+        { itemId: 'flint', count: 100 },
         { itemId: 'branch', count: 100 },
         { itemId: 'flint', count: 50 },
-        { itemId: 'plant_fiber', count: 50 },
+        { itemId: 'fiber', count: 50 },
         { itemId: 'cooked_meat', count: 30 },
         { itemId: 'arrow', count: 50 },
         { itemId: 'sling_stone', count: 50 },
       ];
-      gearIds = ['stone_pickaxe', 'hand_axe', 'flint_spear', 'bow', 'leather_vest'];
+      gearIds = ['stone_pickaxe', 'hand_axe', 'flint_spear', 'bone_bow', 'hide_armor'];
     } else if (packageKey === 'civilization') {
       label = '청동/철기 문명 패키지';
       items = [
         { itemId: 'copper_ingot', count: 50 },
         { itemId: 'tin_ore', count: 50 },
         { itemId: 'bronze_ingot', count: 50 },
-        { itemId: 'iron_ingot', count: 50 },
+        { itemId: 'steel_ingot', count: 50 },
         { itemId: 'coal', count: 60 },
         { itemId: 'obsidian', count: 30 },
         { itemId: 'leather', count: 30 },
         { itemId: 'cooked_meat', count: 50 },
         { itemId: 'arrow', count: 100 },
       ];
-      gearIds = ['obsidian_pickaxe', 'obsidian_axe', 'bronze_sword', 'iron_sword', 'bronze_plate'];
+      gearIds = ['obsidian_pickaxe', 'obsidian_axe', 'bronze_sword', 'iron_sword', 'bronze_shield'];
     } else if (packageKey === 'ancient') {
       label = '강철/고대 보석 패키지';
       items = [
@@ -2660,13 +2667,13 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         { itemId: 'coal', count: 100 },
         { itemId: 'arrow', count: 150 },
       ];
-      gearIds = ['steel_pickaxe', 'steel_axe', 'steel_sword', 'steel_plate', 'jade_amulet'];
+      gearIds = ['steel_pickaxe', 'steel_axe', 'steel_sword', 'iron_shield', 'jade_amulet'];
     } else if (packageKey === 'food') {
       label = '풍족한 식량 패키지';
       items = [
         { itemId: 'cooked_meat', count: 50 },
-        { itemId: 'cured_meat', count: 50 },
-        { itemId: 'smoked_bacon', count: 50 },
+        { itemId: 'jerky', count: 50 },
+        { itemId: 'jerky', count: 50 },
         { itemId: 'waterskin', count: 10 },
       ];
       gearIds = [];

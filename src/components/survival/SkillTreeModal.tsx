@@ -22,6 +22,7 @@ import {
   type AffinityState,
   type SubEnergyId,
   SUB_ENERGIES,
+  AFFINITIES,
   defaultAffinityState,
 } from '@/data/affinitySystem';
 import type { Stack } from '@/lib/survival/types';
@@ -208,7 +209,7 @@ export const SkillTreeModal: React.FC<SkillTreeModalProps> = ({
                         <span className="text-xl">{def.icon}</span>
                         <div>
                           <b className="text-xs text-stone-100">{def.name}</b>
-                          <span className="block text-[9px] text-stone-400">{def.affinityName} 성향</span>
+                          <span className="block text-[9px] text-stone-400">{AFFINITIES[def.affinity].name} 성향</span>
                         </div>
                       </div>
                       <span className={`text-xs font-mono font-bold ${isReadyForFusion ? 'text-amber-300' : 'text-stone-400'}`}>
@@ -216,7 +217,7 @@ export const SkillTreeModal: React.FC<SkillTreeModalProps> = ({
                       </span>
                     </div>
 
-                    <p className="text-[10px] text-stone-300 line-clamp-1">{def.howToEarn}</p>
+                    <p className="text-[10px] text-stone-300 line-clamp-1">{def.howToGain}</p>
 
                     {/* Progress Bar with 30-mark indicator */}
                     <div className="relative h-2.5 w-full rounded-full bg-[#1c1917] overflow-hidden border border-[#44403c]">

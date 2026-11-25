@@ -485,7 +485,7 @@ export default function ExpeditionSystem(p: Props) {
           {p.auto ? <Pause className="!h-3.5 !w-3.5" /> : <Play className="!h-3.5 !w-3.5" />}
           {p.auto
             ? '자동사냥 끄기'
-            : isAmbachoExhausted
+            : p.ambachoDailyDone
               ? '자동사냥 (완료)'
               : (p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0)
                 ? '자동사냥 (소진)'

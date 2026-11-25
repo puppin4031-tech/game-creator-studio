@@ -166,7 +166,6 @@ function Sprite({ k, scale = 1, className = '' }: { k: SpriteKey; scale?: number
         frames={anim.frame_count}
         fps={anim.fps}
         height={targetH}
-        className={className}
         fallback={<img src={staticSrc} height={targetH} style={{ height: targetH, width: 'auto' }} alt="" draggable={false} className={`pixelated select-none ${className}`} />}
       />
     );

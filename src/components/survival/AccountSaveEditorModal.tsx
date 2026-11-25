@@ -79,10 +79,10 @@ const POPULAR_ITEMS: { id: ItemId; label: string; count: number; isGear?: boolea
   { id: 'hand_axe', label: '주먹도끼', count: 1, isGear: true },
   { id: 'obsidian_axe', label: '흑요석 도끼', count: 1, isGear: true },
   { id: 'iron_sword', label: '철제 검', count: 1, isGear: true },
-  { id: 'wood', label: '통나무', count: 50 },
-  { id: 'stone', label: '돌', count: 50 },
+  { id: 'log', label: '통나무', count: 50 },
+  { id: 'flint', label: '돌', count: 50 },
   { id: 'flint', label: '부싯돌', count: 30 },
-  { id: 'iron_ingot', label: '철 주괴', count: 30 },
+  { id: 'steel_ingot', label: '강철 주괴', count: 30 },
   { id: 'cooked_meat', label: '구운 고기', count: 30 },
   { id: 'arrow', label: '화살', count: 50 },
 ];

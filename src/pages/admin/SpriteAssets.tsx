@@ -356,7 +356,7 @@ export function ActionCard({
   const qc = useQueryClient();
   const fileInputId = useId();
   const { data } = useSpriteAnimations(CHARACTER);
-  const current = data?.[action] ?? (action === 'pick_nose' ? data?.nose_pick : action === 'nose_pick' ? data?.pick_nose : undefined);
+  const current = (action !== 'scale' ? data?.[action] : undefined) ?? (action === 'pick_nose' ? data?.nose_pick : action === 'nose_pick' ? data?.pick_nose : undefined);
 
   const [rawFile, setRawFile] = useState<File | null>(null);
   const [normalizedResult, setNormalizedResult] = useState<NormalizerResult | null>(null);

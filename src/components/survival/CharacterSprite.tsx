@@ -32,8 +32,8 @@ export default function CharacterSprite({
 
   // Exact action priority: tier action -> base hunter action -> alias fallback -> intelligent action fallbacks -> idle -> walk
   const anim =
-    tierRemote?.[action] ??
-    baseRemote?.[action] ??
+    (action !== 'scale' ? tierRemote?.[action] : undefined) ??
+    (action !== 'scale' ? baseRemote?.[action] : undefined) ??
     (action === 'nose_pick' ? (tierRemote?.pick_nose ?? baseRemote?.pick_nose) : undefined) ??
     (action === 'pick_nose' ? (tierRemote?.nose_pick ?? baseRemote?.nose_pick) : undefined) ??
     (action === 'chop' ? (tierRemote?.attack ?? baseRemote?.attack ?? tierRemote?.gather ?? baseRemote?.gather) : undefined) ??

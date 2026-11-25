@@ -52,9 +52,10 @@ export interface SpriteAnimation {
   frame_count: number;
   fps: number;
   url: string;
+  updated_at?: string;
 }
 
-export type SpriteAnimationsData = Partial<Record<SpriteAction, SpriteAnimation>> & {
+export type SpriteAnimationsData = Partial<Record<Exclude<SpriteAction, 'scale'>, SpriteAnimation>> & {
   _scale?: number;
   scale?: number;
 };
@@ -188,7 +189,7 @@ async function fetchSpriteAnimationsForKey(characterKey: string): Promise<Sprite
           action: row.action as SpriteAction,
           url,
         };
-        out[row.action as SpriteAction] = item;
+        out[row.action as Exclude<SpriteAction, 'scale'>] = item;
         // Map alias between pick_nose and nose_pick
         if (row.action === 'pick_nose') {
           out['nose_pick'] = { ...item, action: 'nose_pick' as SpriteAction };
@@ -202,9 +203,11 @@ async function fetchSpriteAnimationsForKey(characterKey: string): Promise<Sprite
     try {
       const localSprites = await loadAllSpritesForCharacterFromLocalDb(characterKey);
       for (const loc of localSprites) {
-        const actionKey = loc.action as SpriteAction;
+        if (loc.action === 'scale') continue;
+        const actionKey = loc.action as Exclude<SpriteAction, 'scale'>;
         // If not in cloud data, or local is newer than cloud data
-        if (!out[actionKey] || loc.updatedAt > (out[actionKey]?.updated_at ? new Date(out[actionKey]!.updated_at).getTime() : 0)) {
+        const cloudUpdatedAt = out[actionKey]?.updated_at;
+        if (!out[actionKey] || loc.updatedAt > (cloudUpdatedAt ? new Date(cloudUpdatedAt).getTime() : 0)) {
           const localUrl = URL.createObjectURL(loc.blob);
           const localItem: SpriteAnimation = {
             id: `local-${characterKey}-${loc.action}`,
@@ -266,6 +269,7 @@ export function updateLocalAnimationCache(
   action: SpriteAction,
   anim: SpriteAnimation
 ) {
+  if (action === 'scale') return;
   const current = MEMORY_CACHE.get(characterKey) ?? {};
   current[action] = anim;
   if (action === 'pick_nose') current['nose_pick'] = { ...anim, action: 'nose_pick' as SpriteAction };

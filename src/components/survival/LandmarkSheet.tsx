@@ -26,13 +26,13 @@ export default function LandmarkSheet({ landmark, inRange, claims, backpack, wor
   const shells = countOf(backpack, 'shell');
   return (
     <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 26, stiffness: 260 }}
-      className="absolute inset-x-0 bottom-0 z-30 flex max-h-[75dvh] flex-col border-t-4 border-foreground bg-background">
+      className="fixed inset-x-0 bottom-0 z-[1100] flex max-h-[75dvh] flex-col border-t-4 border-foreground bg-background">
       <div className="flex items-center justify-between border-b-2 border-foreground px-3 py-2">
         <div className="min-w-0 flex-1"><b className="text-lg">{info.name}</b>{landmark.origin && <p className="text-[11px] text-muted-foreground">옛 흔적: {landmark.origin}</p>}</div>
         {onToggleFav && <button type="button" aria-label={isFav ? '즐겨찾기 해제' : '즐겨찾기 등록'} aria-pressed={isFav} onClick={onToggleFav} className="flex h-11 w-11 items-center justify-center"><Star className={`!h-6 !w-6 ${isFav ? 'fill-primary text-primary' : ''}`} /></button>}
         <button type="button" aria-label="닫기" onClick={onClose} className="flex h-11 w-11 items-center justify-center"><X className="!h-7 !w-7" /></button>
       </div>
-      <div className="flex-1 space-y-3 overflow-y-auto p-3 pb-[max(1rem,env(safe-area-inset-bottom))] text-sm">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 pb-[max(1rem,env(safe-area-inset-bottom))] text-sm">
         <p>{info.desc}</p>
         {!inRange && <p className="pixel-frame bg-accent p-2 text-xs">25m 안으로 다가가야 이용할 수 있어요.</p>}
         {landmark.kind !== 'trader' && (

@@ -29,7 +29,7 @@ export default function ShrineSheet({ shrine, state, pos, inRange, backpack, wor
   const line = words ?? (awakened ? MELCHIZEDEK_WORDS[shrine.id.length % MELCHIZEDEK_WORDS.length] : '…낯선 이여, 이 돌들은 아직 잠들어 있다. 손을 얹어 깨워 보겠는가?');
   return (
     <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 26, stiffness: 260 }}
-      className="absolute inset-x-0 bottom-0 z-30 flex max-h-[80dvh] flex-col border-t-4 border-primary bg-background">
+      className="fixed inset-x-0 bottom-0 z-[1100] flex max-h-[80dvh] flex-col border-t-4 border-primary bg-background">
       <div className="flex items-center justify-between border-b-2 border-foreground px-3 py-2">
         <div className="min-w-0 flex-1"><b className="text-lg">{shrine.name}</b>
           <p className="text-[11px] text-muted-foreground">성소 네트워크 {state.found.length}/{SHRINES.length} · 신성력 {state.sacred}</p></div>
@@ -45,7 +45,7 @@ export default function ShrineSheet({ shrine, state, pos, inRange, backpack, wor
           <button type="button" aria-label="닫기" onClick={onClose} className="flex h-11 w-11 items-center justify-center"><X className="!h-7 !w-7" /></button>
         </div>
       </div>
-      <div className="flex-1 space-y-3 overflow-y-auto p-3 pb-[max(1rem,env(safe-area-inset-bottom))] text-sm">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 pb-[max(1rem,env(safe-area-inset-bottom))] text-sm">
         <div className="flex items-end gap-2">
           <img src={melchizedek} alt="멜키체덱" width={48} height={100} className="h-24 w-auto shrink-0 [image-rendering:pixelated]" />
           <div className="pixel-frame flex-1 whitespace-pre-line bg-accent p-2 text-xs"><b className="block text-primary">멜키체덱 · 살렘의 사제</b>{line}</div>

@@ -145,7 +145,7 @@ export const SIGNATURE_WEAPONS: {
       { itemId: 'branch', count: 3 },
       { itemId: 'sinew', count: 2 },
       { itemId: 'horn' as ItemId, count: 1 },
-    ].filter(s => !!ITEMS[s.itemId]),
+    ] satisfies Stack[],
   },
   {
     itemId: 'bronze_spear',
@@ -160,7 +160,7 @@ export const SIGNATURE_WEAPONS: {
     itemId: 'iron_spear',
     label: '철제 창',
     cost: [
-      { itemId: 'iron_ingot', count: 2 },
+      { itemId: 'steel_ingot', count: 2 },
       { itemId: 'branch', count: 2 },
       { itemId: 'leather', count: 1 },
     ],
@@ -204,7 +204,7 @@ export const SIGNATURE_WEAPONS: {
     itemId: 'iron_shield',
     label: '철제 방패',
     cost: [
-      { itemId: 'iron_ingot', count: 3 },
+      { itemId: 'steel_ingot', count: 3 },
       { itemId: 'leather', count: 2 },
     ],
   },

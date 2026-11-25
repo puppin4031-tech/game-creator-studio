@@ -107,7 +107,7 @@ export default function PeerActionMenu({
       initial={{ y: '100%' }}
       animate={{ y: 0 }}
       exit={{ y: '100%' }}
-      className="absolute inset-x-0 bottom-0 z-30 border-t-4 border-foreground bg-background p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] font-pixel"
+      className="fixed inset-x-0 bottom-0 z-[1100] max-h-[80dvh] overflow-y-auto border-t-4 border-foreground bg-background p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] font-pixel"
     >
       <div className="mb-2 flex items-center">
         <b className="text-base">{peer.name}</b>
