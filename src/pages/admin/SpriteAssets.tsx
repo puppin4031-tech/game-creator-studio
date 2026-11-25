@@ -102,6 +102,14 @@ const NODE_TARGETS = [
   { key: 'node-branch', label: '🪵 채집 노드 · 나뭇가지 더미' },
 ];
 
+const PROP_TARGETS = [
+  { key: 'prop-jungle-tree', label: '🌴 배경 장식 · 정글 거목' },
+  { key: 'prop-palm-tree', label: '🌴 배경 장식 · 야자수' },
+  { key: 'prop-bush', label: '🌿 배경 장식 · 덤불/수풀' },
+  { key: 'prop-grass-tuft', label: '🌱 배경 장식 · 잔디/풀 포기' },
+  { key: 'prop-mossy-rock', label: '🪨 배경 장식 · 이끼 바위' },
+];
+
 const GEAR_TARGETS = [
   { key: 'item-hand-axe', label: '🪓 도구 · 주먹도끼' },
   { key: 'item-stone-pickaxe', label: '⛏️ 도구 · 돌곡괭이' },
@@ -893,6 +901,7 @@ export default function SpriteAssets() {
       })),
     ...BUILDING_TARGETS,
     ...NODE_TARGETS,
+    ...PROP_TARGETS,
     ...GEAR_TARGETS,
     ...ITEM_TARGETS,
   ];
@@ -902,9 +911,10 @@ export default function SpriteAssets() {
   const isMob = target.startsWith('mob:');
   const isBuilding = BUILDING_TARGETS.some(b => b.key === target);
   const isNode = NODE_TARGETS.some(n => n.key === target);
+  const isProp = PROP_TARGETS.some(g => g.key === target);
   const isGear = GEAR_TARGETS.some(g => g.key === target);
   const isItem = ITEM_TARGETS.some(i => i.key === target);
-  const isObject = isBuilding || isNode || isGear || isItem;
+  const isObject = isBuilding || isNode || isProp || isGear || isItem;
 
   const actions: SpriteAction[] =
     target === 'hunter' || target.startsWith('hunter:')
@@ -981,6 +991,15 @@ export default function SpriteAssets() {
           className="text-xs font-bold"
         >
           🌲 자연물·노드
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={isProp ? 'default' : 'outline'}
+          onClick={() => setTarget('prop-jungle-tree')}
+          className="text-xs font-bold"
+        >
+          🌿 배경 장식물
         </Button>
         <Button
           type="button"

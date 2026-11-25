@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react';
 import type { LatLng } from '@/lib/survival/types';
 import { getNearbyDecorativeProps, type MapDecorativeProp } from '@/utils/mapPropGenerator';
+import { useSpriteAnimations } from '@/hooks/useSpriteAnimations';
+import SpriteAnimator from '@/components/survival/SpriteAnimator';
 import { computeEntityZIndex, isOccludedByCanopy } from '@/utils/depthSorting';
 
 interface MapFoliageOverlayProps {
@@ -210,7 +212,30 @@ function MossyRockSvg() {
   );
 }
 
+// Admin sprite keys for decorative props (uploaded in /admin/sprites); SVG stays as fallback.
+export const PROP_SPRITE_KEYS: Record<MapDecorativeProp['type'], string> = {
+  jungle_tree: 'prop-jungle-tree',
+  palm_tree: 'prop-palm-tree',
+  bush: 'prop-bush',
+  grass_tuft: 'prop-grass-tuft',
+  mossy_rock: 'prop-mossy-rock',
+};
+const PROP_BASE_HEIGHT: Record<MapDecorativeProp['type'], number> = {
+  jungle_tree: 54, palm_tree: 48, bush: 24, grass_tuft: 16, mossy_rock: 22,
+};
+
 function RenderPropSprite({ type }: { type: MapDecorativeProp['type'] }) {
+  const { data } = useSpriteAnimations(PROP_SPRITE_KEYS[type]);
+  const anim = data?.idle;
+  if (anim?.url) {
+    const h = Math.round(PROP_BASE_HEIGHT[type] * (data?.scale ?? 1));
+    const frames = Math.max(1, anim.frame_count || 1);
+    return <SpriteAnimator url={anim.url} frames={frames} fps={anim.fps} height={h} fallback={<DefaultPropSvg type={type} />} />;
+  }
+  return <DefaultPropSvg type={type} />;
+}
+
+function DefaultPropSvg({ type }: { type: MapDecorativeProp['type'] }) {
   switch (type) {
     case 'jungle_tree':
       return <JungleTreeSvg />;
