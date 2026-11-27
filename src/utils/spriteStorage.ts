@@ -22,6 +22,8 @@ export interface StoredSpriteRecord {
   updatedAt: number;
 }
 
+const BLOB_OBJECT_URL_CACHE = new Map<string, string>();
+
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined' || !window.indexedDB) {
@@ -53,6 +55,14 @@ export async function saveSpriteToLocalDb(
   try {
     const db = await openDb();
     const key = `${characterKey}:${action}`;
+    // Invalidate previous object URL if cached
+    const oldUrl = BLOB_OBJECT_URL_CACHE.get(key);
+    if (oldUrl) {
+      try {
+        URL.revokeObjectURL(oldUrl);
+      } catch {}
+      BLOB_OBJECT_URL_CACHE.delete(key);
+    }
     const record: StoredSpriteRecord = {
       key,
       characterKey,
@@ -96,6 +106,24 @@ export async function loadSpriteFromLocalDb(
 }
 
 /**
+ * Resolve a stored IndexedDB sprite into an Object URL (cached per composite key).
+ */
+export async function getSpriteBlobUrlFromLocalDb(
+  characterKey: string,
+  action: string
+): Promise<string | null> {
+  const key = `${characterKey}:${action}`;
+  const cached = BLOB_OBJECT_URL_CACHE.get(key);
+  if (cached) return cached;
+
+  const rec = await loadSpriteFromLocalDb(characterKey, action);
+  if (!rec || !rec.blob) return null;
+  const objUrl = URL.createObjectURL(rec.blob);
+  BLOB_OBJECT_URL_CACHE.set(key, objUrl);
+  return objUrl;
+}
+
+/**
  * Load all sprite records for a given character key from IndexedDB
  */
 export async function loadAllSpritesForCharacterFromLocalDb(
@@ -117,6 +145,24 @@ export async function loadAllSpritesForCharacterFromLocalDb(
 }
 
 /**
+ * Load all sprite records across ALL character keys from IndexedDB (for fast boot hydration)
+ */
+export async function loadAllSpritesFromLocalDb(): Promise<StoredSpriteRecord[]> {
+  try {
+    const db = await openDb();
+    return await new Promise<StoredSpriteRecord[]>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      tx.onerror = () => reject(tx.error);
+      const req = tx.objectStore(STORE_NAME).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+    });
+  } catch (err) {
+    console.warn('[spriteStorage] Failed to read all sprites from IndexedDB:', err);
+    return [];
+  }
+}
+
+/**
  * Remove a sprite record from IndexedDB
  */
 export async function deleteSpriteFromLocalDb(
@@ -126,6 +172,13 @@ export async function deleteSpriteFromLocalDb(
   try {
     const db = await openDb();
     const key = `${characterKey}:${action}`;
+    const oldUrl = BLOB_OBJECT_URL_CACHE.get(key);
+    if (oldUrl) {
+      try {
+        URL.revokeObjectURL(oldUrl);
+      } catch {}
+      BLOB_OBJECT_URL_CACHE.delete(key);
+    }
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       tx.oncomplete = () => resolve();

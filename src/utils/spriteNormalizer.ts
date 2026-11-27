@@ -130,11 +130,69 @@ export async function normalizeSpriteSheet(
         const g = data[i + 1];
         const b = data[i + 2];
         const dist = Math.hypot(r - targetBg[0], g - targetBg[1], b - targetBg[2]);
-        if (dist <= maxDist) {
+        // Also check common AI magenta (#FF00FF) so slight edge compression artifacts are caught
+        const magentaDist = opts.bgMode !== 'white' ? Math.hypot(r - 255, g - 0, b - 255) : dist;
+        if (Math.min(dist, magentaDist) <= maxDist) {
           data[i + 3] = 0; // Make transparent
         }
       }
     }
+
+    // 2b. 1px Magenta / Purple Edge Spill & Fringe Cleanup Pass:
+    // Soften or remove remaining magenta/purple halo pixels (`R > 150 && B > 150 && G < 100`)
+    // bordering transparent pixels so pixel trees and mobs do not have pink outlines.
+    const alphaSnap = new Uint8ClampedArray(srcW * srcH);
+    for (let idx = 0; idx < srcW * srcH; idx++) {
+      alphaSnap[idx] = data[idx * 4 + 3];
+    }
+
+    for (let y = 0; y < srcH; y++) {
+      for (let x = 0; x < srcW; x++) {
+        const idx = y * srcW + x;
+        if (alphaSnap[idx] === 0) continue;
+
+        const p = idx * 4;
+        const r = data[p];
+        const g = data[p + 1];
+        const b = data[p + 2];
+
+        const isMagentaSpill =
+          r > 150 &&
+          b > 150 &&
+          g < 100 &&
+          r - g > 55 &&
+          b - g > 55;
+
+        if (!isMagentaSpill) continue;
+
+        let nearTransparent = false;
+        for (let dy = -1; dy <= 1 && !nearTransparent; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx < 0 || nx >= srcW || ny < 0 || ny >= srcH || alphaSnap[ny * srcW + nx] < 32) {
+              nearTransparent = true;
+              break;
+            }
+          }
+        }
+
+        if (nearTransparent) {
+          const spillStrength = Math.min(r - g, b - g);
+          if (spillStrength > 105) {
+            data[p + 3] = 0;
+          } else {
+            // Neutralize purple cast toward green/luma and soften edge alpha
+            const neutral = Math.max(g, Math.round(g * 1.15));
+            data[p] = neutral;
+            data[p + 2] = neutral;
+            data[p + 3] = Math.round(alphaSnap[idx] * 0.45);
+          }
+        }
+      }
+    }
+
     srcCtx.putImageData(imgData, 0, 0);
   }
 

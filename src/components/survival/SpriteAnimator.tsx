@@ -1,143 +1,243 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { getSpriteBlobUrlFromLocalDb } from '@/utils/spriteStorage';
 
 interface Props {
   url: string;
-  frames: number;
-  fps: number;
+  frames?: number;
+  fps?: number;
   height?: number;
-  playing?: boolean;
-  /** Play one full cycle then hold the last frame (for one-shot actions like gather/attack). */
-  once?: boolean;
-  /** Render high-resolution illustrated/WebP sprites smoothly instead of nearest-neighbor point sampling. */
+  className?: string;
+  loop?: boolean;
+  /** Keep smooth interpolation for high-res illustrations (e.g. foliage props) instead of pixelated nearest-neighbor */
   smooth?: boolean;
-  /** Static image shown until the first sheet is decoded, or if it fails to load. */
+  /** Disable auto-detecting 4-frame strips from aspect ratio (only for intentionally ultra-wide single-frame banners) */
+  disableStripAutoDetect?: boolean;
   fallback?: ReactNode;
 }
 
-// Cache of decoded sheet aspect ratios so switching actions never shows an empty frame.
-const loaded = new Map<string, number>();
-const inflight = new Map<string, Promise<void>>();
+// Global in-memory decoded image cache so action transitions never flicker or re-fetch
+const IMAGE_DIMENSION_CACHE = new Map<string, { w: number; h: number }>();
+const RESOLVED_URL_CACHE = new Map<string, string>();
+const FAILED_URL_SET = new Set<string>();
 
-export function preloadSpriteSheet(url: string, frames: number): Promise<void> {
-  if (!url || loaded.has(url)) return Promise.resolve();
-  const existing = inflight.get(url);
-  if (existing) return existing;
+/**
+ * Resolves `local://characterKey:action` URLs from IndexedDB into Blob Object URLs.
+ */
+export async function resolveSpriteUrl(url: string): Promise<string> {
+  if (!url) return url;
+  if (RESOLVED_URL_CACHE.has(url)) return RESOLVED_URL_CACHE.get(url)!;
 
-  const p = new Promise<void>(resolve => {
-    const img = new Image();
-    let settled = false;
-    const finish = () => {
-      if (!settled) {
-        settled = true;
-        inflight.delete(url);
-        resolve();
+  if (url.startsWith('local://')) {
+    const raw = url.replace('local://', '');
+    const lastColon = raw.lastIndexOf(':');
+    if (lastColon > 0) {
+      const charKey = raw.slice(0, lastColon);
+      const act = raw.slice(lastColon + 1);
+      const blobUrl = await getSpriteBlobUrlFromLocalDb(charKey, act);
+      if (blobUrl) {
+        RESOLVED_URL_CACHE.set(url, blobUrl);
+        return blobUrl;
       }
-    };
-    const timer = setTimeout(finish, 15000);
-    img.onload = () => {
-      clearTimeout(timer);
-      const ratio = img.naturalWidth / Math.max(1, frames) / Math.max(1, img.naturalHeight) || 1;
-      loaded.set(url, ratio);
-      if (img.decode) {
-        img.decode().then(finish).catch(finish);
-      } else {
-        finish();
-      }
-    };
-    img.onerror = () => {
-      clearTimeout(timer);
-      finish();
-    };
-    img.src = url;
+    }
+    throw new Error(`Unresolved local sprite URL: ${url}`);
+  }
+  return url;
+}
+
+export function preloadSpriteSheet(url: string): Promise<{ w: number; h: number; resolvedUrl: string }> {
+  return resolveSpriteUrl(url).then(resolvedUrl => {
+    const cached = IMAGE_DIMENSION_CACHE.get(resolvedUrl);
+    if (cached) return { ...cached, resolvedUrl };
+
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const dims = {
+          w: img.naturalWidth || 40,
+          h: img.naturalHeight || 48,
+        };
+        IMAGE_DIMENSION_CACHE.set(resolvedUrl, dims);
+        IMAGE_DIMENSION_CACHE.set(url, dims);
+        resolve({ ...dims, resolvedUrl });
+      };
+      img.onerror = (err) => {
+        FAILED_URL_SET.add(url);
+        reject(err);
+      };
+      img.src = resolvedUrl;
+    });
   });
-
-  inflight.set(url, p);
-  return p;
 }
 
-interface Shown {
-  url: string;
-  frames: number;
-  ratio: number;
+/**
+ * Given an image's natural width/height and a declared frame count,
+ * determines the true frame count so a 4-frame horizontal sprite sheet
+ * is NEVER accidentally rendered as 4 identical clones side-by-side when `frames` was saved as 1.
+ */
+export function resolveEffectiveFrameCount(
+  declaredFrames: number,
+  naturalW: number,
+  naturalH: number,
+  disableAutoDetect = false
+): number {
+  const safeDeclared = Math.max(1, Math.round(declaredFrames || 1));
+  if (safeDeclared > 1 || disableAutoDetect || naturalH <= 0) {
+    return safeDeclared;
+  }
+  const aspect = naturalW / naturalH;
+  // Standard 4-frame horizontal strips have aspect ratio ~3.0 to 4.8 (e.g., 4x square or 4x 5:6 cells)
+  if (aspect >= 2.85 && aspect <= 5.2) {
+    return 4;
+  }
+  if (aspect >= 5.3) {
+    return Math.max(4, Math.round(aspect));
+  }
+  return 1;
 }
 
-/** Plays a horizontal sprite-sheet strip. Keeps the previous sheet visible until the next one is decoded. */
+/**
+ * Renders a horizontal sprite sheet (N equal-width frames in a single row)
+ * at a given display height, advancing frames at `fps`.
+ *
+ * CRITICAL GUARANTEE:
+ * - Never renders a multi-frame horizontal strip unclipped.
+ * - Strictly clips the viewport (`overflow: hidden`) to 1 single frame width (`singleFrameWidth`),
+ *   using CSS `background-size: ${singleFrameWidth * effectiveFrames}px ${height}px`
+ *   and `background-position: ${-currentFrame * singleFrameWidth}px 0px`.
+ * - Double-buffered: keeps displaying the previous valid sheet until the new sheet finishes decoding.
+ */
 export default function SpriteAnimator({
   url,
-  frames,
-  fps,
-  height = 64,
-  playing = true,
-  once = false,
+  frames = 4,
+  fps = 8,
+  height = 48,
+  className = '',
+  loop = true,
   smooth = false,
-  fallback,
+  disableStripAutoDetect = false,
+  fallback = null,
 }: Props) {
   const [frame, setFrame] = useState(0);
-  const [hasError, setHasError] = useState(false);
-  const [shown, setShown] = useState<Shown | null>(() => {
-    const ratio = loaded.get(url);
-    return ratio ? { url, frames, ratio } : null;
+  const [failed, setFailed] = useState(() => FAILED_URL_SET.has(url));
+
+  const [activeSheet, setActiveSheet] = useState<{
+    url: string;
+    frames: number;
+    fps: number;
+    dims: { w: number; h: number };
+  } | null>(() => {
+    const resolved = RESOLVED_URL_CACHE.get(url) ?? (url && !url.startsWith('local://') ? url : null);
+    if (!resolved) return null;
+    const d = IMAGE_DIMENSION_CACHE.get(resolved) ?? IMAGE_DIMENSION_CACHE.get(url);
+    return d ? { url: resolved, frames: Math.max(1, frames), fps, dims: d } : null;
   });
 
   useEffect(() => {
-    let alive = true;
-    setHasError(false);
-    const swap = () => {
-      const r = loaded.get(url);
-      if (alive && r) {
-        setShown({ url, frames, ratio: r });
-        setFrame(0);
-      } else if (alive && !r) {
-        setHasError(true);
-      }
-    };
-    if (loaded.has(url)) {
-      swap();
-    } else {
-      preloadSpriteSheet(url, frames)
-        .then(swap)
-        .catch(() => {
-          if (alive) setHasError(true);
-        });
+    if (!url) return;
+    let cancelled = false;
+    setFailed(false);
+
+    const syncResolved = RESOLVED_URL_CACHE.get(url) ?? (!url.startsWith('local://') ? url : null);
+    const cached = syncResolved
+      ? IMAGE_DIMENSION_CACHE.get(syncResolved) ?? IMAGE_DIMENSION_CACHE.get(url)
+      : null;
+
+    if (cached && syncResolved) {
+      setActiveSheet(prev => {
+        if (prev?.url !== syncResolved) setFrame(0);
+        return { url: syncResolved, frames: Math.max(1, frames), fps, dims: cached };
+      });
+      return;
     }
+
+    preloadSpriteSheet(url)
+      .then(({ w, h, resolvedUrl }) => {
+        if (cancelled) return;
+        setActiveSheet(prev => {
+          if (prev?.url !== resolvedUrl) setFrame(0);
+          return { url: resolvedUrl, frames: Math.max(1, frames), fps, dims: { w, h } };
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+
     return () => {
-      alive = false;
+      cancelled = true;
     };
-  }, [url, frames]);
+  }, [url, frames, fps]);
+
+  const shown = activeSheet;
+  const effectiveFrames = shown
+    ? resolveEffectiveFrameCount(shown.frames, shown.dims.w, shown.dims.h, disableStripAutoDetect)
+    : Math.max(1, frames);
+  const activeFps = shown?.fps ?? fps;
 
   useEffect(() => {
-    if (!shown) return;
-    setFrame(0);
-    const n = shown.frames;
-    if (!playing || n < 2) return;
-    const id = window.setInterval(() => {
+    if (effectiveFrames <= 1 || activeFps <= 0) {
+      setFrame(0);
+      return;
+    }
+    const iv = window.setInterval(() => {
       setFrame(f => {
-        const next = f + 1;
-        if (once && next >= n) {
-          window.clearInterval(id);
-          return n - 1;
-        }
-        return next % n;
+        if (f + 1 >= effectiveFrames) return loop ? 0 : effectiveFrames - 1;
+        return f + 1;
       });
-    }, 1000 / fps);
-    return () => window.clearInterval(id);
-  }, [shown, fps, playing, once]);
+    }, Math.max(30, Math.round(1000 / activeFps)));
+    return () => window.clearInterval(iv);
+  }, [effectiveFrames, activeFps, loop, shown?.url]);
 
-  if (hasError) return <>{fallback ?? null}</>;
-  if (!shown) return <div aria-hidden style={{ width: Math.round(height * 0.85), height }} />;
+  if (failed && !shown) return <>{fallback}</>;
 
-  const width = Math.max(1, Math.round(height * shown.ratio));
-  const f = Math.min(frame, shown.frames - 1);
+  // Even before preloadSpriteSheet finishes decoding natural dimensions, if we have a synchronous URL
+  // we can render a 1:1 square clipped single-frame box immediately so there is never an empty flash or 4-wide strip!
+  if (!shown) {
+    if (url && !url.startsWith('local://')) {
+      const initFrames = Math.max(1, frames || 1);
+      const initW = Math.round(height);
+      const f = frame % initFrames;
+      return (
+        <div
+          aria-hidden
+          data-sprite-animator="clipped-pending"
+          data-frame-count={initFrames}
+          className={`${smooth ? '' : 'pixelated'} inline-block shrink-0 select-none overflow-hidden ${className}`}
+          style={{
+            width: initW,
+            height,
+            backgroundImage: `url("${url}")`,
+            backgroundSize: `${initW * initFrames}px ${height}px`,
+            backgroundPosition: `${-f * initW}px 0px`,
+            backgroundRepeat: 'no-repeat',
+            imageRendering: smooth ? 'auto' : 'pixelated',
+          }}
+        />
+      );
+    }
+    return fallback ? <>{fallback}</> : <div style={{ width: Math.round(height * 0.85), height }} className={`inline-block select-none ${className}`} />;
+  }
+
+  const singleFrameNaturalW = shown.dims.w / effectiveFrames;
+  const singleFrameRatio = Math.max(0.35, Math.min(2.2, singleFrameNaturalW / Math.max(1, shown.dims.h)));
+  const singleFrameWidth = Math.max(8, Math.round(height * singleFrameRatio));
+  const f = frame % effectiveFrames;
+
   return (
     <div
       aria-hidden
-      className={smooth ? 'select-none' : 'pixelated select-none'}
+      data-sprite-animator="clipped"
+      data-frame-count={effectiveFrames}
+      data-current-frame={f}
+      className={`${smooth ? '' : 'pixelated'} inline-block shrink-0 select-none overflow-hidden ${
+        effectiveFrames === 1 ? 'animate-pulse-subtle' : ''
+      } ${className}`}
       style={{
-        width,
+        width: singleFrameWidth,
         height,
-        backgroundImage: `url(${shown.url})`,
-        backgroundSize: `${width * shown.frames}px ${height}px`,
-        backgroundPosition: `${-f * width}px 0`,
+        maxWidth: singleFrameWidth,
+        backgroundImage: `url("${shown.url}")`,
+        backgroundSize: `${singleFrameWidth * effectiveFrames}px ${height}px`,
+        backgroundPosition: `${-f * singleFrameWidth}px 0px`,
         backgroundRepeat: 'no-repeat',
         imageRendering: smooth ? 'auto' : 'pixelated',
       }}
