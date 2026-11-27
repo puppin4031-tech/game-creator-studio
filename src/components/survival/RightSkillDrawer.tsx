@@ -43,10 +43,23 @@ export default function RightSkillDrawer({
 
   const [now, setNow] = useState(Date.now());
 
+  // 3 explicit slots: fallback to first 3 equippedSkillIds if not yet initialized
+  const slots: [string | null, string | null, string | null] = modularSkills?.equippedSkillSlots ?? [
+    modularSkills?.equippedSkillIds?.[0] ?? null,
+    modularSkills?.equippedSkillIds?.[1] ?? null,
+    modularSkills?.equippedSkillIds?.[2] ?? null,
+  ];
+
+  const hasActiveCooldown = isOpen && slots.some(id => id && (cooldowns[id] ?? 0) > Date.now());
+
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 200);
+    if (!hasActiveCooldown) return;
+    setNow(Date.now());
+    const t = setInterval(() => {
+      if (!document.hidden) setNow(Date.now());
+    }, 250);
     return () => clearInterval(t);
-  }, []);
+  }, [hasActiveCooldown, cooldowns]);
 
   const toggleOpen = () => {
     setIsOpen(prev => {
@@ -57,13 +70,6 @@ export default function RightSkillDrawer({
       return next;
     });
   };
-
-  // 3 explicit slots: fallback to first 3 equippedSkillIds if not yet initialized
-  const slots: [string | null, string | null, string | null] = modularSkills?.equippedSkillSlots ?? [
-    modularSkills?.equippedSkillIds?.[0] ?? null,
-    modularSkills?.equippedSkillIds?.[1] ?? null,
-    modularSkills?.equippedSkillIds?.[2] ?? null,
-  ];
 
   return (
     <aside

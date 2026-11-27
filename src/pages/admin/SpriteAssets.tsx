@@ -382,9 +382,18 @@ export function ActionCard({
     }
   }
 
+  const isPropSprite = CHARACTER.startsWith('prop-');
+  const isNodeSprite = CHARACTER.startsWith('node-');
   const isObject = !CHARACTER.startsWith('hunter') && !CHARACTER.startsWith('tribe') && !CHARACTER.startsWith('pet:') && !isMob;
   const objectMeta = isObject ? (SPRITE_META as Record<string, { w: number; h: number }>)[CHARACTER] : undefined;
-  const targetCellSize = isMob ? (builtinMob?.cellWidth || 64) : (objectMeta ? Math.max(objectMeta.w, objectMeta.h) : 48);
+  // Preserve crisp high-DPI resolution (256px) for map decorative props & nodes instead of crushing them to 48x48!
+  const targetCellSize = isMob
+    ? Math.max(128, builtinMob?.cellWidth || 128)
+    : isPropSprite
+      ? 256
+      : isNodeSprite
+        ? 192
+        : (objectMeta ? Math.max(96, objectMeta.w, objectMeta.h) : 128);
 
   const [autoChroma, setAutoChroma] = useState(true);
   const [bgMode, setBgMode] = useState<'auto' | 'hot_pink' | 'white'>('auto');

@@ -8,6 +8,8 @@ interface Props {
   playing?: boolean;
   /** Play one full cycle then hold the last frame (for one-shot actions like gather/attack). */
   once?: boolean;
+  /** Render high-resolution illustrated/WebP sprites smoothly instead of nearest-neighbor point sampling. */
+  smooth?: boolean;
   /** Static image shown until the first sheet is decoded, or if it fails to load. */
   fallback?: ReactNode;
 }
@@ -67,6 +69,7 @@ export default function SpriteAnimator({
   height = 64,
   playing = true,
   once = false,
+  smooth = false,
   fallback,
 }: Props) {
   const [frame, setFrame] = useState(0);
@@ -123,12 +126,12 @@ export default function SpriteAnimator({
   if (hasError) return <>{fallback ?? null}</>;
   if (!shown) return <div aria-hidden style={{ width: Math.round(height * 0.85), height }} />;
 
-  const width = height * shown.ratio;
+  const width = Math.max(1, Math.round(height * shown.ratio));
   const f = Math.min(frame, shown.frames - 1);
   return (
     <div
       aria-hidden
-      className="pixelated select-none"
+      className={smooth ? 'select-none' : 'pixelated select-none'}
       style={{
         width,
         height,
@@ -136,7 +139,7 @@ export default function SpriteAnimator({
         backgroundSize: `${width * shown.frames}px ${height}px`,
         backgroundPosition: `${-f * width}px 0`,
         backgroundRepeat: 'no-repeat',
-        imageRendering: 'pixelated',
+        imageRendering: smooth ? 'auto' : 'pixelated',
       }}
     />
   );

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import type { LatLng } from '@/lib/survival/types';
 import { getNearbyDecorativeProps, type MapDecorativeProp } from '@/utils/mapPropGenerator';
-import { useSpriteAnimations } from '@/hooks/useSpriteAnimations';
+import { useSpriteAnimations, type SpriteAnimationsData } from '@/hooks/useSpriteAnimations';
 import SpriteAnimator from '@/components/survival/SpriteAnimator';
 import jungleTreeArt from '@/assets/props/prop_jungle_tree.webp.asset.json';
 import palmTreeArt from '@/assets/props/prop_palm_tree.webp.asset.json';
@@ -18,206 +18,7 @@ interface MapFoliageOverlayProps {
   metersPerPx: number;
 }
 
-// ── Crisp 16-Bit Pixel-Art SVGs ──
-function JungleTreeSvg() {
-  return (
-    <svg
-      width="42"
-      height="54"
-      viewBox="0 0 42 54"
-      className="pixelated drop-shadow-[0_4px_3px_rgba(0,0,0,0.35)]"
-      shapeRendering="crispEdges"
-      aria-hidden="true"
-    >
-      {/* Ground Shadow */}
-      <ellipse cx="21" cy="51" rx="14" ry="3" fill="#1c1917" opacity="0.45" />
-
-      {/* Trunk */}
-      <rect x="18" y="28" width="6" height="23" fill="#3b2314" />
-      <rect x="19" y="30" width="4" height="20" fill="#5c381e" />
-      <rect x="20" y="32" width="2" height="16" fill="#7a4d28" />
-      {/* Root flares */}
-      <rect x="16" y="47" width="2" height="4" fill="#3b2314" />
-      <rect x="24" y="48" width="2" height="3" fill="#3b2314" />
-
-      {/* Foliage Canopy - Deep Shadow Base */}
-      <rect x="9" y="10" width="24" height="20" fill="#142e12" rx="2" />
-      <rect x="6" y="14" width="30" height="13" fill="#142e12" rx="2" />
-
-      {/* Main Dark Green Leaves */}
-      <rect x="10" y="8" width="22" height="19" fill="#1f4a1b" />
-      <rect x="7" y="12" width="28" height="13" fill="#1f4a1b" />
-      <rect x="13" y="4" width="16" height="18" fill="#1f4a1b" />
-
-      {/* Mid Green Leaf Tufts */}
-      <rect x="12" y="6" width="18" height="14" fill="#336e2b" />
-      <rect x="9" y="11" width="24" height="9" fill="#336e2b" />
-      <rect x="15" y="3" width="12" height="12" fill="#336e2b" />
-
-      {/* Bright Green Highlights */}
-      <rect x="14" y="4" width="10" height="5" fill="#4d943c" />
-      <rect x="11" y="9" width="8" height="5" fill="#4d943c" />
-      <rect x="23" y="10" width="7" height="4" fill="#4d943c" />
-      <rect x="16" y="15" width="8" height="3" fill="#4d943c" />
-
-      {/* Top Sunlight Specks */}
-      <rect x="16" y="3" width="5" height="3" fill="#78b858" />
-      <rect x="13" y="8" width="4" height="2" fill="#78b858" />
-    </svg>
-  );
-}
-
-function PalmTreeSvg() {
-  return (
-    <svg
-      width="38"
-      height="48"
-      viewBox="0 0 38 48"
-      className="pixelated drop-shadow-[0_4px_3px_rgba(0,0,0,0.35)]"
-      shapeRendering="crispEdges"
-      aria-hidden="true"
-    >
-      {/* Ground Shadow */}
-      <ellipse cx="19" cy="46" rx="10" ry="2.5" fill="#1c1917" opacity="0.45" />
-
-      {/* Curved Palm Trunk */}
-      <rect x="18" y="24" width="4" height="22" fill="#3a2415" />
-      <rect x="19" y="25" width="2" height="20" fill="#5a381e" />
-      {/* Bark notches */}
-      <rect x="17" y="28" width="2" height="2" fill="#3a2415" />
-      <rect x="21" y="34" width="2" height="2" fill="#3a2415" />
-      <rect x="17" y="40" width="2" height="2" fill="#3a2415" />
-
-      {/* Amber Dates / Nuts */}
-      <rect x="18" y="18" width="2" height="3" fill="#c2782b" />
-      <rect x="20" y="19" width="2" height="3" fill="#d98c36" />
-
-      {/* Palm Fronds - Spreading outwards */}
-      {/* Left Fronds */}
-      <rect x="4" y="11" width="15" height="4" fill="#1c4518" />
-      <rect x="2" y="14" width="10" height="3" fill="#2d6325" />
-      <rect x="7" y="8" width="12" height="4" fill="#3f8232" />
-      <rect x="8" y="9" width="8" height="2" fill="#69ab56" />
-
-      {/* Right Fronds */}
-      <rect x="19" y="11" width="15" height="4" fill="#1c4518" />
-      <rect x="26" y="14" width="10" height="3" fill="#2d6325" />
-      <rect x="19" y="8" width="12" height="4" fill="#3f8232" />
-      <rect x="22" y="9" width="8" height="2" fill="#69ab56" />
-
-      {/* Top Center Fronds */}
-      <rect x="16" y="4" width="6" height="12" fill="#3f8232" />
-      <rect x="17" y="3" width="4" height="6" fill="#69ab56" />
-      <rect x="18" y="2" width="2" height="3" fill="#92cb7c" />
-    </svg>
-  );
-}
-
-function BushSvg() {
-  return (
-    <svg
-      width="30"
-      height="24"
-      viewBox="0 0 30 24"
-      className="pixelated drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)]"
-      shapeRendering="crispEdges"
-      aria-hidden="true"
-    >
-      {/* Shadow */}
-      <ellipse cx="15" cy="22" rx="11" ry="2" fill="#1c1917" opacity="0.4" />
-
-      {/* Shrub Base & Shadow */}
-      <rect x="4" y="8" width="22" height="13" fill="#153612" rx="2" />
-      <rect x="6" y="6" width="18" height="14" fill="#24541f" />
-      <rect x="8" y="4" width="14" height="14" fill="#39752f" />
-
-      {/* Highlights */}
-      <rect x="9" y="6" width="7" height="4" fill="#589a4b" />
-      <rect x="18" y="8" width="5" height="4" fill="#589a4b" />
-      <rect x="11" y="4" width="4" height="2" fill="#80bf6f" />
-
-      {/* Wild Red & Yellow Berries */}
-      <rect x="8" y="11" width="2" height="2" fill="#dc2626" />
-      <rect x="21" y="10" width="2" height="2" fill="#ef4444" />
-      <rect x="14" y="14" width="2" height="2" fill="#f59e0b" />
-      <rect x="17" y="7" width="2" height="2" fill="#eab308" />
-    </svg>
-  );
-}
-
-function GrassTuftSvg() {
-  return (
-    <svg
-      width="24"
-      height="18"
-      viewBox="0 0 24 18"
-      className="pixelated drop-shadow-[0_2px_2px_rgba(0,0,0,0.25)]"
-      shapeRendering="crispEdges"
-      aria-hidden="true"
-    >
-      {/* Base shadow */}
-      <ellipse cx="12" cy="16.5" rx="8" ry="1.5" fill="#1c1917" opacity="0.35" />
-
-      {/* Blades */}
-      {/* Blade 1 (Left) */}
-      <rect x="4" y="9" width="3" height="7" fill="#234a1e" />
-      <rect x="5" y="6" width="2" height="5" fill="#3d7532" />
-      <rect x="6" y="4" width="2" height="4" fill="#65a454" />
-
-      {/* Blade 2 (Center Left) */}
-      <rect x="9" y="7" width="3" height="9" fill="#234a1e" />
-      <rect x="10" y="4" width="2" height="6" fill="#3d7532" />
-      <rect x="10" y="2" width="2" height="4" fill="#7cb869" />
-
-      {/* Blade 3 (Center Right) */}
-      <rect x="13" y="6" width="3" height="10" fill="#234a1e" />
-      <rect x="14" y="3" width="2" height="7" fill="#3d7532" />
-      <rect x="15" y="1" width="2" height="4" fill="#91cc7c" />
-
-      {/* Blade 4 (Right) */}
-      <rect x="17" y="8" width="3" height="8" fill="#234a1e" />
-      <rect x="18" y="5" width="2" height="5" fill="#3d7532" />
-      <rect x="19" y="3" width="2" height="3" fill="#65a454" />
-    </svg>
-  );
-}
-
-function MossyRockSvg() {
-  return (
-    <svg
-      width="28"
-      height="22"
-      viewBox="0 0 28 22"
-      className="pixelated drop-shadow-[0_2px_2px_rgba(0,0,0,0.35)]"
-      shapeRendering="crispEdges"
-      aria-hidden="true"
-    >
-      {/* Shadow */}
-      <ellipse cx="14" cy="20" rx="11" ry="2" fill="#1c1917" opacity="0.45" />
-
-      {/* Rock Body */}
-      <rect x="4" y="7" width="20" height="13" fill="#292524" rx="2" />
-      <rect x="5" y="8" width="18" height="10" fill="#44403c" />
-      <rect x="7" y="10" width="14" height="7" fill="#57534e" />
-      <rect x="12" y="12" width="8" height="4" fill="#78716c" />
-
-      {/* Crack Lines */}
-      <rect x="9" y="11" width="1" height="5" fill="#1c1917" />
-      <rect x="10" y="13" width="3" height="1" fill="#1c1917" />
-
-      {/* Dripping Prehistoric Moss Cap */}
-      <rect x="5" y="5" width="18" height="5" fill="#24541f" rx="1" />
-      <rect x="7" y="4" width="14" height="4" fill="#39752f" />
-      <rect x="9" y="3" width="10" height="3" fill="#589a4b" />
-      {/* Moss Drips */}
-      <rect x="7" y="9" width="2" height="3" fill="#39752f" />
-      <rect x="13" y="8" width="2" height="4" fill="#39752f" />
-      <rect x="19" y="9" width="2" height="2" fill="#39752f" />
-    </svg>
-  );
-}
-
-// Admin sprite keys for decorative props (uploaded in /admin/sprites); SVG stays as fallback.
+// Admin sprite keys for decorative props (uploaded in /admin/sprites); bundled WebP & crisp SVG stay as fallbacks.
 export const PROP_SPRITE_KEYS: Record<MapDecorativeProp['type'], string> = {
   jungle_tree: 'prop-jungle-tree',
   palm_tree: 'prop-palm-tree',
@@ -225,11 +26,17 @@ export const PROP_SPRITE_KEYS: Record<MapDecorativeProp['type'], string> = {
   grass_tuft: 'prop-grass-tuft',
   mossy_rock: 'prop-mossy-rock',
 };
-const PROP_BASE_HEIGHT: Record<MapDecorativeProp['type'], number> = {
-  jungle_tree: 54, palm_tree: 48, bush: 24, grass_tuft: 16, mossy_rock: 22,
+
+// Base heights sized so detailed prop illustrations retain clear silhouettes without sub-pixel downscale crushing.
+const PROP_BASE_SIZE: Record<MapDecorativeProp['type'], { w: number; h: number }> = {
+  jungle_tree: { w: 68, h: 80 },
+  palm_tree: { w: 64, h: 72 },
+  bush: { w: 44, h: 34 },
+  grass_tuft: { w: 34, h: 26 },
+  mossy_rock: { w: 44, h: 34 },
 };
 
-// Bundled default artwork; admin uploads override, SVG is the last fallback.
+// Bundled default high-res artwork; admin uploads override, crisp 16-bit SVG is the final fallback.
 const PROP_DEFAULT_ART: Record<MapDecorativeProp['type'], string> = {
   jungle_tree: jungleTreeArt.url,
   palm_tree: palmTreeArt.url,
@@ -238,49 +45,356 @@ const PROP_DEFAULT_ART: Record<MapDecorativeProp['type'], string> = {
   mossy_rock: mossyRockArt.url,
 };
 
-function DefaultPropArt({ type, height }: { type: MapDecorativeProp['type']; height: number }) {
+// ── High-Resolution Crisp 16-Bit Pixel-Art Fallback SVGs (Native integer px — zero CSS scale blur) ──
+function JungleTreeSvg({ width, height }: { width: number; height: number }) {
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox="0 0 68 84"
+      shapeRendering="crispEdges"
+      aria-hidden="true"
+      className="block select-none"
+    >
+      <rect x="16" y="77" width="36" height="4" fill="#14110f" opacity="0.38" />
+      <rect x="20" y="75" width="28" height="2" fill="#14110f" opacity="0.28" />
+      <rect x="20" y="81" width="28" height="2" fill="#14110f" opacity="0.24" />
+      <rect x="28" y="42" width="12" height="36" fill="#2b180d" />
+      <rect x="24" y="68" width="4" height="10" fill="#2b180d" />
+      <rect x="21" y="73" width="4" height="6" fill="#2b180d" />
+      <rect x="40" y="69" width="4" height="9" fill="#2b180d" />
+      <rect x="43" y="74" width="4" height="5" fill="#2b180d" />
+      <rect x="30" y="44" width="8" height="33" fill="#4e2e18" />
+      <rect x="26" y="70" width="4" height="7" fill="#4e2e18" />
+      <rect x="39" y="71" width="4" height="6" fill="#3d2312" />
+      <rect x="32" y="46" width="3" height="28" fill="#6f4424" />
+      <rect x="33" y="50" width="2" height="18" fill="#8b5a32" />
+      <rect x="35" y="53" width="2" height="6" fill="#2b180d" />
+      <rect x="31" y="63" width="2" height="7" fill="#3d2312" />
+      <rect x="20" y="38" width="9" height="4" fill="#3d2312" />
+      <rect x="40" y="39" width="8" height="4" fill="#2b180d" />
+      <rect x="15" y="40" width="2" height="14" fill="#1f4d1b" />
+      <rect x="16" y="46" width="2" height="11" fill="#35752d" />
+      <rect x="50" y="41" width="2" height="12" fill="#1f4d1b" />
+      <rect x="49" y="45" width="2" height="9" fill="#35752d" />
+      <rect x="10" y="22" width="48" height="22" fill="#0f260e" />
+      <rect x="6" y="26" width="56" height="14" fill="#0f260e" />
+      <rect x="14" y="13" width="40" height="16" fill="#0f260e" />
+      <rect x="20" y="7" width="28" height="12" fill="#0f260e" />
+      <rect x="25" y="4" width="18" height="6" fill="#0f260e" />
+      <rect x="8" y="25" width="52" height="13" fill="#1b4318" />
+      <rect x="12" y="16" width="44" height="24" fill="#1b4318" />
+      <rect x="18" y="9" width="32" height="16" fill="#1b4318" />
+      <rect x="24" y="6" width="20" height="8" fill="#1b4318" />
+      <rect x="10" y="23" width="18" height="11" fill="#2d6a26" />
+      <rect x="38" y="24" width="20" height="10" fill="#2d6a26" />
+      <rect x="15" y="14" width="38" height="14" fill="#2d6a26" />
+      <rect x="20" y="8" width="28" height="12" fill="#2d6a26" />
+      <rect x="25" y="5" width="18" height="6" fill="#2d6a26" />
+      <rect x="27" y="32" width="4" height="5" fill="#1b4318" />
+      <rect x="43" y="31" width="4" height="5" fill="#1b4318" />
+      <rect x="19" y="21" width="3" height="4" fill="#1b4318" />
+      <rect x="12" y="22" width="12" height="6" fill="#469238" />
+      <rect x="17" y="13" width="16" height="8" fill="#469238" />
+      <rect x="35" y="15" width="14" height="7" fill="#469238" />
+      <rect x="41" y="23" width="13" height="6" fill="#469238" />
+      <rect x="22" y="7" width="22" height="7" fill="#469238" />
+      <rect x="26" y="5" width="14" height="4" fill="#469238" />
+      <rect x="27" y="5" width="10" height="3" fill="#74bf54" />
+      <rect x="23" y="9" width="8" height="3" fill="#74bf54" />
+      <rect x="36" y="10" width="6" height="2" fill="#74bf54" />
+      <rect x="18" y="14" width="9" height="3" fill="#74bf54" />
+      <rect x="13" y="22" width="6" height="2" fill="#74bf54" />
+      <rect x="43" y="23" width="6" height="2" fill="#74bf54" />
+      <rect x="29" y="5" width="4" height="2" fill="#a3e079" />
+      <rect x="20" y="14" width="4" height="2" fill="#a3e079" />
+    </svg>
+  );
+}
+
+function PalmTreeSvg({ width, height }: { width: number; height: number }) {
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox="0 0 64 78"
+      shapeRendering="crispEdges"
+      aria-hidden="true"
+      className="block select-none"
+    >
+      <rect x="18" y="72" width="28" height="3" fill="#14110f" opacity="0.38" />
+      <rect x="22" y="70" width="20" height="2" fill="#14110f" opacity="0.25" />
+      <rect x="22" y="75" width="20" height="2" fill="#14110f" opacity="0.22" />
+      <rect x="27" y="64" width="10" height="9" fill="#362012" />
+      <rect x="29" y="65" width="6" height="7" fill="#5e3a20" />
+      <rect x="30" y="66" width="3" height="5" fill="#825330" />
+      <rect x="26" y="54" width="9" height="11" fill="#362012" />
+      <rect x="28" y="55" width="5" height="9" fill="#5e3a20" />
+      <rect x="29" y="56" width="2" height="7" fill="#825330" />
+      <rect x="27" y="44" width="8" height="11" fill="#362012" />
+      <rect x="29" y="45" width="4" height="9" fill="#5e3a20" />
+      <rect x="30" y="46" width="2" height="7" fill="#825330" />
+      <rect x="29" y="34" width="7" height="11" fill="#362012" />
+      <rect x="30" y="35" width="4" height="9" fill="#5e3a20" />
+      <rect x="31" y="36" width="2" height="7" fill="#825330" />
+      <rect x="30" y="25" width="7" height="10" fill="#362012" />
+      <rect x="31" y="26" width="4" height="8" fill="#6d4426" />
+      <rect x="27" y="63" width="8" height="1" fill="#26160c" />
+      <rect x="26" y="58" width="8" height="1" fill="#26160c" />
+      <rect x="27" y="52" width="7" height="1" fill="#26160c" />
+      <rect x="28" y="46" width="7" height="1" fill="#26160c" />
+      <rect x="29" y="40" width="6" height="1" fill="#26160c" />
+      <rect x="30" y="34" width="6" height="1" fill="#26160c" />
+      <rect x="30" y="29" width="6" height="1" fill="#26160c" />
+      <rect x="27" y="22" width="5" height="5" fill="#472810" />
+      <rect x="28" y="23" width="3" height="3" fill="#8c5220" />
+      <rect x="34" y="23" width="5" height="5" fill="#472810" />
+      <rect x="35" y="24" width="3" height="3" fill="#a66329" />
+      <rect x="31" y="24" width="4" height="4" fill="#6b3d17" />
+      <rect x="10" y="19" width="20" height="4" fill="#143311" />
+      <rect x="6" y="22" width="12" height="4" fill="#143311" />
+      <rect x="36" y="19" width="20" height="4" fill="#143311" />
+      <rect x="48" y="22" width="10" height="4" fill="#143311" />
+      <rect x="14" y="15" width="18" height="4" fill="#23571e" />
+      <rect x="8" y="17" width="12" height="4" fill="#23571e" />
+      <rect x="4" y="20" width="8" height="4" fill="#1c4718" />
+      <rect x="3" y="24" width="4" height="4" fill="#143311" />
+      <rect x="8" y="21" width="2" height="4" fill="#23571e" />
+      <rect x="13" y="19" width="2" height="5" fill="#23571e" />
+      <rect x="18" y="19" width="2" height="4" fill="#23571e" />
+      <rect x="23" y="19" width="2" height="4" fill="#23571e" />
+      <rect x="18" y="9" width="15" height="4" fill="#357a2c" />
+      <rect x="12" y="11" width="10" height="4" fill="#357a2c" />
+      <rect x="9" y="13" width="6" height="3" fill="#23571e" />
+      <rect x="16" y="10" width="14" height="2" fill="#5da64b" />
+      <rect x="34" y="15" width="18" height="4" fill="#23571e" />
+      <rect x="46" y="17" width="12" height="4" fill="#23571e" />
+      <rect x="54" y="20" width="7" height="4" fill="#1c4718" />
+      <rect x="58" y="24" width="4" height="4" fill="#143311" />
+      <rect x="40" y="19" width="2" height="4" fill="#23571e" />
+      <rect x="45" y="19" width="2" height="5" fill="#23571e" />
+      <rect x="50" y="20" width="2" height="4" fill="#23571e" />
+      <rect x="55" y="23" width="2" height="4" fill="#23571e" />
+      <rect x="33" y="9" width="15" height="4" fill="#357a2c" />
+      <rect x="44" y="11" width="10" height="4" fill="#357a2c" />
+      <rect x="51" y="13" width="6" height="3" fill="#23571e" />
+      <rect x="35" y="10" width="13" height="2" fill="#5da64b" />
+      <rect x="28" y="6" width="10" height="14" fill="#357a2c" />
+      <rect x="26" y="4" width="6" height="6" fill="#5da64b" />
+      <rect x="34" y="5" width="6" height="5" fill="#5da64b" />
+      <rect x="30" y="3" width="6" height="9" fill="#7ec464" />
+      <rect x="12" y="16" width="16" height="2" fill="#5da64b" />
+      <rect x="37" y="16" width="15" height="2" fill="#5da64b" />
+      <rect x="31" y="3" width="4" height="3" fill="#a8e386" />
+    </svg>
+  );
+}
+
+function BushSvg({ width, height }: { width: number; height: number }) {
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox="0 0 46 36"
+      shapeRendering="crispEdges"
+      aria-hidden="true"
+      className="block select-none"
+    >
+      <rect x="6" y="31" width="34" height="3" fill="#14110f" opacity="0.36" />
+      <rect x="10" y="34" width="26" height="1" fill="#14110f" opacity="0.22" />
+      <rect x="6" y="15" width="34" height="16" fill="#10290e" />
+      <rect x="4" y="18" width="38" height="11" fill="#10290e" />
+      <rect x="10" y="10" width="26" height="10" fill="#10290e" />
+      <rect x="15" y="7" width="16" height="6" fill="#10290e" />
+      <rect x="6" y="17" width="34" height="12" fill="#1e4a19" />
+      <rect x="9" y="12" width="28" height="16" fill="#1e4a19" />
+      <rect x="15" y="8" width="16" height="10" fill="#1e4a19" />
+      <rect x="8" y="16" width="12" height="9" fill="#32702a" />
+      <rect x="26" y="16" width="12" height="9" fill="#32702a" />
+      <rect x="13" y="10" width="20" height="12" fill="#32702a" />
+      <rect x="17" y="8" width="12" height="6" fill="#32702a" />
+      <rect x="10" y="15" width="8" height="4" fill="#529c44" />
+      <rect x="16" y="9" width="13" height="5" fill="#529c44" />
+      <rect x="28" y="15" width="7" height="4" fill="#529c44" />
+      <rect x="18" y="8" width="8" height="2" fill="#82c96e" />
+      <rect x="11" y="15" width="4" height="2" fill="#82c96e" />
+      <rect x="11" y="21" width="3" height="3" fill="#b91c1c" />
+      <rect x="11" y="21" width="2" height="2" fill="#f87171" />
+      <rect x="31" y="19" width="3" height="3" fill="#b91c1c" />
+      <rect x="31" y="19" width="2" height="2" fill="#ef4444" />
+      <rect x="21" y="22" width="3" height="3" fill="#d97706" />
+      <rect x="21" y="22" width="2" height="2" fill="#fbbf24" />
+      <rect x="25" y="13" width="2" height="2" fill="#fde047" />
+    </svg>
+  );
+}
+
+function GrassTuftSvg({ width, height }: { width: number; height: number }) {
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox="0 0 38 30"
+      shapeRendering="crispEdges"
+      aria-hidden="true"
+      className="block select-none"
+    >
+      <rect x="7" y="26" width="24" height="2" fill="#14110f" opacity="0.32" />
+      <rect x="10" y="28" width="18" height="1" fill="#14110f" opacity="0.2" />
+      <rect x="9" y="22" width="20" height="5" fill="#173814" />
+      <rect x="7" y="16" width="3" height="8" fill="#1f4d1b" />
+      <rect x="5" y="12" width="3" height="5" fill="#35752c" />
+      <rect x="4" y="9" width="2" height="4" fill="#5da34e" />
+      <rect x="12" y="13" width="3" height="11" fill="#1f4d1b" />
+      <rect x="11" y="8" width="3" height="7" fill="#35752c" />
+      <rect x="10" y="5" width="2" height="4" fill="#6ab558" />
+      <rect x="9" y="3" width="2" height="2" fill="#9be082" />
+      <rect x="17" y="11" width="4" height="14" fill="#1f4d1b" />
+      <rect x="18" y="6" width="3" height="8" fill="#3c8232" />
+      <rect x="19" y="3" width="2" height="4" fill="#74bf60" />
+      <rect x="20" y="1" width="2" height="2" fill="#a8e88e" />
+      <rect x="23" y="13" width="3" height="11" fill="#1f4d1b" />
+      <rect x="24" y="8" width="3" height="6" fill="#35752c" />
+      <rect x="26" y="5" width="2" height="4" fill="#6ab558" />
+      <rect x="27" y="17" width="3" height="7" fill="#1f4d1b" />
+      <rect x="29" y="13" width="3" height="5" fill="#35752c" />
+      <rect x="31" y="10" width="2" height="3" fill="#5da34e" />
+      <rect x="14" y="14" width="2" height="2" fill="#fde047" />
+      <rect x="25" y="16" width="2" height="2" fill="#f9a8d4" />
+    </svg>
+  );
+}
+
+function MossyRockSvg({ width, height }: { width: number; height: number }) {
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox="0 0 46 36"
+      shapeRendering="crispEdges"
+      aria-hidden="true"
+      className="block select-none"
+    >
+      <rect x="5" y="31" width="36" height="3" fill="#14110f" opacity="0.4" />
+      <rect x="9" y="34" width="28" height="1" fill="#14110f" opacity="0.24" />
+      <rect x="5" y="16" width="36" height="16" fill="#1c1917" />
+      <rect x="8" y="11" width="30" height="7" fill="#1c1917" />
+      <rect x="12" y="8" width="22" height="5" fill="#1c1917" />
+      <rect x="7" y="17" width="32" height="13" fill="#383431" />
+      <rect x="10" y="13" width="26" height="15" fill="#4f4a45" />
+      <rect x="9" y="18" width="14" height="9" fill="#66605b" />
+      <rect x="12" y="15" width="15" height="8" fill="#7d7670" />
+      <rect x="14" y="16" width="8" height="4" fill="#9c948d" />
+      <rect x="28" y="19" width="10" height="10" fill="#2e2a27" />
+      <rect x="21" y="20" width="2" height="8" fill="#24201e" />
+      <rect x="19" y="24" width="3" height="2" fill="#24201e" />
+      <rect x="31" y="21" width="1" height="6" fill="#1c1917" />
+      <rect x="8" y="10" width="28" height="6" fill="#1b4318" />
+      <rect x="11" y="7" width="22" height="6" fill="#2c6625" />
+      <rect x="14" y="6" width="16" height="4" fill="#468f3a" />
+      <rect x="16" y="6" width="9" height="2" fill="#76bf62" />
+      <rect x="10" y="15" width="3" height="5" fill="#2c6625" />
+      <rect x="11" y="15" width="2" height="3" fill="#468f3a" />
+      <rect x="18" y="13" width="4" height="6" fill="#2c6625" />
+      <rect x="19" y="13" width="2" height="4" fill="#468f3a" />
+      <rect x="26" y="14" width="3" height="7" fill="#1b4318" />
+      <rect x="26" y="14" width="2" height="4" fill="#2c6625" />
+      <rect x="32" y="15" width="3" height="4" fill="#2c6625" />
+      <rect x="25" y="4" width="2" height="3" fill="#468f3a" />
+      <rect x="26" y="3" width="2" height="2" fill="#8ad472" />
+      <rect x="36" y="28" width="5" height="4" fill="#292524" />
+      <rect x="37" y="29" width="3" height="2" fill="#57534e" />
+    </svg>
+  );
+}
+
+function DefaultPropSvg({
+  type,
+  width,
+  height,
+}: {
+  type: MapDecorativeProp['type'];
+  width: number;
+  height: number;
+}) {
+  switch (type) {
+    case 'jungle_tree':
+      return <JungleTreeSvg width={width} height={height} />;
+    case 'palm_tree':
+      return <PalmTreeSvg width={width} height={height} />;
+    case 'bush':
+      return <BushSvg width={width} height={height} />;
+    case 'grass_tuft':
+      return <GrassTuftSvg width={width} height={height} />;
+    case 'mossy_rock':
+      return <MossyRockSvg width={width} height={height} />;
+    default:
+      return null;
+  }
+}
+
+function DefaultPropArt({
+  type,
+  width,
+  height,
+}: {
+  type: MapDecorativeProp['type'];
+  width: number;
+  height: number;
+}) {
   const [failed, setFailed] = React.useState(false);
-  if (failed) return <DefaultPropSvg type={type} />;
+  if (failed) return <DefaultPropSvg type={type} width={width} height={height} />;
   return (
     <img
       src={PROP_DEFAULT_ART[type]}
       alt=""
       aria-hidden="true"
       draggable={false}
+      decoding="async"
       onError={() => setFailed(true)}
-      style={{ height, width: 'auto', imageRendering: 'pixelated' }}
-      className="drop-shadow-[0_4px_3px_rgba(0,0,0,0.35)] select-none"
+      style={{
+        height: `${height}px`,
+        width: 'auto',
+        // High-res WebP prop illustrations MUST use smooth hardware mipmap sampling ('auto'),
+        // NOT 'pixelated' (which point-skips 512px->34px into jagged aliased noise)!
+        imageRendering: 'auto',
+      }}
+      className="block select-none"
     />
   );
 }
 
-function RenderPropSprite({ type }: { type: MapDecorativeProp['type'] }) {
-  const { data } = useSpriteAnimations(PROP_SPRITE_KEYS[type]);
-  const anim = data?.idle;
-  const h = Math.round(PROP_BASE_HEIGHT[type] * (data?.scale ?? data?._scale ?? 1));
-  const fallback = <DefaultPropArt type={type} height={h} />;
+function PropVisual({
+  type,
+  animData,
+  finalScale,
+}: {
+  type: MapDecorativeProp['type'];
+  animData?: SpriteAnimationsData;
+  finalScale: number;
+}) {
+  const baseDim = PROP_BASE_SIZE[type];
+  const userScale = animData?.scale ?? animData?._scale ?? 1;
+  // Render directly at final integer target size — NO CSS transform: scale() bitmap blur!
+  const targetH = Math.max(18, Math.round(baseDim.h * userScale * finalScale));
+  const targetW = Math.max(20, Math.round((baseDim.w * userScale * finalScale) / 2) * 2);
+
+  const fallback = <DefaultPropArt type={type} width={targetW} height={targetH} />;
+  const anim = animData?.idle;
   if (anim?.url && !anim.url.startsWith('local://')) {
     const frames = Math.max(1, anim.frame_count || 1);
-    return <SpriteAnimator url={anim.url} frames={frames} fps={anim.fps} height={h} fallback={fallback} />;
+    return (
+      <SpriteAnimator
+        url={anim.url}
+        frames={frames}
+        fps={anim.fps}
+        height={targetH}
+        smooth
+        fallback={fallback}
+      />
+    );
   }
   return fallback;
-}
-
-function DefaultPropSvg({ type }: { type: MapDecorativeProp['type'] }) {
-  switch (type) {
-    case 'jungle_tree':
-      return <JungleTreeSvg />;
-    case 'palm_tree':
-      return <PalmTreeSvg />;
-    case 'bush':
-      return <BushSvg />;
-    case 'grass_tuft':
-      return <GrassTuftSvg />;
-    case 'mossy_rock':
-      return <MossyRockSvg />;
-    default:
-      return null;
-  }
 }
 
 export function MapFoliageOverlay({
@@ -290,13 +404,28 @@ export function MapFoliageOverlay({
   project,
   metersPerPx,
 }: MapFoliageOverlayProps) {
+  // Hoist sprite queries once per prop type (5 hooks total instead of 35 per map render!)
+  const { data: jungleAnim } = useSpriteAnimations(PROP_SPRITE_KEYS.jungle_tree);
+  const { data: palmAnim } = useSpriteAnimations(PROP_SPRITE_KEYS.palm_tree);
+  const { data: bushAnim } = useSpriteAnimations(PROP_SPRITE_KEYS.bush);
+  const { data: grassAnim } = useSpriteAnimations(PROP_SPRITE_KEYS.grass_tuft);
+  const { data: rockAnim } = useSpriteAnimations(PROP_SPRITE_KEYS.mossy_rock);
+
+  const animByType: Record<MapDecorativeProp['type'], SpriteAnimationsData | undefined> = {
+    jungle_tree: jungleAnim,
+    palm_tree: palmAnim,
+    bush: bushAnim,
+    grass_tuft: grassAnim,
+    mossy_rock: rockAnim,
+  };
+
   // 1. Compute deterministic props within 150m (capped at 35, base exclusion 18m)
   const props = useMemo(() => {
     return getNearbyDecorativeProps(center, basePos, 150, 35);
   }, [center.lat, center.lng, basePos?.lat, basePos?.lng]);
 
   // Dynamic scale adjustment according to zoom
-  const zoomScale = Math.max(0.75, Math.min(1.35, 0.55 / Math.max(0.1, metersPerPx)));
+  const zoomScale = Math.max(0.8, Math.min(1.4, 0.55 / Math.max(0.1, metersPerPx)));
 
   return (
     <div
@@ -308,16 +437,17 @@ export function MapFoliageOverlay({
 
         // Viewport bounds check for mobile performance
         if (
-          pt.x < -60 ||
-          pt.x > (typeof window !== 'undefined' ? window.innerWidth + 60 : 1200) ||
-          pt.y < -60 ||
-          pt.y > (typeof window !== 'undefined' ? window.innerHeight + 60 : 1200)
+          pt.x < -80 ||
+          pt.x > (typeof window !== 'undefined' ? window.innerWidth + 80 : 1200) ||
+          pt.y < -80 ||
+          pt.y > (typeof window !== 'undefined' ? window.innerHeight + 80 : 1200)
         ) {
           return null;
         }
 
         const finalScale = prop.scale * zoomScale;
-        const scaleX = prop.flip ? -finalScale : finalScale;
+        const snappedX = Math.round(pt.x);
+        const snappedY = Math.round(pt.y);
         const zIndex = computeEntityZIndex(prop.pos.lat, center.lat);
         const isTree = prop.type === 'jungle_tree' || prop.type === 'palm_tree';
         const isOccluded = isTree && isOccludedByCanopy(playerPos, prop.pos);
@@ -327,16 +457,19 @@ export function MapFoliageOverlay({
             key={prop.id}
             className="absolute pointer-events-none select-none transition-opacity duration-300"
             style={{
-              left: `${pt.x}px`,
-              top: `${pt.y}px`,
-              transform: `translate(-50%, -100%) scale(${scaleX}, ${finalScale})`,
-              transformOrigin: 'bottom center',
-              imageRendering: 'pixelated',
+              left: `${snappedX}px`,
+              top: `${snappedY}px`,
+              transform: prop.flip ? 'translate(-50%, -100%) scaleX(-1)' : 'translate(-50%, -100%)',
+              transformOrigin: 'center bottom',
               zIndex,
               opacity: isOccluded ? 0.45 : 1,
             }}
           >
-            <RenderPropSprite type={prop.type} />
+            <PropVisual
+              type={prop.type}
+              animData={animByType[prop.type]}
+              finalScale={finalScale}
+            />
           </div>
         );
       })}

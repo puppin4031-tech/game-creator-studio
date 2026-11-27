@@ -52,9 +52,12 @@ export function useSurvivalGps(
 
   useEffect(() => {
     if (!enabled) return;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
+    const intervalMs = now < lockedUntil ? 1000 : 5000;
+    const timer = setInterval(() => {
+      if (!document.hidden) setNow(Date.now());
+    }, intervalMs);
     return () => clearInterval(timer);
-  }, [enabled]);
+  }, [enabled, now < lockedUntil]);
 
   useEffect(() => {
     if (!enabled) return;

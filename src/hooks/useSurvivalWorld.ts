@@ -1,7 +1,7 @@
 // @refresh reset
 import { armorySuccessChance, armoryUpgradeCost, gearMult, upgradeCost, weaponAtkWithPlus, weaponAuraForPlus } from '@/lib/survival/upgrade';
 import { isWalkingPace } from '@/lib/survival/walkPace';
-import { advanceExpedition, steerExpedition, pickManualTarget, MANUAL_PICK_M, expeditionLoot, isPocketMovement, startObservedExpedition, EXPEDITION_RADIUS_M, FOCUS_LABEL, CREW_HEAL_FOODS, crewHealGain, DAILY_EXPEDITION_AUTO_LIMIT_SEC, TRIBE_XP_RATIO, getTodayKey, type ExpeditionFocus, type ObservedExpedition, type ExpeditionLog } from '@/lib/survival/expedition';
+import { advanceExpedition, steerExpedition, pickManualTarget, MANUAL_PICK_M, expeditionLoot, isPocketMovement, startObservedExpedition, EXPEDITION_RADIUS_M, FOCUS_LABEL, CREW_HEAL_FOODS, crewHealGain, DAILY_EXPEDITION_AUTO_LIMIT_SEC, DAILY_EXPEDITION_AUTO_RUNS_LIMIT, TRIBE_XP_RATIO, getTodayKey, type ExpeditionFocus, type ObservedExpedition, type ExpeditionLog } from '@/lib/survival/expedition';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -99,7 +99,7 @@ import {
 } from '@/lib/survival/codex';
 import type { GearInstance, LatLng, Stack, WorldEntity, Quality } from '@/lib/survival/types';
 
-import { advancePetDefense, deployPet, setPetRole, settlePetHunts, petRole, PET_GUARD_SLOTS, maxGuardSlotsFor, PET_FOLLOW_SLOTS, PET_FOLLOW_ATK, petStats, type PetRole, fusePets, hatchPet, migratePets, type OwnedPet, type PetDefense, type PetHit } from '@/lib/survival/pets';
+import { advancePetDefense, deployPet, setPetRole, settlePetHunts, petRole, PET_GUARD_SLOTS, maxGuardSlotsFor, PET_FOLLOW_SLOTS, PET_FOLLOW_ATK, PET_DAILY_AUTO_HUNT_LIMIT, petStats, type PetRole, fusePets, hatchPet, migratePets, type OwnedPet, type PetDefense, type PetHit } from '@/lib/survival/pets';
 
 const SAVE_KEY = 'survival-world-v1';
 export const CURRENT_SAVE_VERSION = 2;
@@ -150,6 +150,8 @@ export interface WorldSave extends WorldProgress {
   babyDinos?: BabyDinoId[];
   pets?: OwnedPet[];
   petDefense?: PetDefense;
+  petAutoHuntDay?: string;
+  petAutoHuntCount?: number;
   shrines?: ShrineState;
   researching?: TimedJob | null;
   researchJobs?: TimedJob[];
@@ -159,6 +161,7 @@ export interface WorldSave extends WorldProgress {
   expeditionAuto?: boolean;
   expeditionAutoDay?: string;
   expeditionAutoSecToday?: number;
+  expeditionAutoRunsToday?: number;
   mercenary?: MercenaryContract | null;
   ambachoDailyExpeditionDate?: string;
   lastOfflineReportDate?: string;
@@ -293,6 +296,116 @@ function isFreshOrEmptySave(w?: Partial<WorldSave> | null): boolean {
   );
 }
 
+const DEPLETION_RETENTION_MS = 24 * 60 * 60 * 1000;
+const MAX_PRUNED_EXPLORED = 400;
+const MAX_PRUNED_LOGS = 30;
+const MAX_PRUNED_PINS = 120;
+const MAX_TERRAIN_CELLS = 500;
+
+/**
+ * Garbage-collects unbounded maps/arrays in WorldSave so localStorage & cloud JSON payloads stay small and fast.
+ */
+function pruneWorldSave(data: WorldSave, now: number = Date.now()): WorldSave {
+  // 1. Prune expired depleted entries (> 24h old; all nodes & eggs respawn within 24h)
+  let nextDepleted = data.depleted;
+  const depKeys = Object.keys(data.depleted ?? {});
+  if (depKeys.length > 0) {
+    const cutoff = now - DEPLETION_RETENTION_MS;
+    let changed = false;
+    const kept: Record<string, number> = {};
+    for (const k of depKeys) {
+      const ts = data.depleted[k];
+      if (typeof ts === 'number' && ts >= cutoff) {
+        kept[k] = ts;
+      } else {
+        changed = true;
+      }
+    }
+    if (changed) nextDepleted = kept;
+  }
+
+  // 2. Prune damage entries that belong to already-depleted entities or exceed 120 entries
+  let nextDamage = data.damage;
+  const dmgKeys = Object.keys(data.damage ?? {});
+  if (dmgKeys.length > 0) {
+    let changed = false;
+    const kept: Record<string, number> = {};
+    const slice = dmgKeys.length > 120 ? dmgKeys.slice(-100) : dmgKeys;
+    if (slice.length !== dmgKeys.length) changed = true;
+    for (const k of slice) {
+      if (nextDepleted[k] || !data.damage[k] || data.damage[k] <= 0) {
+        changed = true;
+      } else {
+        kept[k] = data.damage[k];
+      }
+    }
+    if (changed) nextDamage = kept;
+  }
+
+  // 3. Prune expired calmUntil entries
+  let nextCalm = data.calmUntil;
+  if (data.calmUntil) {
+    const calmKeys = Object.keys(data.calmUntil);
+    if (calmKeys.length > 0) {
+      let changed = false;
+      const kept: Record<string, number> = {};
+      for (const k of calmKeys) {
+        if (data.calmUntil[k] > now) kept[k] = data.calmUntil[k];
+        else changed = true;
+      }
+      if (changed) nextCalm = kept;
+    }
+  }
+
+  // 4. Cap explored coordinates & logs & pins & sampled terrain cells
+  const nextExplored = Array.isArray(data.explored) && data.explored.length > MAX_PRUNED_EXPLORED
+    ? data.explored.slice(-MAX_PRUNED_EXPLORED)
+    : data.explored;
+  const nextLogs = Array.isArray(data.expeditionLogs) && data.expeditionLogs.length > MAX_PRUNED_LOGS
+    ? data.expeditionLogs.slice(-MAX_PRUNED_LOGS)
+    : data.expeditionLogs;
+  const nextPins = Array.isArray(data.discoveredPins) && data.discoveredPins.length > MAX_PRUNED_PINS
+    ? data.discoveredPins.slice(-MAX_PRUNED_PINS)
+    : data.discoveredPins;
+
+  let nextZones = data.terrainZones;
+  const zoneKeys = Object.keys(data.terrainZones ?? {});
+  if (zoneKeys.length > MAX_TERRAIN_CELLS) {
+    nextZones = Object.fromEntries(zoneKeys.slice(-MAX_TERRAIN_CELLS).map(k => [k, data.terrainZones[k]]));
+  }
+
+  let nextParks = data.parkCells;
+  const parkKeys = Object.keys(data.parkCells ?? {});
+  if (parkKeys.length > MAX_TERRAIN_CELLS) {
+    nextParks = Object.fromEntries(parkKeys.slice(-MAX_TERRAIN_CELLS).map(k => [k, data.parkCells[k]]));
+  }
+
+  if (
+    nextDepleted === data.depleted &&
+    nextDamage === data.damage &&
+    nextCalm === data.calmUntil &&
+    nextExplored === data.explored &&
+    nextLogs === data.expeditionLogs &&
+    nextPins === data.discoveredPins &&
+    nextZones === data.terrainZones &&
+    nextParks === data.parkCells
+  ) {
+    return data;
+  }
+
+  return {
+    ...data,
+    depleted: nextDepleted,
+    damage: nextDamage,
+    calmUntil: nextCalm,
+    explored: nextExplored,
+    expeditionLogs: nextLogs,
+    discoveredPins: nextPins,
+    terrainZones: nextZones,
+    parkCells: nextParks,
+  };
+}
+
 export function migrateSaveData(raw: unknown, start: LatLng): WorldSave {
   const baseFresh = fresh(start);
   if (!raw || typeof raw !== 'object') {
@@ -411,7 +524,7 @@ export function migrateSaveData(raw: unknown, start: LatLng): WorldSave {
   }
 
   merged.codex = syncCodexStateWithSave(merged);
-  return merged;
+  return pruneWorldSave(merged);
 }
 
 function load(start: LatLng, saveKey: string): WorldSave {
@@ -493,17 +606,38 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
   const setS = useCallback((next: WorldSave | ((previous: WorldSave) => WorldSave)) => {
-    const raw = typeof next === 'function' ? next(ref.current) : next;
-    const prevCodex = ref.current?.codex;
-    const syncedCodex = syncCodexStateWithSave(raw);
-    const hadNewRes = syncedCodex.discoveredResources.length > (prevCodex?.discoveredResources?.length ?? 0);
-    const hadNewPet = syncedCodex.discoveredPets.length > (prevCodex?.discoveredPets?.length ?? 0);
-    const value: WorldSave = {
-      ...raw,
-      codex: {
+    const prev = ref.current;
+    const raw = typeof next === 'function' ? next(prev) : next;
+    if (raw === prev) return;
+
+    // Only rescan codex when inventory, equipment, pets, buildings, or codex itself actually changed!
+    const codexInputsChanged =
+      !prev?.codex ||
+      raw.codex !== prev.codex ||
+      raw.backpack !== prev.backpack ||
+      raw.storage !== prev.storage ||
+      raw.gathered !== prev.gathered ||
+      raw.crafted !== prev.crafted ||
+      raw.gear !== prev.gear ||
+      raw.storedGear !== prev.storedGear ||
+      raw.pets !== prev.pets ||
+      raw.village !== prev.village;
+
+    let nextCodex = raw.codex ?? prev?.codex ?? defaultCodexState();
+    if (codexInputsChanged) {
+      const prevCodex = prev?.codex;
+      const syncedCodex = syncCodexStateWithSave(raw);
+      const hadNewRes = syncedCodex.discoveredResources.length > (prevCodex?.discoveredResources?.length ?? 0);
+      const hadNewPet = syncedCodex.discoveredPets.length > (prevCodex?.discoveredPets?.length ?? 0);
+      nextCodex = {
         ...syncedCodex,
         hasUnseenNew: raw.codex?.hasUnseenNew ?? ((hadNewRes || hadNewPet) ? true : (prevCodex?.hasUnseenNew ?? false)),
-      },
+      };
+    }
+
+    const value: WorldSave = {
+      ...raw,
+      codex: nextCodex,
     };
     ref.current = value;
     setState(value);
@@ -591,39 +725,58 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   const [savedIndicator, setSavedIndicator] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const indicatorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastSavedJsonRef = useRef<string>('');
+  const lastSavedCoreJsonRef = useRef<string>('');
+  const lastBackupAtRef = useRef<number>(0);
+  const lastIndicatorAtRef = useRef<number>(0);
+  const lastCloudCoreJsonRef = useRef<string>('');
+  const lastCloudUploadAtRef = useRef<number>(0);
 
-  const performWrite = useCallback((data: WorldSave) => {
+  const performWrite = useCallback((data: WorldSave, forceBackup = false) => {
     try {
-      const dataToSave = { ...data, saveVersion: CURRENT_SAVE_VERSION, lastActiveAt: Date.now() };
-      const json = JSON.stringify(dataToSave);
-      if (json === lastSavedJsonRef.current) return;
-      localStorage.setItem(saveKey, json);
-      if (!isFreshOrEmptySave(dataToSave) && !saveKey.includes('guest')) {
-        localStorage.setItem(`${saveKey}_backup`, json);
-        localStorage.setItem('survival-world-v1', json);
-      } else if (!isFreshOrEmptySave(dataToSave)) {
-        localStorage.setItem(`${saveKey}_backup`, json);
-      }
-      lastSavedJsonRef.current = json;
+      const nowAt = Date.now();
+      const pruned = pruneWorldSave(data, nowAt);
+      const { lastActiveAt: _ignoredActive, saveVersion: _ignoredVer, ...corePayload } = pruned;
+      const coreJson = JSON.stringify(corePayload);
+      if (!forceBackup && coreJson === lastSavedCoreJsonRef.current) return;
 
-      // Show tiny '저장됨 ✓' indicator for 1.5s
-      setSavedIndicator(true);
-      if (indicatorTimeoutRef.current) clearTimeout(indicatorTimeoutRef.current);
-      indicatorTimeoutRef.current = setTimeout(() => {
-        setSavedIndicator(false);
-      }, 1500);
+      const dataToSave = { ...pruned, saveVersion: CURRENT_SAVE_VERSION, lastActiveAt: nowAt };
+      const json = JSON.stringify(dataToSave);
+      localStorage.setItem(saveKey, json);
+      lastSavedCoreJsonRef.current = coreJson;
+
+      // Write heavy backup copies only on explicit flush (tab hide/close) or at most once every 60s
+      if (forceBackup || nowAt - lastBackupAtRef.current >= 60_000) {
+        lastBackupAtRef.current = nowAt;
+        if (!isFreshOrEmptySave(dataToSave) && !saveKey.includes('guest')) {
+          localStorage.setItem(`${saveKey}_backup`, json);
+          if (saveKey !== 'survival-world-v1') {
+            localStorage.setItem('survival-world-v1', json);
+          }
+        } else if (!isFreshOrEmptySave(dataToSave)) {
+          localStorage.setItem(`${saveKey}_backup`, json);
+        }
+      }
+
+      // Throttle '저장됨 ✓' UI indicator to max once per 30s to prevent constant extra re-renders
+      if (nowAt - lastIndicatorAtRef.current >= 30_000) {
+        lastIndicatorAtRef.current = nowAt;
+        setSavedIndicator(true);
+        if (indicatorTimeoutRef.current) clearTimeout(indicatorTimeoutRef.current);
+        indicatorTimeoutRef.current = setTimeout(() => {
+          setSavedIndicator(false);
+        }, 1500);
+      }
     } catch {
       console.warn('[survival] failed to persist save to localStorage');
     }
   }, [saveKey]);
 
-  // Debounced Save (1500ms) for routine state updates
+  // Debounced Save (3000ms) for routine state updates
   useEffect(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
-      performWrite(s);
-    }, 1500);
+      performWrite(s, false);
+    }, 3000);
 
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -633,7 +786,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   // Immediate Save (flush) function
   const flushSave = useCallback(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    performWrite(ref.current);
+    performWrite(ref.current, true);
   }, [performWrite]);
 
   // Flush on browser tab close / hide / visibilitychange
@@ -729,26 +882,42 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return () => { cancelled = true; };
   }, [userId, setS]);
 
+  const syncToCloud = useCallback((force = false) => {
+    if (!userId || !cloudReadyRef.current) return;
+    const nowAt = Date.now();
+    if (!force && nowAt - lastCloudUploadAtRef.current < 15_000) return;
+    const pruned = pruneWorldSave(ref.current, nowAt);
+    if (isFreshOrEmptySave(pruned)) return;
+    const { lastActiveAt: _a, saveVersion: _v, ...core } = pruned;
+    const coreJson = JSON.stringify(core);
+    if (coreJson === lastCloudCoreJsonRef.current) return;
+    lastCloudCoreJsonRef.current = coreJson;
+    lastCloudUploadAtRef.current = nowAt;
+    void supabase
+      .from('survival_saves')
+      .upsert({ user_id: userId, payload: pruned as unknown as Json, updated_at: new Date(nowAt).toISOString() })
+      .then(({ error }) => {
+        if (error) console.error('[survival] cloud save failed', error);
+      });
+  }, [userId]);
+
   useEffect(() => {
     if (!userId || !cloudReadyRef.current) return;
     if (skipNextUploadRef.current) { skipNextUploadRef.current = false; return; }
     const t = setTimeout(() => {
-      supabase.from('survival_saves').upsert({ user_id: userId, payload: ref.current as unknown as Json, updated_at: new Date().toISOString() })
-        .then(({ error }) => { if (error) console.error('[survival] cloud save failed', error); });
-    }, 2500);
+      syncToCloud(false);
+    }, 12_000);
     return () => clearTimeout(t);
-  }, [s, userId]);
+  }, [s, userId, syncToCloud]);
 
-  // Continuous one-second crew ticks must not postpone the ordinary save debounce forever.
+  // During active 1s expeditions (which reset debounce), checkpoint to cloud at most every 30s if changed.
   useEffect(() => {
-    if (!userId || (!s.observedExpedition && !s.pets?.some(p => p.deployed))) return;
+    if (!userId || !s.observedExpedition) return;
     const timer = window.setInterval(() => {
-      if (!cloudReadyRef.current) return;
-      void supabase.from('survival_saves').upsert({ user_id: userId, payload: ref.current as unknown as Json, updated_at: new Date().toISOString() })
-        .then(({ error }) => { if (error) console.error('[survival] expedition save failed', error); });
-    }, 15_000);
+      syncToCloud(false);
+    }, 30_000);
     return () => window.clearInterval(timer);
-  }, [userId, !!s.observedExpedition, s.pets?.some(p => p.deployed)]);
+  }, [userId, !!s.observedExpedition, syncToCloud]);
 
   const isNight = dayPhase(new Date(now)) === 'night';
   const villageBonuses = useMemo(() => computeVillageBonuses(s.village), [s.village]);
@@ -762,6 +931,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       const settled = settleFoodSpoilage(p.backpack, p.storage, p.lastFreshnessCheckAt, Date.now());
       if (settled.spoiledCount <= 0) return p;
       toast.warning(`🤢 보관하지 않은 생식량 ${settled.spoiledCount}개가 초록색 곰팡이가 피며 상했습니다!`, {
+        id: 'food-spoiled-notice',
         description: '원시 훈제소에서 훈연 보관하거나 상한 음식을 폐기하세요.',
       });
       return {
@@ -1020,19 +1190,16 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     if (p.expeditionAuto) { setS({ ...p, expeditionAuto: false }); return; }
     const now = Date.now();
     const todayKey = getTodayKey(now);
-    const tribeReady = (p.tribe?.count ?? 0) > 0 && !tribeInjured(p.tribe, now);
-    const merc = tribeReady && mercActive(p.mercenary, now) ? p.mercenary!.name : undefined;
-    const hasAmbacho = merc === '암바초' || (p.tribe?.classCounts?.gatherer ?? 0) > 0;
-
-    const usedSec = p.expeditionAutoDay === todayKey ? (p.expeditionAutoSecToday ?? 0) : 0;
-    if (usedSec >= DAILY_EXPEDITION_AUTO_LIMIT_SEC) {
-      toast.warning('오늘의 자동사냥 가능 시간(6시간)을 모두 소진했습니다.', {
-        description: '내일 자정(00:00)에 다시 충전됩니다. (수동 원정 파견은 계속 가능합니다)',
+    const usedRuns = p.expeditionAutoDay === todayKey ? (p.expeditionAutoRunsToday ?? 0) : 0;
+    if (usedRuns >= DAILY_EXPEDITION_AUTO_RUNS_LIMIT) {
+      toast.warning(`오늘의 자동 원정 사냥(${DAILY_EXPEDITION_AUTO_RUNS_LIMIT}/${DAILY_EXPEDITION_AUTO_RUNS_LIMIT}회)을 모두 완료했습니다.`, {
+        id: 'expedition-auto-limit',
+        description: '내일 자정(00:00)에 다시 충전됩니다. (유저가 직접 보내는 수동 원정대 파견은 무제한 가능!)',
       });
       return;
     }
-    if (p.observedExpedition) { setS({ ...p, expeditionAuto: true }); return; }
-    if (dispatchObserved(destination, focus)) setS(p => ({ ...p, expeditionAuto: true }));
+    if (p.observedExpedition) { setS({ ...p, expeditionAuto: true, expeditionAutoDay: todayKey, expeditionAutoRunsToday: usedRuns }); return; }
+    if (dispatchObserved(destination, focus)) setS(prev => ({ ...prev, expeditionAuto: true, expeditionAutoDay: todayKey, expeditionAutoRunsToday: usedRuns }));
   }, [dispatchObserved, setS]);
   const payCost = (p: WorldSave, cost: Stack[]) => {
     // Storage first, then storedGear, then backpack, then unequipped gear (mixed sources allowed).
@@ -1390,26 +1557,25 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
       if (crew.manual) setCrewNearby(nearby);
       const todayKey = getTodayKey(at);
       let autoSecToday = p.expeditionAutoDay === todayKey ? (p.expeditionAutoSecToday ?? 0) : 0;
+      let autoRunsToday = p.expeditionAutoDay === todayKey ? (p.expeditionAutoRunsToday ?? 0) : 0;
       let nextAuto = !!p.expeditionAuto;
       if (nextAuto) {
         autoSecToday += 1;
-        if (autoSecToday >= DAILY_EXPEDITION_AUTO_LIMIT_SEC) {
+        if (autoRunsToday >= DAILY_EXPEDITION_AUTO_RUNS_LIMIT) {
           nextAuto = false;
-          if (crew.phase === 'outbound') {
-            crew.phase = 'returning';
-            crew.target = undefined;
-          }
         }
       }
-      const result = advanceExpedition(crew, nearby, at, outdoors, nextAuto, Math.random, p.damage);
-      if (result.finished && (crew.mercenary === '암바초' || crew.mercenary?.includes('암바초'))) {
+      const canRepeatAuto = nextAuto && (autoRunsToday + 1 < DAILY_EXPEDITION_AUTO_RUNS_LIMIT);
+      const result = advanceExpedition(crew, nearby, at, outdoors, canRepeatAuto, Math.random, p.damage);
+      if (nextAuto && result.autoCycleCompleted) {
+        autoRunsToday += 1;
+      } else if (nextAuto && result.finished && !result.crew.downed) {
+        autoRunsToday += 1;
         nextAuto = false;
-        toast.success('🎒 암바초가 오늘의 1회 원정을 마치고 거점으로 무사히 복귀했습니다!', {
-          description: '내일 자정(00:00) 이후 다시 원정을 떠날 수 있습니다.',
+        toast.success(`🏕️ 오늘의 자동 원정 사냥(${autoRunsToday}/${DAILY_EXPEDITION_AUTO_RUNS_LIMIT}회)을 모두 마치고 거점에 복귀했습니다!`, {
+          id: 'expedition-auto-done',
+          description: '직접 목표를 찍어 보내는 수동 원정대 파견은 횟수 제한 없이 계속 가능합니다.',
         });
-      }
-      if (nextAuto === false && p.expeditionAuto) {
-        result.text = (result.text ? result.text + ' · ' : '') + '⚠️ 오늘 자동사냥 한도(6시간) 도달로 거점에 복귀합니다';
       }
       const stepDist = Math.round(distanceM(crew.pos, result.crew.pos));
       const nextDistM = (p.expeditionDistanceM ?? 0) + stepDist;
@@ -1420,6 +1586,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
         expeditionAuto: nextAuto,
         expeditionAutoDay: todayKey,
         expeditionAutoSecToday: autoSecToday,
+        expeditionAutoRunsToday: autoRunsToday,
         expeditionDistanceM: nextDistM,
         discoveredPins: nextPins,
         observedExpedition: result.finished ? null : result.crew,
@@ -2962,10 +3129,22 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
   }, [setS, options.indoor]);
   const assignPetRole = useCallback((uid: string, role: PetRole) => {
     const p = petAccess(); if (!p) return;
+    const nowAt = Date.now();
+    if (role === 'hunt') {
+      const todayKey = getTodayKey(nowAt);
+      const usedHunts = p.petAutoHuntDay === todayKey ? (p.petAutoHuntCount ?? 0) : 0;
+      if (usedHunts >= PET_DAILY_AUTO_HUNT_LIMIT) {
+        toast.warning(`오늘의 공룡 자동 사냥(${PET_DAILY_AUTO_HUNT_LIMIT}/${PET_DAILY_AUTO_HUNT_LIMIT}회)을 모두 완료했습니다.`, {
+          id: 'pet-auto-hunt-limit',
+          description: '내일 자정(00:00)에 초기화됩니다. (직접 플레이하는 🦖 공룡 탐험대 사냥은 무제한 가능!)',
+        });
+        return;
+      }
+    }
     const maxGuards = maxGuardSlotsFor(p.affinityState?.totals?.divinity ?? 0);
-    const pets = setPetRole(p.pets ?? [], uid, role, Date.now(), maxGuards);
+    const pets = setPetRole(p.pets ?? [], uid, role, nowAt, maxGuards);
     if (!pets) { toast.warning(role === 'guard' ? `거점 지키기는 최대 ${maxGuards}마리예요` : `따라다니기는 최대 ${PET_FOLLOW_SLOTS}마리예요`); return; }
-    setS({ ...p, pets, lastTickAt: Date.now() });
+    setS({ ...p, pets, lastTickAt: nowAt });
   }, [setS, options.indoor]);
   const feedPet = useCallback((uid: string) => {
     const p = ref.current;
@@ -2979,14 +3158,36 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     setS({ ...p, storage, pets: (p.pets ?? []).map(x => x.uid === uid ? { ...x, hp: Math.min(max, x.hp + gain) } : x), lastTickAt: Date.now() });
     toast.success(`${ITEMS[id]?.name ?? id} 1개를 먹였어요 · 체력 +${gain}`);
   }, [setS]);
-  // Hunting pets bring loot to storage.
+  // Hunting pets bring loot to storage (strictly capped at PET_DAILY_AUTO_HUNT_LIMIT = 2 trips/day, then auto-rest).
   useEffect(() => {
     const p = ref.current;
     if (!p.pets?.some(x => petRole(x) === 'hunt')) return;
-    const r = settlePetHunts(p.pets, Date.now());
+    const nowAt = Date.now();
+    const todayKey = getTodayKey(nowAt);
+    const usedHunts = p.petAutoHuntDay === todayKey ? (p.petAutoHuntCount ?? 0) : 0;
+    const remaining = Math.max(0, PET_DAILY_AUTO_HUNT_LIMIT - usedHunts);
+    const r = settlePetHunts(p.pets, nowAt, remaining);
     if (!r.trips && r.pets.every((x, i) => x === p.pets![i])) return;
-    setS(q => ({ ...q, pets: r.pets, storage: addStacks(q.storage, r.loot) }));
-    if (r.trips) toast.success(`사냥 나간 펫이 ${r.trips}번 다녀왔어요 · 창고: ${fmt(r.loot)}`);
+    const nextCount = Math.min(PET_DAILY_AUTO_HUNT_LIMIT, usedHunts + r.trips);
+    setS(q => ({
+      ...q,
+      pets: r.pets,
+      storage: r.loot.length ? addStacks(q.storage, r.loot) : q.storage,
+      petAutoHuntDay: todayKey,
+      petAutoHuntCount: nextCount,
+    }));
+    if (r.trips > 0) {
+      if (nextCount >= PET_DAILY_AUTO_HUNT_LIMIT) {
+        toast.success(`🦖 공룡 자동 사냥 완료 (${nextCount}/${PET_DAILY_AUTO_HUNT_LIMIT}회) · 거점 휴식으로 전환됩니다!`, {
+          id: 'pet-auto-hunt-return',
+          description: r.loot.length ? `창고 보관: ${fmt(r.loot)} · 직접 지휘하는 공룡 탐험대는 무제한 가능` : undefined,
+        });
+      } else {
+        toast.success(`🦖 사냥 나간 공룡 귀환 (${nextCount}/${PET_DAILY_AUTO_HUNT_LIMIT}회) · 창고: ${fmt(r.loot)}`, {
+          id: 'pet-auto-hunt-return',
+        });
+      }
+    }
   }, [now, setS]);
   const togglePetLock = useCallback((uid: string) => {
     const p = petAccess(); if (!p) return;
@@ -4041,7 +4242,7 @@ export function useSurvivalWorld(start: LatLng, options: { enabled?: boolean; sa
     return chosen;
   }, [saveKey, userId, setS, flushSave]);
 
-  return { codex: s.codex ?? defaultCodexState(), codexProgress, recordCodexResource, recordCodexPet, recordCodexBoss, recordCodexAiInvention, markCodexSeen, reloadSaveFromBestSource, claimOfflineRewards, shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, classSkills: s.classSkills ?? [], learnClassSkill, maxSpeedKmh: getPlayerSpeedLimitKmh(s.classSkills, s.affinityState?.totals?.engineering), affinityState: s.affinityState ?? defaultAffinityState(), gainEnergy, triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, dismissTribe, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, updateTutorialState, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, ambachoDailyDone: false, offlineReportClaimedToday: s.lastOfflineReportDate === getTodayKey(), pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage, setPlayerLevel, addStorageItems, addGearItems, grantPresetPackage, clearStorage,
+  return { codex: s.codex ?? defaultCodexState(), codexProgress, recordCodexResource, recordCodexPet, recordCodexBoss, recordCodexAiInvention, markCodexSeen, reloadSaveFromBestSource, claimOfflineRewards, shamanClass: (s.shamanClass ?? s.village?.shamanClass ?? 'NONE') as ShamanClassId, classResource: s.classResource ?? s.village?.classResource ?? 100, classSkills: s.classSkills ?? [], learnClassSkill, maxSpeedKmh: getPlayerSpeedLimitKmh(s.classSkills, s.affinityState?.totals?.engineering), affinityState: s.affinityState ?? defaultAffinityState(), gainEnergy, triggerClassUltimate, researchCivilizationTech, civilizationEraInfo: getCivilizationEraBadge(s.civilizationTechs ?? ['tech_fire_gathering'], s.level), performShamanRitual, evolveShaman, evolvePetToSkullDragon, placeCustomVillageTile, craftCustomGear, craftAmmoBundle, harvestVillageBubble, harvestAllVillageBubbles, startSmokeBatch, instantSmoke, claimSmokeBatch, discardSpoiledFood, cookTavernRecipe, cookShamanDish, claimShamanCooking, freshnessPct: freshnessInfo.freshnessPct, acceptShamanQuest, acceptLanguageQuest, claimLanguageQuest, expeditionLevelInfo, researchVillageBlueprint, trainShamanSkill, forgeSignatureWeapon, enhanceArmoryWeapon, placeVillageTile, moveVillageTile, removeVillageTile, crewAct, healCrew, crewNearby, setCrewManual, steerCrew, commandCrew, hireMerc, dismissTribe, selectTribeClass, toggleEscort, trainTribe, treatTribe, meetShaman, updateTutorialState, grantTutorialBranches, pickTutorialBranch, recruitAmbacho, ambachoDailyDone: false, offlineReportClaimedToday: s.lastOfflineReportDate === getTodayKey(), pickEgg, hatchEgg, permadeathPet, updatePetHp, consumeDinoMeat, settleDinoExpedition, ensureStarterCamp, dispatchObserved, toggleExpeditionAuto, expeditionAutoRemainingSec: Math.max(0, DAILY_EXPEDITION_AUTO_LIMIT_SEC - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoSecToday ?? 0) : 0)), expeditionAutoLimitSec: DAILY_EXPEDITION_AUTO_LIMIT_SEC, expeditionAutoRemainingRuns: Math.max(0, DAILY_EXPEDITION_AUTO_RUNS_LIMIT - (s.expeditionAutoDay === getTodayKey() ? (s.expeditionAutoRunsToday ?? 0) : 0)), expeditionAutoLimitRuns: DAILY_EXPEDITION_AUTO_RUNS_LIMIT, petAutoHuntUsed: s.petAutoHuntDay === getTodayKey() ? (s.petAutoHuntCount ?? 0) : 0, petAutoHuntLimit: PET_DAILY_AUTO_HUNT_LIMIT, rallyExpedition, recallExpedition, pocketMode, togglePocket: () => setPocketMode(p => !p), outdoorMoving: enabled && Date.now() < movingUntil, craftInvention, upgradeGear, reforgeGear, equip, dropGear, storeGear, retrieveGear, loadout, updateInventionCredits, awakenShrine, shrineRite, shrineBless, upgradeSkill, buildAltar, invent, setSanctuaries, inSanctuary, useSkill, skillEffect, construct, tame, recruit, collectWork, withdraw, storeOne, storePacked, adjustStorage, setPlayerLevel, addStorageItems, addGearItems, grantPresetPackage, clearStorage,
     modularSkills: s.modularSkills ?? defaultModularSkillsState(),
     fuseModularSkill,
     useModularSkill,

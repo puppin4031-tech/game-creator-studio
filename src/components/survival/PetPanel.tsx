@@ -3,7 +3,7 @@ import { Egg, Drumstick, Lock, LockOpen, Merge, Shield, Swords } from 'lucide-re
 import { ContextualHelpButton } from './ContextualHelpButton';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { fusionPartner, PET_DAILY_LOOT_CAP, PET_GUARD_SLOTS, PET_MAX_LEVEL, petDay, petStats, petRole, PET_ROLE_LABEL, PET_HUNT_MS, PET_DEFENSE, PET_FOLLOW_ATK, type PetRole, type OwnedPet, type PetDefense } from '@/lib/survival/pets';
+import { fusionPartner, PET_DAILY_LOOT_CAP, PET_DAILY_AUTO_HUNT_LIMIT, PET_GUARD_SLOTS, PET_MAX_LEVEL, petDay, petStats, petRole, PET_ROLE_LABEL, PET_HUNT_MS, PET_DEFENSE, PET_FOLLOW_ATK, type PetRole, type OwnedPet, type PetDefense } from '@/lib/survival/pets';
 import { petById } from '@/lib/survival/dinoEggs';
 import PetSprite from './PetSprite';
 import { HpBar } from './HitFeedback';
@@ -12,26 +12,28 @@ import { fusionSpecies } from '@/lib/survival/pets';
 import { abilitiesFor, abilityText } from '@/lib/survival/petAbilities';
 import PetFusionModal, { type PetFusionResult } from './PetFusionModal';
 
-export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, onLock, onRole, onFeed, onOpenDinoExpedition, eggs = [], onHatch }: {
+export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, onLock, onRole, onFeed, onOpenDinoExpedition, eggs = [], onHatch, autoHuntUsed = 0, autoHuntLimit = PET_DAILY_AUTO_HUNT_LIMIT }: {
   onFeed?: (uid: string) => void;
   onOpenDinoExpedition?: () => void;
   eggs?: { id: string; name: string; walked: number; need: number; ready: boolean }[]; onHatch?: (id: string) => void;
   pets: OwnedPet[]; defense?: PetDefense; ready: boolean; now: number;
+  autoHuntUsed?: number; autoHuntLimit?: number;
   onFuse: (first: string, second: string) => OwnedPet | boolean | null; onDeploy: (uid: string) => void; onLock: (uid: string) => void; onRole?: (uid: string, role: PetRole) => void;
 }) {
   const [pair, setPair] = useState<[string, string] | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [fusionResult, setFusionResult] = useState<PetFusionResult | null>(null);
-  const effect: Record<PetRole, string> = { guard: '거점에 다가오는 맹수 자동 퇴치 · 전리품 창고로', hunt: `${PET_HUNT_MS / 60000}분마다 사냥 후 전리품 귀환`, follow: `함께 걸으며 공격 +${PET_FOLLOW_ATK}`, idle: '거점에서 휴식' };
+  const autoHuntExhausted = autoHuntUsed >= autoHuntLimit;
+  const effect: Record<PetRole, string> = { guard: '거점에 다가오는 맹수 자동 퇴치 · 전리품 창고로', hunt: `${PET_HUNT_MS / 60000}분 후 전리품 귀환 (오늘 자동사냥 ${autoHuntUsed}/${autoHuntLimit}회 · 완료 시 자동 휴식)`, follow: `함께 걸으며 공격 +${PET_FOLLOW_ATK}`, idle: '거점에서 휴식' };
   const first = pets.find(p => p.uid === pair?.[0]), second = pets.find(p => p.uid === pair?.[1]);
   const name = (p: OwnedPet) => petById(p.speciesId)?.name ?? p.name;
   return <section className="space-y-3" aria-label="거점 펫">
     {onOpenDinoExpedition && (
       <div className="pixel-frame flex flex-wrap items-center justify-between gap-2 bg-primary/15 p-2.5 text-xs">
         <div className="space-y-0.5">
-          <b className="block text-sm text-primary">🦖 공룡 탐험대 (횡스크롤 야생 사냥)</b>
+          <b className="block text-sm text-primary">🦖 공룡 탐험대 (직접 플레이 · 횟수 무제한)</b>
           <span className="text-[11px] text-muted-foreground">
-            보유 공룡 최대 3마리를 직접 지휘해 숲속 자원·공룡 알·전리품을 획득하세요!
+            보유 공룡 최대 3마리를 직접 지휘해 숲속 자원·공룡 알·전리품을 횟수 제한 없이 획득하세요!
           </span>
         </div>
         <Button
@@ -47,8 +49,11 @@ export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, 
     )}
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2 text-xs">
       <b className="flex items-center gap-1 text-sm"><Shield className="!h-4 !w-4" />수호 {pets.filter(p => p.deployed).length}/{PET_GUARD_SLOTS}</b>
-      <div className="flex items-center gap-2">
-        <span>오늘 전리품 {defense?.day === petDay(now) ? defense.claims : 0}/{PET_DAILY_LOOT_CAP}</span>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className={autoHuntExhausted ? 'font-bold text-destructive' : 'font-semibold text-primary'}>
+          자동 사냥 {autoHuntUsed}/{autoHuntLimit}회
+        </span>
+        <span>· 수호 전리품 {defense?.day === petDay(now) ? defense.claims : 0}/{PET_DAILY_LOOT_CAP}</span>
         <ContextualHelpButton
           title="공룡 펫 & 알 부화"
           bullets={[
@@ -94,7 +99,7 @@ export default function PetPanel({ pets, defense, ready, now, onFuse, onDeploy, 
         </div>}
         <div className="grid grid-cols-2 gap-2">
           <div className="col-span-2 grid grid-cols-4 gap-1" role="radiogroup" aria-label={`${name(p)} 역할`}>
-            {(['guard', 'hunt', 'follow', 'idle'] as PetRole[]).map(r => <Button key={r} role="radio" aria-checked={petRole(p) === r} variant={petRole(p) === r ? 'default' : 'outline'} className="min-h-11 px-1 text-[11px]" disabled={!ready} onClick={() => onRole ? onRole(p.uid, r) : r === 'guard' || petRole(p) === 'guard' ? onDeploy(p.uid) : undefined}>{PET_ROLE_LABEL[r]}</Button>)}
+            {(['guard', 'hunt', 'follow', 'idle'] as PetRole[]).map(r => <Button key={r} role="radio" aria-checked={petRole(p) === r} variant={petRole(p) === r ? 'default' : 'outline'} className="min-h-11 px-1 text-[11px]" disabled={!ready || (r === 'hunt' && autoHuntExhausted && petRole(p) !== 'hunt')} onClick={() => onRole ? onRole(p.uid, r) : r === 'guard' || petRole(p) === 'guard' ? onDeploy(p.uid) : undefined}>{r === 'hunt' && autoHuntExhausted ? '자동사냥 완료' : PET_ROLE_LABEL[r]}</Button>)}
           </div>
           <Button className="col-span-2 min-h-11 text-xs" disabled={!ready || !partner} onClick={() => { if (partner) setPair([p.uid, partner.uid]); }}><Merge className="!h-4 !w-4" />{p.level >= PET_MAX_LEVEL ? '최고 레벨' : `Lv.${p.level + 1} 합체`}</Button>
           {p.locked && <p className="col-span-2 text-xs text-muted-foreground">합체 잠금 중 · 자물쇠를 눌러 해제</p>}

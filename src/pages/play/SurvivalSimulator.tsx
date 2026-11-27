@@ -483,6 +483,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
     expeditionLevel={g.expeditionLevelInfo.level}
     autoRemainingSec={g.expeditionAutoRemainingSec}
     autoLimitSec={g.expeditionAutoLimitSec}
+    autoRemainingRuns={g.expeditionAutoRemainingRuns}
+    autoLimitRuns={g.expeditionAutoLimitRuns}
     onSend={() => { if (g.dispatchObserved(expeditionDestination, expeditionFocus, activeTribeClassId)) { setWatchExpedition(true); setPanel('none'); setView('expedition'); } }}
     onAuto={() => { g.toggleExpeditionAuto(expeditionDestination, expeditionFocus); setWatchExpedition(true); }} onPocket={g.togglePocket} onMorale={g.rallyExpedition} onReturn={g.recallExpedition} onWatch={() => setView(v => v === 'expedition' ? 'user' : 'expedition')}
     tribe={s.tribe ? { count: s.tribe.count, trainLevel: s.tribe.trainLevel ?? 0, ratio: tribeRatio(s.tribe), maxHp: Math.max(1, Math.round(g.maxHp * tribeRatio(s.tribe) * s.tribe.count)), injured: tribeInjured(s.tribe, Date.now()), starving: !!s.tribe.starving, classId: s.tribe.classId, classCounts: s.tribe.classCounts, mercenaryName: s.mercenary?.name } : undefined} />;
@@ -1132,11 +1134,13 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
   const lastBeastStrike = useRef(0);
   useEffect(() => {
     const id = window.setInterval(() => {
+      if (document.hidden) return;
       const w = gRef.current; const p = w.state; const t = Date.now();
       if (realGps && !gpsReadyRef.current) return;
       const curPosMap = mobPositionsRef.current;
       const nextPosMap: Record<string, LatLng> = {};
       const hostile: Extract<WorldEntity, { kind: 'creature' }>[] = [];
+      let posChanged = false;
 
       for (const e of w.entities) {
         if (e.kind !== 'creature' || p.depleted[e.id]) continue;
@@ -1154,19 +1158,26 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
           if (dist > 1.5) {
             const stepM = engaged ? Math.min(dist - 1.4, 3.6) : Math.min(dist - 1.5, 2.0);
             const ratio = stepM / Math.max(1, dist);
-            nextPosMap[e.id] = {
-              lat: curPos.lat + (p.pos.lat - curPos.lat) * ratio,
-              lng: curPos.lng + (p.pos.lng - curPos.lng) * ratio,
-            };
+            const nextLat = curPos.lat + (p.pos.lat - curPos.lat) * ratio;
+            const nextLng = curPos.lng + (p.pos.lng - curPos.lng) * ratio;
+            nextPosMap[e.id] = { lat: nextLat, lng: nextLng };
+            if (!curPosMap[e.id] || Math.abs(curPosMap[e.id].lat - nextLat) > 1e-8 || Math.abs(curPosMap[e.id].lng - nextLng) > 1e-8) {
+              posChanged = true;
+            }
           } else {
             nextPosMap[e.id] = curPos;
           }
         } else {
           // Keep mobs firmly anchored at their original spawn coordinates on the map so they don't drift or wander
           nextPosMap[e.id] = { lat: e.lat, lng: e.lng };
+          if (curPosMap[e.id] && (Math.abs(curPosMap[e.id].lat - e.lat) > 1e-8 || Math.abs(curPosMap[e.id].lng - e.lng) > 1e-8)) {
+            posChanged = true;
+          }
         }
       }
-      setMobPositions(nextPosMap);
+      if (posChanged) {
+        setMobPositions(nextPosMap);
+      }
 
       setAggroIds(prev => { const n = new Set(hostile.map(e => e.id)); return n.size === prev.size && [...n].every(x => prev.has(x)) ? prev : n; });
       const near = hostile
@@ -2702,6 +2713,8 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   </div>
                   </>}
                   {baseTab === 'pets' && <PetPanel pets={s.pets ?? []} defense={s.petDefense} now={nowTick} ready={atWorkshop(s) && (!realGps || gps.ready || gps.isIndoor || !gps.fix)} onFuse={g.mergePets} onDeploy={g.togglePetDeploy} onRole={g.assignPetRole} onFeed={g.feedPet} onLock={g.togglePetLock}
+                    autoHuntUsed={g.petAutoHuntUsed}
+                    autoHuntLimit={g.petAutoHuntLimit}
                     onOpenDinoExpedition={() => setDinoExpeditionOpen(true)}
                     eggs={(s.dinoEggs ?? []).map(e => ({
                       id: e.id,

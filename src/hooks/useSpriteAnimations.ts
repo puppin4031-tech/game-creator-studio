@@ -118,42 +118,58 @@ function setLocalCachedAnimations(characterKey: string, data: SpriteAnimationsDa
   } catch {}
 }
 
+const INFLIGHT_SPRITE_FETCH = new Map<string, Promise<SpriteAnimationsData>>();
+let guestSessionPromise: Promise<unknown> | null = null;
+
 async function fetchSpriteAnimationsForKey(characterKey: string): Promise<SpriteAnimationsData> {
-  let cachedScale = 1.0;
-  try {
-    const raw = localStorage.getItem(`survival_scale_${characterKey}`);
-    if (raw) cachedScale = parseFloat(raw) || 1.0;
-  } catch {}
+  const inflight = INFLIGHT_SPRITE_FETCH.get(characterKey);
+  if (inflight) return inflight;
 
-  try {
-    // Ensure auth session (user or anonymous guest) exists so private storage bucket can issue signed URLs
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session) {
-      try {
-        await enterGuestSession();
-      } catch {}
-    }
-
-    const { data, error } = await supabase
-      .from('survival_sprite_animations')
-      .select('*')
-      .eq('character_key', characterKey);
-
-    if (error || !data?.length) {
-      return getLocalCachedAnimations(characterKey) ?? { _scale: cachedScale, scale: cachedScale };
-    }
-
-    // Check scale configuration row
-    const scaleRow = data.find(d => d.action === 'scale');
-    const scale = scaleRow?.fps ? scaleRow.fps / 100 : cachedScale;
+  const task = (async (): Promise<SpriteAnimationsData> => {
+    let cachedScale = 1.0;
     try {
-      localStorage.setItem(`survival_scale_${characterKey}`, String(scale));
+      const raw = localStorage.getItem(`survival_scale_${characterKey}`);
+      if (raw) cachedScale = parseFloat(raw) || 1.0;
     } catch {}
 
-    const animRows = data.filter(d => d.action !== 'scale');
-    if (!animRows.length) {
-      return { _scale: scale, scale };
-    }
+    try {
+      // Ensure auth session (user or anonymous guest) exists once across concurrent fetches
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        try {
+          if (!guestSessionPromise) {
+            guestSessionPromise = enterGuestSession().finally(() => {
+              guestSessionPromise = null;
+            });
+          }
+          await guestSessionPromise;
+        } catch {}
+      }
+
+      const { data, error } = await supabase
+        .from('survival_sprite_animations')
+        .select('*')
+        .eq('character_key', characterKey);
+
+      if (error || !data?.length) {
+        const fallback = getLocalCachedAnimations(characterKey) ?? { _scale: cachedScale, scale: cachedScale };
+        MEMORY_CACHE.set(characterKey, fallback);
+        return fallback;
+      }
+
+      // Check scale configuration row
+      const scaleRow = data.find(d => d.action === 'scale');
+      const scale = scaleRow?.fps ? scaleRow.fps / 100 : cachedScale;
+      try {
+        localStorage.setItem(`survival_scale_${characterKey}`, String(scale));
+      } catch {}
+
+      const animRows = data.filter(d => d.action !== 'scale');
+      if (!animRows.length) {
+        const emptyResult = { _scale: scale, scale };
+        MEMORY_CACHE.set(characterKey, emptyResult);
+        return emptyResult;
+      }
 
     // Generate 24-hour signed URLs from private survival-sprites bucket
     const signedMap = new Map<string, string>();
@@ -244,11 +260,20 @@ async function fetchSpriteAnimationsForKey(characterKey: string): Promise<Sprite
       })
     );
 
-    return out;
-  } catch (err) {
-    console.warn(`[useSpriteAnimations] failed to load for ${characterKey}:`, err);
-    return getLocalCachedAnimations(characterKey) ?? { _scale: cachedScale, scale: cachedScale };
-  }
+      MEMORY_CACHE.set(characterKey, out);
+      return out;
+    } catch (err) {
+      console.warn(`[useSpriteAnimations] failed to load for ${characterKey}:`, err);
+      const fallback = getLocalCachedAnimations(characterKey) ?? { _scale: cachedScale, scale: cachedScale };
+      MEMORY_CACHE.set(characterKey, fallback);
+      return fallback;
+    }
+  })().finally(() => {
+    INFLIGHT_SPRITE_FETCH.delete(characterKey);
+  });
+
+  INFLIGHT_SPRITE_FETCH.set(characterKey, task);
+  return task;
 }
 
 /** Clear in-memory and local cache for immediate UI refresh */
@@ -280,7 +305,7 @@ export function updateLocalAnimationCache(
 export function useSpriteAnimations(characterKey = 'hunter') {
   return useQuery({
     queryKey: ['sprite-animations', characterKey],
-    staleTime: 60 * 1000, // 1 minute freshness so admin panel updates reflect quickly
+    staleTime: 10 * 60 * 1000, // 10 min freshness; admin saves explicitly invalidate this query key immediately
     refetchOnWindowFocus: false,
     initialData: () => getLocalCachedAnimations(characterKey),
     queryFn: () => fetchSpriteAnimationsForKey(characterKey),

@@ -108,6 +108,8 @@ interface Props {
   expeditionLevel?: number;
   autoRemainingSec?: number;
   autoLimitSec?: number;
+  autoRemainingRuns?: number;
+  autoLimitRuns?: number;
   ambachoDailyDone?: boolean;
 }
 export interface TribeInfo {
@@ -458,13 +460,15 @@ export default function ExpeditionSystem(p: Props) {
         })}
       </div>
 
-      {/* 자동원정 잔여시간 한 줄 요약 */}
+      {/* 자동원정 잔여 횟수 한 줄 요약 (수동 파견은 무제한) */}
       <div className="flex items-center justify-between px-1 text-[11px]">
-        <span className="text-muted-foreground">⏱️ 오늘 자동원정</span>
-        <span className={`font-mono font-bold ${(p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0) ? 'text-destructive' : 'text-primary'}`}>
-          {p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0
-            ? '한도 소진 (00:00 초기화)'
-            : `${fmtDuration(p.autoRemainingSec ?? 21600)} / 6시간`}
+        <span className="text-muted-foreground">⏱️ 오늘 자동 사냥 (수동 파견은 무제한)</span>
+        <span className={`font-mono font-bold ${(p.autoRemainingRuns !== undefined ? p.autoRemainingRuns <= 0 : (p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0)) ? 'text-destructive' : 'text-primary'}`}>
+          {p.autoRemainingRuns !== undefined
+            ? (p.autoRemainingRuns <= 0 ? `0/${p.autoLimitRuns ?? 2}회 (00:00 초기화)` : `남은 ${p.autoRemainingRuns}/${p.autoLimitRuns ?? 2}회`)
+            : (p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0
+              ? '한도 소진 (00:00 초기화)'
+              : `${fmtDuration(p.autoRemainingSec ?? 21600)} / 6시간`)}
         </span>
       </div>
 
@@ -478,18 +482,16 @@ export default function ExpeditionSystem(p: Props) {
           size="sm"
           variant={p.auto ? 'default' : 'outline'}
           className={`${compactBtn} whitespace-normal`}
-          disabled={(!p.canSend && !p.auto) || ((p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0) && !p.auto)}
+          disabled={(!p.canSend && !p.auto) || (((p.autoRemainingRuns !== undefined ? p.autoRemainingRuns <= 0 : (p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0))) && !p.auto)}
           aria-pressed={p.auto}
           onClick={p.onAuto}
         >
           {p.auto ? <Pause className="!h-3.5 !w-3.5" /> : <Play className="!h-3.5 !w-3.5" />}
           {p.auto
             ? '자동사냥 끄기'
-            : p.ambachoDailyDone
-              ? '자동사냥 (완료)'
-              : (p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0)
-                ? '자동사냥 (소진)'
-                : '자동사냥 켜기'}
+            : (p.autoRemainingRuns !== undefined ? p.autoRemainingRuns <= 0 : (p.autoRemainingSec !== undefined && p.autoRemainingSec <= 0))
+              ? '자동사냥 (2/2 완료)'
+              : `자동사냥 (${p.autoRemainingRuns ?? 2}회 남음)`}
         </Button>
         <Button size="sm" variant="outline" className={`${compactBtn} whitespace-normal`} disabled={!p.crew || Date.now() < (p.crew?.moraleReadyAt ?? 0)} onClick={p.onMorale}>
           <Zap className="!h-3.5 !w-3.5 shrink-0" />사기 진작

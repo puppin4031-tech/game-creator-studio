@@ -39,17 +39,24 @@ export function SkillQuickBar({
   const [now, setNow] = useState(Date.now());
   const [open, setOpen] = useState(true);
 
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 200);
-    return () => clearInterval(t);
-  }, []);
-
   // Determine active skills to display: preference to modular skills equipped
   const equippedModularIds = modularSkills?.equippedSkillIds?.filter(id => !!modularSkills.unlockedSkills[id]) ?? [];
   const hasModularSkills = equippedModularIds.length > 0;
 
   // Legacy fallback
   const legacyIds = (Object.keys(ACTIVE_SKILLS) as ActiveSkill[]).filter(id => known.includes(id));
+  const watchedIds = hasModularSkills ? equippedModularIds : legacyIds;
+  const hasActiveCooldown = open && watchedIds.some(id => (cooldowns?.[id] ?? 0) > Date.now());
+
+  useEffect(() => {
+    if (!hasActiveCooldown) return;
+    setNow(Date.now());
+    const t = setInterval(() => {
+      if (!document.hidden) setNow(Date.now());
+    }, 250);
+    return () => clearInterval(t);
+  }, [hasActiveCooldown, cooldowns]);
+
   if (!hasModularSkills && !legacyIds.length) return null;
 
   return (

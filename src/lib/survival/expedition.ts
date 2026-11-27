@@ -13,7 +13,9 @@ export const BASE_RELIC_CHANCE = 0.01;
 export const EXPEDITION_RADIUS_M = 10;
 export const MAX_EXPEDITION_DISTANCE_M = 1500;
 
-/** Daily maximum auto-expedition active time: 6 hours (21,600 seconds). Resets at 00:00 midnight. */
+/** Daily maximum auto-expedition round-trips: 2 runs per day (manual player expeditions are unlimited). */
+export const DAILY_EXPEDITION_AUTO_RUNS_LIMIT = 2;
+/** Legacy time cap constant kept for compatibility. */
 export const DAILY_EXPEDITION_AUTO_LIMIT_SEC = 6 * 3600;
 
 /** Tribe members earn 30% of standard XP when gathering or hunting on expeditions. */
@@ -157,6 +159,7 @@ export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEnt
   let completed: WorldEntity | undefined;
   let text = '';
   let finished = false;
+  let autoCycleCompleted = false;
   // No invented offline catches: suspended tabs resume from the last visual position.
   const elapsed = Math.max(0, Math.min(1000, now - previous.lastAt));
   if (crew.target && !nearby.some(e => e.id === crew.target?.id)) crew = { ...crew, target: undefined, damage: 0 };
@@ -258,19 +261,18 @@ export function advanceExpedition(previous: ObservedExpedition, nearby: WorldEnt
       if (crew.phase === 'outbound') {
         crew.phase = 'returning';
         text = '목표 타일 도착 · 거점으로 귀환합니다';
-      } else if (repeat && crew.mercenary !== '암바초' && !crew.mercenary?.includes('암바초')) {
+      } else if (repeat) {
+        autoCycleCompleted = true;
         const next = offsetM(crew.home, Math.cos(crew.cycle * 2.4) * 180, Math.sin(crew.cycle * 2.4) * 180);
         crew = { ...crew, hp: crew.maxHp ?? 100, phase: 'outbound', cycle: crew.cycle + 1, destination: next, waypoints: patrolWaypoints(crew.home, next, crew.cycle + 1) };
-        text = '거점 회복 완료 · 다음 자동사냥 출발';
+        text = '거점 회복 완료 · 다음 자동사냥(2회차) 출발';
       } else {
         finished = true;
-        text = (crew.mercenary === '암바초' || crew.mercenary?.includes('암바초'))
-          ? '🎒 암바초가 오늘의 1회 원정을 마치고 거점에 안전하게 복귀했습니다 (내일 다시 출발 가능)'
-          : '원정대가 거점에 귀환했습니다';
+        text = '원정대가 거점에 무사히 귀환했습니다';
       }
     }
   }
-  return { crew, rewards, completed, text, finished };
+  return { crew, rewards, completed, text, finished, autoCycleCompleted };
 }
 export const MANUAL_STEP_M = 2;
 export const MANUAL_PICK_M = 60;
