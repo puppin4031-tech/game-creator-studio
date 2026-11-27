@@ -1737,7 +1737,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                     })()}
                     transition={combatHit || isHeadbutting ? { duration: 0.68, times: [0, 0.22, 0.58, 1], ease: 'easeInOut' } : aggroIds.has(e.id) && !reducedMotion ? { repeat: Infinity, duration: 1.05 } : dmg ? { duration: 0.35 } : { repeat: reducedMotion ? 0 : Infinity, duration: 1.4 }}>
                     <HitReactionWrapper hit={!!(combatHit || isHeadbutting || (dmg && dmg > 0))}>
-                      <div className={boss ? 'scale-150 rounded-full ring-2 ring-destructive shadow-[0_0_18px_hsl(var(--destructive))]' : ''} style={{ transform: faceLeft ? 'scaleX(-1)' : undefined }}>
+                      <div className={boss ? 'scale-150 rounded-full ring-2 ring-destructive shadow-[0_0_18px_hsl(var(--destructive))]' : ''} style={{ transform: faceLeft ? 'scaleX(-1)' : 'translateY(3px)' }}>
                         {e.kind === 'creature'
                           ? <CreatureSprite key={e.type} type={e.type} fallbackUrl={url(sprite)} width={SPRITE_META[sprite].w} height={SPRITE_META[sprite].h}
                               attacking={!!combatHit?.counterDamage || !!petHit?.counterDamage || isHeadbutting} />
@@ -1755,7 +1755,7 @@ export default function SurvivalSimulator({ realGps = false }: { realGps?: boole
                   {creature ? <div className="mt-1 w-20 rounded bg-background/90 px-1 text-center text-[10px]" aria-label={`${name} 체력 ${remainingHp}/${creature.hp}, 공격력 ${creature.atk}`}>
                     <div className="flex items-center gap-1"><HpBar value={remainingHp} max={creature.hp} /></div>
                     <span>{remainingHp}/{creature.hp} · 공격 {creature.atk}</span>
-                  </div> : auto.job?.id === e.id ? <span className="rounded bg-background/80 px-1 text-[10px]">{auto.job.label}</span> : null}
+                  </div> : auto.job?.id === e.id ? <span className="pointer-events-none absolute top-full mt-0.5 whitespace-nowrap rounded bg-background/85 px-1 text-[10px] shadow">{auto.job.label}</span> : null}
                 </button>
               );
             })}

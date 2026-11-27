@@ -228,9 +228,7 @@ export default function SpriteAnimator({
       data-sprite-animator="clipped"
       data-frame-count={effectiveFrames}
       data-current-frame={f}
-      className={`${smooth ? '' : 'pixelated'} inline-block shrink-0 select-none overflow-hidden ${
-        effectiveFrames === 1 ? 'animate-pulse-subtle' : ''
-      } ${className}`}
+      className={`${smooth ? '' : 'pixelated'} inline-block shrink-0 select-none overflow-hidden ${className}`}
       style={{
         width: singleFrameWidth,
         height,

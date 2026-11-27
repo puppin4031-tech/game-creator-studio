@@ -364,6 +364,18 @@ function DefaultPropArt({
   );
 }
 
+// Contact shadow & grounding sink ratios so trees, palms, bushes, grass, and rocks sit firmly planted on the terrain
+const PROP_GROUNDING: Record<
+  MapDecorativeProp['type'],
+  { shadowW: number; shadowH: number; sinkPx: number }
+> = {
+  jungle_tree: { shadowW: 0.56, shadowH: 9, sinkPx: 4 },
+  palm_tree: { shadowW: 0.48, shadowH: 8, sinkPx: 4 },
+  bush: { shadowW: 0.78, shadowH: 7, sinkPx: 3 },
+  grass_tuft: { shadowW: 0.72, shadowH: 5, sinkPx: 2 },
+  mossy_rock: { shadowW: 0.84, shadowH: 8, sinkPx: 3 },
+};
+
 function PropVisual({
   type,
   animData,
@@ -379,22 +391,49 @@ function PropVisual({
   const targetH = Math.max(18, Math.round(baseDim.h * userScale * finalScale));
   const targetW = Math.max(20, Math.round((baseDim.w * userScale * finalScale) / 2) * 2);
 
+  const grounding = PROP_GROUNDING[type];
+  const shadowWidth = Math.max(14, Math.round(targetW * grounding.shadowW));
+  const shadowHeight = Math.max(4, Math.round(grounding.shadowH * Math.min(1.25, finalScale)));
+  const sinkOffset = Math.round(grounding.sinkPx * Math.min(1.2, finalScale));
+
   const fallback = <DefaultPropArt type={type} width={targetW} height={targetH} />;
   const anim = animData?.idle;
-  if (anim?.url && !anim.url.startsWith('local://')) {
-    const frames = Math.max(1, anim.frame_count || 1);
-    return (
+  const spriteNode =
+    anim?.url && !anim.url.startsWith('local://') ? (
       <SpriteAnimator
         url={anim.url}
-        frames={frames}
+        frames={Math.max(1, anim.frame_count || 1)}
         fps={anim.fps}
         height={targetH}
         smooth
         fallback={fallback}
       />
+    ) : (
+      fallback
     );
-  }
-  return fallback;
+
+  return (
+    <div className="relative flex flex-col items-center justify-end">
+      {/* Ground contact shadow anchored directly at the terrain coordinate */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/3 rounded-full bg-black/40 blur-[2px]"
+        style={{
+          width: `${shadowWidth}px`,
+          height: `${shadowHeight}px`,
+        }}
+      />
+      {/* Sink the trunk/base slightly into the contact shadow so it looks rooted in the soil */}
+      <div
+        className="relative z-10 flex items-end justify-center"
+        style={{
+          transform: `translateY(${sinkOffset}px)`,
+        }}
+      >
+        {spriteNode}
+      </div>
+    </div>
+  );
 }
 
 export function MapFoliageOverlay({
@@ -446,8 +485,6 @@ export function MapFoliageOverlay({
         }
 
         const finalScale = prop.scale * zoomScale;
-        const snappedX = Math.round(pt.x);
-        const snappedY = Math.round(pt.y);
         const zIndex = computeEntityZIndex(prop.pos.lat, center.lat);
         const isTree = prop.type === 'jungle_tree' || prop.type === 'palm_tree';
         const isOccluded = isTree && isOccludedByCanopy(playerPos, prop.pos);
@@ -457,8 +494,8 @@ export function MapFoliageOverlay({
             key={prop.id}
             className="absolute pointer-events-none select-none transition-opacity duration-300"
             style={{
-              left: `${snappedX}px`,
-              top: `${snappedY}px`,
+              left: `${pt.x}px`,
+              top: `${pt.y}px`,
               transform: prop.flip ? 'translate(-50%, -100%) scaleX(-1)' : 'translate(-50%, -100%)',
               transformOrigin: 'center bottom',
               zIndex,
